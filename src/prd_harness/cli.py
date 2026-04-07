@@ -203,7 +203,24 @@ def cmd_validate(args: argparse.Namespace) -> int:
                 break
             cur = nxt
 
-    # 5. Impact overlap warnings (ready PRDs only)
+    # 5. Container PRDs must have empty impacts.
+    # The leaf-only rule (see impacts.py) gives us a single source of
+    # truth: containers' effective impacts are computed from their
+    # descendants, so declared impacts on a container would be a
+    # divergent second source that could silently drift.
+    for prd in prds.values():
+        kids = containment.children(prd.id, prds)
+        if kids and prd.impacts:
+            errors.append(
+                f"{prd.id}: container PRD (has {len(kids)} children) "
+                f"must have impacts: [] — declared impacts on containers "
+                f"create divergence with the computed descendant union "
+                f"(got {prd.impacts!r})"
+            )
+
+    # 6. Impact overlap warnings (ready PRDs only).
+    # Uses effective_impacts (aggregated for containers) and exempts
+    # parent/child pairs (containment is not conflict).
     try:
         repo_root = _find_repo_root(args.prd_dir)
         files = impacts.tracked_files(repo_root)
@@ -211,24 +228,37 @@ def cmd_validate(args: argparse.Namespace) -> int:
         files = []
 
     if files:
-        ready = [p for p in prds.values() if p.status == "ready" and p.impacts]
+        ready = [p for p in prds.values() if p.status == "ready"]
         for i, a in enumerate(ready):
             for b in ready[i + 1 :]:
                 # Skip if there's an explicit dep relation in either direction.
                 if b.id in a.depends_on or a.id in b.depends_on:
                     continue
-                overlap = impacts.impacts_overlap(a, b, files)
+                try:
+                    overlap = impacts.impacts_overlap(a, b, files, prds)
+                except ValueError:
+                    # effective_impacts refused — already reported by the
+                    # container-has-impacts check above. Skip silently
+                    # here so we don't double-report.
+                    continue
                 if overlap:
                     warnings.append(
                         f"{a.id} and {b.id} have overlapping impacts "
                         f"({len(overlap)} files) but no explicit dependency"
                     )
 
-    # 6. Undeclared impacts (informational)
-    undeclared = [p.id for p in prds.values() if p.status == "ready" and not p.impacts]
+    # 7. Undeclared impacts on leaves (informational)
+    undeclared = [
+        p.id
+        for p in prds.values()
+        if p.status == "ready"
+        and not p.impacts
+        and not containment.children(p.id, prds)  # leaves only
+    ]
     if undeclared and args.verbose:
         warnings.append(
-            f"{len(undeclared)} ready PRDs have no declared impacts (undeclared = sequential)"
+            f"{len(undeclared)} ready leaf PRDs have no declared impacts "
+            "(undeclared = sequential)"
         )
 
     for err in errors:
@@ -320,23 +350,42 @@ def cmd_conflicts(args: argparse.Namespace) -> int:
     repo_root = _find_repo_root(args.prd_dir)
     conflicts = impacts.find_conflicts(prd, prds, repo_root)
 
+    # Use effective_impacts so containers show their aggregated view
+    # (union of descendants) rather than an empty declared list.
+    try:
+        effective = impacts.effective_impacts(prd, prds)
+    except ValueError as exc:
+        raise SystemExit(str(exc))
+
     if args.json:
         print(
             json.dumps(
-                [
-                    {"id": other_id, "files": sorted(files)}
-                    for other_id, files in conflicts
-                ],
+                {
+                    "id": prd.id,
+                    "effective_impacts": effective,
+                    "conflicts": [
+                        {"id": other_id, "files": sorted(files)}
+                        for other_id, files in conflicts
+                    ],
+                },
                 indent=2,
             )
         )
         return 0
 
-    if not prd.impacts:
-        print(f"{prd.id} has no declared impacts; cannot compute overlaps")
+    if not effective:
+        kids = containment.children(prd.id, prds)
+        if kids:
+            print(
+                f"{prd.id} is a container with {len(kids)} children that "
+                "have no declared impacts yet"
+            )
+        else:
+            print(f"{prd.id} has no declared impacts; cannot compute overlaps")
         return 0
     if not conflicts:
         print(f"{prd.id} has no impact conflicts with other PRDs")
+        print(f"  (effective impact set: {len(effective)} pattern(s))")
         return 0
 
     print(f"{prd.id} conflicts:")
