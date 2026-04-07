@@ -12,15 +12,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
 from . import assign, containment, graph, impacts
+from .invoke import capability_to_model
 from .loader import load_workflows
 from .prd import PRD, load_all, parse_id_sort_key, set_workflow
-from .workflow import Workflow
+from .runner import RunResult, _compute_branch_name, _pick_model, run_workflow
+from .workflow import AgentTask, BuiltIn, ShellTask, Task, Workflow
 
 # Priority/effort orderings used for sorting actionable lists.
 PRIORITY_ORDER: dict[str, int] = {"critical": 0, "high": 1, "medium": 2, "low": 3}
@@ -432,6 +435,234 @@ def cmd_assign(args: argparse.Namespace) -> int:
     return 0
 
 
+def _describe_task(task: Task, ctx_prd: PRD, model_override: str | None) -> str:
+    """Produce a one-line human-readable description of a task for `prd plan`."""
+    if isinstance(task, BuiltIn):
+        kwargs_str = (
+            " " + ", ".join(f"{k}={v!r}" for k, v in task.kwargs.items())
+            if task.kwargs
+            else ""
+        )
+        return f"builtin: {task.name}{kwargs_str}"
+    if isinstance(task, AgentTask):
+        model = _pick_model(task, ctx_prd, override=model_override)
+        prompts = ", ".join(task.prompts) or "(none)"
+        tools_count = len(task.tools)
+        return (
+            f"agent: {task.name} [model={model}, prompts={prompts}, "
+            f"tools={tools_count}, retries={task.retries}]"
+        )
+    if isinstance(task, ShellTask):
+        return f"shell: {task.name} ({task.on_failure}) -> {task.cmd}"
+    return f"unknown task type: {type(task).__name__}"
+
+
+def _resolve_base_ref(explicit: str | None, repo_root: Path) -> str:
+    """Determine the git base ref for a new workflow branch.
+
+    Explicit override (``--base``) wins. Otherwise defaults to the
+    current HEAD of the repo — the idea being that a ``run-chain``
+    starts from whatever branch the user is sitting on.
+    """
+    if explicit:
+        return explicit
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--abbrev-ref", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip() or "main"
+    except subprocess.CalledProcessError:
+        return "main"
+
+
+def _check_runnable(prd: PRD, prds: dict[str, PRD]) -> str | None:
+    """Return an error string if the PRD can't be run, else None."""
+    if prd.status == "done":
+        return f"{prd.id} is already done"
+    if prd.status == "cancelled":
+        return f"{prd.id} is cancelled"
+    if not graph.is_actionable(prd, prds):
+        missing = graph.missing_deps(prd, prds)
+        if missing:
+            return (
+                f"{prd.id} depends on missing PRDs: {', '.join(missing)}"
+            )
+        unfinished = [
+            dep_id
+            for dep_id in prd.depends_on
+            if dep_id in prds and prds[dep_id].status != "done"
+        ]
+        if unfinished:
+            return (
+                f"{prd.id} has unfinished dependencies: "
+                + ", ".join(f"{d} ({prds[d].status})" for d in unfinished)
+            )
+        return f"{prd.id} status is {prd.status!r}, not 'ready'"
+    if not containment.is_runnable(prd, prds):
+        return (
+            f"{prd.id} is an epic/feature with children; "
+            "use the planning workflow or run its task descendants instead"
+        )
+    return None
+
+
+def cmd_plan(args: argparse.Namespace) -> int:
+    """Show the execution plan for a PRD without touching anything.
+
+    Resolves the workflow, computes the branch name + base ref + model,
+    and prints the ordered task list with descriptions. No git
+    operations, no subprocess, no agent invocation.
+    """
+    prds = _load(args.prd_dir)
+    if args.prd_id not in prds:
+        raise SystemExit(f"unknown PRD id: {args.prd_id}")
+    prd = prds[args.prd_id]
+
+    workflows = _load_workflows_or_fail(args.workflows_dir)
+
+    # Resolve workflow (respecting --workflow override).
+    if args.workflow:
+        if args.workflow not in workflows:
+            raise SystemExit(f"unknown workflow: {args.workflow}")
+        workflow = workflows[args.workflow]
+    else:
+        try:
+            workflow = assign.assign_workflow(prd, prds, workflows)
+        except KeyError as exc:
+            raise SystemExit(str(exc))
+
+    branch = _compute_branch_name(prd)
+    repo_root = _find_repo_root(args.prd_dir)
+    base_ref = _resolve_base_ref(args.base, repo_root)
+
+    # Note any runnability issues as warnings (plan still shows, but
+    # the user gets a heads-up that `prd run --execute` would refuse).
+    runnable_error = _check_runnable(prd, prds)
+
+    if args.json:
+        payload: dict[str, object] = {
+            "prd": {
+                "id": prd.id,
+                "title": prd.title,
+                "kind": prd.kind,
+                "status": prd.status,
+                "capability": prd.capability,
+            },
+            "workflow": {
+                "name": workflow.name,
+                "description": workflow.description,
+                "priority": workflow.priority,
+            },
+            "branch": branch,
+            "base_ref": base_ref,
+            "default_model": capability_to_model(prd.capability),
+            "tasks": [
+                _describe_task(task, prd, args.model)
+                for task in workflow.tasks
+            ],
+            "runnable_error": runnable_error,
+        }
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    print(f"# Plan for {prd.id}: {prd.title}")
+    print()
+    print(f"  kind:       {prd.kind}")
+    print(f"  status:     {prd.status}")
+    print(f"  capability: {prd.capability} -> default model {capability_to_model(prd.capability)}")
+    print()
+    print(f"  workflow:   {workflow.name} (priority {workflow.priority})")
+    if workflow.description:
+        print(f"  — {workflow.description}")
+    print()
+    print(f"  branch:     {branch}")
+    print(f"  base ref:   {base_ref}")
+    print()
+    print(f"  tasks ({len(workflow.tasks)}):")
+    for i, task in enumerate(workflow.tasks, start=1):
+        print(f"    {i:>2}. {_describe_task(task, prd, args.model)}")
+
+    if runnable_error:
+        print()
+        print(f"  ⚠ NOT RUNNABLE: {runnable_error}")
+        print("    (`prd run --execute` would refuse this PRD)")
+    return 0
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    """Run a workflow against a PRD. Defaults to dry-run; opt in via --execute.
+
+    In dry-run mode, this is effectively a more detailed version of
+    ``prd plan`` — it walks the runner's dispatch loop but each task
+    only logs what it would do. With ``--execute``, the runner actually
+    creates the worktree, invokes the agent, runs checks, pushes, and
+    creates the PR.
+    """
+    prds = _load(args.prd_dir)
+    if args.prd_id not in prds:
+        raise SystemExit(f"unknown PRD id: {args.prd_id}")
+    prd = prds[args.prd_id]
+
+    workflows = _load_workflows_or_fail(args.workflows_dir)
+
+    # Resolve workflow.
+    if args.workflow:
+        if args.workflow not in workflows:
+            raise SystemExit(f"unknown workflow: {args.workflow}")
+        workflow = workflows[args.workflow]
+    else:
+        try:
+            workflow = assign.assign_workflow(prd, prds, workflows)
+        except KeyError as exc:
+            raise SystemExit(str(exc))
+
+    # Runnability check only applies when actually executing. Dry-run
+    # should be allowed on any PRD for discovery.
+    if args.execute:
+        err = _check_runnable(prd, prds)
+        if err:
+            raise SystemExit(f"cannot run: {err}")
+
+    repo_root = _find_repo_root(args.prd_dir)
+    base_ref = _resolve_base_ref(args.base, repo_root)
+
+    dry_run = not args.execute
+
+    if dry_run:
+        print(f"# Dry-run: {prd.id} via workflow {workflow.name!r}")
+    else:
+        print(f"# Executing: {prd.id} via workflow {workflow.name!r}")
+
+    result = run_workflow(
+        prd=prd,
+        workflow=workflow,
+        repo_root=repo_root,
+        base_ref=base_ref,
+        dry_run=dry_run,
+        model_override=args.model,
+    )
+
+    print()
+    print("  Steps:")
+    for step in result.steps:
+        marker = "✓" if step.success else "✗"
+        detail = f" — {step.detail}" if step.detail else ""
+        print(f"    {marker} [{step.kind}] {step.name}{detail}")
+
+    print()
+    if result.success:
+        print(f"  Result: ✓ success")
+        if result.pr_url:
+            print(f"  PR:     {result.pr_url}")
+        return 0
+    else:
+        print(f"  Result: ✗ FAILED — {result.failure_reason}")
+        return 1
+
+
 # ---------- argparse plumbing ----------
 
 
@@ -498,6 +729,55 @@ def build_parser() -> argparse.ArgumentParser:
         help="Persist assignments to PRD frontmatter (only for unassigned PRDs)",
     )
     sub_assign.set_defaults(func=cmd_assign)
+
+    sub_plan = sub.add_parser(
+        "plan",
+        help="Show the execution plan for a PRD without touching anything",
+    )
+    sub_plan.add_argument("prd_id")
+    sub_plan.add_argument(
+        "--workflow",
+        default=None,
+        help="Override the workflow assignment (by name)",
+    )
+    sub_plan.add_argument(
+        "--base",
+        default=None,
+        help="Base ref for the new branch (default: current HEAD)",
+    )
+    sub_plan.add_argument(
+        "--model",
+        default=None,
+        help="Override the capability->model mapping (e.g. opus)",
+    )
+    sub_plan.set_defaults(func=cmd_plan)
+
+    sub_run = sub.add_parser(
+        "run",
+        help="Run a workflow against a PRD (dry-run unless --execute)",
+    )
+    sub_run.add_argument("prd_id")
+    sub_run.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute (default is dry-run)",
+    )
+    sub_run.add_argument(
+        "--workflow",
+        default=None,
+        help="Override the workflow assignment (by name)",
+    )
+    sub_run.add_argument(
+        "--base",
+        default=None,
+        help="Base ref for the new branch (default: current HEAD)",
+    )
+    sub_run.add_argument(
+        "--model",
+        default=None,
+        help="Override the capability->model mapping (e.g. opus)",
+    )
+    sub_run.set_defaults(func=cmd_run)
 
     return parser
 
