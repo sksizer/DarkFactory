@@ -1,38 +1,45 @@
-# prd-harness
+# darkfactory
 
-SDLC harness for the Pumice PRD lifecycle. Walks the dependency DAG, creates worktrees, invokes Claude Code agents per declarative workflow, runs checks, and stacks pull requests.
+Standalone PRD harness: DAG orchestration, declarative workflows, agent invocation, and stacked PRs.
 
-See [PRD-110](../../docs/prd/PRD-110-prd-harness.md) for the full specification.
+This is the extracted standalone version of the harness originally developed inside [pumice](https://github.com/sksizer/pumice) under `tools/prd-harness`. See [PRD-110](https://github.com/sksizer/pumice/blob/main/docs/prd/PRD-110-prd-harness.md) for the full design history.
 
 ## Quick start
 
-From the repo root:
-
 ```bash
-# Install (mise installs python + uv from mise.toml)
+# Install tools (requires mise)
 mise install
-uv sync --project tools/prd-harness
 
-# Read-only commands (foundation phase) — three equivalent forms:
-just prd status                                  # justfile recipe (recommended)
-make prd ARGS="status"                           # makefile target
-./scripts/prd status                             # direct shell wrapper
-uv run --project tools/prd-harness prd status    # raw uv invocation
+# Install Python dependencies
+uv sync
+
+# Run the CLI
+uv run prd status
 ```
 
-Common subcommands:
+Or use the justfile recipes:
 
 ```bash
 just prd status
 just prd validate
 just prd tree PRD-001
 just prd next --limit 5
-just prd conflicts PRD-070
+```
+
+## Recipes
+
+```bash
+just          # list all recipes
+just prd      # run prd CLI (pass args after)
+just test     # run pytest
+just typecheck  # run mypy
+just lint     # run ruff check
+just format-check  # run ruff format --check
 ```
 
 ## Architecture
 
-Three layers (see [PRD-110](../../docs/prd/PRD-110-prd-harness.md) for details):
+Three layers:
 
 1. **SDLC harness** — CLI, DAG orchestration, status transitions
 2. **Built-in tasks** — `ensure_worktree`, `commit`, `create_pr`, etc.
@@ -41,13 +48,6 @@ Three layers (see [PRD-110](../../docs/prd/PRD-110-prd-harness.md) for details):
 ## Development
 
 ```bash
-# Type-check
-uv run --project tools/prd-harness mypy src tests
-
-# Test
-uv run --project tools/prd-harness pytest
+just typecheck
+just test
 ```
-
-## Status
-
-Foundation phase: PRD parsing, DAG/containment/impacts modules, read-only CLI subcommands. Workflow execution and migration are follow-up phases.

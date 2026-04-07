@@ -1,15 +1,15 @@
 [project]
-name = "prd-harness"
+name = "darkfactory"
 version = "0.1.0"
-description = "SDLC harness for the Pumice PRD lifecycle: DAG orchestration, declarative workflows, agent invocation, stacked PRs."
+description = "Standalone PRD harness: DAG orchestration, declarative workflows, agent invocation, stacked PRs."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "pyyaml>=6.0",
 ]
 
 [project.scripts]
-prd = "prd_harness.cli:main"
+prd = "darkfactory.cli:main"
 
 [dependency-groups]
 dev = [
@@ -23,7 +23,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/prd_harness"]
+packages = ["src/darkfactory"]
 
 [tool.mypy]
 strict = true
