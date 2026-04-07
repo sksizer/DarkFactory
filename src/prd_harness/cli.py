@@ -17,8 +17,10 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from . import containment, graph, impacts
-from .prd import PRD, load_all, parse_id_sort_key
+from . import assign, containment, graph, impacts
+from .loader import load_workflows
+from .prd import PRD, load_all, parse_id_sort_key, set_workflow
+from .workflow import Workflow
 
 # Priority/effort orderings used for sorting actionable lists.
 PRIORITY_ORDER: dict[str, int] = {"critical": 0, "high": 1, "medium": 2, "low": 3}
@@ -45,6 +47,23 @@ def _default_prd_dir() -> Path:
     """Locate ``docs/prd/`` relative to the repo root."""
     repo = _find_repo_root(Path.cwd())
     return repo / "docs" / "prd"
+
+
+def _default_workflows_dir() -> Path:
+    """Locate ``tools/prd-harness/workflows/`` relative to the repo root.
+
+    All built-in workflows ship under this path. Overridable via
+    ``--workflows-dir`` on the CLI for tests or alternative deployments.
+    """
+    repo = _find_repo_root(Path.cwd())
+    return repo / "tools" / "prd-harness" / "workflows"
+
+
+def _load_workflows_or_fail(workflows_dir: Path) -> dict[str, Workflow]:
+    """Load workflows with a user-friendly error if the directory is missing."""
+    if not workflows_dir.exists():
+        raise SystemExit(f"workflows directory not found: {workflows_dir}")
+    return load_workflows(workflows_dir)
 
 
 def _action_sort_key(prd: PRD) -> tuple[int, int, tuple[int, ...]]:
@@ -325,6 +344,94 @@ def cmd_conflicts(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_list_workflows(args: argparse.Namespace) -> int:
+    """List all loaded workflows with priority and description."""
+    workflows = _load_workflows_or_fail(args.workflows_dir)
+    if not workflows:
+        print("(no workflows loaded)")
+        return 0
+
+    # Sort by descending priority then alphabetically for stable display.
+    sorted_wfs = sorted(
+        workflows.values(),
+        key=lambda w: (-w.priority, w.name),
+    )
+
+    if args.json:
+        payload = [
+            {
+                "name": w.name,
+                "priority": w.priority,
+                "description": w.description,
+                "task_count": len(w.tasks),
+                "workflow_dir": str(w.workflow_dir) if w.workflow_dir else None,
+            }
+            for w in sorted_wfs
+        ]
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    for w in sorted_wfs:
+        # Header line: name, priority, task count
+        print(f"{w.name:20} priority={w.priority:<3} tasks={len(w.tasks)}")
+        if w.description:
+            # Indent description under the header
+            for line in w.description.splitlines():
+                print(f"  {line}")
+        print()
+    return 0
+
+
+def cmd_assign(args: argparse.Namespace) -> int:
+    """Compute the workflow assignment for every PRD, optionally persist.
+
+    Output is a table of ``PRD-id -> workflow-name``. With ``--write``,
+    the resolved workflow name is persisted into each PRD's frontmatter
+    (only for PRDs that don't already have an explicit workflow field —
+    the command is idempotent on re-run).
+    """
+    prds = _load(args.prd_dir)
+    workflows = _load_workflows_or_fail(args.workflows_dir)
+
+    try:
+        assignments = assign.assign_all(prds, workflows)
+    except KeyError as exc:
+        raise SystemExit(str(exc))
+
+    if args.json:
+        payload = [
+            {
+                "id": prd_id,
+                "workflow": wf.name,
+                "explicit": prds[prd_id].workflow is not None,
+            }
+            for prd_id, wf in sorted(
+                assignments.items(),
+                key=lambda kv: parse_id_sort_key(kv[0]),
+            )
+        ]
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    # Human-readable table. Mark explicit assignments with a `*`.
+    print(f"{'PRD':14} {'Workflow':20} Source")
+    print("-" * 50)
+    for prd_id in sorted(assignments.keys(), key=parse_id_sort_key):
+        wf = assignments[prd_id]
+        source = "explicit" if prds[prd_id].workflow else "predicate"
+        print(f"{prd_id:14} {wf.name:20} {source}")
+
+    if args.write:
+        written = 0
+        for prd_id, wf in assignments.items():
+            prd = prds[prd_id]
+            if prd.workflow is None:
+                set_workflow(prd, wf.name)
+                written += 1
+        print(f"\nPersisted {written} workflow assignments to frontmatter.")
+    return 0
+
+
 # ---------- argparse plumbing ----------
 
 
@@ -335,6 +442,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="Path to docs/prd directory (default: auto-detect from cwd)",
+    )
+    parser.add_argument(
+        "--workflows-dir",
+        type=Path,
+        default=None,
+        help="Path to workflows directory (default: tools/prd-harness/workflows)",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON output where supported")
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -370,6 +483,22 @@ def build_parser() -> argparse.ArgumentParser:
     sub_conflicts.add_argument("prd_id")
     sub_conflicts.set_defaults(func=cmd_conflicts)
 
+    sub_list_wfs = sub.add_parser(
+        "list-workflows", help="Show loaded workflows with priorities"
+    )
+    sub_list_wfs.set_defaults(func=cmd_list_workflows)
+
+    sub_assign = sub.add_parser(
+        "assign",
+        help="Compute workflow assignment per PRD (optionally persist)",
+    )
+    sub_assign.add_argument(
+        "--write",
+        action="store_true",
+        help="Persist assignments to PRD frontmatter (only for unassigned PRDs)",
+    )
+    sub_assign.set_defaults(func=cmd_assign)
+
     return parser
 
 
@@ -378,6 +507,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.prd_dir is None:
         args.prd_dir = _default_prd_dir()
+    if args.workflows_dir is None:
+        args.workflows_dir = _default_workflows_dir()
     func: Any = args.func
     return int(func(args))
 

@@ -224,3 +224,21 @@ def set_status(prd: PRD, new_status: str) -> None:
     write_frontmatter(prd, fm)
     prd.status = new_status
     prd.updated = fm["updated"]
+
+
+def set_workflow(prd: PRD, workflow_name: str | None) -> None:
+    """Update a PRD's ``workflow`` frontmatter field in place.
+
+    Used by the ``prd assign --write`` CLI command to persist resolved
+    workflow assignments. Also bumps ``updated`` to today so tooling
+    that tracks "recently modified" picks it up.
+
+    Passing ``None`` clears the field (resets to predicate-based
+    routing). Passing a name pins that workflow explicitly.
+    """
+    fm = dict(prd.raw_frontmatter)
+    fm["workflow"] = workflow_name
+    fm["updated"] = date.today().isoformat()
+    write_frontmatter(prd, fm)
+    prd.workflow = workflow_name
+    prd.updated = fm["updated"]
