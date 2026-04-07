@@ -33,13 +33,36 @@ def tracked_files(repo_root: Path) -> list[str]:
     return [line for line in result.stdout.strip().split("\n") if line]
 
 
+_GLOB_META = set("*?[{")
+
+
+def _is_glob(pattern: str) -> bool:
+    """True if the pattern contains glob metacharacters."""
+    return any(c in _GLOB_META for c in pattern)
+
+
 def expand_impacts(patterns: list[str], files: list[str]) -> set[str]:
-    """Expand glob patterns against a file list, returning matched paths."""
+    """Expand glob patterns against a file list, returning matched paths.
+
+    Literal (non-glob) patterns are included verbatim even if the file
+    doesn't exist yet — this lets a PRD declare impacts on files it plans
+    to create. Glob patterns are matched against the existing file list
+    and only produce matches for files that already exist.
+
+    This split matters for overlap detection: two PRDs declaring the same
+    new file (e.g. ``src/foo.rs``) should be flagged as conflicting even
+    before either one runs.
+    """
     matched: set[str] = set()
     for pattern in patterns:
-        for f in files:
-            if f == pattern or fnmatch.fnmatch(f, pattern):
-                matched.add(f)
+        if _is_glob(pattern):
+            # Glob pattern: expand against existing files only.
+            for f in files:
+                if fnmatch.fnmatch(f, pattern):
+                    matched.add(f)
+        else:
+            # Literal path: include verbatim, even if not yet tracked.
+            matched.add(pattern)
     return matched
 
 

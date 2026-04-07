@@ -34,6 +34,35 @@ def test_expand_impacts_no_match() -> None:
     assert matched == set()
 
 
+def test_expand_impacts_literal_nonexistent_file() -> None:
+    """Literal paths for files that don't yet exist are included verbatim.
+
+    This lets a PRD declare an impact on a file it plans to create — two
+    PRDs both targeting the same new file should conflict even before
+    either one runs.
+    """
+    files = ["other/existing.rs"]
+    matched = impacts.expand_impacts(["src/new_file.rs"], files)
+    assert matched == {"src/new_file.rs"}
+
+
+def test_expand_impacts_glob_nonexistent_remains_empty() -> None:
+    """Glob patterns that match no existing files produce no results."""
+    files = ["src/foo.rs"]
+    matched = impacts.expand_impacts(["src/*.py"], files)
+    assert matched == set()
+
+
+def test_expand_impacts_mixed_glob_and_literal() -> None:
+    """A mix of glob (matched against files) and literal (always included)."""
+    files = ["src/foo.rs", "src/bar.rs"]
+    matched = impacts.expand_impacts(
+        ["src/*.rs", "src/brand_new.rs"],
+        files,
+    )
+    assert matched == {"src/foo.rs", "src/bar.rs", "src/brand_new.rs"}
+
+
 def test_impacts_overlap_disjoint(tmp_prd_dir: Path) -> None:
     write_prd(tmp_prd_dir, "PRD-001", "a", impacts=["src/foo.rs"])
     write_prd(tmp_prd_dir, "PRD-002", "b", impacts=["src/bar.rs"])
