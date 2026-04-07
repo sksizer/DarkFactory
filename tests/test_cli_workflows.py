@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from prd_harness.cli import main
-from prd_harness.prd import load_all
+from darkfactory.cli import main
+from darkfactory.prd import load_all
 
 from .conftest import write_prd
 
@@ -26,7 +26,7 @@ def _write_default_workflow(dir_path: Path) -> None:
     default_dir.mkdir(parents=True)
     (default_dir / "workflow.py").write_text(
         '''"""Fixture default workflow."""
-from prd_harness.workflow import BuiltIn, Workflow
+from darkfactory.workflow import BuiltIn, Workflow
 
 workflow = Workflow(
     name="default",
@@ -45,7 +45,7 @@ def _write_ui_workflow(dir_path: Path) -> None:
     ui_dir.mkdir(parents=True)
     (ui_dir / "workflow.py").write_text(
         '''"""Fixture UI workflow."""
-from prd_harness.workflow import BuiltIn, Workflow
+from darkfactory.workflow import BuiltIn, Workflow
 
 
 def _matches(prd, prds):

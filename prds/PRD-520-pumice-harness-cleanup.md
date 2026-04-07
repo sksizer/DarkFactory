@@ -24,14 +24,14 @@ updated: 2026-04-08
 tags:
   - pumice
   - cleanup
-  - migration
+  - extraction
 ---
 
 # Pumice cleanup — remove tools/prd-harness/
 
 ## Summary
 
-Once darkfactory is live and verified (PRD-505 done), remove the harness code from pumice to avoid dual maintenance. This is a pumice-side PR, separate from the darkfactory migration. The cleanup touches the harness directory, the convenience scripts/recipes, and the mise.toml entries that were added for the harness's Python toolchain.
+Once darkfactory is live and verified (PRD-505 done), remove the harness code from pumice to avoid dual maintenance. This is a pumice-side PR, separate from the darkfactory extraction. The cleanup touches the harness directory, the convenience scripts/recipes, and the mise.toml entries that were added for the harness's Python toolchain.
 
 ## Requirements
 
@@ -76,7 +76,7 @@ cd src-tauri && cargo test
 # Commit + PR
 git add -A
 git commit -m "chore: remove tools/prd-harness/ (migrated to darkfactory)"
-gh pr create --base main --title "chore: remove tools/prd-harness/ after darkfactory migration" ...
+gh pr create --base main --title "chore: remove tools/prd-harness/ after darkfactory extraction" ...
 ```
 
 Optional: update `docs/prd/PRD-110-prd-harness.md` with a note at the top:

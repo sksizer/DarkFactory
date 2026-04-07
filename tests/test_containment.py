@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from prd_harness import containment
-from prd_harness.prd import load_all
+from darkfactory import containment
+from darkfactory.prd import load_all
 
 from .conftest import write_prd
 

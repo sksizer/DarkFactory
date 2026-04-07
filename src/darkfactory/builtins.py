@@ -6,12 +6,12 @@ commit, push a branch, open a PR. They live here (not in individual
 workflow modules) because they're shared — every workflow uses the
 same ``commit`` primitive, not a bespoke one.
 
-Workflows reference built-ins by name via :class:`~prd_harness.workflow.BuiltIn`::
+Workflows reference built-ins by name via :class:`~darkfactory.workflow.BuiltIn`::
 
     BuiltIn("commit", kwargs={"message": "chore(prd): {prd_id} start work"})
 
 The runner looks up ``"commit"`` in :data:`BUILTINS` and calls the
-registered function with the :class:`~prd_harness.workflow.ExecutionContext`
+registered function with the :class:`~darkfactory.workflow.ExecutionContext`
 plus any formatted kwargs.
 
 **Dry-run mode**: every built-in checks ``ctx.dry_run`` before doing
@@ -51,7 +51,7 @@ BUILTINS: dict[str, BuiltInFunc] = {}
 
 Populated at import time via the :func:`builtin` decorator. The runner
 looks up names in this dict when dispatching a
-:class:`~prd_harness.workflow.BuiltIn` task. Workflows never touch this
+:class:`~darkfactory.workflow.BuiltIn` task. Workflows never touch this
 dict directly — they reference built-ins by name only.
 """
 
@@ -196,22 +196,41 @@ def ensure_worktree(ctx: ExecutionContext) -> None:
 
 @builtin("set_status")
 def set_status(ctx: ExecutionContext, *, to: Status) -> None:
-    """Rewrite the PRD's ``status:`` frontmatter field.
+    """Rewrite the PRD's ``status:`` frontmatter field inside the worktree.
 
-    Delegates to :func:`prd_harness.prd.set_status`, which preserves
-    the body byte-for-byte and bumps ``updated`` to today. In dry-run
-    mode, only logs the intended change.
+    Targets the worktree's copy of the PRD file, never the source repo.
+    The source repo's working tree must remain untouched by ``prd run`` —
+    status transitions live on the PRD's worktree branch and only reach
+    the source repo via PR merge (see PRD-213).
+
+    Uses :func:`darkfactory.prd.set_status_at`, which surgically rewrites
+    only the ``status:`` and ``updated:`` lines so the resulting commit
+    diff is two lines, not the whole frontmatter block.
     """
     if ctx.dry_run:
         ctx.logger.info(
-            "[dry-run] set status of %s: %s -> %s",
+            "[dry-run] set status of %s: %s -> %s (worktree=%s)",
             ctx.prd.id,
             ctx.prd.status,
             to,
+            ctx.worktree_path,
         )
         return
 
-    prd_module.set_status(ctx.prd, to)
+    if ctx.worktree_path is None:
+        raise RuntimeError(
+            "set_status requires a worktree; ensure_worktree must run first"
+        )
+
+    relative = ctx.prd.path.relative_to(ctx.repo_root)
+    target = ctx.worktree_path / relative
+    prd_module.set_status_at(target, to)
+    # Mirror the field updates onto the in-memory PRD so subsequent
+    # builtins see the new status without re-loading from disk.
+    ctx.prd.status = to
+    from datetime import date as _date
+
+    ctx.prd.updated = _date.today().isoformat()
 
 
 @builtin("commit")

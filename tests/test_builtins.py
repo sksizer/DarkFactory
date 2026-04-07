@@ -23,16 +23,16 @@ from unittest.mock import patch
 
 import pytest
 
-from prd_harness import builtins
-from prd_harness.builtins import (
+from darkfactory import builtins
+from darkfactory.builtins import (
     BUILTINS,
     _extract_acceptance_criteria,
     _pr_body,
     _worktree_target,
     builtin,
 )
-from prd_harness.prd import load_all
-from prd_harness.workflow import ExecutionContext, Workflow
+from darkfactory.prd import load_all
+from darkfactory.workflow import ExecutionContext, Workflow
 
 from .conftest import write_prd
 
@@ -192,7 +192,7 @@ def test_dry_run_ensure_worktree_logs_and_returns(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     ctx = _make_dry_run_ctx(tmp_path)
-    with caplog.at_level(logging.INFO, logger="prd_harness"):
+    with caplog.at_level(logging.INFO, logger="darkfactory"):
         builtins.ensure_worktree(ctx)
     # Should not have actually created a worktree
     assert not (tmp_path / ".worktrees" / "PRD-070-task").exists()
@@ -423,25 +423,69 @@ def test_cleanup_worktree_idempotent(tmp_path: Path) -> None:
     builtins.cleanup_worktree(ctx)  # no exception
 
 
-def test_set_status_mutates_frontmatter(tmp_path: Path) -> None:
+def test_set_status_mutates_worktree_not_source(tmp_path: Path) -> None:
+    """``set_status`` writes to the worktree copy of the PRD, not the
+    source repo. Asserts the source PRD file is byte-identical after the
+    call and the worktree copy carries the new status. This is the
+    PRD-213 invariant: ``prd run`` never touches the source repo.
+    """
+    source = tmp_path / "source"
+    worktree = tmp_path / "worktree"
+    source_prds = source / "prds"
+    worktree_prds = worktree / "prds"
+    source_prds.mkdir(parents=True)
+    worktree_prds.mkdir(parents=True)
+
+    # Create the PRD in both trees with identical content.
+    src_path = write_prd(source_prds, "PRD-070", "status-test", status="ready")
+    wt_path = worktree_prds / src_path.name
+    wt_path.write_text(src_path.read_text(encoding="utf-8"), encoding="utf-8")
+    source_bytes_before = src_path.read_bytes()
+
+    prds = load_all(source_prds)
+    ctx = ExecutionContext(
+        prd=prds["PRD-070"],
+        repo_root=source,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-070-status-test",
+        worktree_path=worktree,
+        dry_run=False,
+    )
+    builtins.set_status(ctx, to="in-progress")
+
+    # Source repo: byte-identical (the invariant).
+    assert src_path.read_bytes() == source_bytes_before, (
+        "set_status must not modify the source repo"
+    )
+
+    # Worktree: status updated.
+    reloaded = load_all(worktree_prds)
+    assert reloaded["PRD-070"].status == "in-progress"
+
+    # In-memory PRD also reflects the new status.
+    assert ctx.prd.status == "in-progress"
+
+
+def test_set_status_requires_worktree(tmp_path: Path) -> None:
+    """Calling ``set_status`` without a worktree path is a programming
+    error — the workflow author forgot to put ``ensure_worktree`` first.
+    """
     prd_dir = tmp_path / "prds"
     prd_dir.mkdir()
     write_prd(prd_dir, "PRD-070", "status-test", status="ready")
     prds = load_all(prd_dir)
-
     ctx = ExecutionContext(
         prd=prds["PRD-070"],
         repo_root=tmp_path,
         workflow=Workflow(name="default"),
         base_ref="main",
         branch_name="prd/PRD-070-status-test",
+        worktree_path=None,
         dry_run=False,
     )
-    builtins.set_status(ctx, to="in-progress")
-
-    # Reload from disk and confirm
-    reloaded = load_all(prd_dir)
-    assert reloaded["PRD-070"].status == "in-progress"
+    with pytest.raises(RuntimeError, match="worktree"):
+        builtins.set_status(ctx, to="in-progress")
 
 
 # ---------- push_branch / create_pr (mocked subprocess) ----------

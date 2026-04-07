@@ -30,7 +30,7 @@ tags:
 
 Add a `prd new <title>` CLI subcommand that creates a new draft PRD from a built-in template. No dependencies, no workflow, just enough scaffolding for a human to start drafting. Auto-picks the next available PRD id and writes the file to the configured `--prd-dir`.
 
-This was the original request from the user that motivated the migration — "could we get a command to make a new draft PRD that matches the template but doesn't have any dependencies, for drafting?"
+This was the original request from the user that motivated the extraction — "could we get a command to make a new draft PRD that matches the template but doesn't have any dependencies, for drafting?"
 
 ## Requirements
 
@@ -215,4 +215,4 @@ Tests:
 ## References
 
 - [[PRD-505-darkfactory-verify-and-push]] — dependency (needs darkfactory to exist first)
-- `tools/prd-harness/src/prd_harness/cli.py` — CLI location in pumice (becomes `src/darkfactory/cli.py` post-migration)
+- `tools/prd-harness/src/prd_harness/cli.py` — CLI location in pumice (becomes `src/darkfactory/cli.py` post-extraction)

@@ -2,17 +2,17 @@
 
 The runner is the glue between every other module in the harness:
 
-- It holds an :class:`~prd_harness.workflow.ExecutionContext` and
+- It holds an :class:`~darkfactory.workflow.ExecutionContext` and
   threads it through the task list.
-- For each :class:`~prd_harness.workflow.BuiltIn`, it looks up the
-  named function in :data:`~prd_harness.builtins.BUILTINS` and calls
+- For each :class:`~darkfactory.workflow.BuiltIn`, it looks up the
+  named function in :data:`~darkfactory.builtins.BUILTINS` and calls
   it with the context + formatted kwargs.
-- For each :class:`~prd_harness.workflow.AgentTask`, it composes the
-  prompt via :func:`~prd_harness.templates.compose_prompt`, picks the
+- For each :class:`~darkfactory.workflow.AgentTask`, it composes the
+  prompt via :func:`~darkfactory.templates.compose_prompt`, picks the
   model (explicit override > capability mapping > sonnet fallback),
-  invokes Claude Code via :func:`~prd_harness.invoke.invoke_claude`,
+  invokes Claude Code via :func:`~darkfactory.invoke.invoke_claude`,
   and stores the output on the context.
-- For each :class:`~prd_harness.workflow.ShellTask`, it runs the
+- For each :class:`~darkfactory.workflow.ShellTask`, it runs the
   formatted command and handles the configured ``on_failure`` policy.
 
 The runner does **not** know how to create branches, manage
@@ -28,7 +28,7 @@ PRD blocked (via a separate ``set_status`` built-in call).
 
 Dry-run mode: when ``ctx.dry_run=True``, every built-in and shell
 task logs what it would do without executing. Agent tasks return a
-synthetic success result via :func:`~prd_harness.invoke.invoke_claude`'s
+synthetic success result via :func:`~darkfactory.invoke.invoke_claude`'s
 ``dry_run=True`` path. This is what ``prd plan`` uses.
 """
 
@@ -56,7 +56,7 @@ if TYPE_CHECKING:
     from .prd import PRD
 
 
-logger = logging.getLogger("prd_harness.runner")
+logger = logging.getLogger("darkfactory.runner")
 
 
 @dataclass

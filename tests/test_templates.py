@@ -6,13 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from prd_harness.prd import load_all
-from prd_harness.templates import (
+from darkfactory.prd import load_all
+from darkfactory.templates import (
     compose_prompt,
     load_prompt_files,
     substitute_placeholders,
 )
-from prd_harness.workflow import ExecutionContext, Workflow
+from darkfactory.workflow import ExecutionContext, Workflow
 
 from .conftest import write_prd
 

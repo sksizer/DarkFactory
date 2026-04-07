@@ -6,7 +6,7 @@ status: ready
 priority: high
 effort: xs
 capability: simple
-parent: "[[PRD-500-darkfactory-migration]]"
+parent: "[[PRD-500-darkfactory-extraction]]"
 depends_on:
   - "[[PRD-504-darkfactory-cli-defaults]]"
 blocks:
@@ -20,7 +20,7 @@ created: 2026-04-08
 updated: 2026-04-08
 tags:
   - harness
-  - migration
+  - extraction
   - verification
 ---
 
@@ -28,7 +28,7 @@ tags:
 
 ## Summary
 
-Final checkpoint before the migration lands: run every check that matters, dogfood the CLI against the migrated PRDs, and push the first commit to `main` on darkfactory. This PRD is the integration test for the whole PRD-500 epic.
+Final checkpoint before the extraction lands: run every check that matters, dogfood the CLI against the ported PRDs, and push the first commit to `main` on darkfactory. This PRD is the integration test for the whole PRD-500 epic.
 
 ## Requirements
 
@@ -53,7 +53,7 @@ rm -rf darkfactory-verify
 gh repo clone sksizer/darkfactory darkfactory-verify
 cd darkfactory-verify
 
-# Copy over all the staged migration content from the working repo
+# Copy over all the staged extraction content from the working repo
 rsync -a --exclude='.git' ~/Developer/darkfactory/ ./
 
 # Verify
@@ -89,7 +89,7 @@ Full harness functionality (see pumice PRD-110 for original design):
 
 200+ tests pass, mypy --strict clean. Dogfooded against the migrated
 dev-PRDs (PRD-200..211 workflow execution layer + PRD-500..505
-migration + PRD-510 prd new + PRD-520 pumice cleanup).
+extraction + PRD-510 prd new + PRD-520 pumice cleanup).
 EOF
 )"
 git push origin main

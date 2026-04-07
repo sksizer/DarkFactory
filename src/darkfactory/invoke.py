@@ -90,8 +90,13 @@ class InvokeResult:
 # ---------- sentinel parsing ----------
 
 
-_SENTINEL_SUCCESS_RE = re.compile(r"^PRD_EXECUTE_OK:\s*(.+)$", re.MULTILINE)
-_SENTINEL_FAILURE_RE = re.compile(r"^PRD_EXECUTE_FAILED:\s*(.+)$", re.MULTILINE)
+# Anchorless: agents sometimes wrap the sentinel in markdown formatting
+# (backticks, blockquote markers, list bullets) when ``claude --print``
+# renders their final line. Substring-style matching is more forgiving
+# than line-anchored matching and still unambiguous because the marker
+# is a fixed token unlikely to appear naturally in PRD work.
+_SENTINEL_SUCCESS_RE = re.compile(r"PRD_EXECUTE_OK:\s*(\S[^\n`]*)")
+_SENTINEL_FAILURE_RE = re.compile(r"PRD_EXECUTE_FAILED:\s*(\S[^\n`]*)")
 
 
 def _parse_sentinels(

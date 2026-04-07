@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
-from prd_harness.invoke import (
+from darkfactory.invoke import (
     CAPABILITY_MODELS,
     InvokeResult,
     _parse_sentinels,
@@ -112,6 +112,26 @@ def test_parse_sentinels_custom_markers_failure() -> None:
 def test_parse_sentinels_strips_whitespace_from_reason() -> None:
     success, reason = _parse_sentinels("PRD_EXECUTE_FAILED:   hello world  \n")
     assert reason == "hello world"
+
+
+def test_parse_sentinels_success_in_inline_code() -> None:
+    """Agents sometimes wrap the sentinel in markdown backticks when
+    ``claude --print`` renders their final line. The parser should
+    still recognize it."""
+    success, reason = _parse_sentinels("verifying ACs...\n`PRD_EXECUTE_OK: PRD-501`\n")
+    assert success is True
+    assert reason is None
+
+
+def test_parse_sentinels_failure_in_inline_code() -> None:
+    success, reason = _parse_sentinels("`PRD_EXECUTE_FAILED: missing dep`\n")
+    assert success is False
+    assert reason == "missing dep"
+
+
+def test_parse_sentinels_success_in_blockquote() -> None:
+    success, reason = _parse_sentinels("> PRD_EXECUTE_OK: PRD-501\n")
+    assert success is True
 
 
 # ---------- invoke_claude (dry-run) ----------

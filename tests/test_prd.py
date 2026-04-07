@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from prd_harness.prd import (
+from darkfactory.prd import (
+    update_frontmatter_field_at,
     PRD_ID_RE,
     load_all,
     parse_id_sort_key,
@@ -157,8 +158,94 @@ def test_set_status_preserves_body(tmp_prd_dir: Path) -> None:
 
 def test_set_status_bumps_updated(tmp_prd_dir: Path) -> None:
     from datetime import date
+
     path = write_prd(tmp_prd_dir, "PRD-070", "task")
     prd = parse_prd(path)
     set_status(prd, "review")
     reread = parse_prd(path)
+    # The on-disk value is single-quoted ('2026-04-07') so PyYAML
+    # round-trips it as a string instead of auto-coercing to date.
     assert reread.raw_frontmatter["updated"] == date.today().isoformat()
+
+
+# ---------- update_frontmatter_field_at byte-preservation ----------
+
+
+def test_update_frontmatter_field_at_preserves_other_fields_byte_for_byte(
+    tmp_prd_dir: Path,
+) -> None:
+    """Single-field updates must not touch any other byte in the file —
+    not other frontmatter fields, not their quoting style, not the body.
+    This is the PRD-214 invariant."""
+    raw = (
+        "---\n"
+        'id: "PRD-070"\n'
+        "title: Example\n"
+        "kind: task\n"
+        "status: ready\n"
+        "priority: high\n"
+        'parent: "[[PRD-001-foo]]"\n'
+        "depends_on: []\n"
+        "blocks:\n"
+        '  - "[[PRD-072-bar]]"\n'
+        "impacts: []\n"
+        "workflow: null\n"
+        "target_version: null\n"
+        "created: 2026-04-01\n"
+        "updated: 2026-04-01\n"
+        "tags:\n"
+        "  - foo\n"
+        "---\n"
+        "\n"
+        "# Body content\n"
+        "\n"
+        "Some text with `backticks` and [[wikilinks]].\n"
+    )
+    path = tmp_prd_dir / "PRD-070-example.md"
+    path.write_text(raw, encoding="utf-8")
+
+    update_frontmatter_field_at(path, {"status": "in-progress"})
+
+    after = path.read_text(encoding="utf-8")
+    expected = raw.replace("status: ready", "status: in-progress")
+    assert after == expected, "only the status line should change"
+
+
+def test_update_frontmatter_field_at_multiple_fields(tmp_prd_dir: Path) -> None:
+    raw = (
+        "---\n"
+        "status: ready\n"
+        "updated: 2026-04-01\n"
+        "id: PRD-070\n"
+        "---\n"
+        "body\n"
+    )
+    path = tmp_prd_dir / "PRD-070-x.md"
+    path.write_text(raw, encoding="utf-8")
+    update_frontmatter_field_at(
+        path, {"status": "review", "updated": "'2026-04-08'"}
+    )
+    after = path.read_text(encoding="utf-8")
+    assert "status: review\n" in after
+    assert "updated: '2026-04-08'\n" in after
+    assert "id: PRD-070\n" in after  # untouched
+    assert after.endswith("body\n")
+
+
+def test_update_frontmatter_field_at_missing_field_raises(
+    tmp_prd_dir: Path,
+) -> None:
+    raw = "---\nstatus: ready\n---\nbody\n"
+    path = tmp_prd_dir / "PRD-070-x.md"
+    path.write_text(raw, encoding="utf-8")
+    with pytest.raises(ValueError, match="missing frontmatter field"):
+        update_frontmatter_field_at(path, {"nonexistent": "value"})
+
+
+def test_update_frontmatter_field_at_no_frontmatter_raises(
+    tmp_prd_dir: Path,
+) -> None:
+    path = tmp_prd_dir / "PRD-070-x.md"
+    path.write_text("just body, no frontmatter\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="no leading frontmatter"):
+        update_frontmatter_field_at(path, {"status": "review"})

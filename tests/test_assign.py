@@ -7,9 +7,9 @@ from typing import Any
 
 import pytest
 
-from prd_harness.assign import assign_all, assign_workflow
-from prd_harness.prd import load_all
-from prd_harness.workflow import BuiltIn, Workflow
+from darkfactory.assign import assign_all, assign_workflow
+from darkfactory.prd import load_all
+from darkfactory.workflow import BuiltIn, Workflow
 
 from .conftest import write_prd
 

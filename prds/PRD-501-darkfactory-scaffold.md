@@ -6,7 +6,7 @@ status: ready
 priority: high
 effort: s
 capability: simple
-parent: "[[PRD-500-darkfactory-migration]]"
+parent: "[[PRD-500-darkfactory-extraction]]"
 depends_on: []
 blocks:
   - "[[PRD-502-darkfactory-port-source]]"
@@ -23,7 +23,7 @@ created: 2026-04-08
 updated: 2026-04-08
 tags:
   - harness
-  - migration
+  - extraction
   - scaffolding
 ---
 
@@ -66,7 +66,21 @@ Clone the empty darkfactory repo locally and set up the top-level scaffolding: `
    - `lint` — `uv run ruff check src tests` (or skip if no ruff yet)
    - `default` — `@just --list`
 
-Nothing in this PRD touches the actual source code — that's PRD-502's job.
+### History carry-over via git filter-repo
+
+Before scaffolding, **preserve the harness's commit history** by using `git filter-repo` to extract the `tools/prd-harness/` subdirectory from a fresh pumice clone:
+
+```bash
+git clone https://github.com/sksizer/pumice.git /tmp/pumice-extract
+cd /tmp/pumice-extract
+git filter-repo --subdirectory-filter tools/prd-harness
+# Now /tmp/pumice-extract has only the harness's history, with paths
+# rewritten as if tools/prd-harness/ had always been the repo root.
+```
+
+Then push that history to darkfactory's `main` as the initial commit set, and layer the scaffolding edits (pyproject rename, mise.toml, etc.) on top. This preserves PR #51..#71 as individual commits in darkfactory rather than collapsing them into one squash. PRD-502 onwards modifies files on top of that history.
+
+Nothing else in this PRD touches the actual source code — that's PRD-502's job.
 
 ## Acceptance Criteria
 
@@ -75,9 +89,10 @@ Nothing in this PRD touches the actual source code — that's PRD-502's job.
 - [ ] AC-3: `uv sync` succeeds with zero dependencies resolved (no src yet — this just validates pyproject is parseable).
 - [ ] AC-4: `just --list` in the repo shows the recipes.
 - [ ] AC-5: `.gitignore` keeps venv / pycache out of staging.
+- [ ] AC-6: `git log --oneline | wc -l` in the scaffolded darkfactory shows the carried-over harness commits (PR #51..#71 individual landings), not a single initial commit.
 
 ## References
 
-- [[PRD-500-darkfactory-migration]] — parent epic
+- [[PRD-500-darkfactory-extraction]] — parent epic
 - `tools/prd-harness/pyproject.toml` — reference for the new pyproject
 - `tools/prd-harness/README.md` — reference for the new README

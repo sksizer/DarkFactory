@@ -3,13 +3,13 @@
 The harness discovers workflows at runtime by scanning a directory for
 subdirectories that contain a ``workflow.py`` module. Each matching
 module is imported and expected to expose a top-level ``workflow``
-attribute that is a :class:`~prd_harness.workflow.Workflow` instance.
+attribute that is a :class:`~darkfactory.workflow.Workflow` instance.
 
 This lets workflow authors drop a new workflow into
 ``tools/prd-harness/workflows/<name>/`` without editing any registry
 or manifest — the loader picks it up automatically. The authored
-``workflow.py`` can import from ``prd_harness.workflow`` and
-``prd_harness.builtins`` just like any normal Python module.
+``workflow.py`` can import from ``darkfactory.workflow`` and
+``darkfactory.builtins`` just like any normal Python module.
 
 Import errors in one workflow.py don't block the others — we log the
 error and skip. Duplicate workflow *names* (two modules both exporting
@@ -26,7 +26,7 @@ from pathlib import Path
 
 from .workflow import Workflow
 
-logger = logging.getLogger("prd_harness.loader")
+logger = logging.getLogger("darkfactory.loader")
 
 
 def load_workflows(workflows_dir: Path) -> dict[str, Workflow]:
@@ -95,7 +95,7 @@ def _load_workflow_module(workflow_file: Path, subdir: Path) -> Workflow:
     if the module has no top-level ``workflow``, and ``TypeError`` if
     ``workflow`` is not a :class:`Workflow` instance.
     """
-    module_name = f"_prd_harness_workflow_{subdir.name}"
+    module_name = f"_darkfactory_workflow_{subdir.name}"
     spec = importlib.util.spec_from_file_location(module_name, workflow_file)
     if spec is None or spec.loader is None:
         raise ImportError(f"could not create import spec for {workflow_file}")

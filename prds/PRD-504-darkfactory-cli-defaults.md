@@ -6,7 +6,7 @@ status: ready
 priority: high
 effort: s
 capability: moderate
-parent: "[[PRD-500-darkfactory-migration]]"
+parent: "[[PRD-500-darkfactory-extraction]]"
 depends_on:
   - "[[PRD-503-darkfactory-port-tests-workflows]]"
 blocks:
@@ -22,7 +22,7 @@ created: 2026-04-08
 updated: 2026-04-08
 tags:
   - harness
-  - migration
+  - extraction
   - cli
 ---
 
@@ -79,7 +79,7 @@ No test updates needed — `test_cli_workflows.py` and `test_cli_run.py` both us
 
 - [ ] AC-1: `_default_prd_dir()` returns `<repo_root>/prds/`.
 - [ ] AC-2: `_default_workflows_dir()` returns `<repo_root>/workflows/`.
-- [ ] AC-3: `darkfactory/prds/` contains the 12 migrated task PRDs (PRD-200..211) plus the migration PRDs (PRD-500..505, 510, 520).
+- [ ] AC-3: `darkfactory/prds/` contains the 12 ported task PRDs (PRD-200..211) plus the extraction PRDs (PRD-500..505, 510, 520).
 - [ ] AC-4: `uv run prd status` (from within darkfactory) reports the correct counts.
 - [ ] AC-5: `uv run prd tree PRD-200` shows the workflow execution layer tree.
 - [ ] AC-6: `uv run prd plan PRD-201` prints a plan with the default workflow.

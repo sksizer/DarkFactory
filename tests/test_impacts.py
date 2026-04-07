@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from prd_harness import impacts
-from prd_harness.prd import load_all
+from darkfactory import impacts
+from darkfactory.prd import load_all
 
 from .conftest import write_prd
 
