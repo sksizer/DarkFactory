@@ -2,7 +2,7 @@
 id: "PRD-209"
 title: "Real Builtin Implementations"
 kind: task
-status: ready
+status: review
 priority: high
 effort: m
 capability: moderate
@@ -17,7 +17,7 @@ impacts:
 workflow: null
 target_version: null
 created: 2026-04-07
-updated: 2026-04-07
+updated: 2026-04-08
 tags:
   - harness
   - builtins

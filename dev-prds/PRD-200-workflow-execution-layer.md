@@ -20,10 +20,7 @@ blocks:
   - "[[PRD-209-real-builtins]]"
   - "[[PRD-210-runner]]"
   - "[[PRD-211-plan-run-cli]]"
-impacts:
-  - tools/prd-harness/src/prd_harness/**
-  - tools/prd-harness/workflows/default/**
-  - tools/prd-harness/tests/**
+impacts: []  # container (see PRD-212): effective impacts derived from leaf descendants
 workflow: null
 target_version: null
 created: 2026-04-07

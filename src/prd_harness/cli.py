@@ -12,13 +12,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from . import containment, graph, impacts
-from .prd import PRD, load_all, parse_id_sort_key
+from . import assign, containment, graph, impacts
+from .invoke import capability_to_model
+from .loader import load_workflows
+from .prd import PRD, load_all, parse_id_sort_key, set_workflow
+from .runner import RunResult, _compute_branch_name, _pick_model, run_workflow
+from .workflow import AgentTask, BuiltIn, ShellTask, Task, Workflow
 
 # Priority/effort orderings used for sorting actionable lists.
 PRIORITY_ORDER: dict[str, int] = {"critical": 0, "high": 1, "medium": 2, "low": 3}
@@ -45,6 +50,23 @@ def _default_prd_dir() -> Path:
     """Locate ``docs/prd/`` relative to the repo root."""
     repo = _find_repo_root(Path.cwd())
     return repo / "docs" / "prd"
+
+
+def _default_workflows_dir() -> Path:
+    """Locate ``tools/prd-harness/workflows/`` relative to the repo root.
+
+    All built-in workflows ship under this path. Overridable via
+    ``--workflows-dir`` on the CLI for tests or alternative deployments.
+    """
+    repo = _find_repo_root(Path.cwd())
+    return repo / "tools" / "prd-harness" / "workflows"
+
+
+def _load_workflows_or_fail(workflows_dir: Path) -> dict[str, Workflow]:
+    """Load workflows with a user-friendly error if the directory is missing."""
+    if not workflows_dir.exists():
+        raise SystemExit(f"workflows directory not found: {workflows_dir}")
+    return load_workflows(workflows_dir)
 
 
 def _action_sort_key(prd: PRD) -> tuple[int, int, tuple[int, ...]]:
@@ -181,7 +203,24 @@ def cmd_validate(args: argparse.Namespace) -> int:
                 break
             cur = nxt
 
-    # 5. Impact overlap warnings (ready PRDs only)
+    # 5. Container PRDs must have empty impacts.
+    # The leaf-only rule (see impacts.py) gives us a single source of
+    # truth: containers' effective impacts are computed from their
+    # descendants, so declared impacts on a container would be a
+    # divergent second source that could silently drift.
+    for prd in prds.values():
+        kids = containment.children(prd.id, prds)
+        if kids and prd.impacts:
+            errors.append(
+                f"{prd.id}: container PRD (has {len(kids)} children) "
+                f"must have impacts: [] — declared impacts on containers "
+                f"create divergence with the computed descendant union "
+                f"(got {prd.impacts!r})"
+            )
+
+    # 6. Impact overlap warnings (ready PRDs only).
+    # Uses effective_impacts (aggregated for containers) and exempts
+    # parent/child pairs (containment is not conflict).
     try:
         repo_root = _find_repo_root(args.prd_dir)
         files = impacts.tracked_files(repo_root)
@@ -189,24 +228,37 @@ def cmd_validate(args: argparse.Namespace) -> int:
         files = []
 
     if files:
-        ready = [p for p in prds.values() if p.status == "ready" and p.impacts]
+        ready = [p for p in prds.values() if p.status == "ready"]
         for i, a in enumerate(ready):
             for b in ready[i + 1 :]:
                 # Skip if there's an explicit dep relation in either direction.
                 if b.id in a.depends_on or a.id in b.depends_on:
                     continue
-                overlap = impacts.impacts_overlap(a, b, files)
+                try:
+                    overlap = impacts.impacts_overlap(a, b, files, prds)
+                except ValueError:
+                    # effective_impacts refused — already reported by the
+                    # container-has-impacts check above. Skip silently
+                    # here so we don't double-report.
+                    continue
                 if overlap:
                     warnings.append(
                         f"{a.id} and {b.id} have overlapping impacts "
                         f"({len(overlap)} files) but no explicit dependency"
                     )
 
-    # 6. Undeclared impacts (informational)
-    undeclared = [p.id for p in prds.values() if p.status == "ready" and not p.impacts]
+    # 7. Undeclared impacts on leaves (informational)
+    undeclared = [
+        p.id
+        for p in prds.values()
+        if p.status == "ready"
+        and not p.impacts
+        and not containment.children(p.id, prds)  # leaves only
+    ]
     if undeclared and args.verbose:
         warnings.append(
-            f"{len(undeclared)} ready PRDs have no declared impacts (undeclared = sequential)"
+            f"{len(undeclared)} ready leaf PRDs have no declared impacts "
+            "(undeclared = sequential)"
         )
 
     for err in errors:
@@ -298,23 +350,42 @@ def cmd_conflicts(args: argparse.Namespace) -> int:
     repo_root = _find_repo_root(args.prd_dir)
     conflicts = impacts.find_conflicts(prd, prds, repo_root)
 
+    # Use effective_impacts so containers show their aggregated view
+    # (union of descendants) rather than an empty declared list.
+    try:
+        effective = impacts.effective_impacts(prd, prds)
+    except ValueError as exc:
+        raise SystemExit(str(exc))
+
     if args.json:
         print(
             json.dumps(
-                [
-                    {"id": other_id, "files": sorted(files)}
-                    for other_id, files in conflicts
-                ],
+                {
+                    "id": prd.id,
+                    "effective_impacts": effective,
+                    "conflicts": [
+                        {"id": other_id, "files": sorted(files)}
+                        for other_id, files in conflicts
+                    ],
+                },
                 indent=2,
             )
         )
         return 0
 
-    if not prd.impacts:
-        print(f"{prd.id} has no declared impacts; cannot compute overlaps")
+    if not effective:
+        kids = containment.children(prd.id, prds)
+        if kids:
+            print(
+                f"{prd.id} is a container with {len(kids)} children that "
+                "have no declared impacts yet"
+            )
+        else:
+            print(f"{prd.id} has no declared impacts; cannot compute overlaps")
         return 0
     if not conflicts:
         print(f"{prd.id} has no impact conflicts with other PRDs")
+        print(f"  (effective impact set: {len(effective)} pattern(s))")
         return 0
 
     print(f"{prd.id} conflicts:")
@@ -323,6 +394,322 @@ def cmd_conflicts(args: argparse.Namespace) -> int:
         for f in sorted(files):
             print(f"    {f}")
     return 0
+
+
+def cmd_list_workflows(args: argparse.Namespace) -> int:
+    """List all loaded workflows with priority and description."""
+    workflows = _load_workflows_or_fail(args.workflows_dir)
+    if not workflows:
+        print("(no workflows loaded)")
+        return 0
+
+    # Sort by descending priority then alphabetically for stable display.
+    sorted_wfs = sorted(
+        workflows.values(),
+        key=lambda w: (-w.priority, w.name),
+    )
+
+    if args.json:
+        payload = [
+            {
+                "name": w.name,
+                "priority": w.priority,
+                "description": w.description,
+                "task_count": len(w.tasks),
+                "workflow_dir": str(w.workflow_dir) if w.workflow_dir else None,
+            }
+            for w in sorted_wfs
+        ]
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    for w in sorted_wfs:
+        # Header line: name, priority, task count
+        print(f"{w.name:20} priority={w.priority:<3} tasks={len(w.tasks)}")
+        if w.description:
+            # Indent description under the header
+            for line in w.description.splitlines():
+                print(f"  {line}")
+        print()
+    return 0
+
+
+def cmd_assign(args: argparse.Namespace) -> int:
+    """Compute the workflow assignment for every PRD, optionally persist.
+
+    Output is a table of ``PRD-id -> workflow-name``. With ``--write``,
+    the resolved workflow name is persisted into each PRD's frontmatter
+    (only for PRDs that don't already have an explicit workflow field —
+    the command is idempotent on re-run).
+    """
+    prds = _load(args.prd_dir)
+    workflows = _load_workflows_or_fail(args.workflows_dir)
+
+    try:
+        assignments = assign.assign_all(prds, workflows)
+    except KeyError as exc:
+        raise SystemExit(str(exc))
+
+    if args.json:
+        payload = [
+            {
+                "id": prd_id,
+                "workflow": wf.name,
+                "explicit": prds[prd_id].workflow is not None,
+            }
+            for prd_id, wf in sorted(
+                assignments.items(),
+                key=lambda kv: parse_id_sort_key(kv[0]),
+            )
+        ]
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    # Human-readable table. Mark explicit assignments with a `*`.
+    print(f"{'PRD':14} {'Workflow':20} Source")
+    print("-" * 50)
+    for prd_id in sorted(assignments.keys(), key=parse_id_sort_key):
+        wf = assignments[prd_id]
+        source = "explicit" if prds[prd_id].workflow else "predicate"
+        print(f"{prd_id:14} {wf.name:20} {source}")
+
+    if args.write:
+        written = 0
+        for prd_id, wf in assignments.items():
+            prd = prds[prd_id]
+            if prd.workflow is None:
+                set_workflow(prd, wf.name)
+                written += 1
+        print(f"\nPersisted {written} workflow assignments to frontmatter.")
+    return 0
+
+
+def _describe_task(task: Task, ctx_prd: PRD, model_override: str | None) -> str:
+    """Produce a one-line human-readable description of a task for `prd plan`."""
+    if isinstance(task, BuiltIn):
+        kwargs_str = (
+            " " + ", ".join(f"{k}={v!r}" for k, v in task.kwargs.items())
+            if task.kwargs
+            else ""
+        )
+        return f"builtin: {task.name}{kwargs_str}"
+    if isinstance(task, AgentTask):
+        model = _pick_model(task, ctx_prd, override=model_override)
+        prompts = ", ".join(task.prompts) or "(none)"
+        tools_count = len(task.tools)
+        return (
+            f"agent: {task.name} [model={model}, prompts={prompts}, "
+            f"tools={tools_count}, retries={task.retries}]"
+        )
+    if isinstance(task, ShellTask):
+        return f"shell: {task.name} ({task.on_failure}) -> {task.cmd}"
+    return f"unknown task type: {type(task).__name__}"
+
+
+def _resolve_base_ref(explicit: str | None, repo_root: Path) -> str:
+    """Determine the git base ref for a new workflow branch.
+
+    Explicit override (``--base``) wins. Otherwise defaults to the
+    current HEAD of the repo — the idea being that a ``run-chain``
+    starts from whatever branch the user is sitting on.
+    """
+    if explicit:
+        return explicit
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--abbrev-ref", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip() or "main"
+    except subprocess.CalledProcessError:
+        return "main"
+
+
+def _check_runnable(prd: PRD, prds: dict[str, PRD]) -> str | None:
+    """Return an error string if the PRD can't be run, else None."""
+    if prd.status == "done":
+        return f"{prd.id} is already done"
+    if prd.status == "cancelled":
+        return f"{prd.id} is cancelled"
+    if not graph.is_actionable(prd, prds):
+        missing = graph.missing_deps(prd, prds)
+        if missing:
+            return (
+                f"{prd.id} depends on missing PRDs: {', '.join(missing)}"
+            )
+        unfinished = [
+            dep_id
+            for dep_id in prd.depends_on
+            if dep_id in prds and prds[dep_id].status != "done"
+        ]
+        if unfinished:
+            return (
+                f"{prd.id} has unfinished dependencies: "
+                + ", ".join(f"{d} ({prds[d].status})" for d in unfinished)
+            )
+        return f"{prd.id} status is {prd.status!r}, not 'ready'"
+    if not containment.is_runnable(prd, prds):
+        return (
+            f"{prd.id} is an epic/feature with children; "
+            "use the planning workflow or run its task descendants instead"
+        )
+    return None
+
+
+def cmd_plan(args: argparse.Namespace) -> int:
+    """Show the execution plan for a PRD without touching anything.
+
+    Resolves the workflow, computes the branch name + base ref + model,
+    and prints the ordered task list with descriptions. No git
+    operations, no subprocess, no agent invocation.
+    """
+    prds = _load(args.prd_dir)
+    if args.prd_id not in prds:
+        raise SystemExit(f"unknown PRD id: {args.prd_id}")
+    prd = prds[args.prd_id]
+
+    workflows = _load_workflows_or_fail(args.workflows_dir)
+
+    # Resolve workflow (respecting --workflow override).
+    if args.workflow:
+        if args.workflow not in workflows:
+            raise SystemExit(f"unknown workflow: {args.workflow}")
+        workflow = workflows[args.workflow]
+    else:
+        try:
+            workflow = assign.assign_workflow(prd, prds, workflows)
+        except KeyError as exc:
+            raise SystemExit(str(exc))
+
+    branch = _compute_branch_name(prd)
+    repo_root = _find_repo_root(args.prd_dir)
+    base_ref = _resolve_base_ref(args.base, repo_root)
+
+    # Note any runnability issues as warnings (plan still shows, but
+    # the user gets a heads-up that `prd run --execute` would refuse).
+    runnable_error = _check_runnable(prd, prds)
+
+    if args.json:
+        payload: dict[str, object] = {
+            "prd": {
+                "id": prd.id,
+                "title": prd.title,
+                "kind": prd.kind,
+                "status": prd.status,
+                "capability": prd.capability,
+            },
+            "workflow": {
+                "name": workflow.name,
+                "description": workflow.description,
+                "priority": workflow.priority,
+            },
+            "branch": branch,
+            "base_ref": base_ref,
+            "default_model": capability_to_model(prd.capability),
+            "tasks": [
+                _describe_task(task, prd, args.model)
+                for task in workflow.tasks
+            ],
+            "runnable_error": runnable_error,
+        }
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    print(f"# Plan for {prd.id}: {prd.title}")
+    print()
+    print(f"  kind:       {prd.kind}")
+    print(f"  status:     {prd.status}")
+    print(f"  capability: {prd.capability} -> default model {capability_to_model(prd.capability)}")
+    print()
+    print(f"  workflow:   {workflow.name} (priority {workflow.priority})")
+    if workflow.description:
+        print(f"  — {workflow.description}")
+    print()
+    print(f"  branch:     {branch}")
+    print(f"  base ref:   {base_ref}")
+    print()
+    print(f"  tasks ({len(workflow.tasks)}):")
+    for i, task in enumerate(workflow.tasks, start=1):
+        print(f"    {i:>2}. {_describe_task(task, prd, args.model)}")
+
+    if runnable_error:
+        print()
+        print(f"  ⚠ NOT RUNNABLE: {runnable_error}")
+        print("    (`prd run --execute` would refuse this PRD)")
+    return 0
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    """Run a workflow against a PRD. Defaults to dry-run; opt in via --execute.
+
+    In dry-run mode, this is effectively a more detailed version of
+    ``prd plan`` — it walks the runner's dispatch loop but each task
+    only logs what it would do. With ``--execute``, the runner actually
+    creates the worktree, invokes the agent, runs checks, pushes, and
+    creates the PR.
+    """
+    prds = _load(args.prd_dir)
+    if args.prd_id not in prds:
+        raise SystemExit(f"unknown PRD id: {args.prd_id}")
+    prd = prds[args.prd_id]
+
+    workflows = _load_workflows_or_fail(args.workflows_dir)
+
+    # Resolve workflow.
+    if args.workflow:
+        if args.workflow not in workflows:
+            raise SystemExit(f"unknown workflow: {args.workflow}")
+        workflow = workflows[args.workflow]
+    else:
+        try:
+            workflow = assign.assign_workflow(prd, prds, workflows)
+        except KeyError as exc:
+            raise SystemExit(str(exc))
+
+    # Runnability check only applies when actually executing. Dry-run
+    # should be allowed on any PRD for discovery.
+    if args.execute:
+        err = _check_runnable(prd, prds)
+        if err:
+            raise SystemExit(f"cannot run: {err}")
+
+    repo_root = _find_repo_root(args.prd_dir)
+    base_ref = _resolve_base_ref(args.base, repo_root)
+
+    dry_run = not args.execute
+
+    if dry_run:
+        print(f"# Dry-run: {prd.id} via workflow {workflow.name!r}")
+    else:
+        print(f"# Executing: {prd.id} via workflow {workflow.name!r}")
+
+    result = run_workflow(
+        prd=prd,
+        workflow=workflow,
+        repo_root=repo_root,
+        base_ref=base_ref,
+        dry_run=dry_run,
+        model_override=args.model,
+    )
+
+    print()
+    print("  Steps:")
+    for step in result.steps:
+        marker = "✓" if step.success else "✗"
+        detail = f" — {step.detail}" if step.detail else ""
+        print(f"    {marker} [{step.kind}] {step.name}{detail}")
+
+    print()
+    if result.success:
+        print(f"  Result: ✓ success")
+        if result.pr_url:
+            print(f"  PR:     {result.pr_url}")
+        return 0
+    else:
+        print(f"  Result: ✗ FAILED — {result.failure_reason}")
+        return 1
 
 
 # ---------- argparse plumbing ----------
@@ -335,6 +722,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="Path to docs/prd directory (default: auto-detect from cwd)",
+    )
+    parser.add_argument(
+        "--workflows-dir",
+        type=Path,
+        default=None,
+        help="Path to workflows directory (default: tools/prd-harness/workflows)",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON output where supported")
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -370,6 +763,71 @@ def build_parser() -> argparse.ArgumentParser:
     sub_conflicts.add_argument("prd_id")
     sub_conflicts.set_defaults(func=cmd_conflicts)
 
+    sub_list_wfs = sub.add_parser(
+        "list-workflows", help="Show loaded workflows with priorities"
+    )
+    sub_list_wfs.set_defaults(func=cmd_list_workflows)
+
+    sub_assign = sub.add_parser(
+        "assign",
+        help="Compute workflow assignment per PRD (optionally persist)",
+    )
+    sub_assign.add_argument(
+        "--write",
+        action="store_true",
+        help="Persist assignments to PRD frontmatter (only for unassigned PRDs)",
+    )
+    sub_assign.set_defaults(func=cmd_assign)
+
+    sub_plan = sub.add_parser(
+        "plan",
+        help="Show the execution plan for a PRD without touching anything",
+    )
+    sub_plan.add_argument("prd_id")
+    sub_plan.add_argument(
+        "--workflow",
+        default=None,
+        help="Override the workflow assignment (by name)",
+    )
+    sub_plan.add_argument(
+        "--base",
+        default=None,
+        help="Base ref for the new branch (default: current HEAD)",
+    )
+    sub_plan.add_argument(
+        "--model",
+        default=None,
+        help="Override the capability->model mapping (e.g. opus)",
+    )
+    sub_plan.set_defaults(func=cmd_plan)
+
+    sub_run = sub.add_parser(
+        "run",
+        help="Run a workflow against a PRD (dry-run unless --execute)",
+    )
+    sub_run.add_argument("prd_id")
+    sub_run.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute (default is dry-run)",
+    )
+    sub_run.add_argument(
+        "--workflow",
+        default=None,
+        help="Override the workflow assignment (by name)",
+    )
+    sub_run.add_argument(
+        "--base",
+        default=None,
+        help="Base ref for the new branch (default: current HEAD)",
+    )
+    sub_run.add_argument(
+        "--model",
+        default=None,
+        help="Override the capability->model mapping (e.g. opus)",
+    )
+    sub_run.set_defaults(func=cmd_run)
+
     return parser
 
 
@@ -378,6 +836,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.prd_dir is None:
         args.prd_dir = _default_prd_dir()
+    if args.workflows_dir is None:
+        args.workflows_dir = _default_workflows_dir()
     func: Any = args.func
     return int(func(args))
 
