@@ -2,7 +2,7 @@
 id: "PRD-207"
 title: "Prompt Template Loader"
 kind: task
-status: ready
+status: review
 priority: high
 effort: xs
 capability: simple
@@ -17,7 +17,7 @@ impacts:
 workflow: null
 target_version: null
 created: 2026-04-07
-updated: 2026-04-07
+updated: 2026-04-08
 tags:
   - harness
   - templates
