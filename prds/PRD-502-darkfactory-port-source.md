@@ -6,7 +6,7 @@ status: ready
 priority: high
 effort: s
 capability: simple
-parent: "[[PRD-500-darkfactory-migration]]"
+parent: "[[PRD-500-darkfactory-extraction]]"
 depends_on:
   - "[[PRD-501-darkfactory-scaffold]]"
 blocks:
@@ -20,7 +20,7 @@ created: 2026-04-08
 updated: 2026-04-08
 tags:
   - harness
-  - migration
+  - extraction
   - rename
 ---
 

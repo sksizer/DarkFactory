@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from prd_harness.prd import load_all
-from prd_harness.workflow import (
+from darkfactory.prd import load_all
+from darkfactory.workflow import (
     AgentTask,
     BuiltIn,
     ExecutionContext,

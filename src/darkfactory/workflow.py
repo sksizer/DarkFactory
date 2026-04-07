@@ -83,7 +83,7 @@ class Task:
 class BuiltIn(Task):
     """Reference a deterministic primitive from the ``BUILTINS`` registry.
 
-    The runner looks up ``name`` in ``prd_harness.builtins.BUILTINS`` and
+    The runner looks up ``name`` in ``darkfactory.builtins.BUILTINS`` and
     calls the registered function with ``(ctx, **kwargs)``. String values
     in ``kwargs`` are formatted via :meth:`ExecutionContext.format_string`
     before the call, so workflow authors can use ``{prd_id}``-style
@@ -229,7 +229,7 @@ class ExecutionContext:
     pr_url: str | None = None
     dry_run: bool = True
     logger: logging.Logger = field(
-        default_factory=lambda: logging.getLogger("prd_harness")
+        default_factory=lambda: logging.getLogger("darkfactory")
     )
 
     def format_string(self, template: str) -> str:

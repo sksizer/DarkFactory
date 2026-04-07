@@ -1,11 +1,11 @@
-"""Command-line interface for the PRD harness.
-
-Foundation phase: read-only subcommands only. Workflow execution, migration,
-and ``run``/``run-chain`` land in subsequent commits.
+"""Command-line interface for the darkfactory PRD harness.
 
 Usage::
 
-    uv run --project tools/prd-harness prd <subcommand> [options]
+    uv run prd <subcommand> [options]
+
+Defaults: PRDs live in ``prds/`` and workflows in ``workflows/`` at the
+repo root. Override via ``--prd-dir`` and ``--workflows-dir``.
 """
 
 from __future__ import annotations
@@ -47,19 +47,25 @@ def _find_repo_root(start: Path) -> Path:
 
 
 def _default_prd_dir() -> Path:
-    """Locate ``docs/prd/`` relative to the repo root."""
+    """Locate ``prds/`` at the repo root.
+
+    darkfactory ships its own PRDs under ``prds/`` rather than the
+    nested ``docs/prd/`` layout the harness used inside pumice.
+    Overridable via ``--prd-dir`` for repos that prefer a different
+    location.
+    """
     repo = _find_repo_root(Path.cwd())
-    return repo / "docs" / "prd"
+    return repo / "prds"
 
 
 def _default_workflows_dir() -> Path:
-    """Locate ``tools/prd-harness/workflows/`` relative to the repo root.
+    """Locate ``workflows/`` at the repo root.
 
     All built-in workflows ship under this path. Overridable via
-    ``--workflows-dir`` on the CLI for tests or alternative deployments.
+    ``--workflows-dir``.
     """
     repo = _find_repo_root(Path.cwd())
-    return repo / "tools" / "prd-harness" / "workflows"
+    return repo / "workflows"
 
 
 def _load_workflows_or_fail(workflows_dir: Path) -> dict[str, Workflow]:
@@ -110,7 +116,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         print(json.dumps(out, indent=2))
         return 0
 
-    print(f"Pumice PRDs — {len(prds)} total")
+    print(f"PRDs — {len(prds)} total")
     for status in ("done", "review", "in-progress", "ready", "blocked", "draft", "cancelled"):
         n = counts.get(status, 0)
         if n:

@@ -1,4 +1,4 @@
-"""Enable ``python -m prd_harness`` invocation."""
+"""Enable ``python -m darkfactory`` invocation."""
 
 from __future__ import annotations
 

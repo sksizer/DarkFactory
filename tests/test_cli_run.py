@@ -14,8 +14,8 @@ from unittest.mock import patch
 
 import pytest
 
-from prd_harness.cli import main
-from prd_harness.invoke import InvokeResult
+from darkfactory.cli import main
+from darkfactory.invoke import InvokeResult
 
 from .conftest import write_prd
 
@@ -34,7 +34,7 @@ def _write_workflow_with_prompts(workflows_dir: Path, name: str = "default") -> 
     (wf / "prompts" / "verify.md").write_text("Fix:\n{{CHECK_OUTPUT}}\n")
     (wf / "workflow.py").write_text(
         f'''"""Fixture {name} workflow."""
-from prd_harness.workflow import AgentTask, BuiltIn, ShellTask, Workflow
+from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Workflow
 
 
 def _applies(prd, prds):
@@ -387,7 +387,7 @@ def test_run_execute_exits_nonzero_on_workflow_failure(
     (wf / "prompts" / "task.md").write_text("# Task\n")
     (wf / "workflow.py").write_text(
         '''"""Failing fixture workflow."""
-from prd_harness.workflow import ShellTask, Workflow
+from darkfactory.workflow import ShellTask, Workflow
 
 workflow = Workflow(
     name="default",
@@ -402,7 +402,7 @@ workflow = Workflow(
     prd_dir.mkdir()
     write_prd(prd_dir, "PRD-070", "task", status="ready")
 
-    with patch("prd_harness.cli._resolve_base_ref", return_value="main"):
+    with patch("darkfactory.cli._resolve_base_ref", return_value="main"):
         exit_code = main(
             [
                 "--prd-dir",

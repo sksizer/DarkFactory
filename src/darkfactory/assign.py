@@ -8,7 +8,7 @@ run for it. The resolution priority is:
    pin a specific workflow to a specific PRD, overriding any predicate
    matching.
 2. **applies_to predicates**: otherwise, evaluate every workflow's
-   :attr:`~prd_harness.workflow.Workflow.applies_to` predicate and pick
+   :attr:`~darkfactory.workflow.Workflow.applies_to` predicate and pick
    the highest-priority workflow that returns truthy. Ties are broken
    alphabetically by workflow name for determinism.
 3. **Default fallback**: if no predicate matches, return the

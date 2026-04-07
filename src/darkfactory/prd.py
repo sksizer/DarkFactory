@@ -210,20 +210,112 @@ def write_frontmatter(prd: PRD, new_fm: dict[str, Any]) -> None:
 
     The body is preserved byte-for-byte. Updates ``prd.raw_frontmatter`` to
     reflect the written state.
+
+    NOTE: this re-serializes the entire frontmatter block, which means
+    PyYAML's quoting style replaces whatever the author wrote (``"PRD-501"``
+    becomes ``PRD-501``, etc.). For single-field updates that should leave
+    every other field byte-for-byte identical, prefer
+    :func:`update_frontmatter_field`.
     """
     new_text = f"---\n{dump_frontmatter(new_fm)}---\n{prd.body}"
     prd.path.write_text(new_text, encoding="utf-8")
     prd.raw_frontmatter = new_fm
 
 
+def update_frontmatter_field_at(
+    path: Path, updates: dict[str, str]
+) -> None:
+    """Surgically rewrite specific frontmatter fields on disk.
+
+    Only the lines matching ``^<field>:`` (where ``<field>`` is a key in
+    ``updates``) inside the leading ``---...---`` block are replaced. Every
+    other byte in the file — including quoting style on other fields, key
+    order, blank lines, and the body — is preserved exactly.
+
+    This is the byte-for-byte preservation contract documented in the
+    harness design plan. Use it for any operation that mutates a known,
+    existing scalar field (status, updated, workflow). For operations that
+    add or remove fields, fall back to :func:`write_frontmatter`.
+
+    Limitations:
+
+    - Only works for fields whose value lives entirely on the line after
+      the colon. Multi-line values (block scalars, nested mappings) are
+      not handled.
+    - The field must already exist in the frontmatter. To add a new field,
+      use the full re-serialization path.
+    - The new value is written verbatim — the caller is responsible for
+      quoting it correctly if it needs quoting.
+
+    Raises ``ValueError`` if the file has no leading frontmatter block, or
+    if any field in ``updates`` is not present in the frontmatter.
+    """
+    text = path.read_text(encoding="utf-8")
+    lines = text.splitlines(keepends=True)
+
+    # Locate the closing --- of the frontmatter block.
+    if not lines or lines[0].rstrip("\r\n") != "---":
+        raise ValueError(f"{path}: no leading frontmatter block")
+    end_idx: int | None = None
+    for i in range(1, len(lines)):
+        if lines[i].rstrip("\r\n") == "---":
+            end_idx = i
+            break
+    if end_idx is None:
+        raise ValueError(f"{path}: unterminated frontmatter block")
+
+    remaining = set(updates)
+    for i in range(1, end_idx):
+        line = lines[i]
+        for field in list(remaining):
+            prefix = f"{field}:"
+            if line.lstrip().startswith(prefix):
+                # Preserve any leading indentation (rare in our PRDs but cheap to keep).
+                indent = line[: len(line) - len(line.lstrip())]
+                eol = "\r\n" if line.endswith("\r\n") else "\n"
+                lines[i] = f"{indent}{field}: {updates[field]}{eol}"
+                remaining.discard(field)
+                break
+
+    if remaining:
+        raise ValueError(
+            f"{path}: cannot update missing frontmatter field(s): {sorted(remaining)}"
+        )
+
+    path.write_text("".join(lines), encoding="utf-8")
+
+
 def set_status(prd: PRD, new_status: str) -> None:
-    """Update a PRD's status (and bump ``updated`` to today) in place."""
-    fm = dict(prd.raw_frontmatter)  # shallow copy preserves key order in 3.7+
-    fm["status"] = new_status
-    fm["updated"] = date.today().isoformat()
-    write_frontmatter(prd, fm)
+    """Update a PRD's status (and bump ``updated`` to today) in place.
+
+    Uses surgical line-editing to preserve every other frontmatter field
+    byte-for-byte. Mutates the file at ``prd.path`` — callers that need to
+    target a copy of the file at a different path (e.g. inside a worktree)
+    should use :func:`set_status_at` directly.
+    """
+    set_status_at(prd.path, new_status)
+    prd.raw_frontmatter = dict(prd.raw_frontmatter)
+    prd.raw_frontmatter["status"] = new_status
+    prd.raw_frontmatter["updated"] = date.today().isoformat()
     prd.status = new_status
-    prd.updated = fm["updated"]
+    prd.updated = prd.raw_frontmatter["updated"]
+
+
+def set_status_at(path: Path, new_status: str) -> None:
+    """Path-targeted variant of :func:`set_status`.
+
+    Updates the ``status:`` and ``updated:`` fields in the frontmatter at
+    ``path`` without touching any other field. This decoupling lets the
+    harness builtin write to the worktree copy of a PRD while leaving the
+    source repo's working tree clean (see PRD-213).
+    """
+    # Quote the date so PyYAML round-trips it as a string instead of
+    # auto-coercing to a ``datetime.date`` object on the next parse.
+    today = date.today().isoformat()
+    update_frontmatter_field_at(
+        path,
+        {"status": new_status, "updated": f"'{today}'"},
+    )
 
 
 def set_workflow(prd: PRD, workflow_name: str | None) -> None:

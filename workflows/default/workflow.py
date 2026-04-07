@@ -23,7 +23,7 @@ pluggable implementation.
 
 from __future__ import annotations
 
-from prd_harness.workflow import AgentTask, BuiltIn, ShellTask, Workflow
+from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Workflow
 
 
 def _applies_to_everything(prd, prds):  # type: ignore[no-untyped-def]

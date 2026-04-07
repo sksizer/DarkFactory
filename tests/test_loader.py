@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from prd_harness.loader import load_workflows
-from prd_harness.workflow import BuiltIn, Workflow
+from darkfactory.loader import load_workflows
+from darkfactory.workflow import BuiltIn, Workflow
 
 
 def _write_workflow(
@@ -28,7 +28,7 @@ def _write_workflow(
 
     if body is None:
         body = f'''"""Fixture workflow."""
-from prd_harness.workflow import BuiltIn, Workflow
+from darkfactory.workflow import BuiltIn, Workflow
 
 workflow = Workflow(
     name={name!r},
@@ -129,7 +129,7 @@ def test_load_skips_workflows_with_syntax_errors(
         "broken",
         body="this is not valid python syntax !@#$%\n",
     )
-    with caplog.at_level(logging.WARNING, logger="prd_harness.loader"):
+    with caplog.at_level(logging.WARNING, logger="darkfactory.loader"):
         result = load_workflows(tmp_path)
     assert "good" in result
     assert "broken" not in result
@@ -145,7 +145,7 @@ def test_load_skips_workflows_missing_attribute(
         "bad",
         body="x = 42\n",  # no `workflow` attribute
     )
-    with caplog.at_level(logging.WARNING, logger="prd_harness.loader"):
+    with caplog.at_level(logging.WARNING, logger="darkfactory.loader"):
         result = load_workflows(tmp_path)
     assert result == {}
     assert any("failed to load workflow" in rec.message for rec in caplog.records)
@@ -160,7 +160,7 @@ def test_load_skips_workflows_with_wrong_type(
         "wrong-type",
         body="workflow = 'not a Workflow instance'\n",
     )
-    with caplog.at_level(logging.WARNING, logger="prd_harness.loader"):
+    with caplog.at_level(logging.WARNING, logger="darkfactory.loader"):
         result = load_workflows(tmp_path)
     assert result == {}
 
@@ -171,7 +171,7 @@ def test_load_rejects_duplicate_names(tmp_path: Path) -> None:
     _write_workflow(
         tmp_path,
         "second",
-        body='''from prd_harness.workflow import Workflow
+        body='''from darkfactory.workflow import Workflow
 workflow = Workflow(name="first")  # deliberate collision
 ''',
     )

@@ -1,6 +1,6 @@
 """Prompt file loading and variable substitution for AgentTasks.
 
-When the runner executes an :class:`~prd_harness.workflow.AgentTask`,
+When the runner executes an :class:`~darkfactory.workflow.AgentTask`,
 it needs to build the prompt the Claude Code subprocess will receive.
 That involves three steps:
 
@@ -8,7 +8,7 @@ That involves three steps:
    relative to the workflow's directory.
 2. **Concatenate** them with blank-line separators, preserving order.
 3. **Substitute** ``{{PLACEHOLDER}}``-style tokens with values from
-   the current :class:`~prd_harness.workflow.ExecutionContext`.
+   the current :class:`~darkfactory.workflow.ExecutionContext`.
 
 The placeholder syntax (``{{UPPERCASE_NAME}}``) is deliberately distinct
 from Python's ``str.format`` ``{lowercase}`` style used by
