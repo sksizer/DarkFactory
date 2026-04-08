@@ -50,7 +50,7 @@ Three reasons:
 
 1. **Implementation cost.** Cross-epic coordination needs a global lock or a shared state store; intra-epic scheduling doesn't. Lumping them together would inflate PRD-545's scope past the point where it could ship in a reasonable time.
 2. **Adoption risk.** Cross-epic coordination is the kind of feature that needs careful rollout — it's the difference between "the harness sometimes won't start the epic you asked for" (acceptable) and "the harness deadlocks waiting for a lock that never resolves" (not acceptable). Better to bed in PRD-545's per-epic case first, then layer this on with confidence.
-3. **Validation pathway.** PRD-545 has a concrete end-to-end integration test (re-running PRD-544's nine parallel children). This PRD's validation requires running two epics concurrently and observing that they sequence correctly — a different test harness, larger setup, and not blocked by the initial implementation.
+3. **Validation pathway.** PRD-545 has a concrete end-to-end integration test (re-running PRD-549's nine parallel children). This PRD's validation requires running two epics concurrently and observing that they sequence correctly — a different test harness, larger setup, and not blocked by the initial implementation.
 
 ## Requirements
 

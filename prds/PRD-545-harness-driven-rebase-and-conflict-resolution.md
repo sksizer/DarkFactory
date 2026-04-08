@@ -9,7 +9,7 @@ capability: complex
 parent:
 depends_on: []
 blocks:
-  - "[[PRD-544-builtins-package-split]]"
+  - "[[PRD-549-builtins-package-split]]"
 impacts:
   - src/darkfactory/runner.py
   - src/darkfactory/impacts.py
@@ -45,9 +45,9 @@ This PRD proposes adding those capabilities so that genuine parallel fan-out fro
 
 ### The concrete incident (forthcoming)
 
-PRD-544 (splitting `builtins.py` into per-function submodules) was originally designed as a nine-child parallel fan-out explicitly to stress-test the harness's DAG execution. An audit during PRD-544's refinement discovered that the harness has **no post-hoc rebase or merge-conflict resolution machinery**: `runner.py` contains zero references to rebase or merge, and `impacts.py` / the `prd conflicts` CLI command performs only *static pre-execution* impact-overlap detection from `impacts:` frontmatter globs. The output of `prd conflicts` is a warning printed at run time. Nothing acts on it.
+PRD-549 (splitting `builtins.py` into per-function submodules) was originally designed as a nine-child parallel fan-out explicitly to stress-test the harness's DAG execution. An audit during PRD-549's refinement discovered that the harness has **no post-hoc rebase or merge-conflict resolution machinery**: `runner.py` contains zero references to rebase or merge, and `impacts.py` / the `prd conflicts` CLI command performs only *static pre-execution* impact-overlap detection from `impacts:` frontmatter globs. The output of `prd conflicts` is a warning printed at run time. Nothing acts on it.
 
-As a result, PRD-544 had to be redesigned to *avoid* the conflict — by pre-relocating `builtins.py` into a transitional `_legacy.py` bucket so each child only makes a one-line delete in the shared file. That's a fine workaround for one epic, but it's not a general solution. The next epic with a true file-level fan-out will hit the same wall and require its own custom workaround. The right fix is in the harness itself.
+As a result, PRD-549 had to be redesigned to *avoid* the conflict — by pre-relocating `builtins.py` into a transitional `_legacy.py` bucket so each child only makes a one-line delete in the shared file. That's a fine workaround for one epic, but it's not a general solution. The next epic with a true file-level fan-out will hit the same wall and require its own custom workaround. The right fix is in the harness itself.
 
 ### Why parallel fan-out matters
 
@@ -60,7 +60,7 @@ Parallel execution of sibling children is one of the main value propositions of 
 But the value evaporates the moment those siblings touch overlapping files, because the harness doesn't know how to reconcile them. Today the options are:
 
 - **(a)** Serialize everything (defeats the point of parallelism).
-- **(b)** Hand-design the epic so siblings can't conflict (works sometimes, as in PRD-544's `_legacy.py` trick, but it's brittle and requires specific foreknowledge).
+- **(b)** Hand-design the epic so siblings can't conflict (works sometimes, as in PRD-549's `_legacy.py` trick, but it's brittle and requires specific foreknowledge).
 - **(c)** Let the humans clean up afterwards (defeats the point of automation).
 
 None of those are satisfying. The harness should handle at least the common cases automatically.
@@ -156,7 +156,7 @@ A follow-up could run a "declared vs actual impacts" check after each PRD merges
 - [ ] **AC-9 (non-functional):** Same epic, same starting commit, same conflict pattern → same execution plan twice in a row.
 - [ ] **AC-10 (opt-out):** `prd run <epic> --no-auto-rebase` produces today's behavior (independent branches, no scheduler, no auto-rebase, no conflict-resolution agent).
 - [ ] **AC-11 (regression):** Non-epic single-PRD runs continue to behave exactly as they do today. This feature adds machinery for epics without touching the simple case.
-- [ ] **AC-12 (validation):** PRD-544's original nine-parallel-children design (without the `_legacy.py` workaround) is re-runnable under this feature as an end-to-end integration test and completes successfully with all nine children merged.
+- [ ] **AC-12 (validation):** PRD-549's original nine-parallel-children design (without the `_legacy.py` workaround) is re-runnable under this feature as an end-to-end integration test and completes successfully with all nine children merged.
 
 ## Open Questions
 
@@ -174,5 +174,5 @@ A follow-up could run a "declared vs actual impacts" check after each PRD merges
 - Prior art: `src/darkfactory/impacts.py` — the static conflict detector this PRD builds on.
 - Prior art: `src/darkfactory/containment.py` — parent/child relationships.
 - Prior art: `prd conflicts <ID>` CLI command in `src/darkfactory/cli.py`.
-- Originating incident: [[PRD-544-builtins-package-split]] — the epic whose nine-parallel-children design exposed this gap. AC-12 of this PRD explicitly targets re-running that design without the `_legacy.py` workaround.
+- Originating incident: [[PRD-549-builtins-package-split]] — the epic whose nine-parallel-children design exposed this gap. AC-12 of this PRD explicitly targets re-running that design without the `_legacy.py` workaround.
 - [[PRD-543-harness-pr-creation-hardening]] — overlaps in spirit: both are "the harness needs to surface and act on information it already has."
