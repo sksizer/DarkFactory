@@ -2,7 +2,7 @@
 id: PRD-544
 title: prd run base_ref must default to main, not the current branch
 kind: task
-status: ready
+status: in-progress
 priority: high
 effort: xs
 capability: trivial
@@ -15,7 +15,7 @@ impacts:
 workflow:
 target_version:
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-08'
 tags:
   - harness
   - reliability
