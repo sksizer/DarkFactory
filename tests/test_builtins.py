@@ -689,10 +689,13 @@ def test_ensure_worktree_remote_timeout_falls_back_to_local(
     # so the guard should not fire despite the timeout.
     original_run = subprocess.run
 
-    def fake_run(cmd, **kwargs):
-        if "ls-remote" in cmd:
+    from typing import Any
+
+    def fake_run(*args: Any, **kwargs: Any) -> Any:
+        cmd = args[0] if args else kwargs.get("args")
+        if isinstance(cmd, list) and "ls-remote" in cmd:
             raise subprocess.TimeoutExpired(cmd, 10)
-        return original_run(cmd, **kwargs)
+        return original_run(*args, **kwargs)
 
     with caplog.at_level(logging.WARNING, logger="darkfactory"):
         with patch("darkfactory.builtins.subprocess.run", side_effect=fake_run):

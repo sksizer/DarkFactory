@@ -88,11 +88,16 @@ workflow = Workflow(
         ShellTask("test", cmd="just test", on_failure="retry_agent"),
         ShellTask("lint", cmd="just lint format-check", on_failure="retry_agent"),
         # ----- teardown phase -----
+        # set_status BEFORE the final commit so the review-status change
+        # lands in the commit that gets pushed. Doing set_status after
+        # commit leaves the status mutation uncommitted and the pushed
+        # branch (and merged PR) shows status: in-progress instead of
+        # review.
+        BuiltIn("set_status", kwargs={"to": "review"}),
         BuiltIn(
             "commit",
             kwargs={"message": "chore(prd): {prd_id} ready for review"},
         ),
-        BuiltIn("set_status", kwargs={"to": "review"}),
         BuiltIn("push_branch"),
         BuiltIn("create_pr"),
     ],
