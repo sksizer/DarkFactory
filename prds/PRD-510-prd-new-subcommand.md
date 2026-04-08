@@ -2,7 +2,7 @@
 id: "PRD-510"
 title: "prd new subcommand for creating draft PRDs"
 kind: task
-status: review
+status: done
 priority: medium
 effort: s
 capability: simple
@@ -52,6 +52,7 @@ This was the original request from the user that motivated the extraction — "c
 1. No dependency on any other command — `prd new` works even if there are zero existing PRDs.
 2. Respects the global `--prd-dir` flag so the user can direct the new PRD into any directory.
 3. Embedded template lives in `cli.py` (or a `templates.py` constant) — no external template file required.
+4. cli.py should be a lightweight command parser + dispatcher with minimal logic.
 
 ## Technical Approach
 
