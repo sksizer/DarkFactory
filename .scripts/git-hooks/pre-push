@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Refuses any push targeting refs/heads/main on origin.
+# Override with --no-verify if you really mean it (but you shouldn't).
+
+set -euo pipefail
+
+protected_branch="refs/heads/main"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    if [ "$remote_ref" = "$protected_branch" ]; then
+        echo ""
+        echo "ERROR: direct push to main is not allowed."
+        echo ""
+        echo "  Local:  $local_ref ($local_sha)"
+        echo "  Remote: $remote_ref"
+        echo ""
+        echo "Open a pull request instead:"
+        echo "  1. Create a branch:  git checkout -b <type>/<short-description>"
+        echo "  2. Push the branch:  git push -u origin <branch>"
+        echo "  3. Open a PR:        gh pr create --base main"
+        echo ""
+        echo "If you absolutely must push to main, bypass with --no-verify."
+        echo "(But you should not. The point of this hook is to make you stop and think.)"
+        echo ""
+        exit 1
+    fi
+done
+
+exit 0

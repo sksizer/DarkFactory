@@ -429,7 +429,9 @@ def test_resolve_base_ref_explicit_wins(tmp_path: Path) -> None:
     assert result == "custom-branch"
 
 
-def test_resolve_base_ref_env_var_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_base_ref_env_var_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """DARKFACTORY_BASE_REF environment variable is used when no explicit arg."""
     _init_git_repo(tmp_path)
     monkeypatch.setenv("DARKFACTORY_BASE_REF", "staging")
@@ -509,7 +511,9 @@ def test_resolve_base_ref_last_resort_main(tmp_path: Path) -> None:
         assert result == "main"
 
 
-def test_resolve_base_ref_explicit_overrides_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_base_ref_explicit_overrides_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Explicit --base flag overrides environment variable."""
     _init_git_repo(tmp_path)
     monkeypatch.setenv("DARKFACTORY_BASE_REF", "staging")
