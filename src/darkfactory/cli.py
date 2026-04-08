@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import subprocess
 import sys
 from collections import Counter
@@ -948,9 +949,33 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _configure_logging(verbose: bool) -> None:
+    """Set up the harness logger so subprocess streaming + status updates
+    actually appear in the user's terminal.
+
+    Without this call, Python's logging defaults to WARNING — meaning
+    every ``log.info(...)`` call inside ``invoke_claude`` (the streaming
+    agent output) is silently dropped. The runner's progress dots are
+    printed via ``print``, not ``logging``, so they were the only signal
+    of life. Adding basicConfig once at CLI entry connects the streaming
+    pipeline to the terminal.
+
+    Verbose mode also enables DEBUG so internal harness diagnostics
+    become visible.
+    """
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(message)s",
+        stream=sys.stderr,
+        force=True,  # override any prior handler installed by an earlier import
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    _configure_logging(verbose=getattr(args, "verbose", False))
     if args.prd_dir is None:
         args.prd_dir = _default_prd_dir()
     if args.workflows_dir is None:

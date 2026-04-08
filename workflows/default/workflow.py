@@ -86,7 +86,9 @@ workflow = Workflow(
         # to {{CHECK_OUTPUT}}, re-invokes the agent once, and re-runs
         # the failing check.
         ShellTask("test", cmd="just test", on_failure="retry_agent"),
+        ShellTask("format", cmd="just format", on_failure="fail"),
         ShellTask("lint", cmd="just lint format-check", on_failure="retry_agent"),
+        ShellTask("typecheck", cmd="just typecheck", on_failure="retry_agent"),
         # ----- teardown phase -----
         # set_status BEFORE the final commit so the review-status change
         # lands in the commit that gets pushed. Doing set_status after

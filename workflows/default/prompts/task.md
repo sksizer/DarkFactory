@@ -27,22 +27,26 @@ use judgment when it's not. Follow the project's existing patterns —
 look at nearby files for style cues (imports, naming, docstrings,
 type annotations).
 
-### 3. Run tests and lint
+### 3. Run tests
 
-Run the tests:
+Run the tests to make sure your changes don't break anything:
 
 ```bash
 just test
 ```
 
-And the lint/format checks:
-
-```bash
-just lint format-check
-```
-
-Fix any failures. If tests that were passing before start failing, you
+Fix any failing tests. If tests that were passing before start failing, you
 broke something — investigate and fix, don't paper over.
+
+**Do not run these tools yourself:**
+- `ruff format` or `just format-check` — the harness auto-formats after
+  you finish, so formatting drift is not your concern.
+- `mypy` or `just typecheck` — the harness runs mypy after formatting. If
+  mypy flags a real type bug, the harness will bring you back with the error
+  message; fix that one thing and return.
+
+The harness handles format and typecheck deterministically so you can focus
+on logic correctness.
 
 ### 4. Stage your changes
 

@@ -10,6 +10,9 @@ test:
 typecheck:
     uv run mypy src tests workflows
 
+format:
+    uv run ruff format src tests workflows
+
 lint:
     uv run ruff check src tests
 
