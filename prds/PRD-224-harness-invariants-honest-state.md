@@ -2,7 +2,7 @@
 id: PRD-224
 title: Harness invariants for honest state
 kind: epic
-status: ready
+status: in-progress
 priority: high
 effort: m
 capability: moderate
