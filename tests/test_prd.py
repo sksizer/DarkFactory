@@ -248,16 +248,7 @@ def test_update_frontmatter_field_at_no_frontmatter_raises(
 
 def test_normalize_list_field_at_tags_sorted_alphabetically(tmp_prd_dir: Path) -> None:
     """AC-1: tags are sorted case-insensitively."""
-    raw = (
-        "---\n"
-        'id: "PRD-070"\n'
-        "tags:\n"
-        "  - zebra\n"
-        "  - Apple\n"
-        "  - mango\n"
-        "---\n"
-        "# Body\n"
-    )
+    raw = '---\nid: "PRD-070"\ntags:\n  - zebra\n  - Apple\n  - mango\n---\n# Body\n'
     path = tmp_prd_dir / "PRD-070-test.md"
     path.write_text(raw, encoding="utf-8")
     changed = normalize_list_field_at(path, "tags", ["zebra", "Apple", "mango"])
@@ -312,7 +303,9 @@ def test_normalize_list_field_at_blocks_natural_sort(tmp_prd_dir: Path) -> None:
     path = tmp_prd_dir / "PRD-070-test.md"
     path.write_text(raw, encoding="utf-8")
     changed = normalize_list_field_at(
-        path, "blocks", ["[[PRD-1.10-slug]]", "[[PRD-1.2-slug]]"],
+        path,
+        "blocks",
+        ["[[PRD-1.10-slug]]", "[[PRD-1.2-slug]]"],
     )
     assert changed
     after = path.read_text(encoding="utf-8")
@@ -350,15 +343,7 @@ def test_normalize_list_field_at_preserves_other_fields_byte_for_byte(
 
 def test_normalize_list_field_at_no_change_when_canonical(tmp_prd_dir: Path) -> None:
     """AC-4: returns False when the field is already in canonical order."""
-    raw = (
-        "---\n"
-        'id: "PRD-070"\n'
-        "tags:\n"
-        "  - alpha\n"
-        "  - beta\n"
-        "  - gamma\n"
-        "---\nbody\n"
-    )
+    raw = '---\nid: "PRD-070"\ntags:\n  - alpha\n  - beta\n  - gamma\n---\nbody\n'
     path = tmp_prd_dir / "PRD-070-x.md"
     path.write_text(raw, encoding="utf-8")
     changed = normalize_list_field_at(path, "tags", ["alpha", "beta", "gamma"])
@@ -370,7 +355,7 @@ def test_normalize_list_field_at_rejects_nonempty_flow_style(
     tmp_prd_dir: Path,
 ) -> None:
     """AC-6: flow-style non-empty list raises a clear ValueError."""
-    raw = "---\n" 'id: "PRD-070"\n' "tags: [foo, bar]\n" "---\nbody\n"
+    raw = '---\nid: "PRD-070"\ntags: [foo, bar]\n---\nbody\n'
     path = tmp_prd_dir / "PRD-070-x.md"
     path.write_text(raw, encoding="utf-8")
     with pytest.raises(ValueError, match="flow-style"):
@@ -381,13 +366,7 @@ def test_normalize_list_field_at_empty_list_writes_flow_empty(
     tmp_prd_dir: Path,
 ) -> None:
     """Normalizing a non-empty field to an empty list writes ``field: []``."""
-    raw = (
-        "---\n"
-        'id: "PRD-070"\n'
-        "tags:\n"
-        "  - foo\n"
-        "---\nbody\n"
-    )
+    raw = '---\nid: "PRD-070"\ntags:\n  - foo\n---\nbody\n'
     path = tmp_prd_dir / "PRD-070-x.md"
     path.write_text(raw, encoding="utf-8")
     changed = normalize_list_field_at(path, "tags", [])
@@ -400,15 +379,7 @@ def test_normalize_list_field_at_write_false_does_not_modify(
     tmp_prd_dir: Path,
 ) -> None:
     """``write=False`` returns True when changes would occur but does not write."""
-    raw = (
-        "---\n"
-        'id: "PRD-070"\n'
-        "tags:\n"
-        "  - zebra\n"
-        "  - Apple\n"
-        "---\n"
-        "# Body\n"
-    )
+    raw = '---\nid: "PRD-070"\ntags:\n  - zebra\n  - Apple\n---\n# Body\n'
     path = tmp_prd_dir / "PRD-070-test.md"
     path.write_text(raw, encoding="utf-8")
     would_change = normalize_list_field_at(

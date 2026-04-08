@@ -2,7 +2,7 @@
 id: "PRD-216"
 title: "Canonicalize PRD list fields to reduce diff churn"
 kind: task
-status: in-progress
+status: review
 priority: medium
 effort: s
 capability: simple
