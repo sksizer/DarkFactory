@@ -12,13 +12,10 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from darkfactory.invoke import InvokeResult
 from darkfactory.prd import PRD, load_all
 from darkfactory.runner import (
-    RunResult,
-    TaskStep,
     _compute_branch_name,
     _pick_model,
     run_workflow,
@@ -26,7 +23,6 @@ from darkfactory.runner import (
 from darkfactory.workflow import (
     AgentTask,
     BuiltIn,
-    ExecutionContext,
     ShellTask,
     Task,
     Workflow,
@@ -283,9 +279,7 @@ def test_shell_failure_fails_workflow(tmp_path: Path) -> None:
 
 def test_shell_failure_ignored(tmp_path: Path) -> None:
     """on_failure=ignore -> step marked successful with a note."""
-    wf = _make_workflow(
-        tmp_path, [ShellTask("fail", cmd="false", on_failure="ignore")]
-    )
+    wf = _make_workflow(tmp_path, [ShellTask("fail", cmd="false", on_failure="ignore")])
     prd = _make_prd(tmp_path)
 
     result = run_workflow(prd, wf, tmp_path, base_ref="main", dry_run=False)
@@ -316,7 +310,9 @@ def test_shell_failure_triggers_agent_retry(tmp_path: Path) -> None:
     wf = _make_workflow(
         tmp_path,
         [
-            AgentTask(prompts=["prompts/task.md"], verify_prompts=["prompts/verify.md"]),
+            AgentTask(
+                prompts=["prompts/task.md"], verify_prompts=["prompts/verify.md"]
+            ),
             ShellTask("test", cmd="exit 1", on_failure="retry_agent"),
         ],
     )
@@ -333,9 +329,12 @@ def test_shell_failure_triggers_agent_retry(tmp_path: Path) -> None:
         ),
     ]
 
-    with patch("darkfactory.runner.invoke_claude") as mock_invoke, patch(
-        "darkfactory.runner._run_shell_once", side_effect=shell_results
-    ) as mock_shell:
+    with (
+        patch("darkfactory.runner.invoke_claude") as mock_invoke,
+        patch(
+            "darkfactory.runner._run_shell_once", side_effect=shell_results
+        ) as mock_shell,
+    ):
         mock_invoke.return_value = InvokeResult(
             stdout="PRD_EXECUTE_OK: PRD-070\n",
             stderr="",
@@ -360,7 +359,9 @@ def test_shell_failure_retry_also_fails(tmp_path: Path) -> None:
     wf = _make_workflow(
         tmp_path,
         [
-            AgentTask(prompts=["prompts/task.md"], verify_prompts=["prompts/verify.md"]),
+            AgentTask(
+                prompts=["prompts/task.md"], verify_prompts=["prompts/verify.md"]
+            ),
             ShellTask("test", cmd="exit 1", on_failure="retry_agent"),
         ],
     )
@@ -370,9 +371,10 @@ def test_shell_failure_retry_also_fails(tmp_path: Path) -> None:
         args=["exit 1"], returncode=1, stdout="still broken\n", stderr=""
     )
 
-    with patch("darkfactory.runner.invoke_claude") as mock_invoke, patch(
-        "darkfactory.runner._run_shell_once", return_value=failing
-    ) as mock_shell:
+    with (
+        patch("darkfactory.runner.invoke_claude") as mock_invoke,
+        patch("darkfactory.runner._run_shell_once", return_value=failing) as mock_shell,
+    ):
         mock_invoke.return_value = InvokeResult(
             stdout="PRD_EXECUTE_OK: PRD-070\n",
             stderr="",

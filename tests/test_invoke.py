@@ -11,11 +11,9 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from darkfactory.invoke import (
     CAPABILITY_MODELS,
-    InvokeResult,
     _parse_sentinels,
     capability_to_model,
     invoke_claude,
@@ -62,9 +60,7 @@ def test_parse_sentinels_success() -> None:
 
 
 def test_parse_sentinels_failure() -> None:
-    success, reason = _parse_sentinels(
-        "something\nPRD_EXECUTE_FAILED: tests failed\n"
-    )
+    success, reason = _parse_sentinels("something\nPRD_EXECUTE_FAILED: tests failed\n")
     assert success is False
     assert reason == "tests failed"
 

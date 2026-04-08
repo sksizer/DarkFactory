@@ -59,7 +59,11 @@ def load_workflows(workflows_dir: Path) -> dict[str, Workflow]:
         return workflows
 
     for subdir in sorted(workflows_dir.iterdir()):
-        if not subdir.is_dir() or subdir.name.startswith("_") or subdir.name.startswith("."):
+        if (
+            not subdir.is_dir()
+            or subdir.name.startswith("_")
+            or subdir.name.startswith(".")
+        ):
             continue
         workflow_file = subdir / "workflow.py"
         if not workflow_file.exists():
@@ -68,9 +72,7 @@ def load_workflows(workflows_dir: Path) -> dict[str, Workflow]:
         try:
             wf = _load_workflow_module(workflow_file, subdir)
         except Exception as exc:  # noqa: BLE001 — we want to log *any* failure
-            logger.warning(
-                "failed to load workflow from %s: %s", workflow_file, exc
-            )
+            logger.warning("failed to load workflow from %s: %s", workflow_file, exc)
             continue
 
         if wf.name in workflows:

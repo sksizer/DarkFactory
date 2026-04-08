@@ -235,9 +235,7 @@ def test_assign_explicit_source(
     assert "explicit" in out
 
 
-def test_assign_json_output(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_assign_json_output(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """--json produces a list of {id, workflow, explicit} records."""
     workflows_dir = tmp_path / "workflows"
     _write_default_workflow(workflows_dir)

@@ -212,19 +212,10 @@ def test_update_frontmatter_field_at_preserves_other_fields_byte_for_byte(
 
 
 def test_update_frontmatter_field_at_multiple_fields(tmp_prd_dir: Path) -> None:
-    raw = (
-        "---\n"
-        "status: ready\n"
-        "updated: 2026-04-01\n"
-        "id: PRD-070\n"
-        "---\n"
-        "body\n"
-    )
+    raw = "---\nstatus: ready\nupdated: 2026-04-01\nid: PRD-070\n---\nbody\n"
     path = tmp_prd_dir / "PRD-070-x.md"
     path.write_text(raw, encoding="utf-8")
-    update_frontmatter_field_at(
-        path, {"status": "review", "updated": "'2026-04-08'"}
-    )
+    update_frontmatter_field_at(path, {"status": "review", "updated": "'2026-04-08'"})
     after = path.read_text(encoding="utf-8")
     assert "status: review\n" in after
     assert "updated: '2026-04-08'\n" in after

@@ -166,9 +166,7 @@ def test_effective_impacts_container_with_no_children_yet(tmp_prd_dir: Path) -> 
 def test_effective_impacts_container_ignores_empty_leaves(tmp_prd_dir: Path) -> None:
     """Leaves that don't declare impacts contribute nothing to the aggregate."""
     write_prd(tmp_prd_dir, "PRD-001", "epic", kind="epic")
-    write_prd(
-        tmp_prd_dir, "PRD-002", "declared", parent="PRD-001", impacts=["x.rs"]
-    )
+    write_prd(tmp_prd_dir, "PRD-002", "declared", parent="PRD-001", impacts=["x.rs"])
     write_prd(tmp_prd_dir, "PRD-003", "undeclared", parent="PRD-001")  # empty
     prds = load_all(tmp_prd_dir)
     assert impacts.effective_impacts(prds["PRD-001"], prds) == ["x.rs"]
@@ -334,9 +332,7 @@ def test_find_conflicts_excludes_parent(tmp_prd_dir: Path) -> None:
     # In this unit test we create a minimal one.
     import subprocess
 
-    subprocess.run(
-        ["git", "init", "-q", "-b", "main"], cwd=tmp_prd_dir, check=True
-    )
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp_prd_dir, check=True)
     conflicts = impacts.find_conflicts(prds["PRD-001"], prds, tmp_prd_dir)
     # Epic and child don't conflict with each other
     assert not any(other_id == "PRD-002" for other_id, _ in conflicts)

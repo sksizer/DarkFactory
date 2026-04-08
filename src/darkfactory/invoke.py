@@ -128,7 +128,10 @@ def _parse_sentinels(
             return False, "unspecified failure"
         if success_hit:
             return True, None
-        return False, f"agent output contained no {success_marker} or {failure_marker} sentinel"
+        return (
+            False,
+            f"agent output contained no {success_marker} or {failure_marker} sentinel",
+        )
 
     # Default marker path: use precompiled regexes.
     failure_match = _SENTINEL_FAILURE_RE.search(stdout)
@@ -139,7 +142,10 @@ def _parse_sentinels(
     if success_match:
         return True, None
 
-    return False, "agent output contained no PRD_EXECUTE_OK or PRD_EXECUTE_FAILED sentinel"
+    return (
+        False,
+        "agent output contained no PRD_EXECUTE_OK or PRD_EXECUTE_FAILED sentinel",
+    )
 
 
 # ---------- main entry point ----------

@@ -154,7 +154,9 @@ def run_workflow(
 
     for task in workflow.tasks:
         try:
-            step = _dispatch(task, ctx, model_override, last_agent_task, last_agent_result)
+            step = _dispatch(
+                task, ctx, model_override, last_agent_task, last_agent_result
+            )
             result.steps.append(step)
 
             if isinstance(task, AgentTask):
