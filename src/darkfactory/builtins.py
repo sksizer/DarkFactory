@@ -34,6 +34,8 @@ import subprocess
 from pathlib import Path
 from typing import Callable
 
+from filelock import FileLock, Timeout
+
 from . import prd as prd_module
 from .workflow import ExecutionContext, Status
 
@@ -218,43 +220,83 @@ def ensure_worktree(ctx: ExecutionContext) -> None:
     ``prd/{prd_id}-{slug}`` created from ``ctx.base_ref``. If the
     worktree already exists (previous run resumed), reuses it without
     re-creating. Sets ``ctx.worktree_path`` and ``ctx.cwd`` on success.
+
+    In live mode, acquires a per-PRD advisory file lock at
+    ``.worktrees/{prd_id}.lock`` before any mutation so two concurrent
+    ``prd run`` invocations for the same PRD fail fast with a clear
+    message instead of racing. The lock is auto-released by the kernel
+    when the process exits; the runner also releases it explicitly at the
+    end of the run (see ``_release_worktree_lock``).
     """
     worktree_path = _worktree_target(ctx)
     branch = ctx.branch_name
 
-    if worktree_path.exists() and not ctx.dry_run:
+    if ctx.dry_run:
+        # Dry-run produces no side effects, so no lock needed.
+        ctx.logger.info(
+            "[dry-run] git worktree add -b %s %s %s",
+            branch,
+            worktree_path,
+            ctx.base_ref,
+        )
+        ctx.worktree_path = worktree_path
+        ctx.cwd = worktree_path
+        return
+
+    # Acquire the lock BEFORE the resume-check or any mutation.
+    # The lock file lives at .worktrees/PRD-X.lock and is per-PRD.
+    lock_path = ctx.repo_root / ".worktrees" / f"{ctx.prd.id}.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+    lock = FileLock(str(lock_path))
+    try:
+        lock.acquire(timeout=0)  # non-blocking
+    except Timeout:
+        raise RuntimeError(
+            f"{ctx.prd.id} is already being worked on by another `prd run` "
+            f"process (lock held on {lock_path}). If that process died, "
+            f"the lock will auto-release when its file handle is reclaimed. "
+            f"On a stuck lock, delete {lock_path} manually."
+        ) from None
+
+    ctx._worktree_lock = lock
+
+    # ---- existing logic below, now lock-protected ----
+    if worktree_path.exists():
         ctx.logger.info("resuming existing worktree: %s", worktree_path)
         ctx.worktree_path = worktree_path
         ctx.cwd = worktree_path
         return
 
-    if not ctx.dry_run:
-        local_exists = _branch_exists_local(ctx.repo_root, branch)
-        remote_exists = _branch_exists_remote(ctx.repo_root, branch)
-        if local_exists or remote_exists:
-            raise RuntimeError(
-                f"branch {branch!r} already exists but worktree {worktree_path} is gone. "
-                f"Another runner may be working on this PRD, or a previous run left a stale "
-                f"branch behind. Run `prd cleanup {ctx.prd.id}` to release it."
-            )
+    local_exists = _branch_exists_local(ctx.repo_root, branch)
+    remote_exists = _branch_exists_remote(ctx.repo_root, branch)
+    if local_exists or remote_exists:
+        # Release the lock before raising so the error state is clean.
+        lock.release()
+        ctx._worktree_lock = None
+        raise RuntimeError(
+            f"branch {branch!r} already exists but worktree {worktree_path} is gone. "
+            f"Run `prd cleanup {ctx.prd.id}` to release it."
+        )
 
     # git worktree add -b <branch> <path> <base>
     # Run from the repo root, not from ctx.cwd (which may not be a git dir yet).
-    cmd = [
-        "git",
-        "-C",
-        str(ctx.repo_root),
-        "worktree",
-        "add",
-        "-b",
-        branch,
-        str(worktree_path),
-        ctx.base_ref,
-    ]
-    if ctx.dry_run:
-        ctx.logger.info("[dry-run] %s", " ".join(cmd))
-    else:
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(ctx.repo_root),
+            "worktree",
+            "add",
+            "-b",
+            branch,
+            str(worktree_path),
+            ctx.base_ref,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
     ctx.worktree_path = worktree_path
     ctx.cwd = worktree_path

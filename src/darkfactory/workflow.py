@@ -32,6 +32,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
 if TYPE_CHECKING:
+    from filelock import FileLock
+
     from .prd import PRD
 
 
@@ -231,6 +233,10 @@ class ExecutionContext:
     logger: logging.Logger = field(
         default_factory=lambda: logging.getLogger("darkfactory")
     )
+    # Advisory process-level lock held by ensure_worktree for the
+    # lifetime of this run. Managed by builtins + runner; tests should
+    # not touch it directly.
+    _worktree_lock: "FileLock | None" = field(default=None, repr=False)
 
     def format_string(self, template: str) -> str:
         """Expand ``{placeholder}`` tokens against context state.

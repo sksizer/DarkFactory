@@ -308,6 +308,12 @@ def test_ensure_worktree_resumes_existing(tmp_git_repo: Path) -> None:
     # Touch a file in the worktree to prove we're reusing it
     (first_path / "marker.txt").write_text("first run\n")
 
+    # Release the lock so the second context can acquire it (simulating
+    # a new process that resumes an interrupted run).
+    assert ctx._worktree_lock is not None
+    ctx._worktree_lock.release()
+    ctx._worktree_lock = None
+
     # Reset the context and call again
     ctx2 = ExecutionContext(
         prd=prds["PRD-070"],
@@ -321,6 +327,10 @@ def test_ensure_worktree_resumes_existing(tmp_git_repo: Path) -> None:
     builtins.ensure_worktree(ctx2)
     assert ctx2.worktree_path == first_path
     assert (first_path / "marker.txt").read_text() == "first run\n"
+    # Release the lock acquired by ctx2 to avoid leaking it after the test.
+    if ctx2._worktree_lock is not None:
+        ctx2._worktree_lock.release()
+        ctx2._worktree_lock = None
 
 
 def test_commit_stages_and_commits(tmp_git_repo: Path) -> None:
@@ -577,6 +587,12 @@ def test_ensure_worktree_errors_if_branch_exists_without_worktree(
     )
     assert not ctx.worktree_path.exists()
 
+    # Release the lock so the second context can proceed past the lock
+    # (simulating that the first runner finished or was interrupted).
+    assert ctx._worktree_lock is not None
+    ctx._worktree_lock.release()
+    ctx._worktree_lock = None
+
     # Second invocation: branch still exists, worktree gone → guard fires.
     ctx2 = ExecutionContext(
         prd=prds["PRD-215"],
@@ -652,6 +668,12 @@ def test_ensure_worktree_resumes_when_both_branch_and_worktree_exist(
     first_path = ctx.worktree_path
     assert first_path is not None and first_path.exists()
 
+    # Release the lock so the second context can acquire it (simulating
+    # a new process that resumes the run).
+    assert ctx._worktree_lock is not None
+    ctx._worktree_lock.release()
+    ctx._worktree_lock = None
+
     # Second call with same branch + existing worktree: should resume, not error.
     ctx2 = ExecutionContext(
         prd=prds["PRD-215"],
@@ -664,6 +686,10 @@ def test_ensure_worktree_resumes_when_both_branch_and_worktree_exist(
     )
     builtins.ensure_worktree(ctx2)  # Must not raise
     assert ctx2.worktree_path == first_path
+    # Release lock to avoid leaking it after the test.
+    if ctx2._worktree_lock is not None:
+        ctx2._worktree_lock.release()
+        ctx2._worktree_lock = None
 
 
 def test_ensure_worktree_remote_timeout_falls_back_to_local(
@@ -755,3 +781,193 @@ def test_ensure_worktree_guard_stubbed_subprocess(tmp_path: Path) -> None:
         with patch("darkfactory.builtins._branch_exists_remote", return_value=False):
             with pytest.raises(RuntimeError, match="already exists"):
                 builtins.ensure_worktree(ctx)
+
+
+# ---------- process lock ----------
+
+
+def test_ensure_worktree_acquires_lock(tmp_git_repo: Path) -> None:
+    """AC-1/AC-8: After ensure_worktree, ctx._worktree_lock is set and lock file exists."""
+    prd_dir = tmp_git_repo / "docs" / "prd"
+    prd_dir.mkdir(parents=True)
+    write_prd(prd_dir, "PRD-217", "lock-acquire")
+    prds = load_all(prd_dir)
+
+    ctx = ExecutionContext(
+        prd=prds["PRD-217"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-217-lock-acquire",
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+    builtins.ensure_worktree(ctx)
+
+    assert ctx._worktree_lock is not None
+    lock_path = tmp_git_repo / ".worktrees" / "PRD-217.lock"
+    assert lock_path.exists()
+
+    # Cleanup
+    ctx._worktree_lock.release()
+    ctx._worktree_lock = None
+
+
+def test_ensure_worktree_refuses_when_locked(tmp_git_repo: Path) -> None:
+    """AC-1: A second concurrent call raises RuntimeError naming the lock file."""
+    from filelock import FileLock as _FileLock
+
+    prd_dir = tmp_git_repo / "docs" / "prd"
+    prd_dir.mkdir(parents=True)
+    write_prd(prd_dir, "PRD-217", "lock-refuse")
+    prds = load_all(prd_dir)
+
+    lock_path = tmp_git_repo / ".worktrees" / "PRD-217.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Hold the lock externally to simulate another process.
+    external_lock = _FileLock(str(lock_path))
+    external_lock.acquire()
+    try:
+        ctx = ExecutionContext(
+            prd=prds["PRD-217"],
+            repo_root=tmp_git_repo,
+            workflow=Workflow(name="default"),
+            base_ref="main",
+            branch_name="prd/PRD-217-lock-refuse",
+            cwd=tmp_git_repo,
+            dry_run=False,
+        )
+        with pytest.raises(RuntimeError, match="already being worked on"):
+            builtins.ensure_worktree(ctx)
+        # Context should not have a lock set since acquisition failed.
+        assert ctx._worktree_lock is None
+    finally:
+        external_lock.release()
+
+
+def test_ensure_worktree_dry_run_no_lock(tmp_path: Path) -> None:
+    """AC-2/AC-6: Dry-run path does not create or acquire the lock."""
+    ctx = _make_dry_run_ctx(tmp_path)
+    builtins.ensure_worktree(ctx)
+
+    assert ctx._worktree_lock is None
+    lock_path = tmp_path / ".worktrees" / "PRD-070.lock"
+    assert not lock_path.exists()
+
+
+def test_ensure_worktree_releases_on_branch_guard_raise(tmp_git_repo: Path) -> None:
+    """AC-4: When the branch-exists guard fires, lock is released before raising."""
+    from filelock import FileLock as _FileLock
+
+    prd_dir = tmp_git_repo / "docs" / "prd"
+    prd_dir.mkdir(parents=True)
+    write_prd(prd_dir, "PRD-217", "lock-guard")
+    prds = load_all(prd_dir)
+
+    ctx = ExecutionContext(
+        prd=prds["PRD-217"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-217-lock-guard",
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+
+    with patch("darkfactory.builtins._branch_exists_local", return_value=True):
+        with patch("darkfactory.builtins._branch_exists_remote", return_value=False):
+            with pytest.raises(RuntimeError, match="already exists"):
+                builtins.ensure_worktree(ctx)
+
+    # Lock must be released — context should not hold it.
+    assert ctx._worktree_lock is None
+
+    # We should be able to acquire the lock immediately after the failed call.
+    lock_path = tmp_git_repo / ".worktrees" / "PRD-217.lock"
+    probe = _FileLock(str(lock_path))
+    probe.acquire(timeout=0)  # raises Timeout if still locked
+    probe.release()
+
+
+def test_runner_releases_lock_on_success(tmp_git_repo: Path) -> None:
+    """AC-5: run_workflow releases the lock on the context when the run completes."""
+    from filelock import FileLock as _FileLock
+
+    from darkfactory.runner import run_workflow
+    from darkfactory.workflow import BuiltIn
+
+    prd_dir = tmp_git_repo / "docs" / "prd"
+    prd_dir.mkdir(parents=True)
+    write_prd(prd_dir, "PRD-217", "runner-success")
+    prds = load_all(prd_dir)
+
+    wf = Workflow(name="default", tasks=[BuiltIn("ensure_worktree")])
+    result = run_workflow(
+        prds["PRD-217"], wf, tmp_git_repo, base_ref="main", dry_run=False
+    )
+    assert result.success is True
+
+    # After run_workflow returns, the lock should be released.
+    lock_path = tmp_git_repo / ".worktrees" / "PRD-217.lock"
+    probe = _FileLock(str(lock_path))
+    probe.acquire(timeout=0)
+    probe.release()
+
+
+def test_runner_releases_lock_on_exception(tmp_git_repo: Path) -> None:
+    """AC-5: run_workflow releases the lock even when a task raises mid-run."""
+    from filelock import FileLock as _FileLock
+
+    from darkfactory.runner import run_workflow
+    from darkfactory.workflow import BuiltIn, ShellTask
+
+    prd_dir = tmp_git_repo / "docs" / "prd"
+    prd_dir.mkdir(parents=True)
+    write_prd(prd_dir, "PRD-217", "runner-exception")
+    prds = load_all(prd_dir)
+
+    # Workflow acquires the lock then immediately fails via a shell task.
+    wf = Workflow(
+        name="default",
+        tasks=[
+            BuiltIn("ensure_worktree"),
+            ShellTask("fail", cmd="false", on_failure="fail"),
+        ],
+    )
+    result = run_workflow(
+        prds["PRD-217"], wf, tmp_git_repo, base_ref="main", dry_run=False
+    )
+    assert result.success is False
+
+    # Lock must be released despite the failure.
+    lock_path = tmp_git_repo / ".worktrees" / "PRD-217.lock"
+    probe = _FileLock(str(lock_path))
+    probe.acquire(timeout=0)
+    probe.release()
+
+
+def test_lock_auto_releases_on_subprocess_exit(tmp_path: Path) -> None:
+    """AC-3: A lock held by a subprocess is released when that process exits."""
+    import sys as _sys
+
+    from filelock import FileLock as _FileLock
+
+    lock_path = tmp_path / "auto-release.lock"
+
+    # Launch a child process that acquires the lock and exits normally.
+    child = subprocess.run(
+        [
+            _sys.executable,
+            "-c",
+            f"from filelock import FileLock; FileLock(r'{lock_path}').acquire()",
+        ],
+        timeout=10,
+    )
+    assert child.returncode == 0
+
+    # After the child exits, the lock file handle is reclaimed by the kernel.
+    # We must be able to acquire it immediately.
+    probe = _FileLock(str(lock_path))
+    probe.acquire(timeout=1)
+    probe.release()
