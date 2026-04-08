@@ -12,8 +12,8 @@ depends_on:
 blocks:
   - "[[PRD-206-list-workflows-assign-cli]]"
 impacts:
-  - tools/prd-harness/src/prd_harness/loader.py
-  - tools/prd-harness/tests/test_loader.py
+  - src/darkfactory/loader.py
+  - tests/test_loader.py
 workflow: null
 target_version: null
 created: 2026-04-07

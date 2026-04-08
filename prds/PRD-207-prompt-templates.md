@@ -12,8 +12,8 @@ depends_on:
 blocks:
   - "[[PRD-210-runner]]"
 impacts:
-  - tools/prd-harness/src/prd_harness/templates.py
-  - tools/prd-harness/tests/test_templates.py
+  - src/darkfactory/templates.py
+  - tests/test_templates.py
 workflow: null
 target_version: null
 created: 2026-04-07

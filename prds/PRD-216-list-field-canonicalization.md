@@ -2,7 +2,7 @@
 id: "PRD-216"
 title: "Canonicalize PRD list fields to reduce diff churn"
 kind: task
-status: draft
+status: ready
 priority: medium
 effort: s
 capability: simple
@@ -11,13 +11,14 @@ depends_on:
   - "[[PRD-214-frontmatter-roundtrip-drift]]"
 blocks: []
 impacts:
-  - tools/prd-harness/src/prd_harness/prd.py
-  - tools/prd-harness/src/prd_harness/cli.py
-  - tools/prd-harness/tests/test_prd.py
+  - src/darkfactory/prd.py
+  - src/darkfactory/cli.py
+  - tests/test_prd.py
+  - tests/test_cli_normalize.py
 workflow: null
 target_version: null
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-08'
 tags:
   - harness
   - hygiene

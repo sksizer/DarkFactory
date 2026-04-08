@@ -13,8 +13,8 @@ blocks:
   - "[[PRD-206-list-workflows-assign-cli]]"
   - "[[PRD-210-runner]]"
 impacts:
-  - tools/prd-harness/src/prd_harness/assign.py
-  - tools/prd-harness/tests/test_assign.py
+  - src/darkfactory/assign.py
+  - tests/test_assign.py
 workflow: null
 target_version: null
 created: 2026-04-07

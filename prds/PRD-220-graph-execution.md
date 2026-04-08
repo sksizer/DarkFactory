@@ -10,10 +10,10 @@ parent: null
 depends_on: []
 blocks: []
 impacts:
-  - tools/prd-harness/src/prd_harness/cli.py
-  - tools/prd-harness/src/prd_harness/runner.py
-  - tools/prd-harness/src/prd_harness/graph.py
-  - tools/prd-harness/tests/test_graph_execution.py
+  - src/darkfactory/cli.py
+  - src/darkfactory/runner.py
+  - src/darkfactory/graph.py
+  - tests/test_graph_execution.py
 workflow: null
 target_version: null
 created: 2026-04-08

@@ -16,8 +16,8 @@ blocks:
   - "[[PRD-208-agent-invoke]]"
   - "[[PRD-210-runner]]"
 impacts:
-  - tools/prd-harness/src/prd_harness/workflow.py
-  - tools/prd-harness/tests/test_workflow.py
+  - src/darkfactory/workflow.py
+  - tests/test_workflow.py
 workflow: null
 target_version: null
 created: 2026-04-07

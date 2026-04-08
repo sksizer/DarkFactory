@@ -14,10 +14,10 @@ blocks:
   - "[[PRD-206-list-workflows-assign-cli]]"
   - "[[PRD-210-runner]]"
 impacts:
-  - tools/prd-harness/workflows/default/workflow.py
-  - tools/prd-harness/workflows/default/prompts/role.md
-  - tools/prd-harness/workflows/default/prompts/task.md
-  - tools/prd-harness/workflows/default/prompts/verify.md
+  - workflows/default/workflow.py
+  - workflows/default/prompts/role.md
+  - workflows/default/prompts/task.md
+  - workflows/default/prompts/verify.md
 workflow: null
 target_version: null
 created: 2026-04-07
