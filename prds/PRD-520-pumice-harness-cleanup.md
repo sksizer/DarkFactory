@@ -11,12 +11,12 @@ depends_on:
   - "[[PRD-505-darkfactory-verify-and-push]]"
 blocks: []
 impacts:
-  - tools/prd-harness/**
-  - scripts/prd
-  - justfile
-  - Makefile
-  - mise.toml
-  - .gitignore
+  - '(pumice) tools/prd-harness/**'
+  - '(pumice) scripts/prd'
+  - '(pumice) justfile'
+  - '(pumice) Makefile'
+  - '(pumice) mise.toml'
+  - '(pumice) .gitignore'
 workflow: null
 target_version: null
 created: 2026-04-08

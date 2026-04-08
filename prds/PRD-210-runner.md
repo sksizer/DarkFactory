@@ -16,8 +16,8 @@ depends_on:
 blocks:
   - "[[PRD-211-plan-run-cli]]"
 impacts:
-  - tools/prd-harness/src/prd_harness/runner.py
-  - tools/prd-harness/tests/test_runner.py
+  - src/darkfactory/runner.py
+  - tests/test_runner.py
 workflow: null
 target_version: null
 created: 2026-04-07

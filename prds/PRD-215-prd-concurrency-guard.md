@@ -11,9 +11,9 @@ depends_on:
   - "[[PRD-213-set-status-wrong-repo]]"
 blocks: []
 impacts:
-  - tools/prd-harness/src/prd_harness/builtins.py
-  - tools/prd-harness/src/prd_harness/runner.py
-  - tools/prd-harness/tests/test_builtins.py
+  - src/darkfactory/builtins.py
+  - src/darkfactory/runner.py
+  - tests/test_builtins.py
 workflow: null
 target_version: null
 created: 2026-04-08

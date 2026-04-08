@@ -12,8 +12,8 @@ depends_on:
 blocks:
   - "[[PRD-210-runner]]"
 impacts:
-  - tools/prd-harness/src/prd_harness/invoke.py
-  - tools/prd-harness/tests/test_invoke.py
+  - src/darkfactory/invoke.py
+  - tests/test_invoke.py
 workflow: null
 target_version: null
 created: 2026-04-07
