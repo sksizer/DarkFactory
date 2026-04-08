@@ -29,26 +29,25 @@ Today darkfactory is shaped like "a harness for the darkfactory repo that lives 
 
 1. **Installable CLI**: users should be able to run `prd` (or `darkfactory`) directly without the `uv run` preamble, from any directory.
 2. **Target directory is the current working directory by default**, overridable with `--directory` (or a global env var).
-3. **Convention-over-configuration layout for target projects**: in a project being *managed by* darkfactory, all darkfactory state (PRDs, custom workflows, local config, worktree metadata) lives under a single `.darkfactory/` directory at the project root.
+3. **One convention everywhere**: every project managed by darkfactory — *including darkfactory's own repo* — keeps its PRDs, custom workflows, local config, and worktree metadata under a single `.darkfactory/` directory at the project root. No special cases.
 4. **Cascading configuration and workflow resolution** across layers: built-in (shipped with the package) → user-level (`~/.config/darkfactory/`) → project-level (`.darkfactory/`), with directory-level as a future extension. Name collisions across layers are a **hard error** during this early period — we prefer loud failure to silent magic.
 
 This is an **epic**. It decomposes into scoped child PRDs that can land independently.
 
-## Scope: "target project" vs "darkfactory's own repo"
+## Scope: two concerns, one convention
 
-This distinction is load-bearing for the whole epic, so it's pulled to the top.
+There are two conceptually separate things that the previous draft conflated, and the *right* way to untangle them is to apply a single convention uniformly rather than special-case darkfactory's own repo.
 
-There are **two** conceptually separate things that have historically been conflated:
+- **Darkfactory-the-tool's own Python source** — `src/darkfactory/`, tests, pyproject.toml, etc. This is package source code and ships in the wheel.
+- **Darkfactory the project's design state** — its roadmap PRDs (PRD-200, PRD-222, …), config, and any custom workflows it wants for its *own* development. This is exactly the kind of thing `.darkfactory/` is designed to hold.
 
-- **Darkfactory-the-tool's own source tree.** The git repo at `~/Developer/DarkFactory`. It contains darkfactory's Python source, its own roadmap PRDs (PRD-200, PRD-222, …), and its own dev-facing workflows. This is *source code*, not a project being managed by darkfactory.
-- **A target project** — any other repo, or darkfactory's own repo treated as one — that has a `.darkfactory/` directory in its root because someone ran `prd init` there. That directory holds *that project's* PRDs, custom workflows, and config.
+The clean split is:
 
-These two have nothing structurally in common, and the previous draft of this PRD was wrong to merge them. Specifically:
+- **First-party built-in workflows live inside the package** at `src/darkfactory/workflows/`. They ship in the wheel and every install gets them for free. This currently means **`default`, `extraction`, and `planning`** — all three are first-party built-ins, not custom darkfactory-specific things.
+- **Darkfactory's own repo uses `.darkfactory/` like any other project.** It gets a `.darkfactory/prds/` (where PRD-200, PRD-222, etc. move to), a `.darkfactory/config.toml` (if it wants any project-level overrides), a `.darkfactory/workflows/` (empty, or for one-off dev workflows darkfactory doesn't want to ship to end users), and `.darkfactory/worktrees/` / `.darkfactory/transcripts/` for runtime state.
+- **No dev-mode hardcoding.** The tool does not sniff pyproject.toml to decide "am I running in my own repo?" and take a special-case path. There is one convention — `.darkfactory/` at the target repo root — and darkfactory's own clone follows it the same way any other project does.
 
-- **Darkfactory's own roadmap PRDs stay at `prds/` at the repo root.** They are not moving to `.darkfactory/prds/`. They are the tool's own source-of-truth documents, tracked the way any project tracks its design docs. No dogfood migration.
-- **Darkfactory's own in-repo workflows (e.g. `workflows/default/`, `workflows/extraction/`) become package-bundled built-in workflows** shipped inside the wheel at `src/darkfactory/workflows/`. They are not "custom workflows that happen to live in darkfactory's `.darkfactory/`"; they are first-party built-ins that every install of darkfactory gets for free.
-- **`.darkfactory/` is exclusively the target-project convention.** Documentation and error messages should consistently describe it that way: "the `.darkfactory/` directory in *your* project."
-- When you run darkfactory *against* its own repo (to use the tool to manage its own PRDs), the tool walks up from cwd, finds no `.darkfactory/`, and either errors with "run `prd init`" or transparently falls back to the `prds/` at the repo root as a special-case for darkfactory developing itself. (Open question — see below.)
+The previous "category error" framing was itself the category error: the right thing to dogfood is the *convention*, not to hide darkfactory's own design state somewhere else to avoid "conflation." Running `prd` inside darkfactory's own clone should look and feel identical to running it inside any other project.
 
 ## Motivation
 
@@ -142,7 +141,7 @@ A workflow discovered in any layer must conform to the expected module API (requ
    - **Workflows**: discovered from all three layers (built-in, user, project). Names must be globally unique. Any collision is a **hard error** at startup naming all conflicting paths.
 8. **Strict workflow API validation**: every discovered workflow is validated against the expected module contract at load time. Failures raise a clear error naming the layer, the file, and the specific violation. No silent skipping.
 9. **`prd init` subcommand**: scaffolds `.darkfactory/prds/`, `.darkfactory/workflows/` (empty, ready for overrides), `.darkfactory/config.toml` (with commented examples), and updates `.gitignore` to exclude `.darkfactory/worktrees/` and `.darkfactory/transcripts/`.
-10. **Darkfactory's own repo is NOT migrated to `.darkfactory/`**. Its roadmap PRDs continue to live at `prds/` at the repo root. Its in-repo workflows move *into the package* at `src/darkfactory/workflows/` as first-party built-ins — not because of dogfooding, but because built-ins have to live inside the wheel to be shippable.
+10. **Darkfactory's own repo follows the `.darkfactory/` convention.** Its roadmap PRDs move from `prds/` to `.darkfactory/prds/`. Its in-repo workflows (`default`, `extraction`, `planning`) move *into the package* at `src/darkfactory/workflows/` as first-party built-ins. No dev-mode fallback, no special-case detection — the tool runs against its own clone exactly the way it runs against any other project.
 11. **`pyproject.toml` scripts entry**: `prd = "darkfactory.cli:main"` already exists; verify that `uv tool install` picks it up. Also expose `darkfactory = "darkfactory.cli:main"` as a secondary alias in case of `prd` name conflicts.
 12. **Documentation update**: README rewritten to show `uv tool install darkfactory && cd ~/my-project && prd init && prd status` as the quickstart. Must explicitly call out that `.darkfactory/` is the target-project convention, separate from darkfactory's own source tree.
 
@@ -154,18 +153,19 @@ This is an epic. Suggested breakdown:
   - Add `_find_darkfactory_dir(cwd: Path) -> Path | None` that walks up from cwd looking for `.darkfactory/`.
   - Add `--directory` / `-C` global flag + `DARKFACTORY_DIR` env var to `cli.py`.
   - Rewrite `_default_prd_dir` and friends to resolve via the discovered `.darkfactory/` path.
-  - For darkfactory developing itself: when `cwd` is inside darkfactory's own repo clone and there's no `.darkfactory/`, fall back to `prds/` at the repo root **only** for the darkfactory repo itself (detected by package name / pyproject.toml), and log a one-line notice. Every other project requires `.darkfactory/`.
+  - No special cases — darkfactory's own repo participates in this mechanism via its own `.darkfactory/` directory (created in PRD-222.8), not via a dev-mode fallback.
 
 - **PRD-222.2 — `prd init` subcommand**
   - Creates `.darkfactory/prds/`, `.darkfactory/workflows/`, `.darkfactory/config.toml` skeleton.
   - Updates `.gitignore` (creating if absent) with the runtime-state ignores.
   - Idempotent — re-running on an initialized dir reports "already initialized" and makes no changes.
-  - Refuses to run inside darkfactory's own source tree (we don't want to scaffold `.darkfactory/` into the tool's own repo by accident).
+  - Works inside darkfactory's own repo too; PRD-222.8 uses it to bootstrap.
 
 - **PRD-222.3 — Bundle built-in workflows inside the package**
-  - Move darkfactory's own `workflows/default/` → `src/darkfactory/workflows/default/` so it ships in the wheel.
-  - Decide per-workflow whether `extraction/` and `planning/` are first-party built-ins or darkfactory-specific dev tooling; first-party ones move too.
-  - Loader discovers built-in workflows via `importlib.resources` / direct module import.
+  - Move `workflows/default/`, `workflows/extraction/`, and `workflows/planning/` into `src/darkfactory/workflows/` so they ship in the wheel.
+  - All three are first-party built-ins available to every install.
+  - Loader discovers built-in workflows via direct module import under `darkfactory.workflows`.
+  - Delete the old top-level `workflows/` directory once the loader is switched over.
 
 - **PRD-222.4 — User config directory (`~/.config/darkfactory/`)**
   - Create on first access if missing (for workflows subdir); `config.toml` is lazy — absent is fine.
@@ -188,10 +188,18 @@ This is an epic. Suggested breakdown:
 - **PRD-222.7 — Package metadata + installability**
   - Verify `pyproject.toml` scripts entry works via `uv tool install`.
   - Add `darkfactory` as a secondary entry point alias.
-  - Update README quickstart and the "target project vs darkfactory's own repo" explanation.
+  - Update README quickstart.
   - Publish to PyPI (may be a separate PRD blocker; see PRD-540).
 
-Each child PRD should be 1–4 hours of work and independently shippable. Note: the previous PRD-222.4 ("dogfood migration — move darkfactory's own `prds/` and `workflows/` under `.darkfactory/`") has been **removed**. It was a category error: darkfactory-the-tool's source tree is not a project managed by darkfactory.
+- **PRD-222.8 — Dogfood: move darkfactory's own state to `.darkfactory/`**
+  - Run `prd init` against darkfactory's own repo root.
+  - Move `prds/*` → `.darkfactory/prds/*` in one commit. Update any code or docs referencing the old path.
+  - Remove the old top-level `prds/` directory.
+  - Ensure `.gitignore` picks up `.darkfactory/worktrees/` and `.darkfactory/transcripts/`.
+  - Verify: every existing harness flow (`prd status`, `prd run`, `prd tree`, workflow execution) continues to work against darkfactory's own clone after the move, with no dev-mode fallback anywhere in the codebase.
+  - This PRD blocks on 222.1 (discovery) + 222.2 (`prd init`) + 222.3 (bundled workflows) landing first.
+
+Each child PRD should be 1–4 hours of work and independently shippable.
 
 ## Acceptance Criteria
 
@@ -204,13 +212,13 @@ High-level for the epic; children get their own concrete ACs:
 - [ ] AC-5 (post-222.5): A workflow with an invalid module shape (missing `applies_to`, wrong `steps` type, etc.) causes `prd` to exit with an error naming the layer, file, and specific contract violation.
 - [ ] AC-6 (post-222.6): `model.trivial = "haiku"` in `~/.config/darkfactory/config.toml` is overridden by the same key in a project's `.darkfactory/config.toml`, which is in turn overridden by `DARKFACTORY_MODEL_TRIVIAL=...`, which is in turn overridden by `--model-trivial ...` on the CLI.
 - [ ] AC-7 (post-222.7): `uv tool install darkfactory` produces a working `prd` binary on PATH.
-- [ ] AC-8: Darkfactory's own `prds/` directory at the repo root is untouched by this epic. Running `prd status` inside darkfactory's own clone continues to work via the dev-mode fallback path.
-- [ ] AC-9: README clearly documents `.darkfactory/` as a *target-project* convention, distinct from darkfactory's own source tree.
+- [ ] AC-8 (post-222.8): Darkfactory's own roadmap PRDs live at `.darkfactory/prds/` and every harness flow works against its own clone via the same code path every other project uses. No dev-mode fallback, no pyproject.toml sniffing, no special cases in the loader.
+- [ ] AC-9: README documents `.darkfactory/` as the universal convention — the same one darkfactory's own repo uses.
 - [ ] AC-10: `.gitignore` generated by `prd init` correctly ignores runtime state while tracking PRDs and workflows.
+- [ ] AC-11 (post-222.3): `extraction` and `planning` are discoverable as first-party built-ins in a fresh install with no on-disk workflow directories anywhere.
 
 ## Open Questions
 
-- [ ] **Darkfactory dev-mode fallback.** When running `prd` inside darkfactory's own clone with no `.darkfactory/`, should it (a) transparently use `prds/` at the repo root, (b) require the darkfactory dev to set `DARKFACTORY_DIR=.` in their shell, or (c) require a `.darkfactory/` with a symlink to `prds/`? Recommendation: (a) — simplest, and it's clearly marked as a special case for a single known repo. The detection is "am I running from inside the git clone whose pyproject.toml declares `name = "darkfactory"`?"
 - [ ] **Explicit shadow opt-in.** Right now any workflow name collision is a hard error. Eventually we'll want users to be able to deliberately shadow a built-in (e.g. override `default` with their own variant). Proposal: add a `shadow:` field in the workflow module itself (e.g. `shadow = "default"`), and when loading a workflow with `shadow = "X"`, any existing "X" from a lower layer is *replaced* rather than colliding. Defer to a follow-up PRD once strict mode has caught enough real bugs.
 - [ ] **Directory-level config (fourth layer).** Nice-to-have for monorepos where different subtrees want different settings. Defer to a later epic; design the cascade so a fourth layer slots in cleanly.
 - [ ] **Short alias (`df`, `dfctr`).** Stick with `prd` as the primary; users can alias in their shell.
