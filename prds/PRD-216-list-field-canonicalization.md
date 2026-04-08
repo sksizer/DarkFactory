@@ -2,7 +2,7 @@
 id: "PRD-216"
 title: "Canonicalize PRD list fields to reduce diff churn"
 kind: task
-status: ready
+status: in-progress
 priority: medium
 effort: s
 capability: simple
@@ -18,7 +18,7 @@ impacts:
 workflow: null
 target_version: null
 created: 2026-04-08
-updated: '2026-04-08'
+updated: '2026-04-07'
 tags:
   - harness
   - hygiene
