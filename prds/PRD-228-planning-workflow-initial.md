@@ -2,7 +2,7 @@
 id: "PRD-228"
 title: "Initial planning workflow: decompose epics into child PRDs"
 kind: task
-status: ready
+status: in-progress
 priority: high
 effort: m
 capability: complex
