@@ -2,7 +2,7 @@
 id: "PRD-505"
 title: "Verify darkfactory end-to-end and push first commit"
 kind: task
-status: ready
+status: done
 priority: high
 effort: xs
 capability: simple
@@ -17,7 +17,7 @@ impacts:
 workflow: null
 target_version: null
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-08'
 tags:
   - harness
   - extraction

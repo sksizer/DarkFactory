@@ -2,7 +2,7 @@
 id: "PRD-502"
 title: "Port source code with prd_harness -> darkfactory rename"
 kind: task
-status: ready
+status: done
 priority: high
 effort: s
 capability: simple
@@ -17,7 +17,7 @@ impacts:
 workflow: null
 target_version: null
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-08'
 tags:
   - harness
   - extraction

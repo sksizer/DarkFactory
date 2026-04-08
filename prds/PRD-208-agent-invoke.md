@@ -2,7 +2,7 @@
 id: "PRD-208"
 title: "Claude Code Subprocess Wrapper"
 kind: task
-status: review
+status: done
 priority: high
 effort: s
 capability: simple
@@ -17,7 +17,7 @@ impacts:
 workflow: null
 target_version: null
 created: 2026-04-07
-updated: 2026-04-08
+updated: '2026-04-08'
 tags:
   - harness
   - agent

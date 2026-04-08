@@ -2,7 +2,7 @@
 id: "PRD-500"
 title: "Extract harness into darkfactory repo"
 kind: epic
-status: ready
+status: done
 priority: high
 effort: m
 capability: moderate
@@ -22,7 +22,7 @@ impacts: []  # epic: no direct file impacts — children declare theirs
 workflow: null
 target_version: null
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-08'
 tags:
   - harness
   - extraction

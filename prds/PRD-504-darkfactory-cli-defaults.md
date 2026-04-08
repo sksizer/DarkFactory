@@ -2,7 +2,7 @@
 id: "PRD-504"
 title: "Update CLI defaults for standalone darkfactory operation"
 kind: task
-status: ready
+status: done
 priority: high
 effort: s
 capability: moderate
@@ -19,7 +19,7 @@ impacts:
 workflow: null
 target_version: null
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-08'
 tags:
   - harness
   - extraction

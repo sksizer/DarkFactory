@@ -2,7 +2,7 @@
 id: "PRD-520"
 title: "Pumice cleanup — remove tools/prd-harness/"
 kind: task
-status: ready
+status: done
 priority: medium
 effort: s
 capability: simple
@@ -20,7 +20,7 @@ impacts:
 workflow: null
 target_version: null
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-08'
 tags:
   - pumice
   - cleanup

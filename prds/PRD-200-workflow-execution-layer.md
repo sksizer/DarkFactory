@@ -2,7 +2,7 @@
 id: "PRD-200"
 title: "Workflow Execution Layer"
 kind: epic
-status: in-progress
+status: done
 priority: high
 effort: l
 capability: complex
@@ -24,7 +24,7 @@ impacts: []  # container (see PRD-212): effective impacts derived from leaf desc
 workflow: null
 target_version: null
 created: 2026-04-07
-updated: 2026-04-07
+updated: '2026-04-08'
 tags:
   - harness
   - workflows

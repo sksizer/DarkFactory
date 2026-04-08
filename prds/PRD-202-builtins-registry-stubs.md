@@ -2,7 +2,7 @@
 id: "PRD-202"
 title: "Builtins Registry + Stub Primitives"
 kind: task
-status: review
+status: done
 priority: high
 effort: xs
 capability: trivial
@@ -19,7 +19,7 @@ impacts:
 workflow: null
 target_version: null
 created: 2026-04-07
-updated: 2026-04-08
+updated: '2026-04-08'
 tags:
   - harness
   - builtins

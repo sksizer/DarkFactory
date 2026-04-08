@@ -2,7 +2,7 @@
 id: "PRD-214"
 title: "PRD frontmatter round-trip drops quotes and rewrites style"
 kind: task
-status: ready
+status: done
 priority: medium
 effort: s
 capability: moderate
@@ -15,7 +15,7 @@ impacts:
 workflow: null
 target_version: null
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-08'
 tags:
   - harness
   - bug
