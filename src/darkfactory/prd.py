@@ -16,7 +16,7 @@ so ``PRD-1.2`` sorts before ``PRD-1.10``.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -165,7 +165,9 @@ def parse_prd(path: Path) -> PRD:
         workflow=fm.get("workflow") if isinstance(fm.get("workflow"), str) else None,
         assignee=fm.get("assignee") if isinstance(fm.get("assignee"), str) else None,
         reviewers=_coerce_list(fm.get("reviewers")),
-        target_version=fm.get("target_version") if isinstance(fm.get("target_version"), str) else None,
+        target_version=fm.get("target_version")
+        if isinstance(fm.get("target_version"), str)
+        else None,
         created=fm.get("created", ""),
         updated=fm.get("updated", ""),
         tags=_coerce_list(fm.get("tags")),
@@ -186,7 +188,9 @@ def load_all(prd_dir: Path) -> dict[str, PRD]:
             continue
         prd = parse_prd(path)
         if prd.id in prds:
-            raise ValueError(f"duplicate PRD id {prd.id!r} in {path.name} and {prds[prd.id].path.name}")
+            raise ValueError(
+                f"duplicate PRD id {prd.id!r} in {path.name} and {prds[prd.id].path.name}"
+            )
         prds[prd.id] = prd
     return prds
 
@@ -222,9 +226,7 @@ def write_frontmatter(prd: PRD, new_fm: dict[str, Any]) -> None:
     prd.raw_frontmatter = new_fm
 
 
-def update_frontmatter_field_at(
-    path: Path, updates: dict[str, str]
-) -> None:
+def update_frontmatter_field_at(path: Path, updates: dict[str, str]) -> None:
     """Surgically rewrite specific frontmatter fields on disk.
 
     Only the lines matching ``^<field>:`` (where ``<field>`` is a key in

@@ -15,7 +15,6 @@ from unittest.mock import patch
 import pytest
 
 from darkfactory.cli import main
-from darkfactory.invoke import InvokeResult
 
 from .conftest import write_prd
 

@@ -96,9 +96,7 @@ def test_substitute_empty_context() -> None:
 def test_substitute_coerces_non_string_values() -> None:
     """Integers and Paths should work without caller ceremony."""
     template = "count: {{N}}, path: {{P}}"
-    result = substitute_placeholders(
-        template, {"N": 42, "P": Path("/tmp/foo")}
-    )
+    result = substitute_placeholders(template, {"N": 42, "P": Path("/tmp/foo")})
     assert "count: 42" in result
     assert "/tmp/foo" in result
 
@@ -120,7 +118,9 @@ def test_substitute_nested_braces_in_code_blocks() -> None:
 # ---------- compose_prompt ----------
 
 
-def _make_ctx(tmp_prd_dir: Path, workflow_dir: Path) -> tuple[Workflow, ExecutionContext]:
+def _make_ctx(
+    tmp_prd_dir: Path, workflow_dir: Path
+) -> tuple[Workflow, ExecutionContext]:
     """Build a workflow (with workflow_dir set) and a context for testing compose."""
     write_prd(tmp_prd_dir, "PRD-070", "test-task")
     prds = load_all(tmp_prd_dir)

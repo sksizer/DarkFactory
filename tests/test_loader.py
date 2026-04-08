@@ -171,9 +171,9 @@ def test_load_rejects_duplicate_names(tmp_path: Path) -> None:
     _write_workflow(
         tmp_path,
         "second",
-        body='''from darkfactory.workflow import Workflow
+        body="""from darkfactory.workflow import Workflow
 workflow = Workflow(name="first")  # deliberate collision
-''',
+""",
     )
     with pytest.raises(ValueError, match="duplicate workflow name"):
         load_workflows(tmp_path)
