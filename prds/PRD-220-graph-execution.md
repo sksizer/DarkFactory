@@ -49,6 +49,7 @@ The whole point of the harness is to remove the manual overhead of "pick next PR
 7. `--parallel` (opt-in) enables concurrent execution of independent siblings whose `impacts` don't overlap. Without this flag, execution is sequential.
 8. Dry-run mode prints the planned traversal order without executing anything.
 9. Status output is streamed: as each PRD starts/finishes, a line is printed (or JSON event with `--json`).
+10. We need to address, or capture for a later task how to propagate potential changes in contracts/apis/touched files to other PRD documents that have not been executed yet.
 
 ## Technical Approach
 
