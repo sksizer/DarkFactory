@@ -441,3 +441,149 @@ def test_invoke_sentinel_parsing_unchanged(tmp_path: Path) -> None:  # NEW
     assert result.success is True
     assert result.failure_reason is None
     assert "PRD_EXECUTE_OK" in result.stdout
+
+
+# ---------- stream-json event parsing ----------
+
+
+def test_invoke_parses_stream_json_assistant_text(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Each stream-json assistant event with text content is summarized to
+    the logger and accumulates into the agent text buffer used for sentinel
+    matching."""
+    events = [
+        '{"type":"system","subtype":"init"}',
+        '{"type":"assistant","message":{"content":[{"type":"text","text":"reading files"}]}}',
+        '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"src/foo.py"}}]}}',
+        '{"type":"user","message":{"content":[{"type":"tool_result","content":"file content"}]}}',
+        '{"type":"result","subtype":"success","result":"PRD_EXECUTE_OK: PRD-T"}',
+    ]
+    script = "\n".join(f"print({e!r})" for e in events)
+    with caplog.at_level(logging.INFO, logger="darkfactory.invoke"):
+        result = invoke_claude(
+            prompt="irrelevant",
+            tools=[],
+            model="sonnet",
+            cwd=tmp_path,
+            executable="python",
+            _argv_override=["-c", script],
+        )
+    assert result.success is True, result.failure_reason
+    messages = [r.getMessage() for r in caplog.records]
+    assert any("[system] init" in m for m in messages)
+    assert any("text: reading files" in m for m in messages)
+    assert any("tool_use: Read src/foo.py" in m for m in messages)
+    assert any("tool_result" in m for m in messages)
+    assert any("[result] success" in m for m in messages)
+
+
+def test_invoke_parses_stream_json_partial_text_deltas(
+    tmp_path: Path,
+) -> None:
+    """Partial-message stream_event deltas accumulate into the agent text
+    buffer so a sentinel split across deltas is still recognized."""
+    events = [
+        '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"PRD_EXEC"}}}',
+        '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"UTE_OK: PRD-T"}}}',
+    ]
+    script = "\n".join(f"print({e!r})" for e in events)
+    result = invoke_claude(
+        prompt="irrelevant",
+        tools=[],
+        model="sonnet",
+        cwd=tmp_path,
+        executable="python",
+        _argv_override=["-c", script],
+    )
+    assert result.success is True, result.failure_reason
+
+
+def test_invoke_unknown_event_types_are_ignored(tmp_path: Path) -> None:
+    """An unrecognized event type doesn't crash and doesn't break the run."""
+    events = [
+        '{"type":"some_future_event","payload":"???"}',
+        '{"type":"result","subtype":"success","result":"PRD_EXECUTE_OK: PRD-T"}',
+    ]
+    script = "\n".join(f"print({e!r})" for e in events)
+    result = invoke_claude(
+        prompt="irrelevant",
+        tools=[],
+        model="sonnet",
+        cwd=tmp_path,
+        executable="python",
+        _argv_override=["-c", script],
+    )
+    assert result.success is True, result.failure_reason
+
+
+def test_invoke_parses_rate_limit_event(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Rate limit warnings surface as a [rate_limit] log line so the user
+    sees them in real time."""
+    events = [
+        '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","rateLimitType":"seven_day","utilization":0.94}}',
+        '{"type":"result","subtype":"success","result":"PRD_EXECUTE_OK: PRD-T"}',
+    ]
+    script = "\n".join(f"print({e!r})" for e in events)
+    with caplog.at_level(logging.INFO, logger="darkfactory.invoke"):
+        result = invoke_claude(
+            prompt="irrelevant",
+            tools=[],
+            model="sonnet",
+            cwd=tmp_path,
+            executable="python",
+            _argv_override=["-c", script],
+        )
+    assert result.success is True
+    messages = [r.getMessage() for r in caplog.records]
+    assert any("[rate_limit] seven_day allowed_warning 94%" in m for m in messages)
+
+
+def test_invoke_parses_assistant_with_thinking_and_text(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A single assistant event can carry both a thinking block and a text
+    block (this is the shape Claude Code emits in --verbose stream-json
+    mode). Both should surface in the log line."""
+    event = (
+        '{"type":"assistant","message":{"content":['
+        '{"type":"thinking","thinking":"hmm let me think"},'
+        '{"type":"text","text":"the answer is 42"}'
+        "]}}"
+    )
+    final = '{"type":"result","subtype":"success","result":"PRD_EXECUTE_OK: PRD-T"}'
+    script = f"print({event!r})\nprint({final!r})"
+    with caplog.at_level(logging.INFO, logger="darkfactory.invoke"):
+        result = invoke_claude(
+            prompt="irrelevant",
+            tools=[],
+            model="sonnet",
+            cwd=tmp_path,
+            executable="python",
+            _argv_override=["-c", script],
+        )
+    assert result.success is True
+    messages = [r.getMessage() for r in caplog.records]
+    # Both thinking and text appear in the same log line, joined with " | "
+    assert any("thinking" in m and "text: the answer is 42" in m for m in messages)
+
+
+def test_invoke_invalid_json_falls_back_to_plain_text(tmp_path: Path) -> None:
+    """A line that isn't valid JSON is logged as-is and treated as agent
+    text. This is the legacy --print plain-text mode and the test-stub
+    path that the existing tests above all rely on."""
+    result = invoke_claude(
+        prompt="irrelevant",
+        tools=[],
+        model="sonnet",
+        cwd=tmp_path,
+        executable="python",
+        _argv_override=[
+            "-c",
+            "print('not json'); print('PRD_EXECUTE_OK: PRD-T')",
+        ],
+    )
+    assert result.success is True
+    assert "not json" in result.stdout
