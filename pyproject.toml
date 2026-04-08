@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "pyyaml>=6.0",
     "filelock>=3.13",
+    "rich>=13.0",
 ]
 
 [project.scripts]

@@ -54,6 +54,7 @@ from .workflow import (
 
 if TYPE_CHECKING:
     from .prd import PRD
+    from .style import Styler
 
 
 logger = logging.getLogger("darkfactory.runner")
@@ -122,6 +123,7 @@ def run_workflow(
     *,
     dry_run: bool = True,
     model_override: str | None = None,
+    styler: "Styler | None" = None,
 ) -> RunResult:
     """Execute a workflow against a single PRD and return the result.
 
@@ -156,7 +158,12 @@ def run_workflow(
         for task in workflow.tasks:
             try:
                 step = _dispatch(
-                    task, ctx, model_override, last_agent_task, last_agent_result
+                    task,
+                    ctx,
+                    model_override,
+                    last_agent_task,
+                    last_agent_result,
+                    styler=styler,
                 )
                 result.steps.append(step)
 
@@ -233,14 +240,16 @@ def _dispatch(
     model_override: str | None,
     last_agent_task: AgentTask | None,
     last_agent_result: InvokeResult | None,
+    *,
+    styler: "Styler | None" = None,
 ) -> TaskStep:
     """Dispatch a single task by type and return a TaskStep describing the outcome."""
     if isinstance(task, BuiltIn):
         return _run_builtin(task, ctx)
     if isinstance(task, AgentTask):
-        return _run_agent(task, ctx, model_override)
+        return _run_agent(task, ctx, model_override, styler=styler)
     if isinstance(task, ShellTask):
-        return _run_shell(task, ctx, last_agent_task, model_override)
+        return _run_shell(task, ctx, last_agent_task, model_override, styler=styler)
     raise TypeError(f"unknown task type: {type(task).__name__}")
 
 
@@ -275,6 +284,7 @@ def _run_agent(
     model_override: str | None,
     *,
     extras: dict[str, object] | None = None,
+    styler: "Styler | None" = None,
 ) -> TaskStep:
     """Compose prompts, invoke Claude Code, and record the result on context."""
     prompt = compose_prompt(ctx.workflow, task.prompts, ctx, extras=extras)
@@ -288,6 +298,7 @@ def _run_agent(
         sentinel_success=task.sentinel_success,
         sentinel_failure=task.sentinel_failure,
         dry_run=ctx.dry_run,
+        styler=styler,
     )
 
     ctx.agent_output = result.stdout
@@ -337,6 +348,8 @@ def _run_shell(
     ctx: ExecutionContext,
     last_agent_task: AgentTask | None,
     model_override: str | None,
+    *,
+    styler: "Styler | None" = None,
 ) -> TaskStep:
     """Run a shell command, handling on_failure policy with agent retry if configured."""
     cmd = ctx.format_string(task.cmd)
@@ -396,6 +409,7 @@ def _run_shell(
         ctx,
         model_override,
         extras={"CHECK_OUTPUT": failure_output},
+        styler=styler,
     )
     if not agent_step.success:
         return TaskStep(

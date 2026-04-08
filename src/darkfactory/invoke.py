@@ -39,7 +39,10 @@ import time
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .style import Element, Styler
 
 
 # ---------- capability -> model mapping ----------
@@ -157,12 +160,16 @@ def _parse_sentinels(
 # ---------- stream-json event summarization ----------
 
 
-def _summarize_stream_event(event: dict[str, Any]) -> tuple[str | None, str]:
-    """Turn one Claude Code stream-json event into (log_line, agent_text).
+def _summarize_stream_event(
+    event: dict[str, Any],
+) -> tuple["Element | None", str, str]:
+    """Turn one Claude Code stream-json event into (element, display_text, agent_text).
 
     Returns:
-        log_line: a one-line human-readable summary suitable for the runner's
-            logger. ``None`` means "skip — nothing interesting to surface".
+        element: the semantic :class:`~darkfactory.style.Element` for this
+            event, or ``None`` to skip display entirely.
+        display_text: a one-line human-readable summary. Empty string when
+            ``element`` is ``None``.
         agent_text: the substring that should be appended to the agent-text
             buffer used for sentinel matching. Empty string for non-text
             events. Sentinels can only appear in assistant text, so we
@@ -181,13 +188,15 @@ def _summarize_stream_event(event: dict[str, Any]) -> tuple[str | None, str]:
     - ``{"type": "result", "subtype": "success"|"error_max_turns"|..., ...}``
         — terminal event with the final message and stats
 
-    Anything not in this list is logged at DEBUG only via the catchall.
+    Anything not in this list is skipped (element=None).
     """
+    from .style import Element
+
     etype = event.get("type")
 
     if etype == "system":
         subtype = event.get("subtype", "?")
-        return (f"[system] {subtype}", "")
+        return (Element.SYSTEM, f"[system] {subtype}", "")
 
     if etype == "assistant":
         msg = event.get("message", {}) or {}
@@ -199,9 +208,12 @@ def _summarize_stream_event(event: dict[str, Any]) -> tuple[str | None, str]:
         # ' | '.
         bits: list[str] = []
         text_accum: list[str] = []
+        has_tool_use = False
+        only_thinking = True
         for block in content:
             btype = block.get("type")
             if btype == "text":
+                only_thinking = False
                 text = block.get("text") or ""
                 text_accum.append(text)
                 # Show first 200 chars on a single line; the buffer keeps
@@ -212,6 +224,8 @@ def _summarize_stream_event(event: dict[str, Any]) -> tuple[str | None, str]:
                 if snippet:
                     bits.append(f"text: {snippet}")
             elif btype == "tool_use":
+                only_thinking = False
+                has_tool_use = True
                 name = block.get("name", "?")
                 inp = block.get("input", {}) or {}
                 # Render a few high-signal inputs concisely.
@@ -230,9 +244,20 @@ def _summarize_stream_event(event: dict[str, Any]) -> tuple[str | None, str]:
                 # Don't echo full thinking — too noisy. Just note it happened.
                 bits.append("thinking")
             else:
+                only_thinking = False
                 bits.append(f"{btype}")
-        line = " | ".join(bits) if bits else None
-        return (line, "\n".join(text_accum))
+
+        if not bits:
+            return (None, "", "\n".join(text_accum))
+
+        display = " | ".join(bits)
+        if has_tool_use:
+            element: Element = Element.TOOL_CALL
+        elif only_thinking and bits == ["thinking"]:
+            element = Element.THINKING
+        else:
+            element = Element.ASSISTANT_TEXT
+        return (element, display, "\n".join(text_accum))
 
     if etype == "user":
         msg = event.get("message", {}) or {}
@@ -248,9 +273,11 @@ def _summarize_stream_event(event: dict[str, Any]) -> tuple[str | None, str]:
                 snippet = (raw or "").replace("\n", " ").strip()
                 if len(snippet) > 200:
                     snippet = snippet[:197] + "..."
-                err = " (error)" if block.get("is_error") else ""
-                return (f"tool_result{err}: {snippet}", "")
-        return (None, "")
+                is_error = block.get("is_error")
+                err = " (error)" if is_error else ""
+                elem = Element.ERROR if is_error else Element.TOOL_RESULT
+                return (elem, f"tool_result{err}: {snippet}", "")
+        return (None, "", "")
 
     if etype == "stream_event":
         ev = event.get("event", {}) or {}
@@ -260,8 +287,8 @@ def _summarize_stream_event(event: dict[str, Any]) -> tuple[str | None, str]:
                 text = delta.get("text") or ""
                 # Don't log every micro-delta — too noisy. But DO accumulate
                 # text into the agent buffer so sentinels build up.
-                return (None, text)
-        return (None, "")
+                return (None, "", text)
+        return (None, "", "")
 
     if etype == "rate_limit_event":
         info = event.get("rate_limit_info", {}) or {}
@@ -269,7 +296,7 @@ def _summarize_stream_event(event: dict[str, Any]) -> tuple[str | None, str]:
         util = info.get("utilization")
         rl_type = info.get("rateLimitType", "?")
         util_str = f" {util:.0%}" if isinstance(util, (int, float)) else ""
-        return (f"[rate_limit] {rl_type} {status}{util_str}", "")
+        return (Element.RATE_LIMIT, f"[rate_limit] {rl_type} {status}{util_str}", "")
 
     if etype == "result":
         subtype = event.get("subtype", "?")
@@ -277,12 +304,23 @@ def _summarize_stream_event(event: dict[str, Any]) -> tuple[str | None, str]:
         snippet = str(msg).replace("\n", " ").strip()
         if len(snippet) > 200:
             snippet = snippet[:197] + "..."
+        # Extract token usage if present — render result events bold so the
+        # token count stands out (AC-3).
+        usage = event.get("usage", {}) or {}
+        input_tokens = usage.get("input_tokens", 0) or 0
+        output_tokens = usage.get("output_tokens", 0) or 0
+        total_tokens = input_tokens + output_tokens
+        token_str = f" [{total_tokens:,} tokens]" if total_tokens else ""
+        display = f"[result] {subtype}{token_str} {snippet}".strip()
+        # Use TOKEN_COUNT element when usage info is present so the line
+        # renders bold; fall back to SYSTEM otherwise.
+        result_elem = Element.TOKEN_COUNT if total_tokens else Element.SYSTEM
         # The result.result field contains the final text, which is where
         # the sentinel typically lands.
-        return (f"[result] {subtype} {snippet}", str(msg))
+        return (result_elem, display, str(msg))
 
     # Unknown event type — log nothing, accumulate nothing.
-    return (None, "")
+    return (None, "", "")
 
 
 # ---------- main entry point ----------
@@ -300,6 +338,7 @@ def invoke_claude(
     executable: str = "pnpm",
     dry_run: bool = False,
     logger: logging.Logger | None = None,
+    styler: "Styler | None" = None,
     _argv_override: list[str] | None = None,
 ) -> InvokeResult:
     """Run Claude Code as a subprocess with the given prompt and return the result.
@@ -444,7 +483,16 @@ def invoke_claude(
             except json.JSONDecodeError:
                 # Not JSON — preserve old behavior. Useful for tests that
                 # stub the subprocess with plain text and for diagnostics.
-                log.info("agent: %s", stripped)
+                if styler is not None:
+                    from .style import Element
+                    import sys
+
+                    print(
+                        styler.render(Element.ASSISTANT_TEXT, stripped),
+                        file=sys.stderr,
+                    )
+                else:
+                    log.info("agent: %s", stripped)
                 agent_text_buf.write(stripped + "\n")
                 continue
 
@@ -452,9 +500,18 @@ def invoke_claude(
                 log.info("agent: %s", stripped)
                 continue
 
-            log_line, agent_text = _summarize_stream_event(event)
-            if log_line is not None:
-                log.info("agent: %s", log_line)
+            element, display_text, agent_text = _summarize_stream_event(event)
+            if element is not None and display_text:
+                if styler is not None:
+                    from .style import Element
+
+                    # Print with styling to stderr so it doesn't mix with
+                    # any stdout output the caller may be collecting.
+                    import sys
+
+                    print(styler.render(element, display_text), file=sys.stderr)
+                else:
+                    log.info("agent: %s", display_text)
             if agent_text:
                 # Append verbatim — adding a trailing newline here would
                 # break sentinel matching when the marker is split across
