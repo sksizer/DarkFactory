@@ -2,7 +2,7 @@
 id: PRD-548
 title: lint_attribution builtin — reject Claude/Anthropic credit before push
 kind: task
-status: review
+status: done
 priority: high
 effort: s
 capability: trivial
