@@ -26,6 +26,8 @@ import pytest
 from darkfactory import builtins
 from darkfactory.builtins import (
     BUILTINS,
+    _branch_exists_local,
+    _branch_exists_remote,
     _extract_acceptance_criteria,
     _pr_body,
     _worktree_target,
@@ -532,3 +534,221 @@ def test_create_pr_captures_url_from_stdout(tmp_path: Path) -> None:
     assert "--base" in cmd
     assert "--title" in cmd
     assert "--body-file" in cmd
+
+
+# ---------- branch-existence guard tests ----------
+
+
+def test_ensure_worktree_errors_if_branch_exists_without_worktree(
+    tmp_git_repo: Path,
+) -> None:
+    """AC-1 / AC-5: Second invocation (branch exists, worktree gone) raises RuntimeError."""
+    prd_dir = tmp_git_repo / "docs" / "prd"
+    prd_dir.mkdir(parents=True)
+    write_prd(prd_dir, "PRD-215", "guard-test")
+    prds = load_all(prd_dir)
+
+    ctx = ExecutionContext(
+        prd=prds["PRD-215"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-215-guard-test",
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+    # First invocation: creates worktree + branch.
+    builtins.ensure_worktree(ctx)
+    assert ctx.worktree_path is not None
+
+    # Simulate worktree dir being gone (e.g. deleted manually or by another process).
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_git_repo),
+            "worktree",
+            "remove",
+            "--force",
+            str(ctx.worktree_path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    assert not ctx.worktree_path.exists()
+
+    # Second invocation: branch still exists, worktree gone → guard fires.
+    ctx2 = ExecutionContext(
+        prd=prds["PRD-215"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-215-guard-test",
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+    with pytest.raises(RuntimeError, match="already exists"):
+        builtins.ensure_worktree(ctx2)
+
+
+def test_ensure_worktree_errors_on_remote_branch(tmp_git_repo: Path) -> None:
+    """AC-2: A fake remote branch (via update-ref) also triggers the guard."""
+    prd_dir = tmp_git_repo / "docs" / "prd"
+    prd_dir.mkdir(parents=True)
+    write_prd(prd_dir, "PRD-215", "remote-guard")
+    prds = load_all(prd_dir)
+
+    branch = "prd/PRD-215-remote-guard"
+
+    # Simulate a remote-tracking ref without a local branch or worktree.
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_git_repo),
+            "update-ref",
+            f"refs/remotes/origin/{branch}",
+            "HEAD",
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+    ctx = ExecutionContext(
+        prd=prds["PRD-215"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name=branch,
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+
+    # Patch _branch_exists_remote to simulate ls-remote finding the branch.
+    with patch("darkfactory.builtins._branch_exists_remote", return_value=True):
+        with pytest.raises(RuntimeError, match="already exists"):
+            builtins.ensure_worktree(ctx)
+
+
+def test_ensure_worktree_resumes_when_both_branch_and_worktree_exist(
+    tmp_git_repo: Path,
+) -> None:
+    """AC-3: Resuming (worktree dir exists, branch exists) works as before."""
+    prd_dir = tmp_git_repo / "docs" / "prd"
+    prd_dir.mkdir(parents=True)
+    write_prd(prd_dir, "PRD-215", "resume-guard")
+    prds = load_all(prd_dir)
+
+    ctx = ExecutionContext(
+        prd=prds["PRD-215"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-215-resume-guard",
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+    builtins.ensure_worktree(ctx)
+    first_path = ctx.worktree_path
+    assert first_path is not None and first_path.exists()
+
+    # Second call with same branch + existing worktree: should resume, not error.
+    ctx2 = ExecutionContext(
+        prd=prds["PRD-215"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-215-resume-guard",
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+    builtins.ensure_worktree(ctx2)  # Must not raise
+    assert ctx2.worktree_path == first_path
+
+
+def test_ensure_worktree_remote_timeout_falls_back_to_local(
+    tmp_git_repo: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """AC-4: When git ls-remote times out, guard falls back to local check and logs warning."""
+    prd_dir = tmp_git_repo / "docs" / "prd"
+    prd_dir.mkdir(parents=True)
+    write_prd(prd_dir, "PRD-215", "timeout-test")
+    prds = load_all(prd_dir)
+
+    ctx = ExecutionContext(
+        prd=prds["PRD-215"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-215-timeout-test",
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+
+    # Simulate ls-remote timeout — worktree and local branch don't exist,
+    # so the guard should not fire despite the timeout.
+    original_run = subprocess.run
+
+    def fake_run(cmd, **kwargs):
+        if "ls-remote" in cmd:
+            raise subprocess.TimeoutExpired(cmd, 10)
+        return original_run(cmd, **kwargs)
+
+    with caplog.at_level(logging.WARNING, logger="darkfactory"):
+        with patch("darkfactory.builtins.subprocess.run", side_effect=fake_run):
+            builtins.ensure_worktree(ctx)
+
+    assert ctx.worktree_path is not None
+    assert any("timed out" in rec.message for rec in caplog.records)
+
+
+def test_branch_exists_local_true(tmp_git_repo: Path) -> None:
+    """_branch_exists_local returns True when the branch exists."""
+    subprocess.run(
+        ["git", "-C", str(tmp_git_repo), "branch", "test-local-branch"],
+        check=True,
+        capture_output=True,
+    )
+    assert _branch_exists_local(tmp_git_repo, "test-local-branch") is True
+
+
+def test_branch_exists_local_false(tmp_git_repo: Path) -> None:
+    """_branch_exists_local returns False when the branch does not exist."""
+    assert _branch_exists_local(tmp_git_repo, "no-such-branch-xyz") is False
+
+
+def test_branch_exists_remote_timeout_returns_false(
+    tmp_git_repo: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """AC-4: _branch_exists_remote returns False and logs a warning on timeout."""
+    timeout_exc = subprocess.TimeoutExpired(["git"], 10)
+    with caplog.at_level(logging.WARNING, logger="darkfactory"):
+        with patch("darkfactory.builtins.subprocess.run", side_effect=timeout_exc):
+            result = _branch_exists_remote(tmp_git_repo, "prd/PRD-215-some-branch")
+
+    assert result is False
+    assert any("timed out" in rec.message for rec in caplog.records)
+
+
+def test_ensure_worktree_guard_stubbed_subprocess(tmp_path: Path) -> None:
+    """AC-5: Stubs subprocess.run to simulate branch-exists case and asserts the error."""
+    prd_dir = tmp_path / "prds"
+    prd_dir.mkdir()
+    write_prd(prd_dir, "PRD-215", "stub-test")
+    prds = load_all(prd_dir)
+
+    ctx = ExecutionContext(
+        prd=prds["PRD-215"],
+        repo_root=tmp_path,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-215-stub-test",
+        cwd=tmp_path,
+        dry_run=False,
+    )
+
+    # Patch helpers directly: local branch exists, no worktree on disk.
+    with patch("darkfactory.builtins._branch_exists_local", return_value=True):
+        with patch("darkfactory.builtins._branch_exists_remote", return_value=False):
+            with pytest.raises(RuntimeError, match="already exists"):
+                builtins.ensure_worktree(ctx)
