@@ -2,13 +2,20 @@
 id: PRD-224
 title: Harness invariants for honest state
 kind: epic
-status: ready
+status: review
 priority: high
 effort: m
 capability: moderate
 parent:
 depends_on: []
-blocks: []
+blocks:
+  - "[[PRD-224.1-validate-review-branches]]"
+  - "[[PRD-224.2-ensure-worktree-stale-guard]]"
+  - "[[PRD-224.3-summarize-agent-run]]"
+  - "[[PRD-224.4-cleanup-subcommand]]"
+  - "[[PRD-224.5-gh-action-merge-status]]"
+  - "[[PRD-224.6-commit-transcript]]"
+  - "[[PRD-224.7-reconcile-status]]"
 impacts: []
 workflow: planning
 target_version:
