@@ -758,22 +758,59 @@ def _describe_task(task: Task, ctx_prd: PRD, model_override: str | None) -> str:
 def _resolve_base_ref(explicit: str | None, repo_root: Path) -> str:
     """Determine the git base ref for a new workflow branch.
 
-    Explicit override (``--base``) wins. Otherwise defaults to the
-    current HEAD of the repo — the idea being that a ``run-chain``
-    starts from whatever branch the user is sitting on.
+    Resolution order:
+
+    1. ``explicit`` from ``--base`` (highest priority)
+    2. ``DARKFACTORY_BASE_REF`` environment variable
+    3. ``main`` if it exists locally
+    4. ``master`` if it exists locally
+    5. The remote's default branch via ``origin/HEAD``
+    6. Last resort: ``main`` (callers will hit a real error later if it's
+       missing too)
+
+    The user's current branch is **not** consulted. PRDs are independent
+    units of work and should base on the project's default branch unless
+    the user says otherwise. Stacking onto a feature branch is the
+    exception, not the rule, and requires an explicit ``--base`` flag.
     """
     if explicit:
         return explicit
+
+    env_override = os.environ.get("DARKFACTORY_BASE_REF")
+    if env_override:
+        return env_override
+
+    for candidate in ("main", "master"):
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repo_root),
+                "rev-parse",
+                "--verify",
+                "--quiet",
+                f"refs/heads/{candidate}",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            return candidate
+
+    # Try remote's default branch (e.g. for fresh clones with no local main)
     try:
         result = subprocess.run(
-            ["git", "-C", str(repo_root), "rev-parse", "--abbrev-ref", "HEAD"],
+            ["git", "-C", str(repo_root), "symbolic-ref", "refs/remotes/origin/HEAD"],
             check=True,
             capture_output=True,
             text=True,
         )
-        return result.stdout.strip() or "main"
+        # Output looks like "refs/remotes/origin/main"
+        return result.stdout.strip().rsplit("/", 1)[-1]
     except subprocess.CalledProcessError:
-        return "main"
+        pass
+
+    return "main"
 
 
 def _check_runnable(prd: PRD, prds: dict[str, PRD]) -> str | None:
