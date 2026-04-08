@@ -7,7 +7,7 @@ Usage::
 Defaults: PRDs live in ``prds/`` and workflows in ``workflows/`` at the
 repo root. Override via ``--prd-dir`` and ``--workflows-dir``.
 
-This should have minimial logic; the subcommand implementations can call into 
+This should have minimial logic; the subcommand implementations can call into
 specific modules for the heavy lifting.
 """
 
@@ -38,6 +38,7 @@ from .prd import (
     set_workflow,
 )
 from .runner import _compute_branch_name, _pick_model, run_workflow
+from .style import Element, Styler, resolve_style_config
 from .workflow import AgentTask, BuiltIn, ShellTask, Task, Workflow
 
 # Priority/effort orderings used for sorting actionable lists.
@@ -420,34 +421,57 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _format_tree_node(prd: PRD, styler: Styler) -> str:
+    """Return a styled inline descriptor for a tree node: ``[kind/status]  title``."""
+    kind_elem = styler.kind_element(prd.kind)
+    kind_icon = styler.icon(prd.kind)
+    status_icon = styler.icon(prd.status)
+    priority_icon = styler.icon(prd.priority)
+
+    styled_id = styler.render(kind_elem, prd.id)
+    styled_kind = styler.render(kind_elem, f"{kind_icon}{prd.kind}")
+    styled_status = styler.render(Element.TREE_STATUS, f"{status_icon}{prd.status}")
+    styled_priority = styler.render(
+        Element.TREE_PRIORITY, f"{priority_icon}{prd.priority}"
+    )
+    return (
+        f"{styled_id}  [{styled_kind}/{styled_status}/{styled_priority}]  {prd.title}"
+    )
+
+
 def _print_tree(
-    prd: PRD, prds: dict[str, PRD], prefix: str = "", is_last: bool = True
+    prd: PRD,
+    prds: dict[str, PRD],
+    styler: Styler,
+    prefix: str = "",
+    is_last: bool = True,
 ) -> None:
     """Recursively print a containment tree branch."""
     connector = "└── " if is_last else "├── "
-    print(f"{prefix}{connector}{prd.id}  [{prd.kind}/{prd.status}]  {prd.title}")
+    print(f"{prefix}{connector}{_format_tree_node(prd, styler)}")
     extension = "    " if is_last else "│   "
     kids = containment.children(prd.id, prds)
     for i, kid in enumerate(kids):
-        _print_tree(kid, prds, prefix + extension, i == len(kids) - 1)
+        _print_tree(kid, prds, styler, prefix + extension, i == len(kids) - 1)
 
 
 def cmd_tree(args: argparse.Namespace) -> int:
     prds = _load(args.prd_dir)
+    styler: Styler = args.styler
     if args.prd_id:
         prd = prds.get(args.prd_id)
         if prd is None:
             raise SystemExit(f"unknown PRD id: {args.prd_id}")
-        print(f"{prd.id}  [{prd.kind}/{prd.status}]  {prd.title}")
+        print(_format_tree_node(prd, styler))
         kids = containment.children(prd.id, prds)
         for i, kid in enumerate(kids):
-            _print_tree(kid, prds, "", i == len(kids) - 1)
+            _print_tree(kid, prds, styler, "", i == len(kids) - 1)
     else:
         for root in containment.roots(prds):
-            print(f"{root.id}  [{root.kind}/{root.status}]  {root.title}")
+            print(_format_tree_node(root, styler))
             kids = containment.children(root.id, prds)
             for i, kid in enumerate(kids):
-                _print_tree(kid, prds, "", i == len(kids) - 1)
+                _print_tree(kid, prds, styler, "", i == len(kids) - 1)
             print()
     return 0
 
@@ -891,11 +915,15 @@ def cmd_run(args: argparse.Namespace) -> int:
     base_ref = _resolve_base_ref(args.base, repo_root)
 
     dry_run = not args.execute
+    styler: Styler = args.styler
 
-    if dry_run:
-        print(f"# Dry-run: {prd.id} via workflow {workflow.name!r}")
-    else:
-        print(f"# Executing: {prd.id} via workflow {workflow.name!r}")
+    header_label = "Dry-run" if dry_run else "Executing"
+    print(
+        styler.render(
+            Element.RUN_HEADER,
+            f"# {header_label}: {prd.id} via workflow {workflow.name!r}",
+        )
+    )
 
     result = run_workflow(
         prd=prd,
@@ -904,23 +932,29 @@ def cmd_run(args: argparse.Namespace) -> int:
         base_ref=base_ref,
         dry_run=dry_run,
         model_override=args.model,
+        styler=styler,
     )
 
     print()
     print("  Steps:")
     for step in result.steps:
+        step_elem = Element.RUN_SUCCESS if step.success else Element.RUN_FAILURE
         marker = "✓" if step.success else "✗"
         detail = f" — {step.detail}" if step.detail else ""
-        print(f"    {marker} [{step.kind}] {step.name}{detail}")
+        print(
+            f"    {styler.render(step_elem, marker)} [{step.kind}] {step.name}{detail}"
+        )
 
     print()
     if result.success:
-        print("  Result: ✓ success")
+        print(f"  Result: {styler.render(Element.RUN_SUCCESS, '✓ success')}")
         if result.pr_url:
             print(f"  PR:     {result.pr_url}")
         return 0
     else:
-        print(f"  Result: ✗ FAILED — {result.failure_reason}")
+        print(
+            f"  Result: {styler.render(Element.RUN_FAILURE, '✗ FAILED')} — {result.failure_reason}"
+        )
         return 1
 
 
@@ -945,6 +979,26 @@ def build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true", help="Emit JSON output where supported"
     )
     parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument(
+        "--theme",
+        default=None,
+        choices=["dark", "light"],
+        help="Color theme (default: dark)",
+    )
+    parser.add_argument(
+        "--no-color",
+        dest="no_color",
+        action="store_true",
+        default=False,
+        help="Disable all color output",
+    )
+    parser.add_argument(
+        "--icon-set",
+        dest="icon_set",
+        default=None,
+        choices=["nerdfont", "ascii", "emoji"],
+        help="Icon set to use (default: auto-detected, ascii fallback)",
+    )
 
     sub = parser.add_subparsers(dest="subcommand", required=True)
 
@@ -1127,6 +1181,22 @@ def main(argv: list[str] | None = None) -> int:
         args.prd_dir = _default_prd_dir()
     if args.workflows_dir is None:
         args.workflows_dir = _default_workflows_dir()
+
+    # Resolve style config and create a Styler. Any command module that needs
+    # styled output reads args.styler — it never constructs one itself.
+    # JSON-output paths must NOT call styler.render() — they use plain print().
+    try:
+        repo_root = _find_repo_root(args.prd_dir)
+    except SystemExit:
+        repo_root = None
+    style_config = resolve_style_config(
+        theme=getattr(args, "theme", None),
+        icon_set=getattr(args, "icon_set", None),
+        no_color=getattr(args, "no_color", False),
+        repo_root=repo_root,
+    )
+    args.styler = Styler(style_config)
+
     func: Any = args.func
     return int(func(args))
 
