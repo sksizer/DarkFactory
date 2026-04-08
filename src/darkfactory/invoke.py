@@ -36,7 +36,7 @@ import re
 import subprocess
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -94,6 +94,8 @@ class InvokeResult:
     exit_code: int
     success: bool
     failure_reason: str | None = None
+    tool_counts: dict[str, int] = field(default_factory=dict)
+    sentinel: str | None = None
 
 
 # ---------- sentinel parsing ----------
@@ -438,6 +440,7 @@ def invoke_claude(
     stdout_buf = StringIO()  # raw stdout (JSONL events when stream-json)
     agent_text_buf = StringIO()  # accumulated assistant text for sentinel matching
     stderr_buf = StringIO()
+    tool_counts: dict[str, int] = {}
     deadline = time.monotonic() + timeout_seconds
     process_done = threading.Event()
     timed_out = threading.Event()
@@ -501,6 +504,12 @@ def invoke_claude(
                 continue
 
             element, display_text, agent_text = _summarize_stream_event(event)
+            # Accumulate tool-call counts from assistant events.
+            if event.get("type") == "assistant":
+                for block in (event.get("message") or {}).get("content") or []:
+                    if block.get("type") == "tool_use":
+                        name = block.get("name") or "unknown"
+                        tool_counts[name] = tool_counts.get(name, 0) + 1
             if element is not None and display_text:
                 if styler is not None:
                     from .style import Element
@@ -575,10 +584,19 @@ def invoke_claude(
             f"stderr: {stderr.strip()[:200]}"
         )
 
+    # Extract the sentinel value (e.g. "PRD-224.3") from the success marker.
+    sentinel_value: str | None = None
+    if success and sentinel_success == "PRD_EXECUTE_OK":
+        m = _SENTINEL_SUCCESS_RE.search(sentinel_haystack)
+        if m:
+            sentinel_value = m.group(1).strip()
+
     return InvokeResult(
         stdout=stdout,
         stderr=stderr,
         exit_code=exit_code,
         success=success,
         failure_reason=failure_reason,
+        tool_counts=tool_counts,
+        sentinel=sentinel_value,
     )

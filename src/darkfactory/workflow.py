@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING, Any, Callable, Literal
 if TYPE_CHECKING:
     from filelock import FileLock
 
+    from .invoke import InvokeResult
     from .prd import PRD
 
 
@@ -229,6 +230,10 @@ class ExecutionContext:
     agent_output: str | None = None
     agent_success: bool = False
     pr_url: str | None = None
+    run_summary: str | None = None
+    last_invoke_result: "InvokeResult | None" = None
+    model: str | None = None
+    invoke_count: int = 0
     dry_run: bool = True
     logger: logging.Logger = field(
         default_factory=lambda: logging.getLogger("darkfactory")

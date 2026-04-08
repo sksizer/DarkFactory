@@ -101,6 +101,7 @@ workflow = Workflow(
             kwargs={"message": "chore(prd): {prd_id} ready for review"},
         ),
         BuiltIn("push_branch"),
+        BuiltIn("summarize_agent_run"),
         BuiltIn("create_pr"),
     ],
 )
