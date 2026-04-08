@@ -30,6 +30,7 @@ Design choices:
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import subprocess
@@ -38,6 +39,7 @@ import time
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
+from typing import Any
 
 
 # ---------- capability -> model mapping ----------
@@ -152,6 +154,137 @@ def _parse_sentinels(
     )
 
 
+# ---------- stream-json event summarization ----------
+
+
+def _summarize_stream_event(event: dict[str, Any]) -> tuple[str | None, str]:
+    """Turn one Claude Code stream-json event into (log_line, agent_text).
+
+    Returns:
+        log_line: a one-line human-readable summary suitable for the runner's
+            logger. ``None`` means "skip — nothing interesting to surface".
+        agent_text: the substring that should be appended to the agent-text
+            buffer used for sentinel matching. Empty string for non-text
+            events. Sentinels can only appear in assistant text, so we
+            accumulate text aggressively and let the parser scan it.
+
+    The Claude Code stream-json envelope shapes we care about:
+
+    - ``{"type": "system", "subtype": "init", ...}`` — start of session
+    - ``{"type": "assistant", "message": {"content": [...]}}`` — model output
+        block (text or tool_use)
+    - ``{"type": "user", "message": {"content": [{"type": "tool_result", ...}]}}``
+        — tool result echoed back from the harness's perspective
+    - ``{"type": "stream_event", "event": {"type": "content_block_delta",
+        "delta": {"type": "text_delta", "text": "..."}}}`` — partial message
+        chunks (only when --include-partial-messages is set)
+    - ``{"type": "result", "subtype": "success"|"error_max_turns"|..., ...}``
+        — terminal event with the final message and stats
+
+    Anything not in this list is logged at DEBUG only via the catchall.
+    """
+    etype = event.get("type")
+
+    if etype == "system":
+        subtype = event.get("subtype", "?")
+        return (f"[system] {subtype}", "")
+
+    if etype == "assistant":
+        msg = event.get("message", {}) or {}
+        content = msg.get("content", []) or []
+        # Pick the most informative block. A single assistant event can
+        # contain multiple content blocks; we summarize each on its own line
+        # by returning only the first here and recursing for the others
+        # would over-complicate the contract — instead we join them with
+        # ' | '.
+        bits: list[str] = []
+        text_accum: list[str] = []
+        for block in content:
+            btype = block.get("type")
+            if btype == "text":
+                text = block.get("text") or ""
+                text_accum.append(text)
+                # Show first 200 chars on a single line; the buffer keeps
+                # the full text for sentinel parsing.
+                snippet = text.replace("\n", " ").strip()
+                if len(snippet) > 200:
+                    snippet = snippet[:197] + "..."
+                if snippet:
+                    bits.append(f"text: {snippet}")
+            elif btype == "tool_use":
+                name = block.get("name", "?")
+                inp = block.get("input", {}) or {}
+                # Render a few high-signal inputs concisely.
+                hint = ""
+                if isinstance(inp, dict):
+                    if "command" in inp:
+                        hint = f" {str(inp['command'])[:120]}"
+                    elif "file_path" in inp:
+                        hint = f" {inp['file_path']}"
+                    elif "pattern" in inp:
+                        hint = f" /{inp['pattern'][:60]}/"
+                    elif "path" in inp:
+                        hint = f" {inp['path']}"
+                bits.append(f"tool_use: {name}{hint}")
+            elif btype == "thinking":
+                # Don't echo full thinking — too noisy. Just note it happened.
+                bits.append("thinking")
+            else:
+                bits.append(f"{btype}")
+        line = " | ".join(bits) if bits else None
+        return (line, "\n".join(text_accum))
+
+    if etype == "user":
+        msg = event.get("message", {}) or {}
+        content = msg.get("content", []) or []
+        for block in content:
+            if block.get("type") == "tool_result":
+                raw = block.get("content")
+                # tool_result content can be a string or a list of blocks
+                if isinstance(raw, list):
+                    raw = " ".join(
+                        b.get("text", "") for b in raw if isinstance(b, dict)
+                    )
+                snippet = (raw or "").replace("\n", " ").strip()
+                if len(snippet) > 200:
+                    snippet = snippet[:197] + "..."
+                err = " (error)" if block.get("is_error") else ""
+                return (f"tool_result{err}: {snippet}", "")
+        return (None, "")
+
+    if etype == "stream_event":
+        ev = event.get("event", {}) or {}
+        if ev.get("type") == "content_block_delta":
+            delta = ev.get("delta", {}) or {}
+            if delta.get("type") == "text_delta":
+                text = delta.get("text") or ""
+                # Don't log every micro-delta — too noisy. But DO accumulate
+                # text into the agent buffer so sentinels build up.
+                return (None, text)
+        return (None, "")
+
+    if etype == "rate_limit_event":
+        info = event.get("rate_limit_info", {}) or {}
+        status = info.get("status", "?")
+        util = info.get("utilization")
+        rl_type = info.get("rateLimitType", "?")
+        util_str = f" {util:.0%}" if isinstance(util, (int, float)) else ""
+        return (f"[rate_limit] {rl_type} {status}{util_str}", "")
+
+    if etype == "result":
+        subtype = event.get("subtype", "?")
+        msg = event.get("result") or ""
+        snippet = str(msg).replace("\n", " ").strip()
+        if len(snippet) > 200:
+            snippet = snippet[:197] + "..."
+        # The result.result field contains the final text, which is where
+        # the sentinel typically lands.
+        return (f"[result] {subtype} {snippet}", str(msg))
+
+    # Unknown event type — log nothing, accumulate nothing.
+    return (None, "")
+
+
 # ---------- main entry point ----------
 
 
@@ -214,11 +347,25 @@ def invoke_claude(
     if _argv_override is not None:
         cmd: list[str] = [executable] + list(_argv_override)
     else:
+        # --output-format stream-json + --verbose emits JSONL events as
+        # they happen (one event per assistant turn, plus tool results,
+        # rate-limit warnings, and a final result event) instead of
+        # buffering until the process exits. This is what actually makes
+        # streaming-to-logger useful — the raw --print mode writes one
+        # blob at the very end.
+        #
+        # We deliberately do NOT pass --include-partial-messages: per-turn
+        # granularity is plenty for "is the agent making progress"
+        # visibility, and per-delta events add a lot of noise without
+        # much extra signal.
         cmd = [
             executable,
             "dlx",
             "@anthropic-ai/claude-code",
             "--print",
+            "--verbose",
+            "--output-format",
+            "stream-json",
             "--model",
             model,
             "--allowed-tools",
@@ -249,7 +396,8 @@ def invoke_claude(
     proc.stdin.write(prompt)
     proc.stdin.close()
 
-    stdout_buf = StringIO()
+    stdout_buf = StringIO()  # raw stdout (JSONL events when stream-json)
+    agent_text_buf = StringIO()  # accumulated assistant text for sentinel matching
     stderr_buf = StringIO()
     deadline = time.monotonic() + timeout_seconds
     process_done = threading.Event()
@@ -278,12 +426,40 @@ def invoke_claude(
     stderr_thread.start()
     watchdog_thread.start()
 
-    # Read stdout line-by-line on the main thread, tee to logger + buffer.
+    # Read stdout line-by-line on the main thread. With stream-json each
+    # line is a JSON envelope; we summarize each event into a one-line log
+    # message and accumulate any assistant text into the sentinel buffer.
+    # Lines that fail to parse as JSON (e.g. tests using a plain stub
+    # subprocess, or unexpected output) fall back to the legacy behavior
+    # of logging the raw line as-is and treating it as agent text.
     assert proc.stdout is not None
     try:
         for line in proc.stdout:
             stdout_buf.write(line)
-            log.info("agent: %s", line.rstrip("\n"))
+            stripped = line.rstrip("\n")
+            if not stripped:
+                continue
+            try:
+                event = json.loads(stripped)
+            except json.JSONDecodeError:
+                # Not JSON — preserve old behavior. Useful for tests that
+                # stub the subprocess with plain text and for diagnostics.
+                log.info("agent: %s", stripped)
+                agent_text_buf.write(stripped + "\n")
+                continue
+
+            if not isinstance(event, dict):
+                log.info("agent: %s", stripped)
+                continue
+
+            log_line, agent_text = _summarize_stream_event(event)
+            if log_line is not None:
+                log.info("agent: %s", log_line)
+            if agent_text:
+                # Append verbatim — adding a trailing newline here would
+                # break sentinel matching when the marker is split across
+                # successive partial-message deltas.
+                agent_text_buf.write(agent_text)
     finally:
         # Signal watchdog that the process has exited (or we're cleaning up).
         process_done.set()
@@ -296,6 +472,7 @@ def invoke_claude(
         watchdog_thread.join(timeout=2)
 
     stdout = stdout_buf.getvalue()
+    agent_text = agent_text_buf.getvalue()
     stderr = stderr_buf.getvalue()
     was_timed_out = timed_out.is_set()
     exit_code = -1 if was_timed_out else proc.returncode
@@ -309,12 +486,25 @@ def invoke_claude(
             failure_reason=f"timeout after {timeout_seconds}s",
         )
 
-    # Exit code of the CLI itself must be zero for success — but a zero
-    # exit code without the sentinel is still a failure (agent didn't
-    # report). Parse sentinels regardless of exit code so the reason
-    # surface is maximally informative.
+    # Sentinel parsing scans both the assembled assistant text (the
+    # natural place sentinels appear when stream-json is in use) and the
+    # raw stdout buffer (covers the legacy text-mode path and tests that
+    # stub plain stdout). The two-pass approach is harmless: if neither
+    # contains the marker we still produce the same "no sentinel" failure.
+    sentinel_haystack = agent_text or stdout
+    if (
+        agent_text
+        and stdout
+        and sentinel_success not in agent_text
+        and sentinel_failure not in agent_text
+    ):
+        # Fallback: agent text didn't have it, look in raw stdout too.
+        # This catches edge cases where the result event wraps the
+        # sentinel differently than the partial-message stream.
+        sentinel_haystack = agent_text + "\n" + stdout
+
     success, failure_reason = _parse_sentinels(
-        stdout,
+        sentinel_haystack,
         success_marker=sentinel_success,
         failure_marker=sentinel_failure,
     )
