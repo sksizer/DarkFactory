@@ -101,8 +101,11 @@ workflow = Workflow(
             "commit",
             kwargs={"message": "chore(prd): {prd_id} ready for review"},
         ),
-        BuiltIn("push_branch"),
         BuiltIn("summarize_agent_run"),
+        # Reject any commit / run summary that credits Claude or Anthropic
+        # before we push or open a PR. See builtins._scan_for_forbidden_attribution.
+        BuiltIn("lint_attribution"),
+        BuiltIn("push_branch"),
         BuiltIn("create_pr"),
     ],
 )

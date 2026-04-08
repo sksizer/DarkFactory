@@ -395,6 +395,98 @@ def test_commit_noop_on_empty_diff(tmp_git_repo: Path) -> None:
     # Nothing to assert except: no exception raised.
 
 
+def test_lint_attribution_rejects_claude_trailer_in_commit(tmp_git_repo: Path) -> None:
+    """lint_attribution should raise when a branch commit credits Claude."""
+    import pytest
+
+    prd_dir = tmp_git_repo / "docs" / "prd"
+    prd_dir.mkdir(parents=True)
+    write_prd(prd_dir, "PRD-070", "lint-attr")
+    prds = load_all(prd_dir)
+
+    ctx = ExecutionContext(
+        prd=prds["PRD-070"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-070-lint-attr",
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+    builtins.ensure_worktree(ctx)
+    assert ctx.worktree_path is not None
+    (ctx.worktree_path / "x.txt").write_text("x\n")
+    subprocess.run(["git", "add", "-A"], cwd=ctx.worktree_path, check=True)
+    subprocess.run(
+        [
+            "git",
+            "commit",
+            "-m",
+            "feat: do a thing\n\nCo-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>",
+        ],
+        cwd=ctx.worktree_path,
+        check=True,
+        capture_output=True,
+    )
+
+    with pytest.raises(RuntimeError, match="forbidden attribution pattern"):
+        builtins.lint_attribution(ctx)
+
+
+def test_lint_attribution_clean_branch_passes(tmp_git_repo: Path) -> None:
+    """lint_attribution is a no-op when no commits credit Claude/Anthropic."""
+    prd_dir = tmp_git_repo / "docs" / "prd"
+    prd_dir.mkdir(parents=True)
+    write_prd(prd_dir, "PRD-070", "lint-clean")
+    prds = load_all(prd_dir)
+
+    ctx = ExecutionContext(
+        prd=prds["PRD-070"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-070-lint-clean",
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+    builtins.ensure_worktree(ctx)
+    assert ctx.worktree_path is not None
+    (ctx.worktree_path / "x.txt").write_text("x\n")
+    builtins.commit(ctx, message="chore(prd): {prd_id} clean commit")
+
+    # Should not raise.
+    builtins.lint_attribution(ctx)
+
+
+def test_commit_rejects_forbidden_attribution(tmp_git_repo: Path) -> None:
+    """commit() itself should refuse a message that credits Claude."""
+    import pytest
+
+    prd_dir = tmp_git_repo / "docs" / "prd"
+    prd_dir.mkdir(parents=True)
+    write_prd(prd_dir, "PRD-070", "commit-guard")
+    prds = load_all(prd_dir)
+
+    ctx = ExecutionContext(
+        prd=prds["PRD-070"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-070-commit-guard",
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+    builtins.ensure_worktree(ctx)
+    assert ctx.worktree_path is not None
+    (ctx.worktree_path / "x.txt").write_text("x\n")
+
+    with pytest.raises(RuntimeError, match="forbidden attribution pattern"):
+        builtins.commit(
+            ctx,
+            message="chore: fix\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
+        )
+
+
 def test_cleanup_worktree_removes_existing(tmp_git_repo: Path) -> None:
     prd_dir = tmp_git_repo / "docs" / "prd"
     prd_dir.mkdir(parents=True)
