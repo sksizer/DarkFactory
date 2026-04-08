@@ -55,6 +55,7 @@ workflow = Workflow(
             kwargs={"message": "chore(prd): {prd_id} ready for review"},
         ),
         BuiltIn("set_status", kwargs={"to": "review"}),
+        BuiltIn("lint_attribution"),
         BuiltIn("push_branch"),
         BuiltIn("create_pr"),
     ],

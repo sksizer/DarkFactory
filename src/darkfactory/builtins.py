@@ -354,6 +354,9 @@ def commit(ctx: ExecutionContext, *, message: str) -> None:
     logical step without worrying about whether anything changed.
     """
     formatted = ctx.format_string(message)
+    _scan_for_forbidden_attribution(
+        formatted, source=f"commit message for {ctx.prd.id}"
+    )
 
     if ctx.dry_run:
         ctx.logger.info("[dry-run] git add -A && git commit -m %r", formatted)
@@ -501,6 +504,8 @@ def create_pr(ctx: ExecutionContext) -> None:
     body = _pr_body(ctx)
     if ctx.run_summary:
         body += "\n\n" + ctx.run_summary
+    _scan_for_forbidden_attribution(title, source=f"PR title for {ctx.prd.id}")
+    _scan_for_forbidden_attribution(body, source=f"PR body for {ctx.prd.id}")
 
     if ctx.dry_run:
         ctx.logger.info(
@@ -545,6 +550,83 @@ def create_pr(ctx: ExecutionContext) -> None:
     # gh prints the PR URL to stdout on success.
     url_line = result.stdout.strip().splitlines()[-1] if result.stdout.strip() else ""
     ctx.pr_url = url_line or None
+
+
+# ----- attribution lint -----
+#
+# The harness MUST NOT credit Claude / Anthropic in commit messages, PR
+# bodies, or run summaries. Default Claude Code commit flows tack on a
+# ``Co-Authored-By: Claude ...`` trailer; subagents have been observed to
+# do the same inside ``retry_agent`` cycles. We detect and reject those
+# patterns loudly rather than silently stripping — silent stripping masks
+# the underlying agent misbehaviour we want to notice and fix.
+_FORBIDDEN_ATTRIBUTION_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"Co-Authored-By:\s*Claude", re.IGNORECASE),
+    re.compile(r"Co-Authored-By:.*@anthropic\.com", re.IGNORECASE),
+    re.compile(r"Generated with .{0,20}Claude Code", re.IGNORECASE),
+    re.compile(r"🤖 Generated with", re.IGNORECASE),
+)
+
+
+def _scan_for_forbidden_attribution(text: str, *, source: str) -> None:
+    """Raise ``RuntimeError`` if ``text`` contains any forbidden pattern.
+
+    ``source`` is a human label (e.g. ``"commit PRD-544"``) included in the
+    error so failures point at the offending artifact. No-op on empty text.
+    """
+    if not text:
+        return
+    for pattern in _FORBIDDEN_ATTRIBUTION_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            raise RuntimeError(
+                f"forbidden attribution pattern in {source}: {match.group(0)!r}. "
+                "Claude/Anthropic must never be credited in commit messages, "
+                "PR bodies, or run summaries — strip the trailer and retry."
+            )
+
+
+@builtin("lint_attribution")
+def lint_attribution(ctx: ExecutionContext) -> None:
+    """Fail if any commit on the branch or the run summary credits Claude/Anthropic.
+
+    Scans:
+
+    - Every commit message in ``{base_ref}..HEAD`` on the current branch
+    - ``ctx.run_summary`` (which feeds the PR body)
+
+    Intended to run after the agent + verification phases and before
+    ``push_branch`` / ``create_pr``, so violations abort the workflow
+    before anything lands on the remote or in a PR. Dry-run is a no-op
+    because there are no real commits to scan.
+    """
+    if ctx.dry_run:
+        ctx.logger.info("[dry-run] lint_attribution: skipped")
+        return
+
+    _scan_for_forbidden_attribution(
+        ctx.run_summary or "", source=f"run summary for {ctx.prd.id}"
+    )
+
+    result = subprocess.run(
+        ["git", "log", f"{ctx.base_ref}..HEAD", "--format=%H%x00%B%x1e"],
+        cwd=str(ctx.cwd),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    # Record separator \x1e between commits; field separator \x00 between
+    # sha and body. Keeps us robust against newlines in commit messages.
+    for entry in result.stdout.split("\x1e"):
+        entry = entry.strip()
+        if not entry:
+            continue
+        sha, _, body = entry.partition("\x00")
+        _scan_for_forbidden_attribution(
+            body, source=f"commit {sha[:12]} on {ctx.branch_name}"
+        )
+
+    ctx.logger.info("lint_attribution: clean")
 
 
 @builtin("cleanup_worktree")

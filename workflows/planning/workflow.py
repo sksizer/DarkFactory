@@ -91,6 +91,7 @@ workflow = Workflow(
             "commit",
             kwargs={"message": "chore(prd): {prd_id} decomposed into tasks"},
         ),
+        BuiltIn("lint_attribution"),
         BuiltIn("push_branch"),
         BuiltIn("create_pr"),
     ],
