@@ -3,9 +3,8 @@ views:
     name: Table
     filters:
       and:
-        - or:
-            - status == "draft"
-            - status == "ready"
+        - not:
+            - status == "done"
     order:
       - file.name
       - status

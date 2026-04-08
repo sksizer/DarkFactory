@@ -2,7 +2,7 @@
 id: PRD-549
 title: Split builtins.py into a package of per-function modules with colocated unit tests
 kind: epic
-status: draft
+status: ready
 priority: medium
 effort: l
 capability: moderate
@@ -13,7 +13,7 @@ impacts:
   - src/darkfactory/builtins.py
   - tests/test_builtins.py
   - pyproject.toml
-workflow:
+workflow: planning
 assignee:
 reviewers: []
 target_version:
