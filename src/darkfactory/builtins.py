@@ -30,7 +30,9 @@ from __future__ import annotations
 
 import logging
 import re
+import shutil
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
@@ -446,6 +448,43 @@ def summarize_agent_run(ctx: ExecutionContext) -> None:
         f"- **Sentinel:** {result.sentinel or 'none'}",
     ]
     ctx.run_summary = "\n".join(lines)
+
+
+@builtin("commit_transcript")
+def commit_transcript(ctx: ExecutionContext) -> None:
+    """Move agent transcript to .darkfactory/transcripts/ and stage it.
+
+    Source: ``.harness-agent-output.log`` written by the runner after each
+    agent invocation. Destination:
+    ``.darkfactory/transcripts/{prd_id}-{timestamp}.log``.
+
+    Timestamps use the wall-clock at the time this builtin runs, which is
+    unique enough for sequential runs. If no transcript exists (dry-run,
+    or the runner didn't produce one), this is a no-op.
+    """
+    src = ctx.cwd / ".harness-agent-output.log"
+    if not src.exists():
+        ctx.logger.info("commit_transcript: no transcript found; skipping")
+        return
+
+    if ctx.dry_run:
+        timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+        dest = (
+            ctx.cwd / ".darkfactory" / "transcripts" / f"{ctx.prd.id}-{timestamp}.log"
+        )
+        ctx.logger.info("[dry-run] move %s -> %s && git add", src, dest)
+        return
+
+    transcript_dir = ctx.cwd / ".darkfactory" / "transcripts"
+    transcript_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    dest = transcript_dir / f"{ctx.prd.id}-{timestamp}.log"
+
+    shutil.move(str(src), str(dest))
+
+    subprocess.run(["git", "add", str(dest)], cwd=str(ctx.cwd), check=True)
+    ctx.logger.info("commit_transcript: staged %s", dest.relative_to(ctx.cwd))
 
 
 @builtin("create_pr")

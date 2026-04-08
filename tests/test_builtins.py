@@ -51,6 +51,7 @@ def test_registry_populated_at_import() -> None:
         "create_pr",
         "cleanup_worktree",
         "summarize_agent_run",
+        "commit_transcript",
     }
     assert expected <= set(BUILTINS.keys())
 
@@ -1130,3 +1131,151 @@ def test_create_pr_without_run_summary_unchanged(tmp_path: Path) -> None:
     assert len(captured_body) == 1
     body = captured_body[0]
     assert "## Harness execution summary" not in body
+
+
+# ---------- commit_transcript ----------
+
+
+def test_commit_transcript_registered() -> None:
+    assert "commit_transcript" in BUILTINS
+
+
+def test_commit_transcript_noop_when_no_transcript(tmp_path: Path) -> None:
+    """AC-5: When no .harness-agent-output.log exists, commit_transcript is a no-op."""
+    prd_dir = tmp_path / "prds"
+    prd_dir.mkdir()
+    write_prd(prd_dir, "PRD-070", "task")
+    prds = load_all(prd_dir)
+
+    ctx = ExecutionContext(
+        prd=prds["PRD-070"],
+        repo_root=tmp_path,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-070-task",
+        cwd=tmp_path,
+        dry_run=False,
+    )
+    # Should not raise and should not create any transcript dir
+    builtins.commit_transcript(ctx)
+    assert not (tmp_path / ".darkfactory" / "transcripts").exists()
+
+
+def test_commit_transcript_moves_and_stages(tmp_git_repo: Path) -> None:
+    """AC-2/AC-3: commit_transcript moves transcript to .darkfactory/transcripts/ and stages it."""
+    prd_dir = tmp_git_repo / "docs" / "prd"
+    prd_dir.mkdir(parents=True)
+    write_prd(prd_dir, "PRD-070", "transcript-test")
+    prds = load_all(prd_dir)
+
+    # Set up a worktree (needed for a real git context)
+    ctx = ExecutionContext(
+        prd=prds["PRD-070"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-070-transcript-test",
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+    builtins.ensure_worktree(ctx)
+    assert ctx.worktree_path is not None
+
+    # Write a fake transcript at the expected source location
+    src = ctx.cwd / ".harness-agent-output.log"
+    src.write_text("# fake transcript\ncontent here\n", encoding="utf-8")
+
+    builtins.commit_transcript(ctx)
+
+    # Source should be gone
+    assert not src.exists()
+
+    # Destination should exist under .darkfactory/transcripts/
+    transcript_dir = ctx.cwd / ".darkfactory" / "transcripts"
+    assert transcript_dir.exists()
+    logs = list(transcript_dir.glob("PRD-070-*.log"))
+    assert len(logs) == 1
+    assert logs[0].read_text(encoding="utf-8") == "# fake transcript\ncontent here\n"
+
+    # File should be staged
+    result = subprocess.run(
+        ["git", "diff", "--cached", "--name-only"],
+        cwd=str(ctx.cwd),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert ".darkfactory/transcripts/" in result.stdout
+
+
+def test_commit_transcript_multiple_invocations_separate_files(
+    tmp_git_repo: Path,
+) -> None:
+    """AC-6: Multiple invocations produce separate timestamped files."""
+    import time
+
+    prd_dir = tmp_git_repo / "docs" / "prd"
+    prd_dir.mkdir(parents=True)
+    write_prd(prd_dir, "PRD-070", "multi-transcript")
+    prds = load_all(prd_dir)
+
+    ctx = ExecutionContext(
+        prd=prds["PRD-070"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-070-multi-transcript",
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+    builtins.ensure_worktree(ctx)
+    assert ctx.worktree_path is not None
+
+    transcript_dir = ctx.cwd / ".darkfactory" / "transcripts"
+
+    # First invocation
+    src = ctx.cwd / ".harness-agent-output.log"
+    src.write_text("first transcript\n", encoding="utf-8")
+    builtins.commit_transcript(ctx)
+    assert len(list(transcript_dir.glob("PRD-070-*.log"))) == 1
+
+    # Wait a second so timestamps differ
+    time.sleep(1)
+
+    # Second invocation
+    src.write_text("second transcript\n", encoding="utf-8")
+    builtins.commit_transcript(ctx)
+
+    logs = sorted(transcript_dir.glob("PRD-070-*.log"))
+    assert len(logs) == 2, "Each invocation must produce a separate file"
+    # Files should have different names (timestamps)
+    assert logs[0].name != logs[1].name
+
+
+def test_commit_transcript_dry_run_noop(tmp_path: Path) -> None:
+    """In dry-run mode, commit_transcript logs but does not move or stage anything."""
+    prd_dir = tmp_path / "prds"
+    prd_dir.mkdir()
+    write_prd(prd_dir, "PRD-070", "task")
+    prds = load_all(prd_dir)
+
+    ctx = ExecutionContext(
+        prd=prds["PRD-070"],
+        repo_root=tmp_path,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-070-task",
+        cwd=tmp_path,
+        dry_run=True,
+    )
+
+    src = tmp_path / ".harness-agent-output.log"
+    src.write_text("dry run transcript\n", encoding="utf-8")
+
+    with patch("subprocess.run") as mock_run:
+        builtins.commit_transcript(ctx)
+        mock_run.assert_not_called()
+
+    # Source file should remain untouched in dry-run
+    assert src.exists()
+    assert not (tmp_path / ".darkfactory" / "transcripts").exists()
