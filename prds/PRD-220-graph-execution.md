@@ -2,7 +2,7 @@
 id: "PRD-220"
 title: "Graph execution: walk DAG and run actionable PRDs"
 kind: feature
-status: in-progress
+status: review
 priority: high
 effort: l
 capability: complex
