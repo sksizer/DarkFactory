@@ -19,7 +19,7 @@ import re
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import yaml
 
@@ -318,6 +318,157 @@ def set_status_at(path: Path, new_status: str) -> None:
         path,
         {"status": new_status, "updated": f"'{today}'"},
     )
+
+
+def _wikilink_sort_key(item: str) -> tuple[int, ...]:
+    """Sort key for ``[[PRD-X-slug]]`` strings — extracts the ID and applies natural sort.
+
+    Handles both quoted (``"[[PRD-NNN-slug]]"``) and unquoted (``[[PRD-NNN-slug]]``) forms.
+    """
+    inner = item.strip("[]")
+    prd_id = "-".join(inner.split("-", 2)[:2])  # ["PRD", "4.2.1"]
+    return parse_id_sort_key(prd_id)
+
+
+#: Canonical sort key for each known list field.
+CANONICAL_SORTS: dict[str, Callable[[str], Any]] = {
+    "tags": str.casefold,
+    "impacts": lambda s: s,
+    "depends_on": _wikilink_sort_key,
+    "blocks": _wikilink_sort_key,
+}
+
+#: Fields whose items need YAML double-quoting (they contain ``[`` which is special).
+_WIKILINK_FIELDS: frozenset[str] = frozenset({"depends_on", "blocks"})
+
+
+def _yaml_item_repr(field: str, value: str) -> str:
+    """Return the YAML scalar representation for a list item value.
+
+    Wikilink fields use double-quoting because ``[`` is a special character in YAML.
+    Other fields (tags, impacts) are written unquoted.
+    """
+    if field in _WIKILINK_FIELDS:
+        return f'"{value}"'
+    return value
+
+
+def normalize_list_field_at(
+    path: Path, field: str, items: list[str], *, write: bool = True
+) -> bool:
+    """Sort ``items`` canonically and surgically rewrite the field's lines on disk.
+
+    Only the YAML list lines for ``field`` are replaced — every other byte in the
+    file (other frontmatter fields, their quoting style, key order, blank lines,
+    and the body) is preserved exactly. This is the same byte-preservation
+    invariant as :func:`update_frontmatter_field_at`.
+
+    Parameters
+    ----------
+    path:
+        Path to the PRD file.
+    field:
+        Name of the list field to normalize (must be a key in :data:`CANONICAL_SORTS`).
+    items:
+        The list of values to sort and write.  For ``depends_on`` / ``blocks``
+        these are the raw wikilink strings (e.g. ``"[[PRD-214-frontmatter-roundtrip-drift]]"``
+        as returned by PyYAML — without outer YAML quoting).  For ``tags`` /
+        ``impacts`` they are plain strings.
+    write:
+        If ``False``, compute and return whether the file *would* change without
+        writing to disk.  Defaults to ``True``.
+
+    Returns
+    -------
+    bool
+        ``True`` if the file was changed (or would be changed when ``write=False``),
+        ``False`` if it was already canonical.
+
+    Raises
+    ------
+    ValueError
+        If ``field`` is not a known list field, the file has no frontmatter, the
+        field is absent from the frontmatter, or the field uses flow-style list
+        syntax (``[a, b]``) with non-empty content.
+    """
+    if field not in CANONICAL_SORTS:
+        raise ValueError(
+            f"unknown list field {field!r}; known: {sorted(CANONICAL_SORTS)}"
+        )
+
+    sort_key = CANONICAL_SORTS[field]
+    sorted_items = sorted(items, key=sort_key)
+
+    text = path.read_text(encoding="utf-8")
+    lines = text.splitlines(keepends=True)
+
+    # Locate frontmatter boundaries.
+    if not lines or lines[0].rstrip("\r\n") != "---":
+        raise ValueError(f"{path}: no leading frontmatter block")
+    end_idx: int | None = None
+    for i in range(1, len(lines)):
+        if lines[i].rstrip("\r\n") == "---":
+            end_idx = i
+            break
+    if end_idx is None:
+        raise ValueError(f"{path}: unterminated frontmatter block")
+
+    # Find the field header line inside the frontmatter block.
+    field_line_idx: int | None = None
+    for i in range(1, end_idx):
+        if lines[i].lstrip().startswith(f"{field}:"):
+            field_line_idx = i
+            break
+    if field_line_idx is None:
+        raise ValueError(f"{path}: field {field!r} not found in frontmatter")
+
+    field_line = lines[field_line_idx]
+    indent = field_line[: len(field_line) - len(field_line.lstrip())]
+    eol = "\r\n" if field_line.endswith("\r\n") else "\n"
+    rest = field_line.lstrip()[len(f"{field}:") :].strip()
+
+    # Detect non-empty flow-style list: ``field: [a, b]``.
+    if rest.startswith("[") and rest.rstrip() not in ("[]", "[ ]"):
+        raise ValueError(
+            f"{path}: field {field!r} uses flow-style list syntax; "
+            "normalize_list_field_at only supports block-style lists"
+        )
+
+    # Collect existing block-style item lines (``  - value``).
+    item_start = field_line_idx + 1
+    item_end = item_start
+    if not rest.startswith("["):
+        while item_end < end_idx and lines[item_end].lstrip().startswith("- "):
+            item_end += 1
+
+    # Determine item indentation (preserve existing or default to two spaces).
+    if item_start < item_end:
+        first = lines[item_start]
+        item_indent = first[: len(first) - len(first.lstrip())]
+    else:
+        item_indent = f"{indent}  "
+
+    # Build replacement lines.
+    if not sorted_items:
+        new_header = f"{indent}{field}: []{eol}"
+        new_item_lines: list[str] = []
+    else:
+        new_header = f"{indent}{field}:{eol}"
+        new_item_lines = [
+            f"{item_indent}- {_yaml_item_repr(field, item)}{eol}"
+            for item in sorted_items
+        ]
+
+    new_lines = (
+        lines[:field_line_idx] + [new_header] + new_item_lines + lines[item_end:]
+    )
+    new_text = "".join(new_lines)
+
+    if new_text == text:
+        return False
+    if write:
+        path.write_text(new_text, encoding="utf-8")
+    return True
 
 
 def set_workflow(prd: PRD, workflow_name: str | None) -> None:
