@@ -303,6 +303,9 @@ def _run_agent(
 
     ctx.agent_output = result.stdout
     ctx.agent_success = result.success
+    ctx.last_invoke_result = result
+    ctx.model = model
+    ctx.invoke_count += 1
     # Side channel for the retry-on-failure path — keeps the function
     # signature stable.
     setattr(ctx, "_last_agent_result", result)

@@ -50,6 +50,7 @@ def test_registry_populated_at_import() -> None:
         "push_branch",
         "create_pr",
         "cleanup_worktree",
+        "summarize_agent_run",
     }
     assert expected <= set(BUILTINS.keys())
 
@@ -971,3 +972,161 @@ def test_lock_auto_releases_on_subprocess_exit(tmp_path: Path) -> None:
     probe = _FileLock(str(lock_path))
     probe.acquire(timeout=1)
     probe.release()
+
+
+# ---------- summarize_agent_run ----------
+
+
+def _make_ctx_with_invoke_result(
+    tmp_path: Path,
+    tool_counts: dict[str, int] | None = None,
+    sentinel: str | None = None,
+    model: str = "sonnet",
+    invoke_count: int = 1,
+) -> ExecutionContext:
+    """Build a dry-run context with a populated last_invoke_result."""
+    from darkfactory.invoke import InvokeResult
+
+    prd_dir = tmp_path / "prds"
+    prd_dir.mkdir()
+    write_prd(prd_dir, "PRD-070", "task")
+    prds = load_all(prd_dir)
+
+    ctx = ExecutionContext(
+        prd=prds["PRD-070"],
+        repo_root=tmp_path,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-070-task",
+        cwd=tmp_path,
+        dry_run=True,
+        model=model,
+        invoke_count=invoke_count,
+    )
+    ctx.last_invoke_result = InvokeResult(
+        stdout="",
+        stderr="",
+        exit_code=0,
+        success=True,
+        tool_counts=tool_counts or {},
+        sentinel=sentinel,
+    )
+    return ctx
+
+
+def test_summarize_agent_run_registered() -> None:
+    assert "summarize_agent_run" in BUILTINS
+
+
+def test_summarize_agent_run_sets_run_summary(tmp_path: Path) -> None:
+    ctx = _make_ctx_with_invoke_result(
+        tmp_path,
+        tool_counts={"Read": 3, "Edit": 2},
+        sentinel="PRD-070",
+        model="sonnet",
+        invoke_count=1,
+    )
+    builtins.summarize_agent_run(ctx)
+
+    assert ctx.run_summary is not None
+    assert "## Harness execution summary" in ctx.run_summary
+    assert "default" in ctx.run_summary  # workflow name
+    assert "sonnet" in ctx.run_summary  # model
+    assert "1" in ctx.run_summary  # invoke count
+    assert "PRD-070" in ctx.run_summary  # sentinel
+    assert "Read" in ctx.run_summary
+    assert "Edit" in ctx.run_summary
+
+
+def test_summarize_agent_run_no_result(tmp_path: Path) -> None:
+    """With no last_invoke_result, summarize_agent_run should be a no-op."""
+    prd_dir = tmp_path / "prds"
+    prd_dir.mkdir()
+    write_prd(prd_dir, "PRD-070", "task")
+    prds = load_all(prd_dir)
+
+    ctx = ExecutionContext(
+        prd=prds["PRD-070"],
+        repo_root=tmp_path,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-070-task",
+        dry_run=True,
+    )
+    builtins.summarize_agent_run(ctx)
+    assert ctx.run_summary is None
+
+
+def test_summarize_agent_run_empty_tool_counts(tmp_path: Path) -> None:
+    ctx = _make_ctx_with_invoke_result(tmp_path, tool_counts={}, sentinel=None)
+    builtins.summarize_agent_run(ctx)
+    assert ctx.run_summary is not None
+    assert "none" in ctx.run_summary  # tool counts: none
+
+
+def test_create_pr_appends_run_summary(tmp_path: Path) -> None:
+    """create_pr includes run_summary in the PR body when it is set."""
+    ctx = _make_ctx_with_invoke_result(
+        tmp_path, tool_counts={"Read": 2}, sentinel="PRD-070"
+    )
+    builtins.summarize_agent_run(ctx)
+    assert ctx.run_summary is not None
+
+    # Dry-run create_pr builds the body in-memory, so we capture what it
+    # would pass to gh by intercepting _pr_body and checking the body used.
+    # Easiest: call create_pr in dry-run mode and inspect run_summary was non-None.
+    # For a non-dry-run path, we patch subprocess.run and read the body file.
+    ctx.dry_run = False
+    captured_body: list[str] = []
+
+    original_run = subprocess.run
+
+    def fake_run(cmd, **kwargs):  # type: ignore[no-untyped-def]
+        if isinstance(cmd, list) and "gh" in cmd:
+            # Read the body file before it is deleted.
+            for i, arg in enumerate(cmd):
+                if arg == "--body-file" and i + 1 < len(cmd):
+                    captured_body.append(Path(cmd[i + 1]).read_text(encoding="utf-8"))
+            return subprocess.CompletedProcess(
+                args=cmd,
+                returncode=0,
+                stdout="https://github.com/owner/repo/pull/1\n",
+                stderr="",
+            )
+        return original_run(cmd, **kwargs)
+
+    with patch("darkfactory.builtins.subprocess.run", side_effect=fake_run):
+        builtins.create_pr(ctx)
+
+    assert len(captured_body) == 1
+    body = captured_body[0]
+    assert "## Harness execution summary" in body
+
+
+def test_create_pr_without_run_summary_unchanged(tmp_path: Path) -> None:
+    """create_pr without run_summary produces same body as before (no regression)."""
+    ctx = _make_dry_run_ctx(tmp_path)
+    ctx.dry_run = False
+
+    captured_body: list[str] = []
+    original_run = subprocess.run
+
+    def fake_run(cmd, **kwargs):  # type: ignore[no-untyped-def]
+        if isinstance(cmd, list) and "gh" in cmd:
+            for i, arg in enumerate(cmd):
+                if arg == "--body-file" and i + 1 < len(cmd):
+                    captured_body.append(Path(cmd[i + 1]).read_text(encoding="utf-8"))
+            return subprocess.CompletedProcess(
+                args=cmd,
+                returncode=0,
+                stdout="https://github.com/owner/repo/pull/2\n",
+                stderr="",
+            )
+        return original_run(cmd, **kwargs)
+
+    with patch("darkfactory.builtins.subprocess.run", side_effect=fake_run):
+        builtins.create_pr(ctx)
+
+    assert len(captured_body) == 1
+    body = captured_body[0]
+    assert "## Harness execution summary" not in body
