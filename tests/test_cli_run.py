@@ -345,14 +345,26 @@ def test_run_execute_refuses_draft_prd(tmp_path: Path) -> None:
         )
 
 
-def test_run_execute_refuses_unfinished_deps(tmp_path: Path) -> None:
+def test_run_execute_with_unfinished_deps_walks_graph(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """PRD-220: running a PRD with unfinished deps now walks the DAG.
+
+    Under the pre-PRD-220 regime this raised a "cannot run: unfinished
+    dependencies" SystemExit. With graph execution, the CLI instead
+    routes through :mod:`darkfactory.graph_execution`, which walks the
+    unmet-dep closure. In this fixture the upstream dep has no real
+    workflow plumbing so its run fails inside the sandbox runner — we
+    assert on the graph-execution code path being entered (non-zero exit
+    + "Executing graph" header), not on the specific failure reason.
+    """
     _init_git_repo(tmp_path)
     workflows_dir = tmp_path / "workflows"
     _write_workflow_with_prompts(workflows_dir)
 
     prd_dir = tmp_path / "prds"
     prd_dir.mkdir()
-    write_prd(prd_dir, "PRD-070", "dep", status="ready")  # dependency still ready
+    write_prd(prd_dir, "PRD-070", "dep", status="ready")
     write_prd(
         prd_dir,
         "PRD-071",
@@ -361,18 +373,21 @@ def test_run_execute_refuses_unfinished_deps(tmp_path: Path) -> None:
         depends_on=["PRD-070"],
     )
 
-    with pytest.raises(SystemExit, match="unfinished"):
-        main(
-            [
-                "--prd-dir",
-                str(prd_dir),
-                "--workflows-dir",
-                str(workflows_dir),
-                "run",
-                "PRD-071",
-                "--execute",
-            ]
-        )
+    rc = main(
+        [
+            "--prd-dir",
+            str(prd_dir),
+            "--workflows-dir",
+            str(workflows_dir),
+            "run",
+            "PRD-071",
+            "--execute",
+        ]
+    )
+    assert rc != 0
+    captured = capsys.readouterr()
+    assert "Executing graph" in captured.out
+    assert "PRD-070" in captured.out
 
 
 def test_run_execute_exits_nonzero_on_workflow_failure(

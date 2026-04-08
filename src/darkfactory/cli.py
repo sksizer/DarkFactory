@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from . import assign, checks, containment, graph, impacts
+from .graph_execution import RunEvent, execute_graph, plan_execution
 from .invoke import capability_to_model
 from .loader import load_workflows
 from .prd import (
@@ -923,14 +924,34 @@ def cmd_plan(args: argparse.Namespace) -> int:
     return 0
 
 
+def _is_graph_target(prd: PRD, prds: dict[str, PRD]) -> bool:
+    """True if ``prd run`` should walk the DAG rather than run a single PRD.
+
+    Routes through the graph executor when the target has children (epic
+    or feature with decomposition) or any unfinished ``depends_on`` —
+    both cases require multi-PRD orchestration. A plain ready leaf with
+    all deps satisfied goes through the legacy single-PRD path.
+    """
+    if not containment.is_leaf(prd, prds):
+        return True
+    for dep_id in prd.depends_on:
+        dep = prds.get(dep_id)
+        if dep is None:
+            continue
+        if dep.status != "done":
+            return True
+    return False
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     """Run a workflow against a PRD. Defaults to dry-run; opt in via --execute.
 
-    In dry-run mode, this is effectively a more detailed version of
-    ``prd plan`` — it walks the runner's dispatch loop but each task
-    only logs what it would do. With ``--execute``, the runner actually
-    creates the worktree, invokes the agent, runs checks, pushes, and
-    creates the PR.
+    - **Single leaf with deps satisfied:** legacy path — one worktree,
+      one workflow run.
+    - **Epic/feature with children, or leaf with unmet deps:** graph
+      execution — walks the DAG in topological order, running each
+      actionable leaf in its own worktree. Sequential only (PRD-220).
+      Parallel fan-out is PRD-551.
     """
     prds = _load(args.prd_dir)
     if args.prd_id not in prds:
@@ -939,7 +960,24 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     workflows = _load_workflows_or_fail(args.workflows_dir)
 
-    # Resolve workflow.
+    repo_root = _find_repo_root(args.prd_dir)
+    base_ref = _resolve_base_ref(args.base, repo_root)
+    dry_run = not args.execute
+    styler: Styler = args.styler
+
+    if _is_graph_target(prd, prds):
+        return _cmd_run_graph(
+            args=args,
+            prd=prd,
+            prds=prds,
+            workflows=workflows,
+            repo_root=repo_root,
+            default_base=base_ref,
+            dry_run=dry_run,
+            styler=styler,
+        )
+
+    # Legacy single-PRD path.
     if args.workflow:
         if args.workflow not in workflows:
             raise SystemExit(f"unknown workflow: {args.workflow}")
@@ -950,18 +988,10 @@ def cmd_run(args: argparse.Namespace) -> int:
         except KeyError as exc:
             raise SystemExit(str(exc))
 
-    # Runnability check only applies when actually executing. Dry-run
-    # should be allowed on any PRD for discovery.
     if args.execute:
         err = _check_runnable(prd, prds)
         if err:
             raise SystemExit(f"cannot run: {err}")
-
-    repo_root = _find_repo_root(args.prd_dir)
-    base_ref = _resolve_base_ref(args.base, repo_root)
-
-    dry_run = not args.execute
-    styler: Styler = args.styler
 
     header_label = "Dry-run" if dry_run else "Executing"
     print(
@@ -1002,6 +1032,137 @@ def cmd_run(args: argparse.Namespace) -> int:
             f"  Result: {styler.render(Element.RUN_FAILURE, '✗ FAILED')} — {result.failure_reason}"
         )
         return 1
+
+
+def _cmd_run_graph(
+    *,
+    args: argparse.Namespace,
+    prd: PRD,
+    prds: dict[str, PRD],
+    workflows: dict[str, Workflow],
+    repo_root: Path,
+    default_base: str,
+    dry_run: bool,
+    styler: Styler,
+) -> int:
+    """Graph-execution path for ``prd run``.
+
+    In dry-run (the default), prints the full DAG + the execution slice
+    that would run under ``--max-runs``. With ``--execute``, actually
+    walks the DAG via :func:`graph_execution.execute_graph`, streaming
+    events and returning a non-zero exit on any failure.
+    """
+    max_runs: int | None = args.max_runs
+
+    if dry_run:
+        plan = plan_execution(
+            prd,
+            prds,
+            max_runs=max_runs,
+            default_base=default_base,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "root": prd.id,
+                        "default_base": default_base,
+                        "full_dag": plan.full_dag,
+                        "execution_slice": plan.execution_slice,
+                        "skipped": [
+                            {"prd_id": pid, "reason": reason}
+                            for pid, reason in plan.skipped
+                        ],
+                        "max_runs": max_runs,
+                    },
+                    indent=2,
+                )
+            )
+            return 0
+
+        print(
+            styler.render(
+                Element.RUN_HEADER,
+                f"# Dry-run graph: {prd.id} (base {default_base})",
+            )
+        )
+        print()
+        print(f"  Full DAG ({len(plan.full_dag)} runnable PRDs):")
+        for i, pid in enumerate(plan.full_dag, start=1):
+            status = prds[pid].status if pid in prds else "?"
+            print(f"    {i:>2}. {pid} [{status}]")
+        print()
+        print(f"  Execution slice ({len(plan.execution_slice)} PRDs will run):")
+        if not plan.execution_slice:
+            print("    (nothing to run)")
+        for i, pid in enumerate(plan.execution_slice, start=1):
+            print(f"    {i:>2}. {pid}")
+        if plan.skipped:
+            print()
+            print("  Skipped:")
+            for pid, reason in plan.skipped:
+                print(f"    - {pid}: {reason}")
+        return 0
+
+    # --execute path.
+    print(
+        styler.render(
+            Element.RUN_HEADER,
+            f"# Executing graph: {prd.id} (base {default_base})",
+        )
+    )
+
+    events: list[RunEvent] = []
+
+    def sink(ev: RunEvent) -> None:
+        events.append(ev)
+        if args.json:
+            print(json.dumps(ev.as_dict()), flush=True)
+        else:
+            _print_run_event(ev, styler)
+
+    report = execute_graph(
+        root_id=prd.id,
+        prd_dir=args.prd_dir,
+        repo_root=repo_root,
+        workflows=workflows,
+        default_base=default_base,
+        max_runs=max_runs,
+        model_override=args.model,
+        workflow_override=args.workflow,
+        dry_run=False,
+        event_sink=sink,
+    )
+
+    print()
+    print(f"  Completed: {len(report.completed)}")
+    for pid in report.completed:
+        print(f"    {styler.render(Element.RUN_SUCCESS, '✓')} {pid}")
+    if report.failed:
+        print(f"  Failed: {len(report.failed)}")
+        for pid, reason in report.failed:
+            print(f"    {styler.render(Element.RUN_FAILURE, '✗')} {pid} — {reason}")
+    if report.skipped:
+        print(f"  Skipped: {len(report.skipped)}")
+        for pid, reason in report.skipped:
+            print(f"    - {pid}: {reason}")
+    return report.exit_code
+
+
+def _print_run_event(ev: RunEvent, styler: Styler) -> None:
+    if ev.event == "start":
+        base = f" (base {ev.base_ref})" if ev.base_ref else ""
+        print(f"  → start {ev.prd_id}{base}")
+    elif ev.event == "finish":
+        if ev.success:
+            marker = styler.render(Element.RUN_SUCCESS, "✓")
+            pr = f" {ev.pr_url}" if ev.pr_url else ""
+            print(f"  {marker} finish {ev.prd_id}{pr}")
+        else:
+            marker = styler.render(Element.RUN_FAILURE, "✗")
+            print(f"  {marker} finish {ev.prd_id} — {ev.failure_reason or 'failed'}")
+    elif ev.event == "skip":
+        print(f"  ↷ skip {ev.prd_id}: {ev.reason}")
 
 
 # ---------- argparse plumbing ----------
@@ -1190,6 +1351,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--model",
         default=None,
         help="Override the capability->model mapping (e.g. opus)",
+    )
+    sub_run.add_argument(
+        "--max-runs",
+        type=int,
+        default=None,
+        dest="max_runs",
+        help=(
+            "In graph mode, cap the total number of PRD runs this "
+            "invocation may execute (counts successes, failures, and "
+            "mid-run introduced PRDs). Default: unbounded."
+        ),
     )
     sub_run.set_defaults(func=cmd_run)
 
