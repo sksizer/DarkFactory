@@ -73,6 +73,16 @@ A reasonable defaults principle: **the harness's defaults should reflect what us
 6. The `prd plan` and `prd run` output prints `base ref: main` (or whatever was resolved) so the user sees what's happening — that already works, no change needed
 7. Tests cover: default returns `main`, explicit override returns the override, fallback to `master` when main is missing, fallback to `origin/HEAD` when neither exists
 8. Add an environment variable escape hatch `DARKFACTORY_BASE_REF` for power users who want to default differently without typing `--base` every time
+9. **When the user is on a non-default branch AND has not passed `--base`, the harness emits a clear, colored warning** before starting the run. The warning must:
+   - Use the existing color/icon styling from PRD-541 (yellow / warning glyph)
+   - Name the user's current branch
+   - Name the resolved base ref (`main` in the common case)
+   - Tell the user how to opt into stacking on their current branch instead: `Pass --base <current-branch> if you intended to stack on your current branch.`
+   - Print to stderr, not stdout, so it doesn't pollute scripted output
+   - Appear before any worktree creation or other side effects, so the user has a chance to Ctrl-C
+10. The warning is suppressed when the user explicitly passed `--base` (any value) — they've already made the choice deliberately
+11. The warning is also suppressed when the user is on `main` / `master` / whatever the default branch resolved to (no warning needed when current branch matches base)
+12. The warning is suppressed in `prd plan` (dry-run) mode, since plan output already shows `base ref:` explicitly — duplicating it as a warning is noise. Or alternatively: keep the warning in plan mode too since it's what the user would see on `--execute`. **Recommendation**: keep it in plan mode, consistency wins
 
 ## Technical Approach
 
@@ -131,6 +141,68 @@ def _resolve_base_ref(explicit: str | None, repo_root: Path) -> str:
 
 The change is bounded to one function. No callers need updating — they all already accept whatever string `_resolve_base_ref` returns.
 
+### The on-foreign-branch warning
+
+A new helper that runs during `prd run` / `prd plan` setup, after `_resolve_base_ref` returns:
+
+```python
+def _warn_if_on_foreign_branch(
+    explicit_base: str | None,
+    resolved_base: str,
+    repo_root: Path,
+    *,
+    logger: logging.Logger,
+) -> None:
+    """Warn loudly if the user is on a branch other than the resolved base.
+
+    Suppressed when:
+    - The user passed --base explicitly (they made the choice deliberately)
+    - The current branch IS the resolved base (no surprise)
+    - We can't determine the current branch (degraded gracefully)
+
+    The warning is colored using the same style helpers from PRD-541
+    (yellow / ⚠ glyph). It prints to stderr so scripted output stays clean.
+    """
+    if explicit_base is not None:
+        return
+
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--abbrev-ref", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        current = result.stdout.strip()
+    except subprocess.CalledProcessError:
+        return  # can't tell — be quiet
+
+    if current == resolved_base or current == "HEAD":
+        return  # detached or on the base branch — fine
+
+    # Yellow + ⚠ via PRD-541's style helpers
+    from darkfactory.style import warn_color, warn_icon
+
+    msg = (
+        f"\n{warn_icon()} {warn_color('You are on branch')} "
+        f"{warn_color(repr(current), bold=True)}{warn_color(' but defaulting base to')} "
+        f"{warn_color(repr(resolved_base), bold=True)}{warn_color('.')}\n"
+        f"   If you intended to stack on your current branch, re-run with: "
+        f"{warn_color(f'--base {current}', bold=True)}\n"
+    )
+    print(msg, file=sys.stderr)
+```
+
+The helper is invoked from the same setup paths in `cli.py` that call `_resolve_base_ref`. It does **not** prompt or block — the user has already decided to run; the warning is informational only. If they Ctrl-C they can re-run with `--base`; otherwise the run proceeds with the safe default.
+
+### Why warn instead of prompt?
+
+Three reasons:
+
+1. **Scriptability** — `prd run` should be safe to invoke from automation. A blocking prompt would break that.
+2. **The default is already safe** — the warning is a "you might have wanted X" hint, not an "are you sure" gate. The action being taken is fine; we're just making the user aware of an alternative.
+3. **Frequency** — most users will hit this exactly once per session (the moment they realize "oh right, I forgot to switch to main"). After they internalize the warning, it becomes informational background noise. A prompt would be obnoxious.
+
 ## Acceptance Criteria
 
 - [ ] AC-1: Running `prd run PRD-X --execute` from a feature branch (e.g. `prd/PRD-yyy`) creates a worktree based on `main`, not on `prd/PRD-yyy`
@@ -141,6 +213,12 @@ The change is bounded to one function. No callers need updating — they all alr
 - [ ] AC-6: In a fresh clone where neither local `main` nor `master` exists, the default resolves via `origin/HEAD`
 - [ ] AC-7: Unit tests cover all five resolution paths above with mocked `subprocess.run`
 - [ ] AC-8: The code comment reflects the new resolution order
+- [ ] AC-9: Running `prd run PRD-X --execute` from a non-default branch (no `--base`) prints a yellow ⚠ warning to stderr naming the current branch and the resolved base, plus the `--base <current-branch>` opt-in command
+- [ ] AC-10: The warning is suppressed when `--base` is passed explicitly (any value)
+- [ ] AC-11: The warning is suppressed when the current branch IS the resolved base (no surprise to warn about)
+- [ ] AC-12: The warning prints to stderr, not stdout, so scripted output stays clean
+- [ ] AC-13: The warning appears before `ensure_worktree` runs so the user has a chance to Ctrl-C before any side effects
+- [ ] AC-14: Tests cover the warning paths: on foreign branch (warns), on resolved base (silent), explicit --base (silent), detached HEAD (silent)
 
 ## Open Questions
 
