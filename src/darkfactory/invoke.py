@@ -30,9 +30,13 @@ Design choices:
 
 from __future__ import annotations
 
+import logging
 import re
 import subprocess
+import threading
+import time
 from dataclasses import dataclass
+from io import StringIO
 from pathlib import Path
 
 
@@ -162,6 +166,8 @@ def invoke_claude(
     timeout_seconds: int = 600,
     executable: str = "pnpm",
     dry_run: bool = False,
+    logger: logging.Logger | None = None,
+    _argv_override: list[str] | None = None,
 ) -> InvokeResult:
     """Run Claude Code as a subprocess with the given prompt and return the result.
 
@@ -175,13 +181,23 @@ def invoke_claude(
     working directory so relative paths the agent reads/writes resolve
     correctly.
 
-    On timeout, returns a failure result with the reason populated —
-    does NOT raise. This matches the runner's expectation that invoke
-    returns a structured result no matter what.
+    Agent stdout is streamed line-by-line to ``logger`` in real time so
+    the user can see progress. The full stdout is also captured in a
+    buffer so sentinel parsing at the end works as before.
+
+    On timeout, returns a failure result with the reason populated and
+    any partial stdout captured before the kill — does NOT raise. This
+    matches the runner's expectation that invoke returns a structured
+    result no matter what.
 
     ``dry_run=True`` skips the actual subprocess entirely and returns a
     synthetic success result with empty output. This is what ``prd
     plan`` uses to show what WOULD happen without spending tokens.
+
+    ``_argv_override`` replaces the ``["dlx", "@anthropic-ai/claude-code",
+    ...]`` portion of the command with the given list. Intended for
+    testing with fake subprocesses (e.g. ``executable="python",
+    _argv_override=["-c", "print('hi')"]``).
     """
     if dry_run:
         return InvokeResult(
@@ -193,33 +209,31 @@ def invoke_claude(
             failure_reason=None,
         )
 
-    cmd: list[str] = [
-        executable,
-        "dlx",
-        "@anthropic-ai/claude-code",
-        "--print",
-        "--model",
-        model,
-        "--allowed-tools",
-        ",".join(tools),
-    ]
+    log = logger or logging.getLogger("darkfactory.invoke")
+
+    if _argv_override is not None:
+        cmd: list[str] = [executable] + list(_argv_override)
+    else:
+        cmd = [
+            executable,
+            "dlx",
+            "@anthropic-ai/claude-code",
+            "--print",
+            "--model",
+            model,
+            "--allowed-tools",
+            ",".join(tools),
+        ]
 
     try:
-        proc = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
-            input=prompt,
-            capture_output=True,
-            text=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             cwd=str(cwd),
-            timeout=timeout_seconds,
-        )
-    except subprocess.TimeoutExpired as exc:
-        return InvokeResult(
-            stdout=exc.stdout or "",  # type: ignore[arg-type]
-            stderr=exc.stderr or "",  # type: ignore[arg-type]
-            exit_code=-1,
-            success=False,
-            failure_reason=f"timeout after {timeout_seconds}s",
+            text=True,
+            bufsize=1,  # line-buffered
         )
     except FileNotFoundError:
         return InvokeResult(
@@ -230,29 +244,94 @@ def invoke_claude(
             failure_reason=f"executable not found: {executable!r}",
         )
 
+    # Send the prompt and close stdin so the CLI knows we're done.
+    assert proc.stdin is not None
+    proc.stdin.write(prompt)
+    proc.stdin.close()
+
+    stdout_buf = StringIO()
+    stderr_buf = StringIO()
+    deadline = time.monotonic() + timeout_seconds
+    process_done = threading.Event()
+    timed_out = threading.Event()
+
+    # Drain stderr in a background thread so it doesn't deadlock
+    # the pipe if Claude writes a lot of warnings.
+    def _drain_stderr() -> None:
+        assert proc.stderr is not None
+        for line in proc.stderr:
+            stderr_buf.write(line)
+
+    # Watchdog thread kills the process if it exceeds the deadline.
+    # Uses process_done to wake early when the process finishes normally,
+    # keeping mock-based tests fast.
+    def _watchdog() -> None:
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            process_done.wait(timeout=remaining)
+        if not process_done.is_set() and proc.poll() is None:
+            proc.kill()
+            timed_out.set()
+
+    stderr_thread = threading.Thread(target=_drain_stderr, daemon=True)
+    watchdog_thread = threading.Thread(target=_watchdog, daemon=True)
+    stderr_thread.start()
+    watchdog_thread.start()
+
+    # Read stdout line-by-line on the main thread, tee to logger + buffer.
+    assert proc.stdout is not None
+    try:
+        for line in proc.stdout:
+            stdout_buf.write(line)
+            log.info("agent: %s", line.rstrip("\n"))
+    finally:
+        # Signal watchdog that the process has exited (or we're cleaning up).
+        process_done.set()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+        stderr_thread.join(timeout=2)
+        watchdog_thread.join(timeout=2)
+
+    stdout = stdout_buf.getvalue()
+    stderr = stderr_buf.getvalue()
+    was_timed_out = timed_out.is_set()
+    exit_code = -1 if was_timed_out else proc.returncode
+
+    if was_timed_out:
+        return InvokeResult(
+            stdout=stdout,
+            stderr=stderr,
+            exit_code=exit_code,
+            success=False,
+            failure_reason=f"timeout after {timeout_seconds}s",
+        )
+
     # Exit code of the CLI itself must be zero for success — but a zero
     # exit code without the sentinel is still a failure (agent didn't
     # report). Parse sentinels regardless of exit code so the reason
     # surface is maximally informative.
     success, failure_reason = _parse_sentinels(
-        proc.stdout,
+        stdout,
         success_marker=sentinel_success,
         failure_marker=sentinel_failure,
     )
 
-    if proc.returncode != 0 and success:
+    if exit_code != 0 and success:
         # Unusual: sentinel says OK but process exited non-zero. Trust
         # the exit code and surface the real problem.
         success = False
         failure_reason = (
-            f"claude exited non-zero ({proc.returncode}) despite success sentinel; "
-            f"stderr: {proc.stderr.strip()[:200]}"
+            f"claude exited non-zero ({exit_code}) despite success sentinel; "
+            f"stderr: {stderr.strip()[:200]}"
         )
 
     return InvokeResult(
-        stdout=proc.stdout,
-        stderr=proc.stderr,
-        exit_code=proc.returncode,
+        stdout=stdout,
+        stderr=stderr,
+        exit_code=exit_code,
         success=success,
         failure_reason=failure_reason,
     )
