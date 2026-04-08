@@ -1,0 +1,28 @@
+views:
+  - type: table
+    name: Table
+    filters:
+      and:
+        - or:
+            - status == "draft"
+            - status == "ready"
+    order:
+      - file.name
+      - status
+    sort:
+      - property: status
+        direction: ASC
+    columnSize:
+      file.name: 467
+  - type: cards
+    name: View
+    filters:
+      and:
+        - or:
+            - status == "draft"
+            - status == "ready"
+    order:
+      - file.name
+      - status
+      - parent
+    imageAspectRatio: 1
