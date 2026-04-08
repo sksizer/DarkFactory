@@ -226,7 +226,7 @@ This is an epic. Suggested breakdown:
 - **PRD-223.1 — Core abstraction**: `SystemOperation`, `SystemContext`, `system.py` module, loader extension
 - **PRD-223.2 — `prd system` CLI subcommand**: `list`, `describe`, `run`
 - **PRD-223.3 — Bulk-mutation builtins**: `set_status_bulk` and any other shared system builtins
-- **PRD-223.4 — `reconcile-status` operation**: the motivating concrete operation
+- **~~PRD-223.4 — `reconcile-status` operation~~**: **moved to [[PRD-224-harness-invariants-honest-state]] child 224.7**. Same item from two angles; track once, not twice.
 - **PRD-223.5 — `audit-impacts` operation**: read-only report of declared-vs-actual file paths
 - **PRD-223.6 — Planning workflow as system operation**: re-cast the planning workflow (from the original architecture plan) as a SystemOperation since it's the same shape — operates on one PRD as input, creates many as output
 
