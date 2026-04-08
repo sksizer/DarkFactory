@@ -22,7 +22,7 @@ from . import assign, containment, graph, impacts
 from .invoke import capability_to_model
 from .loader import load_workflows
 from .prd import PRD, load_all, parse_id_sort_key, set_workflow
-from .runner import RunResult, _compute_branch_name, _pick_model, run_workflow
+from .runner import _compute_branch_name, _pick_model, run_workflow
 from .workflow import AgentTask, BuiltIn, ShellTask, Task, Workflow
 
 # Priority/effort orderings used for sorting actionable lists.
@@ -109,7 +109,12 @@ def cmd_status(args: argparse.Namespace) -> int:
             "actionable": len(actionable),
             "runnable": len(runnable),
             "next": [
-                {"id": p.id, "title": p.title, "priority": p.priority, "effort": p.effort}
+                {
+                    "id": p.id,
+                    "title": p.title,
+                    "priority": p.priority,
+                    "effort": p.effort,
+                }
                 for p in runnable[:5]
             ],
         }
@@ -117,7 +122,15 @@ def cmd_status(args: argparse.Namespace) -> int:
         return 0
 
     print(f"PRDs — {len(prds)} total")
-    for status in ("done", "review", "in-progress", "ready", "blocked", "draft", "cancelled"):
+    for status in (
+        "done",
+        "review",
+        "in-progress",
+        "ready",
+        "blocked",
+        "draft",
+        "cancelled",
+    ):
         n = counts.get(status, 0)
         if n:
             print(f"  {status:14} {n}")
@@ -125,7 +138,9 @@ def cmd_status(args: argparse.Namespace) -> int:
     if runnable:
         print("\nNext runnable (top 5):")
         for prd in runnable[:5]:
-            print(f"  {prd.id:14} [{prd.kind}/{prd.effort}/{prd.capability}]  {prd.title}")
+            print(
+                f"  {prd.id:14} [{prd.kind}/{prd.effort}/{prd.capability}]  {prd.title}"
+            )
     return 0
 
 
@@ -164,7 +179,9 @@ def cmd_next(args: argparse.Namespace) -> int:
         print("(no actionable PRDs match)")
         return 0
     for prd in actionable:
-        print(f"{prd.id:14} [{prd.priority}/{prd.effort}/{prd.capability}]  {prd.title}")
+        print(
+            f"{prd.id:14} [{prd.priority}/{prd.effort}/{prd.capability}]  {prd.title}"
+        )
     return 0
 
 
@@ -279,7 +296,9 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return 0
 
 
-def _print_tree(prd: PRD, prds: dict[str, PRD], prefix: str = "", is_last: bool = True) -> None:
+def _print_tree(
+    prd: PRD, prds: dict[str, PRD], prefix: str = "", is_last: bool = True
+) -> None:
     """Recursively print a containment tree branch."""
     connector = "└── " if is_last else "├── "
     print(f"{prefix}{connector}{prd.id}  [{prd.kind}/{prd.status}]  {prd.title}")
@@ -542,18 +561,15 @@ def _check_runnable(prd: PRD, prds: dict[str, PRD]) -> str | None:
     if not graph.is_actionable(prd, prds):
         missing = graph.missing_deps(prd, prds)
         if missing:
-            return (
-                f"{prd.id} depends on missing PRDs: {', '.join(missing)}"
-            )
+            return f"{prd.id} depends on missing PRDs: {', '.join(missing)}"
         unfinished = [
             dep_id
             for dep_id in prd.depends_on
             if dep_id in prds and prds[dep_id].status != "done"
         ]
         if unfinished:
-            return (
-                f"{prd.id} has unfinished dependencies: "
-                + ", ".join(f"{d} ({prds[d].status})" for d in unfinished)
+            return f"{prd.id} has unfinished dependencies: " + ", ".join(
+                f"{d} ({prds[d].status})" for d in unfinished
             )
         return f"{prd.id} status is {prd.status!r}, not 'ready'"
     if not containment.is_runnable(prd, prds):
@@ -614,10 +630,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
             "branch": branch,
             "base_ref": base_ref,
             "default_model": capability_to_model(prd.capability),
-            "tasks": [
-                _describe_task(task, prd, args.model)
-                for task in workflow.tasks
-            ],
+            "tasks": [_describe_task(task, prd, args.model) for task in workflow.tasks],
             "runnable_error": runnable_error,
         }
         print(json.dumps(payload, indent=2))
@@ -627,7 +640,9 @@ def cmd_plan(args: argparse.Namespace) -> int:
     print()
     print(f"  kind:       {prd.kind}")
     print(f"  status:     {prd.status}")
-    print(f"  capability: {prd.capability} -> default model {capability_to_model(prd.capability)}")
+    print(
+        f"  capability: {prd.capability} -> default model {capability_to_model(prd.capability)}"
+    )
     print()
     print(f"  workflow:   {workflow.name} (priority {workflow.priority})")
     if workflow.description:
@@ -709,7 +724,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     print()
     if result.success:
-        print(f"  Result: ✓ success")
+        print("  Result: ✓ success")
         if result.pr_url:
             print(f"  PR:     {result.pr_url}")
         return 0
@@ -735,7 +750,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Path to workflows directory (default: tools/prd-harness/workflows)",
     )
-    parser.add_argument("--json", action="store_true", help="Emit JSON output where supported")
+    parser.add_argument(
+        "--json", action="store_true", help="Emit JSON output where supported"
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
 
     sub = parser.add_subparsers(dest="subcommand", required=True)
@@ -745,14 +762,18 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub_next = sub.add_parser("next", help="List actionable PRDs")
     sub_next.add_argument("--limit", type=int, default=10)
-    sub_next.add_argument("--capability", default="", help="Comma-separated capability filter")
+    sub_next.add_argument(
+        "--capability", default="", help="Comma-separated capability filter"
+    )
     sub_next.set_defaults(func=cmd_next)
 
     sub_validate = sub.add_parser("validate", help="Cycle/missing-dep/orphan checks")
     sub_validate.set_defaults(func=cmd_validate)
 
     sub_tree = sub.add_parser("tree", help="Show containment tree")
-    sub_tree.add_argument("prd_id", nargs="?", help="Root PRD id (default: full forest)")
+    sub_tree.add_argument(
+        "prd_id", nargs="?", help="Root PRD id (default: full forest)"
+    )
     sub_tree.set_defaults(func=cmd_tree)
 
     sub_children = sub.add_parser("children", help="Direct children of a PRD")
@@ -762,7 +783,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub_orphans = sub.add_parser("orphans", help="Top-level PRDs (no parent)")
     sub_orphans.set_defaults(func=cmd_orphans)
 
-    sub_undec = sub.add_parser("undecomposed", help="Epics/features lacking task children")
+    sub_undec = sub.add_parser(
+        "undecomposed", help="Epics/features lacking task children"
+    )
     sub_undec.set_defaults(func=cmd_undecomposed)
 
     sub_conflicts = sub.add_parser("conflicts", help="Show file impact overlaps")

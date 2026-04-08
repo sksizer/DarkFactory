@@ -22,7 +22,9 @@ def _make_workflow(
 ) -> Workflow:
     """Construct a minimal Workflow for assignment tests."""
     if applies_to is None:
-        return Workflow(name=name, priority=priority, tasks=[BuiltIn("ensure_worktree")])
+        return Workflow(
+            name=name, priority=priority, tasks=[BuiltIn("ensure_worktree")]
+        )
     return Workflow(
         name=name,
         priority=priority,

@@ -75,7 +75,9 @@ def assign_all(
     ``--write``. Propagates ``KeyError`` from :func:`assign_workflow` if
     any single PRD has no match and there's no default.
     """
-    return {prd_id: assign_workflow(prd, prds, workflows) for prd_id, prd in prds.items()}
+    return {
+        prd_id: assign_workflow(prd, prds, workflows) for prd_id, prd in prds.items()
+    }
 
 
 def _matches(workflow: Workflow, prd: PRD, prds: dict[str, PRD]) -> bool:

@@ -143,9 +143,7 @@ def _is_ancestor(possibly_ancestor: PRD, child: PRD, prds: dict[str, PRD]) -> bo
     return False
 
 
-def impacts_overlap(
-    a: PRD, b: PRD, files: list[str], prds: dict[str, PRD]
-) -> set[str]:
+def impacts_overlap(a: PRD, b: PRD, files: list[str], prds: dict[str, PRD]) -> set[str]:
     """Files both PRDs would touch.
 
     Returns an empty set in three cases:
