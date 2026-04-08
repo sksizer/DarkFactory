@@ -74,6 +74,11 @@ Tooling (and the author) can see at a glance which upstream merges have not yet 
 
 ### Detection mechanism
 
+Two triggers:
+
+- **Post-merge** (PR merged to `main`): original trigger described below.
+- **Post-run** (graph execution): [[PRD-220-graph-execution]] emits a `{prd_id, changed_files}` event per completed run in its JSON stream. PRD-550 can consume this stream to flag downstream PRDs *as they're being produced by the graph executor*, not just on final merge. This is especially valuable inside an epic that's fanning out — stale-flag siblings before the whole epic lands.
+
 1. On PRD merge (post-merge hook or scheduler tick), compute the set of files actually changed (reuse PRD-546's drift-detection machinery where possible — same file-set computation).
 2. Scan all non-terminal PRDs (`draft`, `ready`, `in-progress`, `planning`) whose `impacts:` list intersects that set.
 3. For each match, append an entry to `upstream_changes:` in the downstream PRD's frontmatter and (optionally) transition status.
@@ -106,6 +111,7 @@ Critically, the child PRDs 549.3a–i, once they exist, will also have `impacts:
 
 ## References
 
+- [[PRD-220-graph-execution]] — surfaces per-run changed-file events that PRD-550 consumes to flag stale PRDs mid-epic.
 - [[PRD-546-impact-declaration-drift-detection]] — computes the actual-vs-declared file set; reuse its pipeline.
 - [[PRD-547-cross-epic-scheduler-coordination]] — related coordination problem across epics.
 - [[PRD-549-builtins-package-split]] — concrete example of a PRD vulnerable to upstream churn.
