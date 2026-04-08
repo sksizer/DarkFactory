@@ -2,7 +2,7 @@
 id: "PRD-230"
 title: "Main branch protection: refuse direct pushes locally and on GitHub"
 kind: task
-status: review
+status: done
 priority: medium
 effort: xs
 capability: trivial
