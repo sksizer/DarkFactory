@@ -6,6 +6,9 @@ Usage::
 
 Defaults: PRDs live in ``prds/`` and workflows in ``workflows/`` at the
 repo root. Override via ``--prd-dir`` and ``--workflows-dir``.
+
+This should have minimial logic; the subcommand implementations can call into 
+specific modules for the heavy lifting.
 """
 
 from __future__ import annotations
