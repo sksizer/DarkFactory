@@ -9,6 +9,7 @@ views:
     order:
       - file.name
       - status
+      - kind
     sort:
       - property: status
         direction: ASC
