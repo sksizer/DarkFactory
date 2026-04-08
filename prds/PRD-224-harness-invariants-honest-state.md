@@ -44,7 +44,7 @@ Examples from the live record:
 
 These aren't bugs in any single piece of code — they're missing invariants. The harness has plenty of state, but no checks that the state is honest.
 
-## Decomposition into 6 child PRDs
+## Decomposition into 7 child PRDs
 
 ### PRD-224.1 — `prd validate` warns on review-but-branch-gone PRDs
 
@@ -178,6 +178,43 @@ jobs:
 - What about PRDs whose status field uses a different YAML quoting style than the sed pattern expects? PRD-214's `update_frontmatter_field_at` is the robust answer, but reimplementing it in bash would be ugly. Alternative: invoke `python -c "from darkfactory.prd import set_status_at; ..."` if darkfactory is pip-installable by then (PRD-222.5). Until then, the sed pattern is good enough — it's the same shape every other status mutation produces.
 - What if the PRD file is missing on main (rare but possible)? Action exits 0 with a log message, no failure.
 
+### PRD-224.7 — `prd reconcile` local command for status drift
+
+**What:** A local CLI subcommand `prd reconcile [--execute] [--dry-run]` that does what PRD-224.5's GitHub Action does, but locally and on-demand. Uses `gh pr list --state merged --json headRefName,mergedAt,number` to find merged PRs whose head branch matches `prd/PRD-X-*`, finds the corresponding PRD file with `status: review`, and flips it to `done`.
+
+**The key behavior decision:** for trivial status-only changes, **commit directly to main** rather than opening a fresh PR for each one. Status flips are mechanical, single-line, no logic — going through review for each is overkill. The commit message format makes the auto-reconcile origin obvious:
+
+```
+chore(prd): mark PRD-X done (auto-reconciled from merged PR #N)
+
+[skip ci]
+```
+
+**Workflow:**
+
+```
+prd reconcile           # dry-run by default — print what would change
+prd reconcile --execute # flip statuses, commit to main, push
+```
+
+**Why this exists alongside PRD-224.5:**
+
+- **224.5 (GH Action)** handles the happy path automatically — fires the moment a PR merges, no human action needed.
+- **224.7 (local reconcile)** is the catch-up tool for cases the action missed: PRs merged before the action existed, branches that didn't follow the `prd/PRD-X-*` convention, action failures, repos where the action isn't enabled. It's also the right tool for the "I just pulled main and want to make sure everything's tidy" workflow.
+
+The user explicitly wanted compute on local hardware where possible, so the local command is the primary path; the GH Action is the convenience layer on top.
+
+**Effort:** s. Reuses the same pattern PR #18's manual sed command did, but properly via `update_frontmatter_field_at`.
+
+**Impacts:**
+- `src/darkfactory/cli.py` (new cmd_reconcile)
+- `tests/test_cli_reconcile.py` (new file)
+
+**Open questions:**
+- Should reconcile also clean up local worktrees as a side effect, or stay focused on status updates? Recommendation: stay focused — `prd cleanup` (224.4) is the worktree-removal tool. They can be chained: `prd reconcile && prd cleanup --merged`.
+- What if multiple PRDs need reconciling? Batch them in a single commit titled "chore(prd): reconcile N merged PRD statuses".
+- Direct-to-main without a PR is unusual — should it require `--commit-to-main` opt-in? Recommendation: yes, default to creating a PR (matches the rest of the harness's safety norms), with `--commit-to-main` as an explicit shortcut for the trivial-status-only path.
+
 ### PRD-224.6 — Commit agent transcripts to `.darkfactory/transcripts/`
 
 **What:** Move the transcript dump from `<worktree>/.harness-agent-output.log` to `.darkfactory/transcripts/PRD-X-{ISO8601}.log`. One file per agent invocation, timestamped, never overwritten. Committed automatically by the workflow as part of the "ready for review" step. Lands in main when the PR merges → permanent record.
@@ -206,8 +243,9 @@ jobs:
 - [ ] AC-5 (post 224.4): `prd status` shows a hygiene line listing how many merged-PRD worktrees are still on disk.
 - [ ] AC-6 (post 224.5): A test PR for a `prd/PRD-test-` branch, when merged, triggers the GitHub Action and lands a follow-up commit on main flipping the PRD's status to `done`.
 - [ ] AC-7 (post 224.6): An agent invocation creates a file at `.darkfactory/transcripts/PRD-X-{timestamp}.log`, the file is committed by the harness's commit step, and it lands in main when the PR merges.
-- [ ] AC-8: All 6 children pass `prd validate`, `pytest`, and `mypy --strict` independently.
-- [ ] AC-9: Running PRD-224 itself through the harness completes without manual rescue.
+- [ ] AC-8 (post 224.7): `prd reconcile` (dry-run) lists merged-but-not-flipped PRDs; `--execute` updates them; `--commit-to-main` skips the PR step for trivial status flips.
+- [ ] AC-9: All 7 children pass `prd validate`, `pytest`, and `mypy --strict` independently.
+- [ ] AC-10: Running PRD-224 itself through the harness completes without manual rescue.
 
 ## Open Questions
 

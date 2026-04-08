@@ -143,7 +143,61 @@ After the agent finishes, post `gh pr comment` replies on each of the comments i
 
 This is optional because some users may prefer to review the new commits manually before declaring comments addressed. Make it `--reply-to-comments` opt-in.
 
-### PRD-225.6 — Loop detection
+### PRD-225.6 — Local polling rework daemon (auto, but on user hardware)
+
+**What:** A long-running local process `prd rework-watch [--interval 60s]` that polls open PRs for new review comments and triggers `prd rework <PRD-X>` automatically when unaddressed feedback appears.
+
+**Why polling instead of GH webhooks:** the user wants computation on their own hardware, not on GitHub Actions runners. A local poller:
+
+- Runs the agent on the user's machine (full control over model, network, secrets)
+- Doesn't require exposing a webhook endpoint
+- Survives network blips (next poll catches up)
+- Easy to pause/stop without messing with GH settings
+- Handles air-gapped or VPN-restricted dev setups
+
+**Polling logic:**
+
+1. Every N seconds, list open PRs whose head branch matches `prd/PRD-*`
+2. For each PR, fetch comments via `gh pr view`
+3. Compare against the harness's last seen comment ID for that PR (stored in `.darkfactory/state/rework-watch.json`)
+4. If new unresolved comments exist → invoke `prd rework PRD-X` in a subprocess
+5. Update the last-seen pointer
+6. Sleep, repeat
+
+**Safety:**
+
+- Refuse to start if the worktree for any active PR is missing (something else is going on)
+- Maximum N rework cycles per PR per hour (default 3) to prevent thrashing on a hostile reviewer or an agent that can't stop revising
+- Honor the same per-PRD process lock from PRD-217 so a manual `prd run` doesn't race with the watcher
+- A `pause` file at `.darkfactory/state/rework-watch.pause` halts the watcher without stopping the process — useful when you want to manually iterate
+
+**CLI:**
+
+```
+prd rework-watch                 # foreground, ctrl-C to stop
+prd rework-watch --daemon        # background (writes PID file)
+prd rework-watch --status        # show last poll time, queued PRDs
+prd rework-watch --pause         # touch the pause file
+prd rework-watch --resume        # remove the pause file
+prd rework-watch --stop          # kill the daemon
+```
+
+**Effort:** m. New module + state file + signal handling. Test coverage needs a fake `gh pr view` and time-controlled polling loop.
+
+**Impacts:**
+- `src/darkfactory/cli.py` (new cmd_rework_watch)
+- `src/darkfactory/rework_watch.py` (new module)
+- `tests/test_rework_watch.py` (new file)
+- `.darkfactory/state/` directory in the layout (PRD-222)
+
+**Open questions:**
+- Should the watcher invoke `prd rework` synchronously (block on each PR) or fan out to parallel subprocesses for independent PRDs? Recommendation: synchronous v1, parallel later.
+- What happens when the watcher detects new comments but the agent is mid-implementation on something else? Recommendation: queue the rework and process when the lock is free.
+- Cron alternative: should we ship a sample crontab entry instead of a daemon? Recommendation: ship the daemon since it has state, but document the cron pattern for users who prefer that.
+
+This is a phase-2 piece of PRD-225 — it depends on 225.1-225.5 being solid first. Don't ship it before the manual `prd rework` command is well-tested.
+
+### PRD-225.7 — Loop detection
 
 A safety check: if the same `prd rework PRD-X` produces no changes (agent runs but stages nothing), flag it loudly. Possible causes: agent thinks the comments are already addressed, agent disagrees and pushed back in its sentinel, agent is confused. The harness should not silently no-op repeated rework attempts — that's how loops happen.
 
