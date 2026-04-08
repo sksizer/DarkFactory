@@ -96,6 +96,7 @@ workflow = Workflow(
         # branch (and merged PR) shows status: in-progress instead of
         # review.
         BuiltIn("set_status", kwargs={"to": "review"}),
+        BuiltIn("commit_transcript"),
         BuiltIn(
             "commit",
             kwargs={"message": "chore(prd): {prd_id} ready for review"},
