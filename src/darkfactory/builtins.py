@@ -39,6 +39,7 @@ from typing import Callable
 from filelock import FileLock, Timeout
 
 from . import prd as prd_module
+from .checks import is_resume_safe
 from .workflow import ExecutionContext, Status
 
 _log = logging.getLogger(__name__)
@@ -265,6 +266,11 @@ def ensure_worktree(ctx: ExecutionContext) -> None:
 
     # ---- existing logic below, now lock-protected ----
     if worktree_path.exists():
+        status = is_resume_safe(branch, ctx.repo_root)
+        if not status.safe:
+            lock.release()
+            ctx._worktree_lock = None
+            raise RuntimeError(status.reason)
         ctx.logger.info("resuming existing worktree: %s", worktree_path)
         ctx.worktree_path = worktree_path
         ctx.cwd = worktree_path

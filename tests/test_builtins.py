@@ -33,6 +33,7 @@ from darkfactory.builtins import (
     _worktree_target,
     builtin,
 )
+from darkfactory.checks import ResumeStatus
 from darkfactory.prd import load_all
 from darkfactory.workflow import ExecutionContext, Workflow
 
@@ -330,6 +331,128 @@ def test_ensure_worktree_resumes_existing(tmp_git_repo: Path) -> None:
     assert ctx2.worktree_path == first_path
     assert (first_path / "marker.txt").read_text() == "first run\n"
     # Release the lock acquired by ctx2 to avoid leaking it after the test.
+    if ctx2._worktree_lock is not None:
+        ctx2._worktree_lock.release()
+        ctx2._worktree_lock = None
+
+
+def test_ensure_worktree_raises_on_merged_pr(tmp_git_repo: Path) -> None:
+    """ensure_worktree should raise RuntimeError when is_resume_safe returns not-safe (merged)."""
+    prd_dir = tmp_git_repo / "docs" / "prd"
+    prd_dir.mkdir(parents=True)
+    write_prd(prd_dir, "PRD-070", "stale-test")
+    prds = load_all(prd_dir)
+
+    ctx = ExecutionContext(
+        prd=prds["PRD-070"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-070-stale-test",
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+    # Create the worktree first so the resume path is taken
+    builtins.ensure_worktree(ctx)
+    assert ctx.worktree_path is not None
+    assert ctx._worktree_lock is not None
+    ctx._worktree_lock.release()
+    ctx._worktree_lock = None
+
+    not_safe = ResumeStatus(
+        safe=False,
+        reason="PR for prd/PRD-070-stale-test is merged; run `prd cleanup` to start fresh",
+        kind="pr_merged",
+    )
+    ctx2 = ExecutionContext(
+        prd=prds["PRD-070"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-070-stale-test",
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+    with patch("darkfactory.builtins.is_resume_safe", return_value=not_safe):
+        with pytest.raises(RuntimeError, match="prd cleanup"):
+            builtins.ensure_worktree(ctx2)
+
+
+def test_ensure_worktree_raises_on_closed_pr(tmp_git_repo: Path) -> None:
+    """ensure_worktree should raise RuntimeError when is_resume_safe returns not-safe (closed)."""
+    prd_dir = tmp_git_repo / "docs" / "prd"
+    prd_dir.mkdir(parents=True)
+    write_prd(prd_dir, "PRD-071", "closed-test")
+    prds = load_all(prd_dir)
+
+    ctx = ExecutionContext(
+        prd=prds["PRD-071"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-071-closed-test",
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+    builtins.ensure_worktree(ctx)
+    assert ctx._worktree_lock is not None
+    ctx._worktree_lock.release()
+    ctx._worktree_lock = None
+
+    not_safe = ResumeStatus(
+        safe=False,
+        reason="PR for prd/PRD-071-closed-test is closed; run `prd cleanup` to start fresh",
+        kind="pr_closed",
+    )
+    ctx2 = ExecutionContext(
+        prd=prds["PRD-071"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-071-closed-test",
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+    with patch("darkfactory.builtins.is_resume_safe", return_value=not_safe):
+        with pytest.raises(RuntimeError, match="prd cleanup"):
+            builtins.ensure_worktree(ctx2)
+
+
+def test_ensure_worktree_resumes_when_safe(tmp_git_repo: Path) -> None:
+    """ensure_worktree should proceed when is_resume_safe returns safe."""
+    prd_dir = tmp_git_repo / "docs" / "prd"
+    prd_dir.mkdir(parents=True)
+    write_prd(prd_dir, "PRD-072", "safe-resume-test")
+    prds = load_all(prd_dir)
+
+    ctx = ExecutionContext(
+        prd=prds["PRD-072"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-072-safe-resume-test",
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+    builtins.ensure_worktree(ctx)
+    assert ctx._worktree_lock is not None
+    ctx._worktree_lock.release()
+    ctx._worktree_lock = None
+
+    safe = ResumeStatus(safe=True, reason="", kind="safe")
+    ctx2 = ExecutionContext(
+        prd=prds["PRD-072"],
+        repo_root=tmp_git_repo,
+        workflow=Workflow(name="default"),
+        base_ref="main",
+        branch_name="prd/PRD-072-safe-resume-test",
+        cwd=tmp_git_repo,
+        dry_run=False,
+    )
+    with patch("darkfactory.builtins.is_resume_safe", return_value=safe):
+        builtins.ensure_worktree(ctx2)
+
+    assert ctx2.worktree_path is not None
     if ctx2._worktree_lock is not None:
         ctx2._worktree_lock.release()
         ctx2._worktree_lock = None
