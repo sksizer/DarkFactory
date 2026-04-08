@@ -2,7 +2,7 @@
 id: "PRD-221"
 title: "Workflow owns format + typecheck so agents don't loop on them"
 kind: task
-status: ready
+status: review
 priority: high
 effort: xs
 capability: simple
