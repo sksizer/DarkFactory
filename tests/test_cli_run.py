@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
-from darkfactory.cli import main
+from darkfactory.cli import _resolve_base_ref, main
 
 from .conftest import write_prd
 
@@ -416,3 +416,101 @@ workflow = Workflow(
     assert exit_code == 1
     out = capsys.readouterr().out
     assert "FAILED" in out
+
+
+# ---------- _resolve_base_ref unit tests ----------
+
+
+def test_resolve_base_ref_explicit_wins(tmp_path: Path) -> None:
+    """Explicit --base flag has highest priority."""
+    _init_git_repo(tmp_path)
+    result = _resolve_base_ref("custom-branch", tmp_path)
+    assert result == "custom-branch"
+
+
+def test_resolve_base_ref_env_var_override(tmp_path: Path, monkeypatch) -> None:
+    """DARKFACTORY_BASE_REF environment variable is used when no explicit arg."""
+    _init_git_repo(tmp_path)
+    monkeypatch.setenv("DARKFACTORY_BASE_REF", "staging")
+    result = _resolve_base_ref(None, tmp_path)
+    assert result == "staging"
+
+
+def test_resolve_base_ref_defaults_to_main(tmp_path: Path) -> None:
+    """Defaults to 'main' when it exists locally."""
+    _init_git_repo(tmp_path)
+
+    # Mock subprocess to say main exists but master doesn't
+    def mock_run(cmd, **kwargs):
+        if "refs/heads/main" in str(cmd):
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout="", stderr=""
+            )
+        return subprocess.CompletedProcess(args=cmd, returncode=1, stdout="", stderr="")
+
+    with patch("darkfactory.cli.subprocess.run", side_effect=mock_run):
+        result = _resolve_base_ref(None, tmp_path)
+        assert result == "main"
+
+
+def test_resolve_base_ref_falls_back_to_master(tmp_path: Path) -> None:
+    """Falls back to 'master' when 'main' doesn't exist locally."""
+    _init_git_repo(tmp_path)
+
+    # Mock subprocess to say master exists but main doesn't
+    def mock_run(cmd, **kwargs):
+        if "refs/heads/master" in str(cmd):
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout="", stderr=""
+            )
+        return subprocess.CompletedProcess(args=cmd, returncode=1, stdout="", stderr="")
+
+    with patch("darkfactory.cli.subprocess.run", side_effect=mock_run):
+        result = _resolve_base_ref(None, tmp_path)
+        assert result == "master"
+
+
+def test_resolve_base_ref_falls_back_to_origin_head(tmp_path: Path) -> None:
+    """Falls back to origin/HEAD when neither main nor master exist locally."""
+    _init_git_repo(tmp_path)
+
+    # Mock subprocess to check refs fail, but symbolic-ref succeeds
+    def mock_run(cmd, **kwargs):
+        if "symbolic-ref" in str(cmd):
+            return subprocess.CompletedProcess(
+                args=cmd,
+                returncode=0,
+                stdout="refs/remotes/origin/develop\n",
+                stderr="",
+            )
+        # All branch checks fail
+        return subprocess.CompletedProcess(args=cmd, returncode=1, stdout="", stderr="")
+
+    with patch("darkfactory.cli.subprocess.run", side_effect=mock_run):
+        result = _resolve_base_ref(None, tmp_path)
+        assert result == "develop"
+
+
+def test_resolve_base_ref_last_resort_main(tmp_path: Path) -> None:
+    """Last resort fallback is 'main' when all else fails."""
+    _init_git_repo(tmp_path)
+
+    # Mock subprocess so all calls return failure
+    def mock_run_all_fail(cmd, **kwargs):
+        # For check=True calls (symbolic-ref), raise exception
+        if "symbolic-ref" in str(cmd):
+            raise subprocess.CalledProcessError(1, cmd)
+        # For other calls, return failure status
+        return subprocess.CompletedProcess(args=cmd, returncode=1, stdout="", stderr="")
+
+    with patch("darkfactory.cli.subprocess.run", side_effect=mock_run_all_fail):
+        result = _resolve_base_ref(None, tmp_path)
+        assert result == "main"
+
+
+def test_resolve_base_ref_explicit_overrides_env(tmp_path: Path, monkeypatch) -> None:
+    """Explicit --base flag overrides environment variable."""
+    _init_git_repo(tmp_path)
+    monkeypatch.setenv("DARKFACTORY_BASE_REF", "staging")
+    result = _resolve_base_ref("explicit-branch", tmp_path)
+    assert result == "explicit-branch"
