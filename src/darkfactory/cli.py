@@ -25,7 +25,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from . import assign, containment, graph, impacts
+from . import assign, checks, containment, graph, impacts
 from .invoke import capability_to_model
 from .loader import load_workflows
 from .prd import (
@@ -408,6 +408,15 @@ def cmd_validate(args: argparse.Namespace) -> int:
             f"{len(undeclared)} ready leaf PRDs have no declared impacts "
             "(undeclared = sequential)"
         )
+
+    # 8. Review-status PRDs whose branch is gone from origin.
+    try:
+        repo_root = _find_repo_root(args.prd_dir)
+        git_state = checks.SubprocessGitState(str(repo_root))
+        for issue in checks.validate_review_branches(prds, git_state):
+            warnings.append(issue.message)
+    except Exception:  # noqa: BLE001 — best-effort outside a git repo
+        pass
 
     for err in errors:
         print(f"ERROR: {err}", file=sys.stderr)
