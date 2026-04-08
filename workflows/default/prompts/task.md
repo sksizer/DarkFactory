@@ -44,20 +44,24 @@ just lint format-check
 Fix any failures. If tests that were passing before start failing, you
 broke something — investigate and fix, don't paper over.
 
-### 4. Commit
+### 4. Stage your changes
 
-Stage your changes and commit with a conventional-commits message:
+Run `git add` for the files you modified or created so the harness's
+commit builtin can see them:
 
-- `feat(prd-harness): {{PRD_ID}} <one-line summary>` for new features
-- `fix(prd-harness): {{PRD_ID}} <one-line summary>` for bug fixes
-- `chore(prd-harness): {{PRD_ID}} <one-line summary>` otherwise
+```bash
+git add -A
+git status
+git diff --cached
+```
 
-The subject line must be lowercase after the scope (commitlint rule).
-Include a body explaining what changed and why. Reference the PRD
-filename in the body. Do not bypass commit hooks.
+**Do not run `git commit`.** The harness commits immediately after
+you return — it owns commit-message authoring and history shape, and
+`git commit` is intentionally outside your tool allowlist. If you try
+to commit, the run will fail.
 
-**Do not** push, branch, or open a PR — the harness will handle those
-steps after you return.
+You also must not push, branch, or open a PR — the harness handles
+all of those.
 
 ### 5. Report
 
@@ -74,7 +78,7 @@ AC-3: FAIL — <reason>
 
 Your final line must be exactly one of:
 
-- `PRD_EXECUTE_OK: {{PRD_ID}}` — everything passed, commit made.
+- `PRD_EXECUTE_OK: {{PRD_ID}}` — everything passed, changes are staged.
 - `PRD_EXECUTE_FAILED: <reason>` — you could not complete the task.
 
 The harness reads this line to decide the next step.

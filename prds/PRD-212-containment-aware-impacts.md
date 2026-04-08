@@ -2,7 +2,7 @@
 id: "PRD-212"
 title: "Containment-aware impact overlap detection"
 kind: task
-status: review
+status: done
 priority: high
 effort: s
 capability: moderate
@@ -16,7 +16,7 @@ impacts:
 workflow: null
 target_version: null
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-08'
 tags:
   - harness
   - impacts
