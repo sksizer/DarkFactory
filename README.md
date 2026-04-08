@@ -45,6 +45,12 @@ Three layers:
 2. **Built-in tasks** — `ensure_worktree`, `commit`, `create_pr`, etc.
 3. **Workflows** — declarative Python (`workflows/{name}/workflow.py`) describing the per-PRD-type implementation procedure
 
+## Concurrency
+
+`prd run` uses advisory file locking (via [`filelock`](https://pypi.org/project/filelock/)) to prevent two runners from working on the same PRD simultaneously. The lock is held for the lifetime of the runner process and auto-released by the kernel on process exit (including crashes). This works on macOS, Linux, and Windows.
+
+Read-only subcommands (`prd status`, `prd plan`, `prd validate`) do not acquire locks and are safe to run from multiple terminals at the same time.
+
 ## Development
 
 ```bash

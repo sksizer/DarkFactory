@@ -2,7 +2,7 @@
 id: "PRD-217"
 title: "Process-level lock for active worktrees (cross-platform)"
 kind: task
-status: ready
+status: review
 priority: high
 effort: s
 capability: moderate

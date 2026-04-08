@@ -152,39 +152,59 @@ def run_workflow(
     last_agent_task: AgentTask | None = None
     last_agent_result: InvokeResult | None = None
 
-    for task in workflow.tasks:
-        try:
-            step = _dispatch(
-                task, ctx, model_override, last_agent_task, last_agent_result
-            )
-            result.steps.append(step)
-
-            if isinstance(task, AgentTask):
-                last_agent_task = task
-                # We can't easily reach the InvokeResult from _dispatch without
-                # restructuring, so we re-record it here via a side channel:
-                # _dispatch stores the agent result on the context.
-                last_agent_result = getattr(ctx, "_last_agent_result", None)
-
-            if not step.success:
-                result.success = False
-                result.failure_reason = step.detail or f"task {step.name!r} failed"
-                break
-        except Exception as exc:  # noqa: BLE001 — we want to log any failure
-            result.success = False
-            result.failure_reason = f"task {_task_name(task)!r} raised: {exc}"
-            result.steps.append(
-                TaskStep(
-                    name=_task_name(task),
-                    kind=_task_kind(task),
-                    success=False,
-                    detail=str(exc),
+    try:
+        for task in workflow.tasks:
+            try:
+                step = _dispatch(
+                    task, ctx, model_override, last_agent_task, last_agent_result
                 )
-            )
-            break
+                result.steps.append(step)
+
+                if isinstance(task, AgentTask):
+                    last_agent_task = task
+                    # We can't easily reach the InvokeResult from _dispatch without
+                    # restructuring, so we re-record it here via a side channel:
+                    # _dispatch stores the agent result on the context.
+                    last_agent_result = getattr(ctx, "_last_agent_result", None)
+
+                if not step.success:
+                    result.success = False
+                    result.failure_reason = step.detail or f"task {step.name!r} failed"
+                    break
+            except Exception as exc:  # noqa: BLE001 — we want to log any failure
+                result.success = False
+                result.failure_reason = f"task {_task_name(task)!r} raised: {exc}"
+                result.steps.append(
+                    TaskStep(
+                        name=_task_name(task),
+                        kind=_task_kind(task),
+                        success=False,
+                        detail=str(exc),
+                    )
+                )
+                break
+    finally:
+        _release_worktree_lock(ctx)
 
     result.pr_url = ctx.pr_url
     return result
+
+
+def _release_worktree_lock(ctx: ExecutionContext) -> None:
+    """Release the advisory lock acquired by ensure_worktree, if any.
+
+    Safe to call multiple times and on contexts that never acquired a
+    lock (e.g. dry-run paths).
+    """
+    lock = ctx._worktree_lock
+    if lock is None:
+        return
+    try:
+        lock.release()
+    except Exception as exc:  # noqa: BLE001
+        ctx.logger.warning("failed to release worktree lock: %s", exc)
+    finally:
+        ctx._worktree_lock = None
 
 
 def _task_name(task: Task) -> str:
