@@ -1,19 +1,19 @@
 ---
-id: "PRD-224"
-title: "Harness invariants for honest state"
+id: PRD-224
+title: Harness invariants for honest state
 kind: epic
 status: ready
 priority: high
 effort: m
 capability: moderate
-parent: null
+parent:
 depends_on: []
 blocks: []
-impacts: []  # epic — children declare their own
-workflow: null
-target_version: null
+impacts: []
+workflow: planning
+target_version:
 created: 2026-04-08
-updated: '2026-04-08'
+updated: 2026-04-08
 tags:
   - harness
   - invariants
