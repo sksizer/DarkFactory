@@ -2,7 +2,7 @@
 id: "PRD-510"
 title: "prd new subcommand for creating draft PRDs"
 kind: task
-status: ready
+status: in-progress
 priority: medium
 effort: s
 capability: simple
@@ -17,7 +17,7 @@ impacts:
 workflow: null
 target_version: null
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-08'
 tags:
   - harness
   - cli
