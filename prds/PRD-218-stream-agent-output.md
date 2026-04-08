@@ -2,7 +2,7 @@
 id: "PRD-218"
 title: "Stream agent subprocess output in real time"
 kind: task
-status: ready
+status: review
 priority: high
 effort: s
 capability: moderate

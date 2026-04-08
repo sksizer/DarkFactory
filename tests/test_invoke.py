@@ -1,15 +1,20 @@
 """Tests for the Claude Code subprocess wrapper.
 
-The tests mock ``subprocess.run`` so they don't actually invoke Claude
-Code — they exercise the wrapper's command-building, sentinel parsing,
-timeout handling, and dry-run behavior in isolation.
+Existing tests that previously patched ``subprocess.run`` have been updated
+to patch ``subprocess.Popen`` to match the streaming implementation.  Five
+new tests (marked with ``# NEW``) cover the streaming-specific behaviour:
+logger tee, full-stdout capture, partial stdout on timeout, stderr drain,
+and unchanged sentinel parsing.
 """
 
 from __future__ import annotations
 
-import subprocess
+import io
+import logging
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 from darkfactory.invoke import (
@@ -18,6 +23,30 @@ from darkfactory.invoke import (
     capability_to_model,
     invoke_claude,
 )
+
+
+# ---------- helpers ----------
+
+
+def _make_mock_popen(
+    stdout: str = "", stderr: str = "", returncode: int = 0
+) -> MagicMock:
+    """Build a mock Popen object for patching ``subprocess.Popen``.
+
+    ``proc.stdout`` and ``proc.stderr`` are ``io.StringIO`` instances so the
+    line-reading loops in ``invoke_claude`` work without spawning a real
+    process.  ``proc.poll()`` returns ``returncode`` immediately so the
+    watchdog thread knows the process is already done and exits without
+    sleeping through the full timeout.
+    """
+    mock_proc = MagicMock()
+    mock_proc.stdin = MagicMock()
+    mock_proc.stdout = io.StringIO(stdout)
+    mock_proc.stderr = io.StringIO(stderr)
+    mock_proc.returncode = returncode
+    mock_proc.wait.return_value = returncode
+    mock_proc.poll.return_value = returncode  # process already exited
+    return mock_proc
 
 
 # ---------- capability_to_model ----------
@@ -149,7 +178,7 @@ def test_invoke_claude_dry_run_returns_synthetic_success(tmp_path: Path) -> None
 
 
 def test_invoke_claude_dry_run_does_not_call_subprocess(tmp_path: Path) -> None:
-    with patch("subprocess.run") as mock_run:
+    with patch("subprocess.Popen") as mock_popen:
         invoke_claude(
             prompt="prompt",
             tools=["Read"],
@@ -157,30 +186,18 @@ def test_invoke_claude_dry_run_does_not_call_subprocess(tmp_path: Path) -> None:
             cwd=tmp_path,
             dry_run=True,
         )
-        mock_run.assert_not_called()
+        mock_popen.assert_not_called()
 
 
 # ---------- invoke_claude (mocked subprocess, success path) ----------
 
 
-def _mock_completed(
-    stdout: str = "", stderr: str = "", returncode: int = 0
-) -> subprocess.CompletedProcess[str]:
-    """Build a CompletedProcess-shaped mock for patching subprocess.run."""
-    return subprocess.CompletedProcess(
-        args=["mock"],
-        returncode=returncode,
-        stdout=stdout,
-        stderr=stderr,
-    )
-
-
 def test_invoke_claude_success_sentinel(tmp_path: Path) -> None:
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = _mock_completed(
-            stdout="implementation details\nPRD_EXECUTE_OK: PRD-070\n",
-            returncode=0,
-        )
+    mock_proc = _make_mock_popen(
+        stdout="implementation details\nPRD_EXECUTE_OK: PRD-070\n",
+        returncode=0,
+    )
+    with patch("subprocess.Popen", return_value=mock_proc):
         result = invoke_claude(
             prompt="p",
             tools=["Read", "Edit"],
@@ -195,15 +212,15 @@ def test_invoke_claude_success_sentinel(tmp_path: Path) -> None:
 
 def test_invoke_claude_builds_expected_command(tmp_path: Path) -> None:
     """The subprocess call should use `pnpm dlx` with the right flags."""
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = _mock_completed(stdout="PRD_EXECUTE_OK: X\n")
+    mock_proc = _make_mock_popen(stdout="PRD_EXECUTE_OK: X\n")
+    with patch("subprocess.Popen", return_value=mock_proc) as mock_popen:
         invoke_claude(
             prompt="my prompt",
             tools=["Read", "Edit", "Bash(cargo:*)"],
             model="opus",
             cwd=tmp_path,
         )
-        args, kwargs = mock_run.call_args
+        args, kwargs = mock_popen.call_args
         cmd = args[0]
         assert cmd[0] == "pnpm"
         assert cmd[1] == "dlx"
@@ -215,8 +232,8 @@ def test_invoke_claude_builds_expected_command(tmp_path: Path) -> None:
         # Tools flag
         tools_idx = cmd.index("--allowed-tools")
         assert cmd[tools_idx + 1] == "Read,Edit,Bash(cargo:*)"
-        # Prompt via stdin
-        assert kwargs["input"] == "my prompt"
+        # Prompt written to stdin (not passed as input= kwarg)
+        mock_proc.stdin.write.assert_called_once_with("my prompt")
         # cwd passed through
         assert kwargs["cwd"] == str(tmp_path)
 
@@ -225,11 +242,11 @@ def test_invoke_claude_builds_expected_command(tmp_path: Path) -> None:
 
 
 def test_invoke_claude_failure_sentinel(tmp_path: Path) -> None:
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = _mock_completed(
-            stdout="oh no\nPRD_EXECUTE_FAILED: tests wouldn't pass\n",
-            returncode=0,
-        )
+    mock_proc = _make_mock_popen(
+        stdout="oh no\nPRD_EXECUTE_FAILED: tests wouldn't pass\n",
+        returncode=0,
+    )
+    with patch("subprocess.Popen", return_value=mock_proc):
         result = invoke_claude(
             prompt="p",
             tools=["Read"],
@@ -242,10 +259,8 @@ def test_invoke_claude_failure_sentinel(tmp_path: Path) -> None:
 
 def test_invoke_claude_nonzero_exit_with_no_sentinel(tmp_path: Path) -> None:
     """Exit code nonzero and no sentinel -> failure with sentinel-missing reason."""
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = _mock_completed(
-            stdout="", stderr="agent crashed", returncode=1
-        )
+    mock_proc = _make_mock_popen(stdout="", stderr="agent crashed", returncode=1)
+    with patch("subprocess.Popen", return_value=mock_proc):
         result = invoke_claude(
             prompt="p",
             tools=["Read"],
@@ -259,12 +274,12 @@ def test_invoke_claude_nonzero_exit_with_no_sentinel(tmp_path: Path) -> None:
 
 def test_invoke_claude_nonzero_exit_with_success_sentinel(tmp_path: Path) -> None:
     """Exit code nonzero but sentinel says OK -> trust the exit code (failure)."""
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = _mock_completed(
-            stdout="PRD_EXECUTE_OK: PRD-070\n",
-            stderr="something broke after the sentinel",
-            returncode=2,
-        )
+    mock_proc = _make_mock_popen(
+        stdout="PRD_EXECUTE_OK: PRD-070\n",
+        stderr="something broke after the sentinel",
+        returncode=2,
+    )
+    with patch("subprocess.Popen", return_value=mock_proc):
         result = invoke_claude(
             prompt="p",
             tools=["Read"],
@@ -281,22 +296,25 @@ def test_invoke_claude_nonzero_exit_with_success_sentinel(tmp_path: Path) -> Non
 
 
 def test_invoke_claude_timeout(tmp_path: Path) -> None:
-    with patch("subprocess.run") as mock_run:
-        mock_run.side_effect = subprocess.TimeoutExpired(
-            cmd=["pnpm"], timeout=5, output="partial output", stderr="partial err"
-        )
-        result = invoke_claude(
-            prompt="p",
-            tools=["Read"],
-            model="sonnet",
-            cwd=tmp_path,
-            timeout_seconds=5,
-        )
+    """Timeout path: success=False, exit_code=-1, failure_reason contains 'timeout'.
+
+    Uses a real Python subprocess that sleeps 30s so the watchdog fires
+    after timeout_seconds=1 and kills it.  Takes ~1s to run.
+    """
+    result = invoke_claude(
+        prompt="p",
+        tools=[],
+        model="sonnet",
+        cwd=tmp_path,
+        executable="python",
+        _argv_override=["-c", "import time; time.sleep(30)"],
+        timeout_seconds=1,
+    )
     assert result.success is False
     assert result.exit_code == -1
     assert result.failure_reason is not None
     assert "timeout" in result.failure_reason.lower()
-    assert "5" in result.failure_reason
+    assert "1" in result.failure_reason
 
 
 # ---------- invoke_claude (executable missing) ----------
@@ -304,8 +322,8 @@ def test_invoke_claude_timeout(tmp_path: Path) -> None:
 
 def test_invoke_claude_executable_not_found(tmp_path: Path) -> None:
     """A missing `pnpm` binary should produce a clear error, not crash."""
-    with patch("subprocess.run") as mock_run:
-        mock_run.side_effect = FileNotFoundError("No such file or directory: 'pnpm'")
+    with patch("subprocess.Popen") as mock_popen:
+        mock_popen.side_effect = FileNotFoundError("No such file or directory: 'pnpm'")
         result = invoke_claude(
             prompt="p",
             tools=["Read"],
@@ -315,3 +333,111 @@ def test_invoke_claude_executable_not_found(tmp_path: Path) -> None:
     assert result.success is False
     assert result.failure_reason is not None
     assert "executable not found" in result.failure_reason
+
+
+# ---------- NEW: streaming tests ----------
+
+
+def test_invoke_streams_to_logger(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:  # NEW
+    """Each stdout line is logged to 'darkfactory.invoke' at INFO level with 'agent:' prefix."""
+    with caplog.at_level(logging.INFO, logger="darkfactory.invoke"):
+        invoke_claude(
+            prompt="irrelevant",
+            tools=[],
+            model="sonnet",
+            cwd=tmp_path,
+            executable="python",
+            _argv_override=[
+                "-c",
+                "import time; print('one', flush=True); time.sleep(0.05); print('two', flush=True)",
+            ],
+        )
+
+    messages = [r.getMessage() for r in caplog.records]
+    assert any(m == "agent: one" for m in messages)
+    assert any(m == "agent: two" for m in messages)
+
+
+def test_invoke_captures_full_stdout(tmp_path: Path) -> None:  # NEW
+    """result.stdout contains the complete agent output even with streaming."""
+    result = invoke_claude(
+        prompt="irrelevant",
+        tools=[],
+        model="sonnet",
+        cwd=tmp_path,
+        executable="python",
+        _argv_override=[
+            "-c",
+            "import time; print('one', flush=True); time.sleep(0.05); print('two', flush=True)",
+        ],
+    )
+    assert "one" in result.stdout
+    assert "two" in result.stdout
+
+
+def test_invoke_timeout_returns_partial_stdout(tmp_path: Path) -> None:  # NEW
+    """Partial stdout captured before timeout kill is included in result.stdout.
+
+    Takes ~1s to run (real subprocess that sleeps 30s, killed after 1s).
+    """
+    result = invoke_claude(
+        prompt="irrelevant",
+        tools=[],
+        model="sonnet",
+        cwd=tmp_path,
+        executable="python",
+        _argv_override=[
+            "-c",
+            "print('partial', flush=True); import time; time.sleep(30)",
+        ],
+        timeout_seconds=1,
+    )
+    assert result.success is False
+    assert "timeout" in result.failure_reason.lower()  # type: ignore[union-attr]
+    assert "partial" in result.stdout
+
+
+def test_invoke_stderr_drained_on_timeout(tmp_path: Path) -> None:  # NEW
+    """Stderr written before timeout is included in result.stderr.
+
+    Takes ~1s to run (real subprocess that writes stderr then sleeps 30s).
+    """
+    result = invoke_claude(
+        prompt="irrelevant",
+        tools=[],
+        model="sonnet",
+        cwd=tmp_path,
+        executable="python",
+        _argv_override=[
+            "-c",
+            (
+                "import sys; "
+                "sys.stderr.write('err output\\n'); "
+                "sys.stderr.flush(); "
+                "import time; time.sleep(30)"
+            ),
+        ],
+        timeout_seconds=1,
+    )
+    assert result.success is False
+    assert result.stderr  # non-empty
+
+
+def test_invoke_sentinel_parsing_unchanged(tmp_path: Path) -> None:  # NEW
+    """Sentinel parsing produces identical results with the streaming implementation."""
+    result = invoke_claude(
+        prompt="irrelevant",
+        tools=[],
+        model="sonnet",
+        cwd=tmp_path,
+        executable="python",
+        _argv_override=[
+            "-c",
+            "print('doing work'); print('PRD_EXECUTE_OK: PRD-218')",
+        ],
+    )
+    assert result.success is True
+    assert result.failure_reason is None
+    assert "PRD_EXECUTE_OK" in result.stdout
