@@ -296,6 +296,34 @@ def _run_agent(
     # signature stable.
     setattr(ctx, "_last_agent_result", result)
 
+    # Dump the raw agent transcript to a file inside the worktree so any
+    # 'no sentinel found' / 'unexpected output' failures can be diagnosed
+    # post-mortem without re-running. The file lives at the worktree root
+    # and is overwritten on each invocation (one transcript per agent
+    # task per run). Diagnostic dump must never fail the workflow.
+    if not ctx.dry_run and ctx.cwd:
+        try:
+            transcript = ctx.cwd / ".harness-agent-output.log"
+            transcript.write_text(
+                "\n".join(
+                    [
+                        f"# task: {task.name}",
+                        f"# model: {model}",
+                        f"# success: {result.success}",
+                        f"# exit_code: {result.exit_code}",
+                        f"# failure_reason: {result.failure_reason or ''}",
+                        "# ---- stdout ----",
+                        result.stdout,
+                        "# ---- stderr ----",
+                        result.stderr,
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            logger.warning("could not write agent transcript: %s", exc)
+
     return TaskStep(
         name=task.name,
         kind="agent",
