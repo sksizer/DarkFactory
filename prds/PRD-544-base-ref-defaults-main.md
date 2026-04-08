@@ -2,7 +2,7 @@
 id: PRD-544
 title: prd run base_ref must default to main, not the current branch
 kind: task
-status: in-progress
+status: review
 priority: high
 effort: xs
 capability: trivial

@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -428,7 +429,7 @@ def test_resolve_base_ref_explicit_wins(tmp_path: Path) -> None:
     assert result == "custom-branch"
 
 
-def test_resolve_base_ref_env_var_override(tmp_path: Path, monkeypatch) -> None:
+def test_resolve_base_ref_env_var_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """DARKFACTORY_BASE_REF environment variable is used when no explicit arg."""
     _init_git_repo(tmp_path)
     monkeypatch.setenv("DARKFACTORY_BASE_REF", "staging")
@@ -441,7 +442,7 @@ def test_resolve_base_ref_defaults_to_main(tmp_path: Path) -> None:
     _init_git_repo(tmp_path)
 
     # Mock subprocess to say main exists but master doesn't
-    def mock_run(cmd, **kwargs):
+    def mock_run(cmd: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
         if "refs/heads/main" in str(cmd):
             return subprocess.CompletedProcess(
                 args=cmd, returncode=0, stdout="", stderr=""
@@ -458,7 +459,7 @@ def test_resolve_base_ref_falls_back_to_master(tmp_path: Path) -> None:
     _init_git_repo(tmp_path)
 
     # Mock subprocess to say master exists but main doesn't
-    def mock_run(cmd, **kwargs):
+    def mock_run(cmd: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
         if "refs/heads/master" in str(cmd):
             return subprocess.CompletedProcess(
                 args=cmd, returncode=0, stdout="", stderr=""
@@ -475,7 +476,7 @@ def test_resolve_base_ref_falls_back_to_origin_head(tmp_path: Path) -> None:
     _init_git_repo(tmp_path)
 
     # Mock subprocess to check refs fail, but symbolic-ref succeeds
-    def mock_run(cmd, **kwargs):
+    def mock_run(cmd: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
         if "symbolic-ref" in str(cmd):
             return subprocess.CompletedProcess(
                 args=cmd,
@@ -496,7 +497,7 @@ def test_resolve_base_ref_last_resort_main(tmp_path: Path) -> None:
     _init_git_repo(tmp_path)
 
     # Mock subprocess so all calls return failure
-    def mock_run_all_fail(cmd, **kwargs):
+    def mock_run_all_fail(cmd: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
         # For check=True calls (symbolic-ref), raise exception
         if "symbolic-ref" in str(cmd):
             raise subprocess.CalledProcessError(1, cmd)
@@ -508,7 +509,7 @@ def test_resolve_base_ref_last_resort_main(tmp_path: Path) -> None:
         assert result == "main"
 
 
-def test_resolve_base_ref_explicit_overrides_env(tmp_path: Path, monkeypatch) -> None:
+def test_resolve_base_ref_explicit_overrides_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Explicit --base flag overrides environment variable."""
     _init_git_repo(tmp_path)
     monkeypatch.setenv("DARKFACTORY_BASE_REF", "staging")
