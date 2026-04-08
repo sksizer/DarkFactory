@@ -2,7 +2,7 @@
 id: "PRD-510"
 title: "prd new subcommand for creating draft PRDs"
 kind: task
-status: review
+status: in-progress
 priority: medium
 effort: s
 capability: simple
