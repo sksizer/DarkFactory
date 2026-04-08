@@ -225,7 +225,7 @@ def is_fully_decomposed(prd: PRD, prds: dict[str, PRD]) -> bool:
 
 - Decompose along natural interface boundaries
 - Each task should be 1-4 hours of solo-implementable work
-- Backend before frontend, pure functions before commands before UI
+- API and contract definition before backend before frontend, pure functions before commands before UI
 - Use the parent PRD's existing structure as ground truth
 - Sibling tasks should be ordered such that earlier tasks unblock later ones
 - Set `parent` on every new task; set `depends_on` between siblings where order matters
@@ -263,9 +263,9 @@ def is_fully_decomposed(prd: PRD, prds: dict[str, PRD]) -> bool:
 
 ## Open Questions
 
-- [ ] What's the right way for the agent to update the parent epic's `blocks:` field? Options: (a) `Write` the whole file (loses byte-for-byte preservation if there are quoting differences), (b) call into `update_frontmatter_field_at` somehow (but the agent doesn't have a Python REPL), (c) instruct the agent to use `Edit` *just for this one operation* and re-add `Edit` to the allowlist. **Recommendation**: (c) for now — pragmatic, well-scoped. PRD-229 will tighten this with `forbidden_path_globs`.
-- [ ] Should the workflow re-run `prd validate` against the parent PRD (not just the children) to make sure the updated `blocks:` field is well-formed? Yes — `prd validate` already validates the whole set, so a single run covers it.
-- [ ] What about epics that are already partially decomposed (some children exist, more are needed)? The current `is_fully_decomposed` check returns true if *any* task descendant exists, which means partially-decomposed epics won't be picked up. **Recommendation**: leave that nuance for later; the immediate need is "decompose epics that have zero children".
+- [ ] What's the right way for the agent to update the parent epic's `blocks:` field? Options: (a) `Write` the whole file (loses byte-for-byte preservation if there are quoting differences), (b) call into `update_frontmatter_field_at` somehow (but the agent doesn't have a Python REPL), (c) instruct the agent to use `Edit` *just for this one operation* and re-add `Edit` to the allowlist. **Recommendation**: (**c**) for now — pragmatic, well-scoped. PRD-229 will tighten this with `forbidden_path_globs`.
+- [ ] Should the workflow re-run `prd validate` against the parent PRD (not just the children) to make sure the updated `blocks:` field is well-formed? **Yes** — `prd validate` already validates the whole set, so a single run covers it.
+- [ ] What about epics that are already partially decomposed (some children exist, more are needed)? The current `is_fully_decomposed` check returns true if *any* task descendant exists, which means partially-decomposed epics won't be picked up. **Recommendation**: leave that nuance for later; the immediate need is "decompose epics that have zero children". 
 - [ ] How does the planning workflow interact with the process lock from PRD-217? Standard — same per-PRD lock applies. Two `prd run PRD-222` invocations can't race.
 - [ ] Should there be a `--dry-run` mode that has the agent describe its plan without writing files? Yes, the existing `--dry-run` flag works because the agent task in dry-run mode just logs what it would do. No special handling needed.
 - [ ] What model retries on this workflow? `retries=1` matches the default. Decomposition is expensive enough that more retries are unlikely to help.
