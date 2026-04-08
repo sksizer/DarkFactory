@@ -7,7 +7,8 @@ priority: medium
 effort: l
 capability: moderate
 parent:
-depends_on: []
+depends_on:
+  - "[[PRD-543-harness-pr-creation-hardening]]"
 blocks: []
 impacts:
   - src/darkfactory/builtins.py
@@ -35,7 +36,9 @@ Two organizational changes bundled as one epic because they touch the same files
 
 2. **Establish a colocated unit-test convention.** Unit tests for `foo.py` live next to it as `foo_test.py`. Integration and end-to-end tests continue to live under `tests/` at the repo root. `pytest` discovers both.
 
-This is an **epic**. It decomposes into a handful of independently shippable child PRDs, several of which can run in parallel — intentionally structured that way to exercise DAG execution in the harness.
+This is an **epic**. It decomposes into a handful of independently shippable child PRDs, several of which can run in parallel.
+
+**Ordering note.** This epic `depends_on` PRD-543 (harness PR creation hardening). PRD-543 promotes the subprocess `_run` helper into a shared `run_cli` module; this epic then *uses* that helper rather than re-homing `_run` into `builtins/_shared.py` only to move it again later. Execute PRD-543 first.
 
 ## Motivation
 
@@ -194,13 +197,14 @@ addopts = "--import-mode=importlib"
 - Add one throwaway colocated `*_test.py` somewhere (e.g. `src/darkfactory/prd_test.py` with a single trivial assertion) purely to verify discovery works. Remove or replace with a real test before merge.
 - Build the wheel, unzip it, assert no `*_test.py` inside. Add a `just wheel-check` recipe (or equivalent) to run this check in CI later.
 
-### PRD-544.2 — Scaffold `builtins/` package
+### PRD-544.2 — Scaffold `builtins/` package and move existing content into `_legacy.py`
 - Create `src/darkfactory/builtins/` directory.
-- Move `BUILTIN_REGISTRY` and the `@builtin` decorator into `src/darkfactory/builtins/_registry.py`.
+- Move the entire contents of `src/darkfactory/builtins.py` into `src/darkfactory/builtins/_legacy.py` verbatim. Delete the old `builtins.py`.
+- Move `BUILTIN_REGISTRY` and the `@builtin` decorator into `src/darkfactory/builtins/_registry.py`. Update `_legacy.py` to import them from there.
 - Create empty `_shared.py`.
-- `src/darkfactory/builtins/__init__.py` imports nothing yet (no builtins have moved), just re-exports the registry and the decorator.
-- **Do not move any builtins yet.** This PRD is an empty functional change: every existing import still resolves, nothing functionally changes, all tests still pass.
-- Done in one commit so that C1…C9 can branch from a clean scaffold.
+- `src/darkfactory/builtins/__init__.py` imports `_legacy` (so its `@builtin` decorations run) and re-exports every public name from `_legacy` so every existing call site keeps working unchanged.
+- **Empty functional change.** Every existing import still resolves, nothing functionally changes, all 283 tests still pass.
+- The point of staging `_legacy.py` is so that every PRD-544.3x child does *two* small edits: add a new per-builtin submodule, and delete the function from `_legacy.py`. The `_legacy.py` delete is a one-line change that rebases cleanly across sibling children.
 
 ### PRD-544.3a … PRD-544.3i — One PRD per builtin (9 in parallel)
 Nine sibling PRDs, one per public builtin:
@@ -216,19 +220,21 @@ Nine sibling PRDs, one per public builtin:
 - **PRD-544.3i** Promote any shared helpers identified during 3a–3h to `builtins/_shared.py` (may be a trailing cleanup rather than a parallel sibling).
 
 Each PRD in this fan-out:
-1. Creates the new submodule file, moves the relevant function + its exclusively-used helpers, adds colocated `*_test.py` with unit tests covering the function's branches.
-2. Deletes the function from `src/darkfactory/builtins.py` (the old monolith). By the end of PRD-544.3, `builtins.py` should contain only the `@builtin`/registry import shim or be deletable.
-3. Passes `just test && just lint && just typecheck && just format-check`.
-4. Is independent of its siblings — any conflict on the shrinking `builtins.py` file is a known friction point worth observing for DAG execution.
+1. Creates the new submodule file under `src/darkfactory/builtins/<name>.py`, moves the relevant function + its exclusively-used helpers, adds a colocated `<name>_test.py` with unit tests covering the function's branches.
+2. Deletes the function from `src/darkfactory/builtins/_legacy.py` (the transitional bucket created in PRD-544.2). That delete is the only change any sibling makes to `_legacy.py`, so siblings conflict only on a single line and rebase cleanly.
+3. Updates `src/darkfactory/builtins/__init__.py` if the public re-export needs to point at the new submodule (no-op in practice — submodule decoration registers itself, and `__init__.py` already wildcards from the registry).
+4. Passes `just test && just lint && just typecheck && just format-check`.
+5. Is independent of its siblings in terms of actual logic; the only shared file edit is a one-line deletion from `_legacy.py`.
 
-**DAG friction note.** All nine children modify the same file (`src/darkfactory/builtins.py` — deleting different functions from it). This will produce merge conflicts on the file if they land in parallel. Two options:
-- **(a)** Accept the conflict and let the harness handle rebases. This is a *good* DAG stress test — it exposes whether the harness can rebase child PRDs of an epic cleanly.
-- **(b)** Have PRD-544.2 also pre-delete `builtins.py` entirely and move its contents into a temporary `_legacy.py` that each child imports from and chips away at. More complex but avoids the conflict.
-- Recommendation: **(a)** — the point of this epic *is* to stress-test the harness, and avoiding the conflict would defeat that.
+**DAG friction — avoid, don't stress-test.** All nine children would otherwise modify the same file (`src/darkfactory/builtins.py` — deleting different functions from it). This would produce pairwise merge conflicts between siblings. Originally this epic proposed accepting the conflict as a harness stress test, but an audit of the harness found that **no post-hoc rebase or merge-conflict resolution machinery exists** in `runner.py`. The built-in `prd conflicts` command (impacts.py / `find_conflicts`) performs *static pre-execution* impact-overlap detection from the `impacts:` frontmatter globs — it warns you that two PRDs will collide, but it does not rebase or re-run the agent on conflicted files. Stress-testing a feature that does not exist would just produce nine unmergeable branches.
+
+Therefore: **avoid the conflict.** PRD-544.2 shall also relocate the existing contents of `builtins.py` into a transitional `src/darkfactory/builtins/_legacy.py` inside the new package. `__init__.py` re-exports from `_legacy` so the public API continues to work. Each PRD-544.3x child then *adds* its new per-builtin submodule, updates `_legacy.py` to remove the now-moved function, and touches only its own new files plus a single-line deletion in `_legacy.py`. The single-line-deletion conflict is trivial to rebase automatically and in the worst case is easy to resolve by hand.
+
+Follow-up worth a separate PRD: **harness-driven rebase and conflict resolution for parallel epic children.** The gap surfaced here (no runner-level rebase) is a general limitation that will bite any future epic with a true file-level fan-out. Out of scope for this epic; tracking as an open question below.
 
 ### PRD-544.4 — Final cleanup
 - Delete `tests/test_builtins.py` (its coverage has been migrated into the colocated files by 544.3a–h).
-- Delete `src/darkfactory/builtins.py` if it still exists as a stub; otherwise no-op.
+- Delete `src/darkfactory/builtins/_legacy.py` — by this point every function has been extracted and `_legacy.py` should be empty or contain only dead imports.
 - Verify the `builtins/` directory is the single source of truth and re-exports everything needed.
 
 ## Acceptance Criteria
@@ -240,17 +246,18 @@ Each PRD in this fan-out:
 - [ ] **AC-5** (post-544.2): `src/darkfactory/builtins/` exists as a package, `_registry.py` holds the decorator + registry, `__init__.py` re-exports the public API unchanged. Every existing import site still resolves. All tests pass.
 - [ ] **AC-6** (post-544.3a–i): Each of the nine builtins lives in its own submodule `src/darkfactory/builtins/<name>.py` with a colocated `<name>_test.py` that exercises the function's non-trivial branches.
 - [ ] **AC-7** (post-544.3): Shared helpers used by more than one builtin live in `src/darkfactory/builtins/_shared.py`. Helpers used by exactly one builtin live in that builtin's own submodule.
-- [ ] **AC-8** (post-544.4): The old `src/darkfactory/builtins.py` monolith and `tests/test_builtins.py` are both deleted. No dead code remains.
+- [ ] **AC-8** (post-544.4): `src/darkfactory/builtins/_legacy.py`, the old `src/darkfactory/builtins.py` monolith, and `tests/test_builtins.py` are all gone. No dead code remains.
 - [ ] **AC-9** (ongoing): At every child PRD merge, `just test`, `just lint`, `just typecheck`, and `just format-check` all pass clean. No existing test is deleted without a colocated replacement.
 - [ ] **AC-10** (ongoing): The public Python API of `darkfactory.builtins` is unchanged. Grep of the rest of the codebase confirms no import sites needed edits beyond what the refactor itself changed.
 
 ## Open Questions
 
-- [ ] **Conflict-stress vs conflict-avoidance in PRD-544.3.** Recommendation: accept the conflict and let the harness prove it can rebase. Confirm before kicking off the nine parallel children.
-- [ ] **PRD-543 interaction with `_run`.** PRD-543 wants to promote subprocess handling into a shared `run_cli` helper. If 543 merges first, this epic adopts the new helper directly and skips `_shared._run`. If 544 merges first, `_run` lives in `builtins/_shared.py` until 543 moves it. Either order is fine; flagging so the two don't surprise each other.
-- [ ] **Test discovery under `workflows/`.** Do we want colocated unit tests inside workflow modules too, or is the convention scoped to `src/darkfactory/`? Leaning toward "yes, everywhere" — but flagging since it expands the pytest `testpaths` list.
+- [ ] **RESOLVED — Conflict avoidance in PRD-544.3.** Originally proposed as a harness stress test; audit of `runner.py` / `impacts.py` found that the harness has only static pre-execution impact-overlap detection (`prd conflicts`), not post-hoc rebase or merge-conflict resolution. Flipped the approach to *avoid* the conflict via the `_legacy.py` transitional bucket. See the DAG friction note.
+- [ ] **RESOLVED — PRD-543 ordering.** This epic `depends_on` PRD-543. PRD-543 lands first, promotes subprocess handling to a shared `run_cli` helper, and this epic adopts it directly. No fallback path; the depends_on is load-bearing.
+- [ ] **RESOLVED — Colocated tests in `workflows/` and everywhere else.** The rule is: unit tests live next to the module under test, full stop. This applies to `src/darkfactory/`, `workflows/`, and any future package. Migration is opportunistic — not all-at-once — but every new unit test is colocated and every touched module's tests move when it's natural.
+- [ ] **Follow-up PRD — harness-driven rebase / conflict resolution for parallel epic children.** The gap surfaced by this epic (no runner-level rebase when siblings touch the same file) is a general limitation that will bite any true file-level fan-out in the future. Out of scope for this epic; worth its own PRD.
 - [ ] **`summarize_agent_run` coverage.** The existing `tests/test_builtins.py` coverage for this function may be thin; PRD-544.3e should audit and backfill as needed.
-- [ ] **Follow-up epics.** Same treatment for `cli.py`, `runner.py`, and `invoke.py` is explicitly **out of scope** for this epic. If the pattern works out, each of those gets its own epic; the first to run will revisit the lessons learned here.
+- [ ] **Follow-up epics for other large modules.** Same treatment for `cli.py`, `runner.py`, and `invoke.py` is explicitly **out of scope** for this epic. Each will get its own epic if the pattern works out.
 
 ## References
 
