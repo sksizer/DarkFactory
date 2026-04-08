@@ -1,0 +1,34 @@
+name: Reconcile PRD status on merge
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+jobs:
+  flip-status:
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'prd/PRD-')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Flip status to done
+        run: |
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+          PRD_ID=$(echo "$BRANCH" | sed -E 's|^prd/(PRD-[0-9.]+).*|\1|')
+          FILE=$(ls prds/${PRD_ID}-*.md 2>/dev/null || true)
+          if [ -z "$FILE" ]; then
+            echo "No PRD file matching $PRD_ID -- skipping"
+            exit 0
+          fi
+          sed -i 's|^status: review$|status: done|' "$FILE"
+          sed -i "s|^updated: .*|updated: '$(date -u +%Y-%m-%d)'|" "$FILE"
+          if ! git diff --quiet "$FILE"; then
+            git config user.name "darkfactory-bot"
+            git config user.email "darkfactory-bot@users.noreply.github.com"
+            git add "$FILE"
+            git commit -m "chore(prd): mark $PRD_ID done (auto-reconciled by merge action) [skip ci]"
+            git push
+          fi
