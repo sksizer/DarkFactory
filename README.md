@@ -1,5 +1,7 @@
 # darkfactory
 
+[![CI](https://github.com/sksizer/DarkFactory/actions/workflows/ci.yml/badge.svg)](https://github.com/sksizer/DarkFactory/actions/workflows/ci.yml)
+
 Standalone PRD harness: DAG orchestration, declarative workflows, agent invocation, and stacked PRs.
 
 This is the extracted standalone version of the harness originally developed inside [pumice](https://github.com/sksizer/pumice) under `tools/prd-harness`. See [PRD-110](https://github.com/sksizer/pumice/blob/main/docs/prd/PRD-110-prd-harness.md) for the full design history.
