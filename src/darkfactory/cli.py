@@ -798,7 +798,8 @@ def cmd_assign(args: argparse.Namespace) -> int:
         if args.json:
             print(json.dumps([], indent=2))
         else:
-            print("(no workflows loaded)")
+            print(f"{'PRD':14} {'Workflow':20} Source")
+            print("-" * 50)
         return 0
 
     try:
@@ -1326,6 +1327,103 @@ def _cmd_run_graph(
     return report.exit_code
 
 
+def find_worktree(prd_id: str, repo_root: Path) -> Path | None:
+    """Find the worktree path for the given PRD id using git worktree list.
+
+    Returns the worktree path if found, or None if no worktree exists.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "worktree", "list", "--porcelain"],
+            capture_output=True,
+            text=True,
+            cwd=repo_root,
+        )
+        if result.returncode != 0:
+            return None
+    except FileNotFoundError:
+        return None
+
+    current_path: str | None = None
+    for line in result.stdout.splitlines():
+        if line.startswith("worktree "):
+            current_path = line[len("worktree ") :]
+        elif line.startswith("branch "):
+            branch_ref = line[len("branch ") :]
+            # branch refs/heads/prd/PRD-NNN-slug
+            branch = branch_ref.removeprefix("refs/heads/")
+            if re.match(rf"^prd/{re.escape(prd_id)}-", branch):
+                return Path(current_path) if current_path else None
+    return None
+
+
+def find_open_pr(branch_name: str, repo_root: Path) -> int | None:
+    """Find the PR number for an open PR on the given branch.
+
+    Returns the PR number if an open PR exists, or None otherwise.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "gh",
+                "pr",
+                "list",
+                "--head",
+                branch_name,
+                "--state",
+                "open",
+                "--json",
+                "number",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=repo_root,
+        )
+        if result.returncode != 0:
+            return None
+        prs: list[dict[str, Any]] = json.loads(result.stdout)
+        if prs:
+            return int(prs[0]["number"])
+    except (FileNotFoundError, json.JSONDecodeError, ValueError):
+        pass
+    return None
+
+
+def cmd_rework(args: argparse.Namespace) -> int:
+    """Rework a PRD by addressing PR review feedback. Defaults to dry-run; opt in via --execute."""
+    prds = _load(args.prd_dir)
+    prd_id = args.prd_id
+    if prd_id not in prds:
+        raise SystemExit(f"unknown PRD id: {prd_id}")
+    prd = prds[prd_id]
+
+    if prd.status != "review":
+        raise SystemExit(f"ERROR: {prd_id} is in '{prd.status}', not 'review'")
+
+    repo_root = _find_repo_root(args.prd_dir)
+
+    worktree_path = find_worktree(prd_id, repo_root)
+    if worktree_path is None:
+        raise SystemExit(
+            f"ERROR: No worktree found for {prd_id}. Run 'prd run {prd_id}' first."
+        )
+
+    branch_name = _compute_branch_name(prd)
+    pr_number = find_open_pr(branch_name, repo_root)
+    if pr_number is None:
+        raise SystemExit(f"ERROR: No open PR found for {prd_id}")
+
+    if not args.execute:
+        print(f"Would rework {prd_id}")
+        print(f"  Worktree: {worktree_path}")
+        print(f"  PR: #{pr_number}")
+        print(f"  Branch: {branch_name}")
+        return 0
+
+    # Set up execution context for the rework workflow (PRD-225.4)
+    return 0
+
+
 def _get_merged_prd_prs() -> list[dict[str, Any]]:
     """Return merged PRs whose head branch matches ``prd/PRD-*``."""
     result = subprocess.run(
@@ -1745,6 +1843,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override timeout in minutes (overrides all other timeout sources)",
     )
     sub_run.set_defaults(func=cmd_run)
+
+    p_rework = sub.add_parser("rework", help="Address PR review feedback for a PRD")
+    p_rework.add_argument("prd_id", help="PRD ID to rework")
+    p_rework.add_argument("--execute", action="store_true")
+    p_rework.add_argument("--all", action="store_true", help="Include resolved threads")
+    p_rework.add_argument("--since", help="Only comments after this commit")
+    p_rework.add_argument("--reviewer", help="Only comments from this reviewer")
+    p_rework.add_argument("--from-pr-comment", help="Address a single comment by ID")
+    p_rework.add_argument(
+        "--reply-to-comments",
+        action="store_true",
+        help="Post replies on addressed comments",
+    )
+    p_rework.set_defaults(func=cmd_rework)
 
     sub_reconcile = sub.add_parser(
         "reconcile",
