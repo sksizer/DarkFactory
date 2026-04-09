@@ -24,9 +24,8 @@ level and return. This is what powers ``prd plan`` and the default
 
 **Subprocess discipline**: all shell commands use ``subprocess.run``
 with an explicit argv list (never ``shell=True``), capture output,
-and check the return code. Git and gh invocations go through
-:func:`_run_git` and :func:`_run_gh` helpers that centralize cwd
-handling and dry-run support.
+and check the return code. Each builtin implements its own subprocess
+invocation with appropriate dry-run and cwd handling.
 """
 
 from __future__ import annotations
@@ -34,10 +33,8 @@ from __future__ import annotations
 import subprocess  # noqa: F401  # re-exported for test monkeypatching
 
 from darkfactory.builtins._registry import BUILTINS, BuiltInFunc, builtin
-from darkfactory.workflow import ExecutionContext
 from darkfactory.builtins._shared import (
     _FORBIDDEN_ATTRIBUTION_PATTERNS,
-    _run,
     _scan_for_forbidden_attribution,
 )
 
@@ -56,7 +53,6 @@ __all__ = [
     "BUILTINS",
     "BuiltInFunc",
     "builtin",
-    "_run",
     "_scan_for_forbidden_attribution",
     "_FORBIDDEN_ATTRIBUTION_PATTERNS",
     "ensure_worktree",
@@ -69,20 +65,3 @@ __all__ = [
     "lint_attribution",
     "cleanup_worktree",
 ]
-
-
-def _format_tool_counts(tool_counts: dict[str, int]) -> str:
-    """Format tool counts as a compact inline string, e.g. 'Read×5, Edit×3'."""
-    if not tool_counts:
-        return "none"
-    return ", ".join(f"{name}×{count}" for name, count in sorted(tool_counts.items()))
-
-
-def _format_invocations(ctx: ExecutionContext) -> str:
-    """Format agent invocation count from context."""
-    count = ctx.invoke_count
-    if count == 0:
-        return "0"
-    if count == 1:
-        return "1"
-    return str(count)
