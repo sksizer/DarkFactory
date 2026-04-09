@@ -267,6 +267,138 @@ def test_container_with_declared_impacts_produces_error(
     assert "container PRD" in captured.err
 
 
+# ---------- impact overlap warnings ----------
+
+
+def test_impact_overlap_warns_but_returns_0(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Two ready PRDs with overlapping impacts and no dep produce a warning, not an error."""
+    prd_a = _make_prd(id="PRD-001", impacts=["src/shared.py"])
+    prd_b = _make_prd(id="PRD-002", impacts=["src/shared.py"])
+    prds = {"PRD-001": prd_a, "PRD-002": prd_b}
+
+    def run() -> int:
+        with (
+            patch("darkfactory.cli.validate._load", return_value=prds),
+            patch("darkfactory.cli.validate.graph.build_graph", return_value={}),
+            patch("darkfactory.cli.validate.graph.detect_cycles", return_value=[]),
+            patch("darkfactory.cli.validate.containment.children", return_value=[]),
+            patch(
+                "darkfactory.cli.validate._find_repo_root",
+                return_value=Path("/fake"),
+            ),
+            patch(
+                "darkfactory.cli.validate.impacts.tracked_files",
+                return_value=["src/shared.py"],
+            ),
+            patch(
+                "darkfactory.cli.validate.impacts.impacts_overlap",
+                return_value={"src/shared.py"},
+            ),
+            patch(
+                "darkfactory.cli.validate.checks.SubprocessGitState",
+                side_effect=Exception("no git"),
+            ),
+        ):
+            return cmd_validate(_make_args(tmp_path))
+
+    result = run()
+    assert result == 0
+    captured = capsys.readouterr()
+    assert "overlapping impacts" in captured.err
+    assert "1 files" in captured.err
+
+
+# ---------- verbose undeclared impacts ----------
+
+
+def test_undeclared_impacts_warn_in_verbose_mode(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Ready leaf PRDs with no impacts produce a warning when --verbose is set."""
+    prd = _make_prd(id="PRD-001", impacts=[])
+    prds = {"PRD-001": prd}
+
+    def run() -> int:
+        with (
+            patch("darkfactory.cli.validate._load", return_value=prds),
+            patch("darkfactory.cli.validate.graph.build_graph", return_value={}),
+            patch("darkfactory.cli.validate.graph.detect_cycles", return_value=[]),
+            patch("darkfactory.cli.validate.containment.children", return_value=[]),
+        ):
+            return cmd_validate(_make_args(tmp_path, verbose=True))
+
+    result = _with_git_patches(run)
+    assert result == 0
+    captured = capsys.readouterr()
+    assert "no declared impacts" in captured.err
+
+
+def test_undeclared_impacts_silent_without_verbose(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Without --verbose, undeclared impacts are not warned about."""
+    prd = _make_prd(id="PRD-001", impacts=[])
+    prds = {"PRD-001": prd}
+
+    def run() -> int:
+        with (
+            patch("darkfactory.cli.validate._load", return_value=prds),
+            patch("darkfactory.cli.validate.graph.build_graph", return_value={}),
+            patch("darkfactory.cli.validate.graph.detect_cycles", return_value=[]),
+            patch("darkfactory.cli.validate.containment.children", return_value=[]),
+        ):
+            return cmd_validate(_make_args(tmp_path, verbose=False))
+
+    result = _with_git_patches(run)
+    assert result == 0
+    captured = capsys.readouterr()
+    assert "no declared impacts" not in captured.err
+
+
+# ---------- review-branch warnings ----------
+
+
+def test_review_branch_issue_produces_warning(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """validate_review_branches issues appear as warnings, exit code stays 0."""
+    prd = _make_prd(id="PRD-001")
+    prds = {"PRD-001": prd}
+
+    fake_issue = MagicMock()
+    fake_issue.message = "PRD-001: review branch prd/PRD-001 not found on origin"
+
+    def run() -> int:
+        with (
+            patch("darkfactory.cli.validate._load", return_value=prds),
+            patch("darkfactory.cli.validate.graph.build_graph", return_value={}),
+            patch("darkfactory.cli.validate.graph.detect_cycles", return_value=[]),
+            patch("darkfactory.cli.validate.containment.children", return_value=[]),
+            patch(
+                "darkfactory.cli.validate._find_repo_root",
+                return_value=Path("/fake"),
+            ),
+            patch(
+                "darkfactory.cli.validate.impacts.tracked_files",
+                return_value=[],
+            ),
+            patch("darkfactory.cli.validate.checks.SubprocessGitState"),
+            patch(
+                "darkfactory.cli.validate.checks.validate_review_branches",
+                return_value=[fake_issue],
+            ),
+        ):
+            return cmd_validate(_make_args(tmp_path))
+
+    result = run()
+    assert result == 0
+    captured = capsys.readouterr()
+    assert "review branch" in captured.err
+    assert "not found on origin" in captured.err
+
+
 # ---------- cmd_validate overall OK path ----------
 
 
