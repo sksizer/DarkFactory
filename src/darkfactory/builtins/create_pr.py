@@ -99,6 +99,14 @@ def create_pr(ctx: ExecutionContext) -> None:
             capture_output=True,
             text=True,
         )
+    except subprocess.CalledProcessError as exc:
+        detail = (
+            f"gh pr create failed (exit {exc.returncode}):"
+            f"\nstdout: {exc.stdout}"
+            f"\nstderr: {exc.stderr}"
+        )
+        _log.error(detail)
+        raise RuntimeError(detail) from exc
     finally:
         Path(body_path).unlink(missing_ok=True)
 

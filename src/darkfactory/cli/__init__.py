@@ -839,7 +839,12 @@ def cmd_plan(args: argparse.Namespace) -> int:
         f"  capability: {prd.capability} -> default model {capability_to_model(prd.capability)}"
     )
     print()
-    print(f"  workflow:   {workflow.name} (priority {workflow.priority})")
+    tmpl_tag = (
+        f"template: {workflow.template_name}"
+        if workflow.template_name
+        else "no template"
+    )
+    print(f"  workflow:   {workflow.name} ({tmpl_tag})")
     if workflow.description:
         print(f"  — {workflow.description}")
     print()
