@@ -26,12 +26,14 @@ import pytest
 from darkfactory import builtins
 from darkfactory.builtins import (
     BUILTINS,
-    _branch_exists_local,
-    _branch_exists_remote,
     _extract_acceptance_criteria,
     _pr_body,
-    _worktree_target,
     builtin,
+)
+from darkfactory.builtins.ensure_worktree import (
+    _branch_exists_local,
+    _branch_exists_remote,
+    _worktree_target,
 )
 from darkfactory.checks import ResumeStatus
 from darkfactory.prd import load_all
@@ -373,7 +375,9 @@ def test_ensure_worktree_raises_on_merged_pr(tmp_git_repo: Path) -> None:
         cwd=tmp_git_repo,
         dry_run=False,
     )
-    with patch("darkfactory.builtins.is_resume_safe", return_value=not_safe):
+    with patch(
+        "darkfactory.builtins.ensure_worktree.is_resume_safe", return_value=not_safe
+    ):
         with pytest.raises(RuntimeError, match="prd cleanup"):
             builtins.ensure_worktree(ctx2)
 
@@ -413,7 +417,9 @@ def test_ensure_worktree_raises_on_closed_pr(tmp_git_repo: Path) -> None:
         cwd=tmp_git_repo,
         dry_run=False,
     )
-    with patch("darkfactory.builtins.is_resume_safe", return_value=not_safe):
+    with patch(
+        "darkfactory.builtins.ensure_worktree.is_resume_safe", return_value=not_safe
+    ):
         with pytest.raises(RuntimeError, match="prd cleanup"):
             builtins.ensure_worktree(ctx2)
 
@@ -449,7 +455,9 @@ def test_ensure_worktree_resumes_when_safe(tmp_git_repo: Path) -> None:
         cwd=tmp_git_repo,
         dry_run=False,
     )
-    with patch("darkfactory.builtins.is_resume_safe", return_value=safe):
+    with patch(
+        "darkfactory.builtins.ensure_worktree.is_resume_safe", return_value=safe
+    ):
         builtins.ensure_worktree(ctx2)
 
     assert ctx2.worktree_path is not None
@@ -858,7 +866,9 @@ def test_ensure_worktree_errors_on_remote_branch(tmp_git_repo: Path) -> None:
     )
 
     # Patch _branch_exists_remote to simulate ls-remote finding the branch.
-    with patch("darkfactory.builtins._branch_exists_remote", return_value=True):
+    with patch(
+        "darkfactory.builtins.ensure_worktree._branch_exists_remote", return_value=True
+    ):
         with pytest.raises(RuntimeError, match="already exists"):
             builtins.ensure_worktree(ctx)
 
@@ -994,8 +1004,13 @@ def test_ensure_worktree_guard_stubbed_subprocess(tmp_path: Path) -> None:
     )
 
     # Patch helpers directly: local branch exists, no worktree on disk.
-    with patch("darkfactory.builtins._branch_exists_local", return_value=True):
-        with patch("darkfactory.builtins._branch_exists_remote", return_value=False):
+    with patch(
+        "darkfactory.builtins.ensure_worktree._branch_exists_local", return_value=True
+    ):
+        with patch(
+            "darkfactory.builtins.ensure_worktree._branch_exists_remote",
+            return_value=False,
+        ):
             with pytest.raises(RuntimeError, match="already exists"):
                 builtins.ensure_worktree(ctx)
 
@@ -1092,8 +1107,13 @@ def test_ensure_worktree_releases_on_branch_guard_raise(tmp_git_repo: Path) -> N
         dry_run=False,
     )
 
-    with patch("darkfactory.builtins._branch_exists_local", return_value=True):
-        with patch("darkfactory.builtins._branch_exists_remote", return_value=False):
+    with patch(
+        "darkfactory.builtins.ensure_worktree._branch_exists_local", return_value=True
+    ):
+        with patch(
+            "darkfactory.builtins.ensure_worktree._branch_exists_remote",
+            return_value=False,
+        ):
             with pytest.raises(RuntimeError, match="already exists"):
                 builtins.ensure_worktree(ctx)
 
