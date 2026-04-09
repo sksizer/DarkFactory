@@ -405,7 +405,7 @@ def test_status_shows_hygiene_line_when_stale(
         )
     ]
 
-    with patch("darkfactory.cli.find_stale_worktrees", return_value=stale):
+    with patch("darkfactory.cli.status.find_stale_worktrees", return_value=stale):
         rc = main(["--prd-dir", str(prd_dir), "status"])
 
     assert rc == 0
@@ -422,7 +422,7 @@ def test_status_hides_hygiene_line_when_none(
     prd_dir.mkdir()
     write_prd(prd_dir, "PRD-001", "feat", status="done")
 
-    with patch("darkfactory.cli.find_stale_worktrees", return_value=[]):
+    with patch("darkfactory.cli.status.find_stale_worktrees", return_value=[]):
         rc = main(["--prd-dir", str(prd_dir), "status"])
 
     assert rc == 0
