@@ -25,7 +25,10 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Protocol
+from typing import TYPE_CHECKING, Callable, Protocol
+
+if TYPE_CHECKING:
+    from .style import Styler
 
 from . import assign, containment, graph
 from .prd import PRD, load_all, set_status_at
@@ -448,6 +451,7 @@ def execute_graph(
     dry_run: bool = True,
     event_sink: EventSink | None = None,
     run_workflow_fn: Callable[..., RunResult] = run_workflow,
+    styler: "Styler | None" = None,
 ) -> ExecutionReport:
     """Walk the candidate PRDs produced by ``strategy`` and run each in turn.
 
@@ -571,6 +575,7 @@ def execute_graph(
             base_ref=base_ref,
             dry_run=dry_run,
             model_override=model_override,
+            styler=styler,
         )
 
         if result.success:

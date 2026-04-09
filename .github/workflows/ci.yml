@@ -3,6 +3,13 @@ on:
   push:
     branches: [main]
   pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'conftest.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/ci.yml'
 jobs:
   test:
     runs-on: ubuntu-latest
