@@ -62,8 +62,9 @@ workflow = Workflow(
                 "Read",
                 "Glob",
                 "Grep",
-                # Create new PRD files (and overwrite parent PRD with updated blocks)
+                # Create new PRD files and edit existing ones (e.g. parent blocks:)
                 "Write",
+                "Edit",
                 # Self-validate
                 "Bash(uv run prd validate*)",
                 "Bash(uv run prd:*)",
@@ -87,6 +88,7 @@ workflow = Workflow(
         ),
         # ----- teardown phase -----
         BuiltIn("set_status", kwargs={"to": "review"}),
+        BuiltIn("commit_transcript"),
         BuiltIn(
             "commit",
             kwargs={"message": "chore(prd): {prd_id} decomposed into tasks"},
