@@ -8,27 +8,8 @@ effort: l
 capability: complex
 parent:
 depends_on: []
-blocks:
-  - "[[PRD-567.1-ensure-worktree-auto-recovery]]"
-  - "[[PRD-567.2-reduce-permission-denial-token-waste]]"
-  - "[[PRD-567.3-file-deletion-permissions]]"
-  - "[[PRD-567.4-filesystem-containment-hardening]]"
-  - "[[PRD-567.5-pre-run-stale-cleanup]]"
-  - "[[PRD-567.6-refactor-workflow]]"
-  - "[[PRD-567.7-planning-workflow-template-alignment]]"
-  - "[[PRD-567.8-structured-failure-context-in-events]]"
-impacts:
-  - src/darkfactory/builtins/ensure_worktree.py
-  - src/darkfactory/invoke.py
-  - src/darkfactory/workflows/task/workflow.py
-  - src/darkfactory/workflows/planning/workflow.py
-  - src/darkfactory/workflows/default/prompts/role.md
-  - src/darkfactory/workflows/task/prompts/role.md
-  - src/darkfactory/workflows/task/prompts/task.md
-  - src/darkfactory/workflows/default/prompts/task.md
-  - src/darkfactory/graph_execution.py
-  - src/darkfactory/event_log.py
-  - src/darkfactory/templates_builtin.py
+blocks: []
+impacts: []
 workflow:
 assignee:
 reviewers: []
@@ -167,6 +148,22 @@ When a task fails, include stderr and failure detail in the `task_finish` event.
 - [ ] AC-6: PRDs tagged `refactor` or `cleanup` are assigned the refactor workflow with deletion permissions.
 - [ ] AC-7: The planning workflow's open/close sequences are generated from a `WorkflowTemplate`, not manually listed.
 - [ ] AC-8: Failed task events include stderr and structured failure detail, not just exit codes.
+
+## Impacted files (informational)
+
+These are the expected files to be modified across child tasks:
+
+- `src/darkfactory/builtins/ensure_worktree.py`
+- `src/darkfactory/invoke.py`
+- `src/darkfactory/workflows/task/workflow.py`
+- `src/darkfactory/workflows/planning/workflow.py`
+- `src/darkfactory/workflows/default/prompts/role.md`
+- `src/darkfactory/workflows/task/prompts/role.md`
+- `src/darkfactory/workflows/task/prompts/task.md`
+- `src/darkfactory/workflows/default/prompts/task.md`
+- `src/darkfactory/graph_execution.py`
+- `src/darkfactory/event_log.py`
+- `src/darkfactory/templates_builtin.py`
 
 ## References
 
