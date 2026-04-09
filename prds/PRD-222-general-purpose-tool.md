@@ -1,19 +1,19 @@
 ---
-id: "PRD-222"
-title: "Make darkfactory a general-purpose CLI tool installable anywhere"
+id: PRD-222
+title: Make darkfactory a general-purpose CLI tool installable anywhere
 kind: epic
-status: draft
+status: ready
 priority: high
 effort: l
 capability: moderate
-parent: null
+parent:
 depends_on: []
 blocks: []
-impacts: []  # epic — children declare their own
-workflow: null
-target_version: null
+impacts: []
+workflow:
+target_version:
 created: 2026-04-08
-updated: '2026-04-08'
+updated: 2026-04-08
 tags:
   - harness
   - cli
