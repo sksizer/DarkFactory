@@ -2,7 +2,7 @@
 id: PRD-565
 title: CI path filtering with dedicated PRD validation workflow
 kind: feature
-status: review
+status: done
 priority: high
 effort: s
 capability: simple
@@ -18,7 +18,7 @@ assignee:
 reviewers: []
 target_version:
 created: 2026-04-09
-updated: '2026-04-09'
+updated: 2026-04-09
 tags:
   - harness
   - ci
