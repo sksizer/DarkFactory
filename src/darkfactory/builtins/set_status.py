@@ -39,8 +39,18 @@ def set_status(ctx: ExecutionContext, *, to: Status) -> None:
 
     relative = ctx.prd.path.relative_to(ctx.repo_root)
     target = ctx.worktree_path / relative
+    old_status = ctx.prd.status
     prd_module.set_status_at(target, to)
     # Mirror the field updates onto the in-memory PRD so subsequent
     # builtins see the new status without re-loading from disk.
     ctx.prd.status = to
     ctx.prd.updated = _date.today().isoformat()
+
+    if ctx.event_writer:
+        ctx.event_writer.emit(
+            "task",
+            "builtin_effect",
+            task="set_status",
+            effect="set_status",
+            detail={"from": old_status, "to": to},
+        )

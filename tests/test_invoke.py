@@ -19,6 +19,7 @@ import pytest
 
 from darkfactory.invoke import (
     CAPABILITY_MODELS,
+    _find_terminal_result,
     _parse_sentinels,
     capability_to_model,
     invoke_claude,
@@ -587,3 +588,133 @@ def test_invoke_invalid_json_falls_back_to_plain_text(tmp_path: Path) -> None:
     )
     assert result.success is True
     assert "not json" in result.stdout
+
+
+# ---------- _find_terminal_result ----------
+
+
+def test_find_terminal_result_no_result_line() -> None:
+    lines = ["some output", "no json here", '{"type":"assistant","text":"hi"}']
+    assert _find_terminal_result(lines) is None
+
+
+def test_find_terminal_result_present() -> None:
+    lines = [
+        "some output",
+        '{"type":"result","subtype":"success","is_error":false}',
+    ]
+    result = _find_terminal_result(lines)
+    assert result is not None
+    assert result["type"] == "result"
+    assert result["subtype"] == "success"
+
+
+def test_find_terminal_result_multiple_json_picks_result() -> None:
+    lines = [
+        '{"type":"assistant","message":"hello"}',
+        '{"type":"result","subtype":"success","is_error":false}',
+        '{"type":"system","subtype":"init"}',
+    ]
+    result = _find_terminal_result(lines)
+    assert result is not None
+    assert result["type"] == "result"
+
+
+def test_find_terminal_result_malformed_json_skipped() -> None:
+    lines = [
+        "{bad json}",
+        '{"type":"result","subtype":"success","is_error":false}',
+    ]
+    result = _find_terminal_result(lines)
+    assert result is not None
+    assert result["type"] == "result"
+
+
+def test_find_terminal_result_only_malformed_json() -> None:
+    lines = ["{bad json}", "{also bad"]
+    assert _find_terminal_result(lines) is None
+
+
+def test_find_terminal_result_picks_last_result() -> None:
+    lines = [
+        '{"type":"result","subtype":"error","is_error":true}',
+        '{"type":"result","subtype":"success","is_error":false}',
+    ]
+    # reversed scan picks the last one (success)
+    result = _find_terminal_result(lines)
+    assert result is not None
+    assert result["subtype"] == "success"
+
+
+# ---------- timeout with terminal result event ----------
+
+
+def test_invoke_timeout_with_result_event_uses_result_verdict(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """When a task times out but already emitted a result event, the outcome
+    is based on the result event (not timeout failure).
+
+    Takes ~1s (real subprocess killed after 1s).
+    """
+    result_event = '{"type":"result","subtype":"success","is_error":false,"result":"PRD_EXECUTE_OK: PRD-T"}'
+    script = f"print({result_event!r}, flush=True); import time; time.sleep(30)"
+    with caplog.at_level(logging.WARNING, logger="darkfactory.invoke"):
+        result = invoke_claude(
+            prompt="irrelevant",
+            tools=[],
+            model="sonnet",
+            cwd=tmp_path,
+            executable="python",
+            _argv_override=["-c", script],
+            timeout_seconds=1,
+        )
+    assert result.success is True
+    assert result.exit_code == -1  # was killed
+    messages = [r.getMessage() for r in caplog.records]
+    assert any("terminal result event found" in m for m in messages)
+
+
+def test_invoke_timeout_with_error_result_event_uses_error_verdict(
+    tmp_path: Path,
+) -> None:
+    """When result event has is_error=True, timeout path reports failure from event."""
+    result_event = '{"type":"result","subtype":"error","is_error":true}'
+    script = f"print({result_event!r}, flush=True); import time; time.sleep(30)"
+    result = invoke_claude(
+        prompt="irrelevant",
+        tools=[],
+        model="sonnet",
+        cwd=tmp_path,
+        executable="python",
+        _argv_override=["-c", script],
+        timeout_seconds=1,
+    )
+    assert result.success is False
+    assert result.exit_code == -1
+    # failure_reason should NOT say "timeout after" — it comes from the result event
+    assert result.failure_reason is not None
+    assert "timeout after" not in result.failure_reason
+
+
+def test_invoke_timeout_without_result_event_is_timeout_failure(
+    tmp_path: Path,
+) -> None:
+    """When no result event is emitted before timeout, behavior is unchanged:
+    failure with 'timeout' in failure_reason.
+
+    Takes ~1s (real subprocess killed after 1s).
+    """
+    result = invoke_claude(
+        prompt="irrelevant",
+        tools=[],
+        model="sonnet",
+        cwd=tmp_path,
+        executable="python",
+        _argv_override=["-c", "import time; time.sleep(30)"],
+        timeout_seconds=1,
+    )
+    assert result.success is False
+    assert result.exit_code == -1
+    assert result.failure_reason is not None
+    assert "timeout" in result.failure_reason.lower()

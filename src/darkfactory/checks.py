@@ -192,14 +192,70 @@ def _get_pr_state(branch: str, repo_root: Path) -> str:
             capture_output=True,
             text=True,
             cwd=repo_root,
+            timeout=10,
         )
         if result.returncode == 0:
             prs = json.loads(result.stdout)
             if prs:
                 return str(prs[0]["state"])
-    except (FileNotFoundError, json.JSONDecodeError, ValueError):
+    except (
+        FileNotFoundError,
+        json.JSONDecodeError,
+        ValueError,
+        subprocess.TimeoutExpired,
+    ):
         pass
     return "UNKNOWN"
+
+
+def _fetch_all_pr_states(repo_root: Path) -> dict[str, str]:
+    """Fetch PR states for all branches in a single gh call.
+
+    Returns a mapping of ``headRefName`` → state (MERGED, CLOSED, OPEN).
+    If a branch has multiple PRs, the most relevant state wins
+    (MERGED > CLOSED > OPEN).
+    """
+    try:
+        result = subprocess.run(
+            [
+                "gh",
+                "pr",
+                "list",
+                "--state",
+                "all",
+                "--limit",
+                "500",
+                "--json",
+                "headRefName,state",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=repo_root,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            return {}
+        prs = json.loads(result.stdout)
+    except (
+        FileNotFoundError,
+        json.JSONDecodeError,
+        ValueError,
+        subprocess.TimeoutExpired,
+    ):
+        return {}
+
+    # If a branch has multiple PRs (e.g. one MERGED, one OPEN), prefer MERGED.
+    priority = {"MERGED": 2, "CLOSED": 1, "OPEN": 0}
+    states: dict[str, str] = {}
+    for pr in prs:
+        branch = pr.get("headRefName", "")
+        state = str(pr.get("state", ""))
+        if not branch or not state:
+            continue
+        existing = states.get(branch)
+        if existing is None or priority.get(state, -1) > priority.get(existing, -1):
+            states[branch] = state
+    return states
 
 
 def _has_unpushed_commits(worktree_path: Path, branch: str) -> bool:
@@ -224,6 +280,9 @@ def find_stale_worktrees(repo_root: Path) -> list[StaleWorktree]:
     if not worktrees_dir.exists():
         return []
 
+    # Single API call to get all PR states instead of one per worktree.
+    all_pr_states = _fetch_all_pr_states(repo_root)
+
     stale = []
     for entry in sorted(worktrees_dir.iterdir()):
         if not entry.is_dir():
@@ -234,7 +293,7 @@ def find_stale_worktrees(repo_root: Path) -> list[StaleWorktree]:
             continue
         prd_id = m.group(1)
         branch = f"prd/{name}"
-        pr_state = _get_pr_state(branch, repo_root)
+        pr_state = all_pr_states.get(branch, "UNKNOWN")
         if pr_state in ("MERGED", "CLOSED"):
             stale.append(
                 StaleWorktree(

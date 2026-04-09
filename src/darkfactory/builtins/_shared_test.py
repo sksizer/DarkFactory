@@ -1,16 +1,48 @@
-"""Unit tests for shared helpers: _run and _scan_for_forbidden_attribution."""
+"""Unit tests for shared helpers: _scan_for_forbidden_attribution."""
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
 
 from darkfactory.builtins._shared import (
     _FORBIDDEN_ATTRIBUTION_PATTERNS,
-    _run,
     _scan_for_forbidden_attribution,
 )
+from darkfactory.workflow import ExecutionContext
+
+
+def _run(
+    ctx: ExecutionContext,
+    cmd: list[str],
+    *,
+    check: bool = True,
+    capture: bool = False,
+) -> subprocess.CompletedProcess[str]:
+    """Run a subprocess command inside ``ctx.cwd`` with dry-run support.
+
+    In dry-run mode, logs the command at INFO level and returns a fake
+    ``CompletedProcess`` with exit code 0. In live mode, runs the
+    command for real and raises ``subprocess.CalledProcessError`` on
+    non-zero exit when ``check=True``.
+
+    Using an explicit argv list (not a shell string) prevents shell
+    injection entirely — callers don't get to interpolate variables
+    into a command line, they build the argv themselves.
+    """
+    if ctx.dry_run:
+        ctx.logger.info("[dry-run] %s", " ".join(cmd))
+        return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
+
+    return subprocess.run(
+        cmd,
+        cwd=str(ctx.cwd),
+        check=check,
+        capture_output=capture,
+        text=True,
+    )
 
 
 # ---------- _scan_for_forbidden_attribution ----------

@@ -36,11 +36,13 @@ from __future__ import annotations
 
 import logging
 import subprocess
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .builtins import BUILTINS
+from .event_log import EventWriter
 from .invoke import InvokeResult, capability_to_model, invoke_claude
 from .templates import compose_prompt
 from .timeouts import resolve_timeout
@@ -127,6 +129,7 @@ def run_workflow(
     cli_timeout_minutes: int | None = None,
     config_timeouts: dict[str, object] | None = None,
     styler: "Styler | None" = None,
+    session_id: str | None = None,
 ) -> RunResult:
     """Execute a workflow against a single PRD and return the result.
 
@@ -138,8 +141,19 @@ def run_workflow(
 
     ``dry_run=True`` (default) makes every task log instead of
     executing — safe to call on arbitrary PRDs.
+
+    ``session_id`` correlates events across PRDs within a single CLI
+    invocation. When provided and ``dry_run=False``, an
+    :class:`EventWriter` is created and threaded through the execution
+    context.
     """
     branch_name = _compute_branch_name(prd)
+
+    # Create EventWriter for non-dry-run executions with a session_id.
+    writer: EventWriter | None = None
+    if not dry_run and session_id:
+        writer = EventWriter(repo_root, session_id, prd.id)
+
     ctx = ExecutionContext(
         prd=prd,
         repo_root=repo_root,
@@ -149,7 +163,17 @@ def run_workflow(
         cwd=repo_root,
         dry_run=dry_run,
         logger=logger,
+        event_writer=writer,
     )
+
+    if writer:
+        writer.emit(
+            "workflow",
+            "workflow_start",
+            workflow=workflow.name,
+            branch_name=branch_name,
+            worktree_path=str(ctx.worktree_path) if ctx.worktree_path else None,
+        )
 
     result = RunResult(success=True)
     # Track the last AgentTask so a later ShellTask with
@@ -160,6 +184,25 @@ def run_workflow(
     try:
         for task in workflow.tasks:
             try:
+                t_name = _task_name(task)
+                t_kind = _task_kind(task)
+
+                if writer:
+                    task_fields: dict[str, object] = {
+                        "task": t_name,
+                        "kind": t_kind,
+                    }
+                    if isinstance(task, ShellTask):
+                        task_fields["cmd"] = (
+                            ctx.format_string(task.cmd) if not ctx.dry_run else task.cmd
+                        )
+                    elif isinstance(task, AgentTask):
+                        task_fields["model"] = _pick_model(
+                            task, prd, override=model_override
+                        )
+                    writer.emit("workflow", "task_start", **task_fields)
+
+                task_start = time.monotonic()
                 step = _dispatch(
                     task,
                     ctx,
@@ -170,7 +213,19 @@ def run_workflow(
                     config_timeouts=config_timeouts,
                     styler=styler,
                 )
+                duration_ms = int((time.monotonic() - task_start) * 1000)
                 result.steps.append(step)
+
+                if writer:
+                    writer.emit(
+                        "workflow",
+                        "task_finish",
+                        task=t_name,
+                        kind=t_kind,
+                        success=step.success,
+                        duration_ms=duration_ms,
+                        detail=step.detail or None,
+                    )
 
                 if isinstance(task, AgentTask):
                     last_agent_task = task
@@ -194,8 +249,29 @@ def run_workflow(
                         detail=str(exc),
                     )
                 )
+                if writer:
+                    writer.emit(
+                        "workflow",
+                        "task_finish",
+                        task=_task_name(task),
+                        kind=_task_kind(task),
+                        success=False,
+                        detail=str(exc),
+                    )
                 break
     finally:
+        if writer:
+            writer.emit(
+                "workflow",
+                "workflow_finish",
+                success=result.success,
+                failure_reason=result.failure_reason,
+                steps=[
+                    {"name": s.name, "kind": s.kind, "success": s.success}
+                    for s in result.steps
+                ],
+            )
+            writer.close()
         _release_worktree_lock(ctx)
 
     result.pr_url = ctx.pr_url
@@ -333,6 +409,8 @@ def _run_agent(
         dry_run=ctx.dry_run,
         timeout_seconds=timeout_seconds,
         styler=styler,
+        event_writer=ctx.event_writer,
+        event_task_name=task.name,
     )
 
     ctx.agent_output = result.stdout
@@ -343,40 +421,6 @@ def _run_agent(
     # Side channel for the retry-on-failure path — keeps the function
     # signature stable.
     setattr(ctx, "_last_agent_result", result)
-
-    # Dump the raw agent transcript to a predictable path **outside** any
-    # worktree so ``git add -A`` inside a worktree can never sweep it into
-    # a commit. File lives at ``<repo_root>/.harness-transcripts/<prd>.log``
-    # where repo_root is the main checkout (not the worktree). The worktree
-    # is at ``<repo_root>/.worktrees/<name>/``, which is a strict subtree —
-    # writing the transcript one level up at ``<repo_root>/.harness-transcripts/``
-    # is physically outside every worktree's working tree. One file per PRD,
-    # overwritten on each agent-task invocation. Diagnostic dump must never
-    # fail the workflow. See docs/agent-verification-model.md.
-    if not ctx.dry_run and ctx.repo_root:
-        try:
-            transcripts_dir = ctx.repo_root / ".harness-transcripts"
-            transcripts_dir.mkdir(parents=True, exist_ok=True)
-            transcript = transcripts_dir / f"{ctx.prd.id}.log"
-            transcript.write_text(
-                "\n".join(
-                    [
-                        f"# task: {task.name}",
-                        f"# model: {model}",
-                        f"# success: {result.success}",
-                        f"# exit_code: {result.exit_code}",
-                        f"# failure_reason: {result.failure_reason or ''}",
-                        "# ---- stdout ----",
-                        result.stdout,
-                        "# ---- stderr ----",
-                        result.stderr,
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-        except OSError as exc:
-            logger.warning("could not write agent transcript: %s", exc)
 
     return TaskStep(
         name=task.name,
@@ -404,6 +448,25 @@ def _run_shell(
         return TaskStep(name=task.name, kind="shell", success=True, detail="dry-run")
 
     first_result = _run_shell_once(cmd, ctx, task.env)
+
+    # Emit shell output events via the event writer.
+    if ctx.event_writer:
+        if first_result.stdout:
+            ctx.event_writer.emit(
+                "task",
+                "shell_output",
+                task=task.name,
+                stream="stdout",
+                text=first_result.stdout[:10000],
+            )
+        if first_result.stderr:
+            ctx.event_writer.emit(
+                "task",
+                "shell_output",
+                task=task.name,
+                stream="stderr",
+                text=first_result.stderr[:10000],
+            )
 
     if first_result.returncode == 0:
         return TaskStep(name=task.name, kind="shell", success=True)

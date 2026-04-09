@@ -33,15 +33,16 @@ from __future__ import annotations
 import io
 import os
 import sys
-import tomllib
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 from rich.style import Style
 from rich.text import Text
+
+if TYPE_CHECKING:
+    from darkfactory.config import Config
 
 
 # ---------------------------------------------------------------------------
@@ -352,95 +353,72 @@ class StyleConfig:
 # ---------------------------------------------------------------------------
 
 
-def _merge_toml_file(config: dict[str, Any], path: Path) -> None:
-    """Merge style settings from a TOML config file into *config*.
-
-    Silently ignores missing files and parse errors (best-effort).
-    Expected TOML shape::
-
-        [style]
-        theme = "light"
-        icon_set = "nerdfont"
-        no_color = false
-    """
-    if not path.exists():
-        return
-    try:
-        with open(path, "rb") as fh:
-            data = tomllib.load(fh)
-        style_section = data.get("style", {})
-        if isinstance(style_section, dict):
-            for key in ("theme", "icon_set", "no_color"):
-                if key in style_section:
-                    config[key] = style_section[key]
-    except Exception:  # noqa: BLE001 — never fail on bad/missing config
-        pass
-
-
 def resolve_style_config(
     *,
+    config: "Config | None" = None,
     theme: str | None = None,
     icon_set: str | None = None,
     no_color: bool = False,
-    repo_root: Path | None = None,
 ) -> StyleConfig:
     """Merge all config sources into a single :class:`StyleConfig`.
+
+    File-based config layers (user and project) are pre-resolved by the caller
+    via :func:`darkfactory.config.resolve_config` and passed as *config*.
 
     Precedence (highest wins):
 
     1. CLI flags (*theme*, *icon_set*, *no_color*)
     2. Environment variables (``DARKFACTORY_THEME``, ``DARKFACTORY_ICON_SET``,
        ``NO_COLOR``)
-    3. Project config — ``<repo_root>/.darkfactory/config.toml``
-    4. User config — ``~/.config/darkfactory/config.toml``
-    5. Built-in defaults (dark theme, ascii icons, color enabled)
+    3. Resolved *config* object (from TOML files via cascade resolver)
+    4. Built-in defaults (dark theme, ascii icons, color enabled)
 
     Color is also automatically suppressed when stdout is not a TTY (unless
     an explicit ``--no-color`` flag or ``NO_COLOR`` env var was set and the
     caller already passes ``no_color=True``).
     """
-    config: dict[str, Any] = {"theme": "dark", "icon_set": None, "no_color": False}
+    merged: dict[str, Any] = {"theme": "dark", "icon_set": None, "no_color": False}
 
-    # Layer 4: user config
-    user_cfg = Path.home() / ".config" / "darkfactory" / "config.toml"
-    _merge_toml_file(config, user_cfg)
-
-    # Layer 3: project config (overrides user)
-    if repo_root is not None:
-        project_cfg = repo_root / ".darkfactory" / "config.toml"
-        _merge_toml_file(config, project_cfg)
+    # Layer 3: file-resolved config (user + project merged by resolve_config)
+    if config is not None:
+        s = config.style
+        merged["theme"] = s.theme
+        if s.icon_set:
+            merged["icon_set"] = s.icon_set
+        if s.no_color:
+            merged["no_color"] = True
 
     # Layer 2: environment variables
     if os.environ.get("NO_COLOR") is not None:
-        config["no_color"] = True
+        merged["no_color"] = True
     env_theme = os.environ.get("DARKFACTORY_THEME")
     if env_theme:
-        config["theme"] = env_theme
+        merged["theme"] = env_theme
     env_icon_set = os.environ.get("DARKFACTORY_ICON_SET")
     if env_icon_set:
-        config["icon_set"] = env_icon_set
+        merged["icon_set"] = env_icon_set
 
     # Layer 1: CLI flags (highest priority)
     if no_color:
-        config["no_color"] = True
+        merged["no_color"] = True
     if theme is not None:
-        config["theme"] = theme
+        merged["theme"] = theme
     if icon_set is not None:
-        config["icon_set"] = icon_set
+        merged["icon_set"] = icon_set
 
     # Resolve icon set: explicit config > Nerd Font detection > ascii default
-    resolved_icon_set: str = config.get("icon_set") or ""
+    resolved_icon_set: str = merged.get("icon_set") or ""
     if not resolved_icon_set:
         detected = detect_nerdfont()
         resolved_icon_set = "nerdfont" if detected is True else "ascii"
 
     # Suppress color when stdout is not a TTY (unless already disabled above)
-    no_color_final = bool(config["no_color"])
+    no_color_final = bool(merged["no_color"])
     if not no_color_final and not sys.stdout.isatty():
         no_color_final = True
 
     return StyleConfig(
-        theme_name=str(config.get("theme", "dark")),
+        theme_name=str(merged.get("theme", "dark")),
         icon_set_name=resolved_icon_set,
         no_color=no_color_final,
     )

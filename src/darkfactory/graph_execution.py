@@ -25,9 +25,13 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Callable, Protocol
+
+if TYPE_CHECKING:
+    from .style import Styler
 
 from . import assign, containment, graph
+from .event_log import EventWriter
 from .prd import PRD, load_all, set_status_at
 from .runner import RunResult, _compute_branch_name, run_workflow
 from .workflow import Workflow
@@ -216,6 +220,134 @@ class MultiDepUnsupported(Exception):
         )
 
 
+# ---- Queue filters and discovery ------------------------------------------
+
+
+@dataclass
+class QueueFilters:
+    min_priority: str | None = None
+    tags: list[str] = field(default_factory=list)
+    exclude_ids: list[str] = field(default_factory=list)
+
+
+PRIORITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+
+
+def matches_filters(prd: PRD, filters: QueueFilters) -> bool:
+    if filters.min_priority:
+        threshold = PRIORITY_RANK.get(filters.min_priority, 2)
+        if PRIORITY_RANK.get(prd.priority, 2) > threshold:
+            return False
+    if filters.tags and not any(t in prd.tags for t in filters.tags):
+        return False
+    if prd.id in filters.exclude_ids:
+        return False
+    return True
+
+
+def deps_satisfied(prd: PRD, prds: dict[str, PRD]) -> bool:
+    for dep_id in prd.depends_on:
+        dep = prds.get(dep_id)
+        if dep is None or dep.status not in ("done", "review"):
+            return False
+    return True
+
+
+def _prd_sort_key(prd: PRD) -> tuple[int, tuple[int, ...]]:
+    from .prd import parse_id_sort_key
+
+    return (PRIORITY_RANK.get(prd.priority, 2), parse_id_sort_key(prd.id))
+
+
+def topo_sort_with_tiebreak(ready: list[PRD], prds: dict[str, PRD]) -> list[PRD]:
+    """Topological sort of ``ready`` PRDs with priority-then-number tiebreak.
+
+    Edges in the sub-graph are restricted to those where both endpoints are in
+    the ready set. Within a wave of zero-in-degree nodes, higher-priority and
+    lower-numbered PRDs come first.
+    """
+    ready_ids = {p.id for p in ready}
+    prd_by_id = {p.id: p for p in ready}
+
+    # Build in-degree and downstream adjacency restricted to the ready set.
+    in_degree: dict[str, int] = {p.id: 0 for p in ready}
+    downstream: dict[str, list[str]] = {p.id: [] for p in ready}
+    for p in ready:
+        for dep_id in p.depends_on:
+            if dep_id in ready_ids:
+                in_degree[p.id] += 1
+                downstream[dep_id].append(p.id)
+
+    # Kahn's algorithm with tiebreak.
+    wave = sorted(
+        [pid for pid, deg in in_degree.items() if deg == 0],
+        key=lambda pid: _prd_sort_key(prd_by_id[pid]),
+    )
+    out: list[PRD] = []
+
+    while wave:
+        pid = wave.pop(0)
+        out.append(prd_by_id[pid])
+        for successor in downstream[pid]:
+            in_degree[successor] -= 1
+            if in_degree[successor] == 0:
+                wave.append(successor)
+                wave.sort(key=lambda s: _prd_sort_key(prd_by_id[s]))
+
+    return out
+
+
+def discover_ready_queue(prds: dict[str, PRD], filters: QueueFilters) -> list[PRD]:
+    ready = [
+        p
+        for p in prds.values()
+        if p.status == "ready"
+        and deps_satisfied(p, prds)
+        and matches_filters(p, filters)
+    ]
+    return topo_sort_with_tiebreak(ready, prds)
+
+
+# ---- Candidate strategies -------------------------------------------------
+
+
+class CandidateStrategy(Protocol):
+    """Strategy for selecting which PRD candidates to consider each iteration."""
+
+    def candidates(self, prds: dict[str, PRD]) -> list[str]:
+        """Return ordered candidate PRD IDs for this iteration."""
+        ...
+
+
+class RootedStrategy:
+    """Candidate strategy for a DAG rooted at a single PRD.
+
+    Reproduces the existing ``graph_scope`` + ``actionable_order`` traversal.
+    """
+
+    def __init__(self, root_id: str) -> None:
+        self.root_id = root_id
+
+    def candidates(self, prds: dict[str, PRD]) -> list[str]:
+        scope = graph_scope(self.root_id, prds)
+        return actionable_order(scope, prds)
+
+
+class QueueStrategy:
+    """Candidate strategy that discovers all ready PRDs repo-wide.
+
+    Re-runs ``discover_ready_queue`` on each call so PRDs that become ready
+    mid-run (because a dependency just completed) are picked up on the next
+    iteration (AC-6).
+    """
+
+    def __init__(self, filters: QueueFilters) -> None:
+        self.filters = filters
+
+    def candidates(self, prds: dict[str, PRD]) -> list[str]:
+        return [p.id for p in discover_ready_queue(prds, self.filters)]
+
+
 # ---- Dry-run plan ---------------------------------------------------------
 
 
@@ -236,15 +368,24 @@ class ExecutionSlice:
 
 
 def plan_execution(
-    root: PRD,
+    root: PRD | None,
     prds: dict[str, PRD],
     *,
     max_runs: int | None,
     default_base: str,
+    strategy: CandidateStrategy | None = None,
 ) -> ExecutionSlice:
-    """Compute the dry-run plan for a root PRD."""
-    scope = graph_scope(root.id, prds)
-    order = actionable_order(scope, prds)
+    """Compute the dry-run plan for a root PRD or a candidate strategy.
+
+    ``root`` is the backward-compatible entry point (creates a
+    :class:`RootedStrategy` internally). Pass ``strategy`` directly to use
+    queue mode or any other custom traversal.
+    """
+    if strategy is None:
+        if root is None:
+            raise ValueError("Either strategy or root must be provided")
+        strategy = RootedStrategy(root.id)
+    order = strategy.candidates(prds)
 
     skipped: list[tuple[str, str]] = []
     slice_ids: list[str] = []
@@ -298,11 +439,12 @@ def plan_execution(
 
 
 def execute_graph(
-    root_id: str,
     prd_dir: Path,
     repo_root: Path,
     workflows: dict[str, Workflow],
     *,
+    strategy: CandidateStrategy | None = None,
+    root_id: str | None = None,
     default_base: str,
     max_runs: int | None = None,
     model_override: str | None = None,
@@ -310,18 +452,41 @@ def execute_graph(
     dry_run: bool = True,
     event_sink: EventSink | None = None,
     run_workflow_fn: Callable[..., RunResult] = run_workflow,
+    styler: "Styler | None" = None,
+    session_id: str | None = None,
 ) -> ExecutionReport:
-    """Walk the DAG rooted at ``root_id`` and run each actionable leaf.
+    """Walk the candidate PRDs produced by ``strategy`` and run each in turn.
 
     Sequential execution. Re-loads PRDs between runs so planning workflows
-    can grow the DAG mid-invocation. ``run_workflow_fn`` is injectable for
-    testing — production code uses the default (:func:`runner.run_workflow`).
+    can grow the DAG mid-invocation, and so :class:`QueueStrategy` can pick
+    up newly-ready PRDs on each iteration. ``run_workflow_fn`` is injectable
+    for testing — production code uses the default
+    (:func:`runner.run_workflow`).
+
+    Pass ``root_id`` (keyword) for the backward-compatible rooted mode; this
+    creates a :class:`RootedStrategy` internally. Pass ``strategy`` to use
+    queue mode or any other traversal.
     """
+    if strategy is None:
+        if root_id is None:
+            raise ValueError("Either strategy or root_id must be provided")
+        strategy = RootedStrategy(root_id)
+
     report = ExecutionReport()
 
     def emit(ev: RunEvent) -> None:
         if event_sink is not None:
             event_sink(ev)
+
+    def _emit_dag_event(target_prd_id: str, event_type: str, **fields: object) -> None:
+        """Write a DAG-level event to a per-PRD event file."""
+        if session_id and not dry_run:
+            try:
+                writer = EventWriter(repo_root, session_id, target_prd_id)
+                writer.emit("dag", event_type, **fields)
+                writer.close()
+            except OSError:
+                logger.warning("failed to write DAG event for %s", target_prd_id)
 
     completed_this_run: dict[str, str] = {}
     # Explicit skip list that persists across iterations (e.g. multi-dep
@@ -333,12 +498,13 @@ def execute_graph(
 
     while True:
         prds = load_all(prd_dir)
-        if root_id not in prds:
-            report.skipped.append((root_id, "root PRD not found after reload"))
+
+        # For rooted mode, verify the root still exists after reload.
+        if isinstance(strategy, RootedStrategy) and strategy.root_id not in prds:
+            report.skipped.append((strategy.root_id, "root PRD not found after reload"))
             break
 
-        scope = graph_scope(root_id, prds)
-        order = actionable_order(scope, prds)
+        order = strategy.candidates(prds)
 
         # Prune dependents of anything failed/blocked/multi-dep/skipped.
         effective_skipped: set[str] = set(sticky_skipped.keys()) | blocked_ids
@@ -375,6 +541,9 @@ def execute_graph(
 
         if max_runs is not None and total_runs >= max_runs:
             emit(RunEvent(event="skip", prd_id=picked.id, reason="max_runs"))
+            _emit_dag_event(
+                picked.id, "prd_skipped", prd_id=picked.id, reason="max_runs"
+            )
             report.skipped.append((picked.id, "max_runs"))
             break
 
@@ -390,6 +559,12 @@ def execute_graph(
                     prd_id=picked.id,
                     reason=f"multi_dep (PRD-552 needed): {exc.unmet}",
                 )
+            )
+            _emit_dag_event(
+                picked.id,
+                "prd_skipped",
+                prd_id=picked.id,
+                reason=f"multi_dep (PRD-552 needed): {exc.unmet}",
             )
             continue
 
@@ -409,9 +584,22 @@ def execute_graph(
                     reason=f"workflow_assign_failed: {exc}",
                 )
             )
+            _emit_dag_event(
+                picked.id,
+                "prd_skipped",
+                prd_id=picked.id,
+                reason=f"workflow_assign_failed: {exc}",
+            )
             continue
 
         emit(RunEvent(event="start", prd_id=picked.id, base_ref=base_ref))
+        _emit_dag_event(
+            picked.id,
+            "prd_picked",
+            prd_id=picked.id,
+            base_ref=base_ref,
+            workflow=workflow.name,
+        )
         total_runs += 1
 
         result = run_workflow_fn(
@@ -421,6 +609,8 @@ def execute_graph(
             base_ref=base_ref,
             dry_run=dry_run,
             model_override=model_override,
+            styler=styler,
+            session_id=session_id,
         )
 
         if result.success:
@@ -433,6 +623,13 @@ def execute_graph(
                     success=True,
                     pr_url=result.pr_url,
                 )
+            )
+            _emit_dag_event(
+                picked.id,
+                "prd_finished",
+                prd_id=picked.id,
+                success=True,
+                pr_url=result.pr_url,
             )
         else:
             report.failed.append((picked.id, result.failure_reason or "unknown"))
@@ -452,6 +649,19 @@ def execute_graph(
                     success=False,
                     failure_reason=result.failure_reason,
                 )
+            )
+            _emit_dag_event(
+                picked.id,
+                "prd_finished",
+                prd_id=picked.id,
+                success=False,
+                failure_reason=result.failure_reason,
+            )
+            _emit_dag_event(
+                picked.id,
+                "prd_blocked",
+                prd_id=picked.id,
+                reason=result.failure_reason or "unknown",
             )
 
     return report

@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING, Any, Callable, Literal
 if TYPE_CHECKING:
     from filelock import FileLock
 
+    from .event_log import EventWriter
     from .invoke import InvokeResult
     from .prd import PRD
 
@@ -80,6 +81,8 @@ class Task:
     no benefit. The class exists purely for ``isinstance()`` dispatch in
     the runner's task loop.
     """
+
+    name: str
 
 
 @dataclass
@@ -239,6 +242,7 @@ class ExecutionContext:
     logger: logging.Logger = field(
         default_factory=lambda: logging.getLogger("darkfactory")
     )
+    event_writer: "EventWriter | None" = None
     # Advisory process-level lock held by ensure_worktree for the
     # lifetime of this run. Managed by builtins + runner; tests should
     # not touch it directly.

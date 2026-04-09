@@ -42,6 +42,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from .event_log import EventWriter
     from .style import Element, Styler
 
 
@@ -98,6 +99,26 @@ class InvokeResult:
     sentinel: str | None = None
 
 
+# ---------- terminal result event ----------
+
+
+def _find_terminal_result(output_lines: list[str]) -> dict[str, Any] | None:
+    """Scan output lines for the last {"type": "result", ...} JSON object."""
+    for line in reversed(output_lines):
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            obj: dict[str, Any] = json.loads(line)
+            if obj.get("type", "").startswith("darkfactory_"):
+                continue
+            if obj.get("type") == "result":
+                return obj
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
 # ---------- sentinel parsing ----------
 
 
@@ -125,6 +146,23 @@ def _parse_sentinels(
     output, we treat it as failure — the agent shouldn't emit both and
     the conservative interpretation is "something went wrong mid-task".
     """
+    # Pre-filter: remove darkfactory envelope lines so their JSON values
+    # cannot produce false sentinel matches. A darkfactory_stderr line
+    # whose "text" field contains a sentinel string (e.g. if the agent's
+    # stderr captured a prior sentinel) would otherwise match the regex.
+    filtered: list[str] = []
+    for raw_line in stdout.splitlines(keepends=True):
+        stripped = raw_line.strip()
+        if stripped.startswith("{"):
+            try:
+                parsed = json.loads(stripped)
+                if parsed.get("type", "").startswith("darkfactory_"):
+                    continue
+            except json.JSONDecodeError:
+                pass
+        filtered.append(raw_line)
+    stdout = "".join(filtered)
+
     # Custom marker fast path: if the caller specified non-default markers,
     # fall back to substring matching since we can't know their regex shape.
     if success_marker != "PRD_EXECUTE_OK" or failure_marker != "PRD_EXECUTE_FAILED":
@@ -342,6 +380,8 @@ def invoke_claude(
     logger: logging.Logger | None = None,
     styler: "Styler | None" = None,
     _argv_override: list[str] | None = None,
+    event_writer: "EventWriter | None" = None,
+    event_task_name: str | None = None,
 ) -> InvokeResult:
     """Run Claude Code as a subprocess with the given prompt and return the result.
 
@@ -411,6 +451,15 @@ def invoke_claude(
             model,
             "--allowed-tools",
             ",".join(tools),
+            # Prevent the agent from reading/writing outside the project
+            # directory (cwd). Without this, file tools accept absolute
+            # paths and can escape a worktree into the main repo.
+            "--disallowed-tools",
+            "Edit(../)",
+            "--disallowed-tools",
+            "Write(../)",
+            "--disallowed-tools",
+            "Read(../)",
         ]
 
     try:
@@ -503,6 +552,15 @@ def invoke_claude(
                 log.info("agent: %s", stripped)
                 continue
 
+            # Emit agent_event to the structured event log.
+            if event_writer is not None:
+                event_writer.emit(
+                    "task",
+                    "agent_event",
+                    task=event_task_name or "agent",
+                    event=event,
+                )
+
             element, display_text, agent_text = _summarize_stream_event(event)
             # Accumulate tool-call counts from assistant events.
             if event.get("type") == "assistant":
@@ -544,6 +602,24 @@ def invoke_claude(
     exit_code = -1 if was_timed_out else proc.returncode
 
     if was_timed_out:
+        terminal_result = _find_terminal_result(stdout.splitlines())
+        if terminal_result is not None:
+            log.warning(
+                "Task timed out at %ds but terminal result event found — using result verdict",
+                timeout_seconds,
+            )
+            is_error = terminal_result.get("is_error", True)
+            subtype = terminal_result.get("subtype", "")
+            result_success = not is_error and subtype != "error"
+            return InvokeResult(
+                stdout=stdout,
+                stderr=stderr,
+                exit_code=exit_code,
+                success=result_success,
+                failure_reason=None
+                if result_success
+                else f"result error (timed out at {timeout_seconds}s): subtype={subtype!r}",
+            )
         return InvokeResult(
             stdout=stdout,
             stderr=stderr,

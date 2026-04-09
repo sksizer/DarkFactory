@@ -7,7 +7,8 @@ from typing import Any
 import pytest
 
 from darkfactory.templates import TemplateViolation, WorkflowTemplate
-from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Workflow
+from darkfactory.templates_builtin import REWORK_TEMPLATE, SYSTEM_OPERATION_TEMPLATE
+from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Task, Workflow
 
 
 def _make_template(**kwargs: Any) -> WorkflowTemplate:
@@ -328,3 +329,154 @@ def test_workflow_can_be_constructed_without_template_name() -> None:
     )
     assert wf.template_name is None
     assert len(wf.tasks) == 2
+
+
+# ---------- REWORK_TEMPLATE tests ----------
+
+
+def test_rework_template_is_importable() -> None:
+    """REWORK_TEMPLATE is importable from darkfactory.templates_builtin."""
+    assert REWORK_TEMPLATE is not None
+    assert isinstance(REWORK_TEMPLATE, WorkflowTemplate)
+    assert REWORK_TEMPLATE.name == "rework"
+
+
+def test_rework_template_open_includes_check_pr_exists_and_fetch_review_comments() -> (
+    None
+):
+    """open list includes check_pr_exists and fetch_review_comments."""
+    open_names = [t.name for t in REWORK_TEMPLATE.open]
+    assert "check_pr_exists" in open_names
+    assert "fetch_review_comments" in open_names
+
+
+def test_rework_template_close_does_not_include_create_pr() -> None:
+    """close list does NOT include create_pr."""
+    close_names = [t.name for t in REWORK_TEMPLATE.close]
+    assert "create_pr" not in close_names
+
+
+def test_rework_template_close_includes_push_branch() -> None:
+    """close list includes push_branch instead of create_pr."""
+    close_names = [t.name for t in REWORK_TEMPLATE.close]
+    assert "push_branch" in close_names
+
+
+def test_rework_template_valid_composition() -> None:
+    """Composing with an AgentTask produces correct task order."""
+    agent = AgentTask(name="address-feedback")
+    wf = REWORK_TEMPLATE.compose(
+        name="rework-prd-123",
+        description="Address review feedback",
+        applies_to=lambda prd, prds: True,
+        priority=5,
+        middle=[agent],
+    )
+    open_names = [t.name for t in REWORK_TEMPLATE.open]
+    close_names = [t.name for t in REWORK_TEMPLATE.close]
+    task_list = wf.tasks
+    # open tasks come first
+    for i, name in enumerate(open_names):
+        assert task_list[i].name == name
+    # middle task is next
+    assert task_list[len(open_names)] is agent
+    # close tasks come last
+    for i, name in enumerate(close_names):
+        assert task_list[len(open_names) + 1 + i].name == name
+
+
+def test_rework_template_missing_agent_task_raises() -> None:
+    """Composing with no AgentTask raises TemplateViolation."""
+    with pytest.raises(TemplateViolation, match="at least 1 AgentTask"):
+        REWORK_TEMPLATE.compose(
+            name="rework-wf",
+            description="",
+            applies_to=lambda prd, prds: True,
+            priority=0,
+            middle=[ShellTask(name="verify", cmd="just test")],
+        )
+
+
+def test_rework_template_empty_middle_raises() -> None:
+    """Composing with empty middle raises TemplateViolation (needs AgentTask)."""
+    with pytest.raises(TemplateViolation, match="at least 1 AgentTask"):
+        REWORK_TEMPLATE.compose(
+            name="rework-wf",
+            description="",
+            applies_to=lambda prd, prds: True,
+            priority=0,
+            middle=[],
+        )
+
+
+# ---------- SYSTEM_OPERATION_TEMPLATE ----------
+
+
+def test_system_operation_template_is_importable() -> None:
+    """SYSTEM_OPERATION_TEMPLATE is importable from darkfactory.templates_builtin."""
+    assert SYSTEM_OPERATION_TEMPLATE is not None
+    assert SYSTEM_OPERATION_TEMPLATE.name == "system-operation"
+
+
+def test_system_operation_template_open_starts_with_acquire_lock() -> None:
+    """The first open task is acquire_global_lock."""
+    assert SYSTEM_OPERATION_TEMPLATE.open[0] == BuiltIn("acquire_global_lock")
+
+
+def test_system_operation_template_close_ends_with_release_lock() -> None:
+    """The last close task is release_global_lock."""
+    assert SYSTEM_OPERATION_TEMPLATE.close[-1] == BuiltIn("release_global_lock")
+
+
+def test_system_operation_template_compose_empty_middle_succeeds() -> None:
+    """Composing with an empty middle is valid (no minimum count constraints)."""
+    wf = SYSTEM_OPERATION_TEMPLATE.compose(
+        name="sys-op",
+        description="test run",
+        applies_to=_dummy_applies_to,
+        priority=0,
+        middle=[],
+    )
+    # open(2) + middle(0) + close(3) = 5
+    assert len(wf.tasks) == 5
+    assert wf.tasks[0] == BuiltIn("acquire_global_lock")
+    assert wf.tasks[-1] == BuiltIn("release_global_lock")
+
+
+def test_system_operation_template_compose_valid_middle() -> None:
+    """Valid composition produces [lock, log_start, *middle, report, log_end, unlock]."""
+    shell = ShellTask(name="run-op", cmd="just operate")
+    agent = AgentTask(name="agent-op")
+    wf = SYSTEM_OPERATION_TEMPLATE.compose(
+        name="sys-op",
+        description="test run",
+        applies_to=_dummy_applies_to,
+        priority=0,
+        middle=[shell, agent],
+    )
+    assert wf.tasks == [
+        BuiltIn("acquire_global_lock"),
+        BuiltIn("log_operation_start"),
+        shell,
+        agent,
+        BuiltIn("write_report"),
+        BuiltIn("log_operation_end"),
+        BuiltIn("release_global_lock"),
+    ]
+
+
+def test_system_operation_template_disallows_unknown_kinds() -> None:
+    """A task kind not in middle_kinds raises TemplateViolation."""
+
+    class ForeignTask(Task):
+        pass
+
+    foreign = ForeignTask()
+    with pytest.raises(TemplateViolation, match="not an allowed middle kind"):
+        SYSTEM_OPERATION_TEMPLATE.compose(
+            name="sys-op",
+            description="",
+            applies_to=_dummy_applies_to,
+            priority=0,
+            middle=[foreign],
+        )

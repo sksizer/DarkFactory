@@ -1,12 +1,12 @@
 ---
-id: "PRD-220"
+id: PRD-220
 title: "Graph execution: walk DAG and run actionable PRDs"
 kind: feature
-status: review
+status: done
 priority: high
 effort: l
 capability: complex
-parent: null
+parent:
 depends_on: []
 blocks: []
 impacts:
@@ -15,10 +15,10 @@ impacts:
   - src/darkfactory/graph_execution.py
   - tests/test_graph_execution.py
   - prds/README.md
-workflow: null
-target_version: null
+workflow:
+target_version:
 created: 2026-04-08
-updated: '2026-04-08'
+updated: 2026-04-08
 tags:
   - harness
   - execution

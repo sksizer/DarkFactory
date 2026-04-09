@@ -23,7 +23,7 @@ def _make_ctx(tmp_path: Path, *, dry_run: bool = False) -> MagicMock:
     ctx.run_summary = None
     ctx.prd.id = "PRD-001"
     ctx.prd.title = "Test PR"
-    ctx.prd.path = tmp_path / "prds" / "PRD-001.md"
+    ctx.prd.path = tmp_path / ".darkfactory" / "prds" / "PRD-001.md"
     ctx.prd.body = ""
     ctx.repo_root = tmp_path
     ctx.workflow.name = "test-workflow"
@@ -64,10 +64,10 @@ def test_extract_acceptance_criteria_strips_whitespace() -> None:
 
 def test_pr_body_includes_prd_path(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
-    ctx.prd.path = tmp_path / "prds" / "PRD-001.md"
+    ctx.prd.path = tmp_path / ".darkfactory" / "prds" / "PRD-001.md"
     ctx.prd.body = ""
     body = _pr_body(ctx)
-    assert "prds/PRD-001.md" in body
+    assert ".darkfactory/prds/PRD-001.md" in body
 
 
 def test_pr_body_includes_ac_checklist(tmp_path: Path) -> None:

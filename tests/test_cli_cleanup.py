@@ -44,12 +44,12 @@ def test_find_stale_worktrees_returns_merged(tmp_path: Path) -> None:
     _make_worktree_dir(tmp_path, "PRD-001-some-feature")
     _make_worktree_dir(tmp_path, "PRD-002-another")
 
-    def fake_pr_state(branch: str, repo_root: Path) -> str:
-        if "PRD-001" in branch:
-            return "MERGED"
-        return "OPEN"
+    fake_states = {
+        "prd/PRD-001-some-feature": "MERGED",
+        "prd/PRD-002-another": "OPEN",
+    }
 
-    with patch("darkfactory.checks._get_pr_state", side_effect=fake_pr_state):
+    with patch("darkfactory.checks._fetch_all_pr_states", return_value=fake_states):
         result = find_stale_worktrees(tmp_path)
 
     assert len(result) == 1
@@ -62,7 +62,10 @@ def test_find_stale_worktrees_returns_closed(tmp_path: Path) -> None:
     _init_git_repo(tmp_path)
     _make_worktree_dir(tmp_path, "PRD-003-closed-one")
 
-    with patch("darkfactory.checks._get_pr_state", return_value="CLOSED"):
+    with patch(
+        "darkfactory.checks._fetch_all_pr_states",
+        return_value={"prd/PRD-003-closed-one": "CLOSED"},
+    ):
         result = find_stale_worktrees(tmp_path)
 
     assert len(result) == 1
@@ -73,7 +76,9 @@ def test_find_stale_worktrees_skips_open(tmp_path: Path) -> None:
     _init_git_repo(tmp_path)
     _make_worktree_dir(tmp_path, "PRD-005-open-one")
 
-    with patch("darkfactory.checks._get_pr_state", return_value="OPEN"):
+    fake_states = {"prd/PRD-005-open-one": "OPEN"}
+
+    with patch("darkfactory.checks._fetch_all_pr_states", return_value=fake_states):
         result = find_stale_worktrees(tmp_path)
 
     assert result == []
@@ -153,9 +158,9 @@ def test_cleanup_single_merged_pr_removes(
     )
 
     with (
-        patch("darkfactory.cli._find_worktree_for_prd", return_value=stale),
+        patch("darkfactory.cli.cleanup._find_worktree_for_prd", return_value=stale),
         patch("darkfactory.checks._has_unpushed_commits", return_value=False),
-        patch("darkfactory.cli._remove_worktree") as mock_remove,
+        patch("darkfactory.cli.cleanup._remove_worktree") as mock_remove,
     ):
         rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001"])
 
@@ -179,8 +184,8 @@ def test_cleanup_single_open_pr_refuses(
     )
 
     with (
-        patch("darkfactory.cli._find_worktree_for_prd", return_value=stale),
-        patch("darkfactory.cli._remove_worktree") as mock_remove,
+        patch("darkfactory.cli.cleanup._find_worktree_for_prd", return_value=stale),
+        patch("darkfactory.cli.cleanup._remove_worktree") as mock_remove,
     ):
         rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001"])
 
@@ -204,9 +209,9 @@ def test_cleanup_single_unpushed_refuses_without_force(
     )
 
     with (
-        patch("darkfactory.cli._find_worktree_for_prd", return_value=stale),
+        patch("darkfactory.cli.cleanup._find_worktree_for_prd", return_value=stale),
         patch("darkfactory.checks._has_unpushed_commits", return_value=True),
-        patch("darkfactory.cli._remove_worktree") as mock_remove,
+        patch("darkfactory.cli.cleanup._remove_worktree") as mock_remove,
     ):
         rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001"])
 
@@ -228,14 +233,122 @@ def test_cleanup_single_unpushed_with_force_succeeds(
     )
 
     with (
-        patch("darkfactory.cli._find_worktree_for_prd", return_value=stale),
+        patch("darkfactory.cli.cleanup._find_worktree_for_prd", return_value=stale),
         patch("darkfactory.checks._has_unpushed_commits", return_value=True),
-        patch("darkfactory.cli._remove_worktree") as mock_remove,
+        patch("darkfactory.cli.cleanup._remove_worktree") as mock_remove,
     ):
         rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001", "--force"])
 
     assert rc == 0
     mock_remove.assert_called_once()
+
+
+# ---------- cmd cleanup orphaned branch ----------
+
+
+def test_cleanup_orphaned_branch_no_commits_force(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Force-removing an orphaned branch with 0 commits ahead succeeds."""
+    prd_dir = _setup_cleanup_env(tmp_path)
+
+    with (
+        patch("darkfactory.cli.cleanup._find_worktree_for_prd", return_value=None),
+        patch(
+            "darkfactory.cli.cleanup._find_orphaned_branch",
+            return_value="prd/PRD-001-my-feature",
+        ),
+        patch("darkfactory.cli.cleanup._orphaned_branch_commit_count", return_value=0),
+        patch("darkfactory.cli.cleanup.subprocess"),
+    ):
+        rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001", "--force"])
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "Removed orphaned branch" in out
+
+
+def test_cleanup_orphaned_branch_with_commits_refuses_without_force(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Orphaned branch with commits ahead should refuse without --force."""
+    prd_dir = _setup_cleanup_env(tmp_path)
+
+    with (
+        patch("darkfactory.cli.cleanup._find_worktree_for_prd", return_value=None),
+        patch(
+            "darkfactory.cli.cleanup._find_orphaned_branch",
+            return_value="prd/PRD-001-my-feature",
+        ),
+        patch("darkfactory.cli.cleanup._orphaned_branch_commit_count", return_value=3),
+    ):
+        rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001"])
+
+    assert rc == 1
+    out = capsys.readouterr().out
+    assert "3 commit(s)" in out
+    assert "--force" in out
+
+
+def test_cleanup_orphaned_branch_with_commits_force_succeeds(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Force-removing an orphaned branch with commits prints count."""
+    prd_dir = _setup_cleanup_env(tmp_path)
+
+    with (
+        patch("darkfactory.cli.cleanup._find_worktree_for_prd", return_value=None),
+        patch(
+            "darkfactory.cli.cleanup._find_orphaned_branch",
+            return_value="prd/PRD-001-my-feature",
+        ),
+        patch("darkfactory.cli.cleanup._orphaned_branch_commit_count", return_value=5),
+        patch("darkfactory.cli.cleanup.subprocess"),
+    ):
+        rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001", "--force"])
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "5 commit(s) ahead of main" in out
+
+
+def test_cleanup_no_worktree_no_branch(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """No worktree and no orphaned branch prints clear message."""
+    prd_dir = _setup_cleanup_env(tmp_path)
+
+    with (
+        patch("darkfactory.cli.cleanup._find_worktree_for_prd", return_value=None),
+        patch("darkfactory.cli.cleanup._find_orphaned_branch", return_value=None),
+    ):
+        rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001"])
+
+    assert rc == 1
+    out = capsys.readouterr().out
+    assert "No worktree or orphaned branch found" in out
+
+
+def test_cleanup_orphaned_branch_no_commits_without_force(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Orphaned branch with 0 commits ahead can be removed without --force."""
+    prd_dir = _setup_cleanup_env(tmp_path)
+
+    with (
+        patch("darkfactory.cli.cleanup._find_worktree_for_prd", return_value=None),
+        patch(
+            "darkfactory.cli.cleanup._find_orphaned_branch",
+            return_value="prd/PRD-001-my-feature",
+        ),
+        patch("darkfactory.cli.cleanup._orphaned_branch_commit_count", return_value=0),
+        patch("darkfactory.cli.cleanup.subprocess"),
+    ):
+        rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001"])
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "Removed orphaned branch" in out
 
 
 # ---------- cmd cleanup --merged ----------
@@ -254,9 +367,11 @@ def test_cleanup_merged_removes_only_merged(
     )
 
     with (
-        patch("darkfactory.cli.find_stale_worktrees", return_value=[stale_merged]),
+        patch(
+            "darkfactory.cli.cleanup.find_stale_worktrees", return_value=[stale_merged]
+        ),
         patch("darkfactory.checks._has_unpushed_commits", return_value=False),
-        patch("darkfactory.cli._remove_worktree") as mock_remove,
+        patch("darkfactory.cli.cleanup._remove_worktree") as mock_remove,
     ):
         rc = main(["--prd-dir", str(prd_dir), "cleanup", "--merged"])
 
@@ -269,7 +384,7 @@ def test_cleanup_merged_no_stale_worktrees(
 ) -> None:
     prd_dir = _setup_cleanup_env(tmp_path)
 
-    with patch("darkfactory.cli.find_stale_worktrees", return_value=[]):
+    with patch("darkfactory.cli.cleanup.find_stale_worktrees", return_value=[]):
         rc = main(["--prd-dir", str(prd_dir), "cleanup", "--merged"])
 
     assert rc == 0
@@ -297,7 +412,7 @@ def test_status_shows_hygiene_line_when_stale(
         )
     ]
 
-    with patch("darkfactory.cli.find_stale_worktrees", return_value=stale):
+    with patch("darkfactory.cli.status.find_stale_worktrees", return_value=stale):
         rc = main(["--prd-dir", str(prd_dir), "status"])
 
     assert rc == 0
@@ -314,7 +429,7 @@ def test_status_hides_hygiene_line_when_none(
     prd_dir.mkdir()
     write_prd(prd_dir, "PRD-001", "feat", status="done")
 
-    with patch("darkfactory.cli.find_stale_worktrees", return_value=[]):
+    with patch("darkfactory.cli.status.find_stale_worktrees", return_value=[]):
         rc = main(["--prd-dir", str(prd_dir), "status"])
 
     assert rc == 0
