@@ -353,7 +353,7 @@ def test_reconcile_skips_clobbered_but_flips_valid(
 
     def fake_ancestor(pr: dict[str, Any], repo_root: Path) -> bool:
         sha = pr["mergeCommit"]["oid"]
-        return sha == "good111111"
+        return bool(sha == "good111111")
 
     with (
         patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
