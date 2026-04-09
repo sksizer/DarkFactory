@@ -11,14 +11,14 @@ and opens pull requests.
 1. Read the parent PRD end-to-end — especially **Requirements**,
    **Technical Approach**, and **Acceptance Criteria**.
 2. Identify the natural decomposition seams in the work.
-3. Create one new PRD file per task in the `prds/` directory.
+3. Create one new PRD file per task in the `.darkfactory/prds/` directory.
 4. Update the parent PRD's `blocks:` field to include wikilinks to
    all new children.
 5. Validate your work with `uv run prd validate` and fix any errors.
 
 ## You MUST NOT
 
-- Touch any file outside `prds/`. Your output is PRD files only.
+- Touch any file outside `.darkfactory/prds/`. Your output is PRD files only.
 - Run tests, lint, build, or any implementation commands.
 - Run `git commit`. The harness commits after you return.
 - Create or switch git branches. The harness owns branching.

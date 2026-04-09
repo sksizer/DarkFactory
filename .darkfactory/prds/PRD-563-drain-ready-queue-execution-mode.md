@@ -2,7 +2,7 @@
 id: PRD-563
 title: "Drain-ready-queue execution mode: run all ready PRDs without a target"
 kind: feature
-status: review
+status: ready
 priority: high
 effort: m
 capability: moderate
@@ -10,10 +10,11 @@ parent:
 depends_on:
   - "[[PRD-220-graph-execution]]"
 blocks:
-  - "[[PRD-563.1-queue-discovery-and-filtering]]"
-  - "[[PRD-563.2-candidate-strategy-refactor]]"
-  - "[[PRD-563.3-cli-all-flag-and-wiring]]"
-  - "[[PRD-563.4-drain-queue-tests]]"
+  - "[[PRD-563.1-queue-filters-and-discovery]]"
+  - "[[PRD-563.2-cli-all-flag-and-filters]]"
+  - "[[PRD-563.3-refactor-execution-strategy]]"
+  - "[[PRD-563.4-wire-queue-mode-into-cmd-run]]"
+  - "[[PRD-563.5-drain-ready-queue-tests]]"
 impacts: []
 workflow:
 assignee:

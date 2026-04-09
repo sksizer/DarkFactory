@@ -27,6 +27,11 @@ def build_parser() -> argparse.ArgumentParser:
         cmd_undecomposed,
         cmd_validate,
     )
+    from darkfactory.cli.system import (
+        cmd_system_describe,
+        cmd_system_list,
+        cmd_system_run,
+    )
 
     parser = argparse.ArgumentParser(prog="prd", description="Pumice PRD harness CLI")
     parser.add_argument(
@@ -48,6 +53,13 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="Path to workflows directory (default: tools/prd-harness/workflows)",
+    )
+    parser.add_argument(
+        "--operations-dir",
+        type=Path,
+        default=None,
+        dest="operations_dir",
+        help="Path to system operations directory (default: .darkfactory/operations/)",
     )
     parser.add_argument(
         "--json", action="store_true", help="Emit JSON output where supported"
@@ -223,7 +235,33 @@ def build_parser() -> argparse.ArgumentParser:
         "run",
         help="Run a workflow against a PRD (dry-run unless --execute)",
     )
-    sub_run.add_argument("prd_id")
+    sub_run.add_argument("prd_id", nargs="?", default=None)
+    sub_run.add_argument(
+        "--all",
+        dest="run_all",
+        action="store_true",
+        help="Drain the ready queue: run all ready PRDs without a target",
+    )
+    sub_run.add_argument(
+        "--priority",
+        default=None,
+        choices=["critical", "high", "medium", "low"],
+        help="Only run PRDs at or above this priority",
+    )
+    sub_run.add_argument(
+        "--tag",
+        dest="tags",
+        action="append",
+        default=None,
+        help="Only run PRDs with this tag (repeatable, OR semantics)",
+    )
+    sub_run.add_argument(
+        "--exclude",
+        dest="exclude_ids",
+        action="append",
+        default=None,
+        help="Exclude specific PRD IDs (repeatable)",
+    )
     sub_run.add_argument(
         "--execute",
         action="store_true",
@@ -295,5 +333,52 @@ def build_parser() -> argparse.ArgumentParser:
         help="Commit directly to main instead of opening a PR",
     )
     sub_reconcile.set_defaults(func=cmd_reconcile)
+
+    # ---------- system subcommand ----------
+
+    sub_system = sub.add_parser(
+        "system",
+        help="Discover and run system operations",
+    )
+    system_sub = sub_system.add_subparsers(
+        dest="system_subcommand", metavar="SUBCOMMAND", required=True
+    )
+
+    # system list
+    sub_sys_list = system_sub.add_parser(
+        "list", help="List all available system operations"
+    )
+    sub_sys_list.set_defaults(func=cmd_system_list)
+
+    # system describe <name>
+    sub_sys_describe = system_sub.add_parser(
+        "describe", help="Show metadata and task list for a system operation"
+    )
+    sub_sys_describe.add_argument("name", help="Operation name")
+    sub_sys_describe.set_defaults(func=cmd_system_describe)
+
+    # system run <name>
+    sub_sys_run = system_sub.add_parser(
+        "run",
+        help="Run a system operation (dry-run unless --execute)",
+    )
+    sub_sys_run.add_argument("name", help="Operation name")
+    sub_sys_run.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute (default is dry-run)",
+    )
+    sub_sys_run.add_argument(
+        "--target",
+        default=None,
+        metavar="PRD-X",
+        help="Target PRD id for operations that accept_target=True",
+    )
+    sub_sys_run.add_argument(
+        "--model",
+        default=None,
+        help="Override the model for agent tasks (e.g. opus)",
+    )
+    sub_sys_run.set_defaults(func=cmd_system_run)
 
     return parser

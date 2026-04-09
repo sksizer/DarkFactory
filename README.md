@@ -58,6 +58,20 @@ Three layers:
 
 Read-only subcommands (`prd status`, `prd plan`, `prd validate`) do not acquire locks and are safe to run from multiple terminals at the same time.
 
+## Contributing
+
+### Branch protection
+
+The `main` branch requires **"Require branches to be up to date before merging"** in GitHub branch protection settings. This prevents a class of silent code loss where a long-lived branch that rewrites a file merges cleanly but drops changes that landed on `main` after the branch was created.
+
+If your PR is out of date with `main`, GitHub will block the merge until you rebase or merge main into your branch. This is intentional — it surfaces conflicts that would otherwise be silently resolved in the wrong direction.
+
+The ruleset definition lives at [`.github/rulesets/main-protection.json`](.github/rulesets/main-protection.json) and can be imported via **Settings > Rules > Rulesets > New ruleset > Import a ruleset**.
+
+### Large refactors
+
+When a PR does a structural rewrite (e.g. moving a module into a package, renaming files), rebase onto latest `main` before the final review pass. Structural changes are the most likely to silently drop concurrent work during merge.
+
 ## Development
 
 ```bash

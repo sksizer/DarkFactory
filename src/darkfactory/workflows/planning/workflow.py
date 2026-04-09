@@ -7,7 +7,7 @@ below any highly-specialized workflow.
 
 The agent is pinned to ``opus`` (decomposition is complex reasoning)
 and constrained to a tool allowlist that only allows creating files
-under ``prds/``. Validates new children with ``prd validate`` before
+under ``.darkfactory/prds/``. Validates new children with ``prd validate`` before
 the sentinel line.
 """
 
@@ -36,7 +36,7 @@ workflow = Workflow(
     description=(
         "Decompose an epic or feature PRD into fine-grained task PRDs. "
         "Pinned to opus; constrained tool allowlist that only allows "
-        "creating files under prds/. Validates new children with "
+        "creating files under .darkfactory/prds/. Validates new children with "
         "`prd validate` before sentinel."
     ),
     applies_to=_is_undecomposed_epic_or_feature,
@@ -62,8 +62,9 @@ workflow = Workflow(
                 "Read",
                 "Glob",
                 "Grep",
-                # Create new PRD files (and overwrite parent PRD with updated blocks)
+                # Create new PRD files and edit existing ones (e.g. parent blocks:)
                 "Write",
+                "Edit",
                 # Self-validate
                 "Bash(uv run prd validate*)",
                 "Bash(uv run prd:*)",
@@ -87,6 +88,7 @@ workflow = Workflow(
         ),
         # ----- teardown phase -----
         BuiltIn("set_status", kwargs={"to": "review"}),
+        BuiltIn("commit_transcript"),
         BuiltIn(
             "commit",
             kwargs={"message": "chore(prd): {prd_id} decomposed into tasks"},
