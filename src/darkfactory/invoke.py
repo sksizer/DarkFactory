@@ -429,6 +429,15 @@ def invoke_claude(
             model,
             "--allowed-tools",
             ",".join(tools),
+            # Prevent the agent from reading/writing outside the project
+            # directory (cwd). Without this, file tools accept absolute
+            # paths and can escape a worktree into the main repo.
+            "--disallowed-tools",
+            "Edit(../)",
+            "--disallowed-tools",
+            "Write(../)",
+            "--disallowed-tools",
+            "Read(../)",
         ]
 
     try:
