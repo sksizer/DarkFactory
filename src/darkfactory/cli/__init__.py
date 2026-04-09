@@ -1359,7 +1359,7 @@ def _get_merged_prd_prs() -> list[dict[str, Any]]:
             "--state",
             "merged",
             "--json",
-            "headRefName,mergedAt,number",
+            "headRefName,mergedAt,mergeCommit,number",
             "--limit",
             "200",
         ],
@@ -1402,6 +1402,24 @@ def _extract_prd_id_from_path(prd_file: Path) -> str:
     """Extract the PRD ID (e.g. ``PRD-224.7``) from a filename."""
     m = re.match(r"^(PRD-[\d.]+)-", prd_file.name)
     return m.group(1) if m else prd_file.stem
+
+
+def _merge_commit_is_ancestor(pr: dict[str, Any], repo_root: Path) -> bool:
+    """Check whether the PR's merge commit is reachable from HEAD.
+
+    Returns True if the merge commit is an ancestor of HEAD (changes are
+    present), False if it is missing (changes may have been clobbered).
+    When the merge commit SHA is unavailable, returns True to avoid blocking.
+    """
+    merge_commit = pr.get("mergeCommit") or {}
+    sha = merge_commit.get("oid")
+    if not sha:
+        return False  # can't verify — treat as suspicious
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "merge-base", "--is-ancestor", sha, "HEAD"],
+        capture_output=True,
+    )
+    return result.returncode == 0
 
 
 def _build_reconcile_commit_msg(
@@ -1487,6 +1505,31 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
         print("All PRD statuses are up to date.")
         return 0
 
+    # 2b. Verify merge commits are reachable from HEAD.
+    repo_root = _find_repo_root(prd_dir)
+    verified: list[tuple[Path, dict[str, Any]]] = []
+    clobbered: list[tuple[Path, dict[str, Any]]] = []
+    for prd_file, pr in candidates:
+        if _merge_commit_is_ancestor(pr, repo_root):
+            verified.append((prd_file, pr))
+        else:
+            clobbered.append((prd_file, pr))
+
+    if clobbered:
+        print("WARNING: The following PRDs were merged but their merge commits")
+        print("are NOT reachable from HEAD — changes may have been clobbered:\n")
+        for prd_file, pr in clobbered:
+            prd_id = _extract_prd_id_from_path(prd_file)
+            sha = (pr.get("mergeCommit") or {}).get("oid", "???")[:10]
+            print(f"  {prd_id}: PR #{pr['number']} merge commit {sha} missing from HEAD")
+        print()
+
+    candidates = verified
+
+    if not candidates:
+        print("No PRDs to reconcile (all candidates have missing merge commits).")
+        return 0
+
     # 3. Print what would change (dry-run).
     for prd_file, pr in candidates:
         prd_id = _extract_prd_id_from_path(prd_file)
@@ -1504,7 +1547,6 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
         )
 
     # 5. Commit.
-    repo_root = _find_repo_root(prd_dir)
     if args.commit_to_main:
         _commit_to_main(candidates, repo_root)
     else:
