@@ -76,7 +76,11 @@ def test_audit_impacts_all_present(tmp_path: Path) -> None:
 def test_audit_impacts_missing_on_done_prd(tmp_path: Path) -> None:
     """Missing paths on done PRDs are errors and raise ValueError."""
     prd = _write_and_parse(
-        tmp_path, "PRD-002", "missing-file", status="done", impacts=["src/nonexistent.py"]
+        tmp_path,
+        "PRD-002",
+        "missing-file",
+        status="done",
+        impacts=["src/nonexistent.py"],
     )
     ctx = _make_ctx(tmp_path, {"PRD-002": prd})
 
@@ -168,12 +172,18 @@ def test_audit_impacts_mixed_completed_and_incomplete(tmp_path: Path) -> None:
     (tmp_path / "exists.py").touch()
 
     prd_done = _write_and_parse(
-        tmp_path, "PRD-010", "done-missing",
-        status="done", impacts=["exists.py", "missing_done.py"],
+        tmp_path,
+        "PRD-010",
+        "done-missing",
+        status="done",
+        impacts=["exists.py", "missing_done.py"],
     )
     prd_ready = _write_and_parse(
-        tmp_path, "PRD-011", "ready-missing",
-        status="ready", impacts=["missing_ready.py"],
+        tmp_path,
+        "PRD-011",
+        "ready-missing",
+        status="ready",
+        impacts=["missing_ready.py"],
     )
     ctx = _make_ctx(tmp_path, {"PRD-010": prd_done, "PRD-011": prd_ready})
 

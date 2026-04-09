@@ -19,7 +19,14 @@ from typing import Any
 
 from darkfactory import assign, checks, containment, graph, impacts
 from darkfactory.event_log import generate_session_id
-from darkfactory.graph_execution import RunEvent, execute_graph, plan_execution
+from darkfactory.graph_execution import (
+    QueueFilters,
+    QueueStrategy,
+    RunEvent,
+    deps_satisfied,
+    execute_graph,
+    plan_execution,
+)
 from darkfactory.invoke import capability_to_model
 from darkfactory.prd import (
     PRD,
@@ -877,6 +884,8 @@ def _is_graph_target(prd: PRD, prds: dict[str, PRD]) -> bool:
 def cmd_run(args: argparse.Namespace) -> int:
     """Run a workflow against a PRD. Defaults to dry-run; opt in via --execute.
 
+    - **Queue mode (--all):** runs all ready PRDs repo-wide, filtered by
+      ``--priority``, ``--tag``, and ``--exclude``.
     - **Single leaf with deps satisfied:** legacy path — one worktree,
       one workflow run.
     - **Epic/feature with children, or leaf with unmet deps:** graph
@@ -884,17 +893,44 @@ def cmd_run(args: argparse.Namespace) -> int:
       actionable leaf in its own worktree. Sequential only (PRD-220).
       Parallel fan-out is PRD-551.
     """
+    run_all = getattr(args, "run_all", False)
+    prd_id = getattr(args, "prd_id", None)
+
+    if run_all and prd_id:
+        print("error: --all and PRD ID are mutually exclusive", file=sys.stderr)
+        return 1
+    if not run_all and not prd_id:
+        print("error: provide either a PRD ID or --all", file=sys.stderr)
+        return 1
+
     prds = _load(args.prd_dir)
-    if args.prd_id not in prds:
-        raise SystemExit(f"unknown PRD id: {args.prd_id}")
-    prd = prds[args.prd_id]
-
     workflows = _load_workflows_or_fail(args.workflows_dir)
-
     repo_root = _find_repo_root(args.prd_dir)
     base_ref = _resolve_base_ref(args.base, repo_root)
     dry_run = not args.execute
     styler: Styler = args.styler
+
+    if run_all:
+        filters = QueueFilters(
+            min_priority=getattr(args, "priority", None),
+            tags=getattr(args, "tags", None) or [],
+            exclude_ids=getattr(args, "exclude_ids", None) or [],
+        )
+        strategy = QueueStrategy(filters)
+        return _cmd_run_queue(
+            args=args,
+            strategy=strategy,
+            prds=prds,
+            workflows=workflows,
+            repo_root=repo_root,
+            default_base=base_ref,
+            dry_run=dry_run,
+            styler=styler,
+        )
+
+    if prd_id not in prds:
+        raise SystemExit(f"unknown PRD id: {prd_id}")
+    prd = prds[prd_id]
 
     if _is_graph_target(prd, prds):
         return _cmd_run_graph(
@@ -969,6 +1005,132 @@ def cmd_run(args: argparse.Namespace) -> int:
             f"  Result: {styler.render(Element.RUN_FAILURE, '✗ FAILED')} — {result.failure_reason}"
         )
         return 1
+
+
+def _cmd_run_queue(
+    *,
+    args: argparse.Namespace,
+    strategy: QueueStrategy,
+    prds: dict[str, PRD],
+    workflows: dict[str, Workflow],
+    repo_root: Path,
+    default_base: str,
+    dry_run: bool,
+    styler: Styler,
+) -> int:
+    """Queue-execution path for ``prd run --all``.
+
+    In dry-run (the default), prints the ordered ready queue with each PRD's
+    ID, title, priority, and dependency status. With ``--execute``, actually
+    runs all queued PRDs sequentially via :func:`graph_execution.execute_graph`.
+    """
+    max_runs: int | None = args.max_runs
+
+    if dry_run:
+        plan = plan_execution(
+            None,
+            prds,
+            max_runs=max_runs,
+            default_base=default_base,
+            strategy=strategy,
+        )
+
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "mode": "queue",
+                        "default_base": default_base,
+                        "execution_slice": plan.execution_slice,
+                        "skipped": [
+                            {"prd_id": pid, "reason": reason}
+                            for pid, reason in plan.skipped
+                        ],
+                        "max_runs": max_runs,
+                    },
+                    indent=2,
+                )
+            )
+            return 0
+
+        print(
+            styler.render(
+                Element.RUN_HEADER,
+                "# Dry-run queue (--all)",
+            )
+        )
+        print()
+
+        if not plan.execution_slice:
+            print("  (no ready PRDs match the current filters)")
+            return 0
+
+        print(f"  Ready queue ({len(plan.execution_slice)} PRDs will run):")
+        for i, pid in enumerate(plan.execution_slice, start=1):
+            prd = prds.get(pid)
+            title = prd.title if prd else "?"
+            priority = prd.priority if prd else "?"
+            dep_note = (
+                ("deps satisfied" if deps_satisfied(prd, prds) else "deps pending")
+                if prd
+                else "?"
+            )
+            print(f"    {i:>2}. {pid} [{priority}] {title!r} — {dep_note}")
+
+        if plan.skipped:
+            print()
+            print("  Skipped:")
+            for pid, reason in plan.skipped:
+                print(f"    - {pid}: {reason}")
+        return 0
+
+    # --execute path.
+    print(
+        styler.render(
+            Element.RUN_HEADER,
+            "# Executing queue (--all)",
+        )
+    )
+
+    events: list[RunEvent] = []
+
+    def sink(ev: RunEvent) -> None:
+        events.append(ev)
+        if args.json:
+            print(json.dumps(ev.as_dict()), flush=True)
+        else:
+            _print_run_event(ev, styler)
+
+    session = generate_session_id()
+
+    report = execute_graph(
+        prd_dir=args.prd_dir,
+        repo_root=repo_root,
+        workflows=workflows,
+        strategy=strategy,
+        default_base=default_base,
+        max_runs=max_runs,
+        model_override=args.model,
+        workflow_override=args.workflow,
+        dry_run=False,
+        event_sink=sink,
+        styler=styler,
+        session_id=session,
+    )
+
+    print()
+    print(f"  Completed: {len(report.completed)}")
+    for pid in report.completed:
+        print(f"    {styler.render(Element.RUN_SUCCESS, '✓')} {pid}")
+    if report.failed:
+        print(f"  Failed: {len(report.failed)}")
+        for pid, reason in report.failed:
+            print(f"    {styler.render(Element.RUN_FAILURE, '✗')} {pid} — {reason}")
+    if report.skipped:
+        print(f"  Skipped: {len(report.skipped)}")
+        for pid, reason in report.skipped:
+            print(f"    - {pid}: {reason}")
+    return report.exit_code
 
 
 def _cmd_run_graph(
