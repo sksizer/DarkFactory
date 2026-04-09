@@ -2,14 +2,20 @@
 id: PRD-227
 title: "Workflow templates: enforced opening/closing with configurable middle"
 kind: epic
-status: in-progress
+status: review
 priority: high
 effort: m
 capability: moderate
 parent:
 depends_on:
   - "[[PRD-224-harness-invariants-honest-state]]"
-blocks: []
+blocks:
+  - "[[PRD-227.1-core-workflow-template]]"
+  - "[[PRD-227.2-prd-implementation-template]]"
+  - "[[PRD-227.3-migrate-default-workflow]]"
+  - "[[PRD-227.4-migrate-extraction-workflow]]"
+  - "[[PRD-227.5-rework-template]]"
+  - "[[PRD-227.6-system-operation-template]]"
 impacts: []
 workflow: planning
 target_version:
