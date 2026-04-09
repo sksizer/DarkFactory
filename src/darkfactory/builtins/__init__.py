@@ -1,4 +1,7 @@
-"""Built-in task primitives — real implementations.
+"""Built-in task primitives — re-export hub.
+
+Imports every submodule so @builtin-decorated functions register on
+package import. Re-exports the public API for backwards compatibility.
 
 Built-ins are the deterministic SDLC operations that every workflow
 references by name: create a worktree, set a PRD's status, make a
@@ -34,84 +37,44 @@ import shutil
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
 
 from filelock import FileLock, Timeout
 
-from . import prd as prd_module
-from .checks import is_resume_safe
-from .workflow import ExecutionContext, Status
+from darkfactory import prd as prd_module
+from darkfactory.builtins._registry import BUILTINS, BuiltInFunc, builtin
+from darkfactory.builtins._shared import (
+    _FORBIDDEN_ATTRIBUTION_PATTERNS,
+    _run,
+    _scan_for_forbidden_attribution,
+)
+from darkfactory.checks import is_resume_safe
+from darkfactory.workflow import ExecutionContext, Status
 
 _log = logging.getLogger(__name__)
 
-BuiltInFunc = Callable[..., None]
-"""Signature every built-in shares: takes ``ExecutionContext`` plus **kwargs, returns None.
+# Import submodules to trigger registration (added by later PRDs as builtins move)
+# For now, the builtin functions still live in this file until migrated.
 
-Return value is always ``None`` — built-ins communicate results by
-mutating the context (setting ``ctx.worktree_path``, ``ctx.pr_url``, etc.)
-and signal failure by raising an exception. This keeps the dispatch
-uniform in the runner.
-"""
-
-
-BUILTINS: dict[str, BuiltInFunc] = {}
-"""Global registry mapping built-in name to its implementing function.
-
-Populated at import time via the :func:`builtin` decorator. The runner
-looks up names in this dict when dispatching a
-:class:`~darkfactory.workflow.BuiltIn` task. Workflows never touch this
-dict directly — they reference built-ins by name only.
-"""
-
-
-def builtin(name: str) -> Callable[[BuiltInFunc], BuiltInFunc]:
-    """Decorator that registers a function in :data:`BUILTINS`.
-
-    Rejects duplicate registrations with ``ValueError`` to catch typos
-    and accidental overrides during development.
-    """
-
-    def decorator(func: BuiltInFunc) -> BuiltInFunc:
-        if name in BUILTINS:
-            raise ValueError(f"duplicate builtin registration for {name!r}")
-        BUILTINS[name] = func
-        return func
-
-    return decorator
+__all__ = [
+    "BUILTINS",
+    "BuiltInFunc",
+    "builtin",
+    "_run",
+    "_scan_for_forbidden_attribution",
+    "_FORBIDDEN_ATTRIBUTION_PATTERNS",
+    "ensure_worktree",
+    "set_status",
+    "commit",
+    "push_branch",
+    "summarize_agent_run",
+    "commit_transcript",
+    "create_pr",
+    "lint_attribution",
+    "cleanup_worktree",
+]
 
 
 # ---------- internal helpers ----------
-
-
-def _run(
-    ctx: ExecutionContext,
-    cmd: list[str],
-    *,
-    check: bool = True,
-    capture: bool = False,
-) -> subprocess.CompletedProcess[str]:
-    """Run a subprocess command inside ``ctx.cwd`` with dry-run support.
-
-    In dry-run mode, logs the command at INFO level and returns a fake
-    ``CompletedProcess`` with exit code 0. In live mode, runs the
-    command for real and raises ``subprocess.CalledProcessError`` on
-    non-zero exit when ``check=True``.
-
-    Using an explicit argv list (not a shell string) prevents shell
-    injection entirely — callers don't get to interpolate variables
-    into a command line, they build the argv themselves.
-    """
-    if ctx.dry_run:
-        ctx.logger.info("[dry-run] %s", " ".join(cmd))
-        return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
-
-    return subprocess.run(
-        cmd,
-        cwd=str(ctx.cwd),
-        check=check,
-        capture_output=capture,
-        text=True,
-    )
 
 
 def _worktree_target(ctx: ExecutionContext) -> Path:
@@ -556,40 +519,6 @@ def create_pr(ctx: ExecutionContext) -> None:
     # gh prints the PR URL to stdout on success.
     url_line = result.stdout.strip().splitlines()[-1] if result.stdout.strip() else ""
     ctx.pr_url = url_line or None
-
-
-# ----- attribution lint -----
-#
-# The harness MUST NOT credit Claude / Anthropic in commit messages, PR
-# bodies, or run summaries. Default Claude Code commit flows tack on a
-# ``Co-Authored-By: Claude ...`` trailer; subagents have been observed to
-# do the same inside ``retry_agent`` cycles. We detect and reject those
-# patterns loudly rather than silently stripping — silent stripping masks
-# the underlying agent misbehaviour we want to notice and fix.
-_FORBIDDEN_ATTRIBUTION_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"Co-Authored-By:\s*Claude", re.IGNORECASE),
-    re.compile(r"Co-Authored-By:.*@anthropic\.com", re.IGNORECASE),
-    re.compile(r"Generated with .{0,20}Claude Code", re.IGNORECASE),
-    re.compile(r"🤖 Generated with", re.IGNORECASE),
-)
-
-
-def _scan_for_forbidden_attribution(text: str, *, source: str) -> None:
-    """Raise ``RuntimeError`` if ``text`` contains any forbidden pattern.
-
-    ``source`` is a human label (e.g. ``"commit PRD-544"``) included in the
-    error so failures point at the offending artifact. No-op on empty text.
-    """
-    if not text:
-        return
-    for pattern in _FORBIDDEN_ATTRIBUTION_PATTERNS:
-        match = pattern.search(text)
-        if match:
-            raise RuntimeError(
-                f"forbidden attribution pattern in {source}: {match.group(0)!r}. "
-                "Claude/Anthropic must never be credited in commit messages, "
-                "PR bodies, or run summaries — strip the trailer and retry."
-            )
 
 
 @builtin("lint_attribution")
