@@ -173,14 +173,14 @@ addopts = "--import-mode=importlib"
                              │
     ┌───────────┬────────────┼────────────┬───────────┐
     │           │            │            │           │
- 549.3a     549.3b         549.3c       ...         549.3i
- ensure_    set_status    commit       (9 parallel children,
- worktree                                one per builtin)
+  549.3      549.4         549.5        ...          549.11
+  ensure_    set_status    commit       (9 parallel children,
+  worktree                                one per builtin)
     │           │            │                        │
     └───────────┴────────────┼────────────────────────┘
                              │
                      ┌───────┴────────┐
-                     │ PRD-549.4      │
+                     │ PRD-549.12     │
                      │ delete old     │
                      │ tests/test_    │
                      │ builtins.py    │
@@ -202,22 +202,25 @@ addopts = "--import-mode=importlib"
 - **Do not move any builtins yet.** This PRD is an empty functional change: every existing import still resolves, nothing functionally changes, all tests still pass.
 - Done in one commit so that C1…C9 can branch from a clean scaffold.
 
-### PRD-549.3a … PRD-549.3i — One PRD per builtin (9 in parallel)
+### PRD-549.3 … PRD-549.11 — One PRD per builtin (9 in parallel)
+
+> **ID format note.** Earlier drafts of this epic used alphabetic suffixes (PRD-549.3a…3i). That scheme is invalid — `prd validate` requires numeric-only IDs matching `^PRD-\d+(?:\.\d+)*$`. The children below use numeric IDs 549.3 through 549.11. Do **not** reintroduce alphabetic suffixes in any decomposition.
+
 Nine sibling PRDs, one per public builtin:
 
-- **PRD-549.3a** `ensure_worktree` → `builtins/ensure_worktree.py` + `ensure_worktree_test.py`
-- **PRD-549.3b** `set_status` → `builtins/set_status.py` + `set_status_test.py`
-- **PRD-549.3c** `commit` → `builtins/commit.py` + `commit_test.py`
-- **PRD-549.3d** `push_branch` → `builtins/push_branch.py` + `push_branch_test.py`
-- **PRD-549.3e** `summarize_agent_run` → `builtins/summarize_agent_run.py` + `summarize_agent_run_test.py`
-- **PRD-549.3f** `commit_transcript` → `builtins/commit_transcript.py` + `commit_transcript_test.py`
-- **PRD-549.3g** `create_pr` → `builtins/create_pr.py` + `create_pr_test.py`
-- **PRD-549.3h** `cleanup_worktree` → `builtins/cleanup_worktree.py` + `cleanup_worktree_test.py`
-- **PRD-549.3i** Promote any shared helpers identified during 3a–3h to `builtins/_shared.py` (may be a trailing cleanup rather than a parallel sibling).
+- **PRD-549.3** `ensure_worktree` → `builtins/ensure_worktree.py` + `ensure_worktree_test.py`
+- **PRD-549.4** `set_status` → `builtins/set_status.py` + `set_status_test.py`
+- **PRD-549.5** `commit` → `builtins/commit.py` + `commit_test.py`
+- **PRD-549.6** `push_branch` → `builtins/push_branch.py` + `push_branch_test.py`
+- **PRD-549.7** `summarize_agent_run` → `builtins/summarize_agent_run.py` + `summarize_agent_run_test.py`
+- **PRD-549.8** `commit_transcript` → `builtins/commit_transcript.py` + `commit_transcript_test.py`
+- **PRD-549.9** `create_pr` → `builtins/create_pr.py` + `create_pr_test.py`
+- **PRD-549.10** `cleanup_worktree` → `builtins/cleanup_worktree.py` + `cleanup_worktree_test.py`
+- **PRD-549.11** Promote any shared helpers identified during 549.3–549.10 to `builtins/_shared.py` (may be a trailing cleanup rather than a parallel sibling).
 
 Each PRD in this fan-out:
 1. Creates the new submodule file, moves the relevant function + its exclusively-used helpers, adds colocated `*_test.py` with unit tests covering the function's branches.
-2. Deletes the function from `src/darkfactory/builtins.py` (the old monolith). By the end of PRD-549.3, `builtins.py` should contain only the `@builtin`/registry import shim or be deletable.
+2. Deletes the function from `src/darkfactory/builtins.py` (the old monolith). By the end of PRD-549.11, `builtins.py` should contain only the `@builtin`/registry import shim or be deletable.
 3. Passes `just test && just lint && just typecheck && just format-check`.
 4. Is independent of its siblings — any conflict on the shrinking `builtins.py` file is a known friction point worth observing for DAG execution.
 
@@ -226,8 +229,8 @@ Each PRD in this fan-out:
 - **(b)** Have PRD-549.2 also pre-delete `builtins.py` entirely and move its contents into a temporary `_legacy.py` that each child imports from and chips away at. More complex but avoids the conflict.
 - Recommendation: **(a)** — the point of this epic *is* to stress-test the harness, and avoiding the conflict would defeat that.
 
-### PRD-549.4 — Final cleanup
-- Delete `tests/test_builtins.py` (its coverage has been migrated into the colocated files by 549.3a–h).
+### PRD-549.12 — Final cleanup
+- Delete `tests/test_builtins.py` (its coverage has been migrated into the colocated files by 549.3–549.10).
 - Delete `src/darkfactory/builtins.py` if it still exists as a stub; otherwise no-op.
 - Verify the `builtins/` directory is the single source of truth and re-exports everything needed.
 
@@ -238,18 +241,18 @@ Each PRD in this fan-out:
 - [ ] **AC-3** (post-549.1): A built wheel (`uv build` / `python -m build`) contains zero `*_test.py` files. Automated check exists to prove this.
 - [ ] **AC-4** (post-549.1): `conftest.py` at the repo root provides shared fixtures to both `tests/` and colocated unit tests.
 - [ ] **AC-5** (post-549.2): `src/darkfactory/builtins/` exists as a package, `_registry.py` holds the decorator + registry, `__init__.py` re-exports the public API unchanged. Every existing import site still resolves. All tests pass.
-- [ ] **AC-6** (post-549.3a–i): Each of the nine builtins lives in its own submodule `src/darkfactory/builtins/<name>.py` with a colocated `<name>_test.py` that exercises the function's non-trivial branches.
-- [ ] **AC-7** (post-549.3): Shared helpers used by more than one builtin live in `src/darkfactory/builtins/_shared.py`. Helpers used by exactly one builtin live in that builtin's own submodule.
-- [ ] **AC-8** (post-549.4): The old `src/darkfactory/builtins.py` monolith and `tests/test_builtins.py` are both deleted. No dead code remains.
+- [ ] **AC-6** (post-549.3–549.11): Each of the nine builtins lives in its own submodule `src/darkfactory/builtins/<name>.py` with a colocated `<name>_test.py` that exercises the function's non-trivial branches.
+- [ ] **AC-7** (post-549.11): Shared helpers used by more than one builtin live in `src/darkfactory/builtins/_shared.py`. Helpers used by exactly one builtin live in that builtin's own submodule.
+- [ ] **AC-8** (post-549.12): The old `src/darkfactory/builtins.py` monolith and `tests/test_builtins.py` are both deleted. No dead code remains.
 - [ ] **AC-9** (ongoing): At every child PRD merge, `just test`, `just lint`, `just typecheck`, and `just format-check` all pass clean. No existing test is deleted without a colocated replacement.
 - [ ] **AC-10** (ongoing): The public Python API of `darkfactory.builtins` is unchanged. Grep of the rest of the codebase confirms no import sites needed edits beyond what the refactor itself changed.
 
 ## Open Questions
 
-- [ ] **Conflict-stress vs conflict-avoidance in PRD-549.3.** Recommendation: accept the conflict and let the harness prove it can rebase. Confirm before kicking off the nine parallel children.
+- [ ] **Conflict-stress vs conflict-avoidance in the 549.3–549.11 fan-out.** Recommendation: accept the conflict and let the harness prove it can rebase. Confirm before kicking off the nine parallel children.
 - [ ] **PRD-543 interaction with `_run`.** PRD-543 wants to promote subprocess handling into a shared `run_cli` helper. If 543 merges first, this epic adopts the new helper directly and skips `_shared._run`. If 549 merges first, `_run` lives in `builtins/_shared.py` until 543 moves it. Either order is fine; flagging so the two don't surprise each other.
 - [ ] **Test discovery under `workflows/`.** Do we want colocated unit tests inside workflow modules too, or is the convention scoped to `src/darkfactory/`? Leaning toward "yes, everywhere" — but flagging since it expands the pytest `testpaths` list.
-- [ ] **`summarize_agent_run` coverage.** The existing `tests/test_builtins.py` coverage for this function may be thin; PRD-549.3e should audit and backfill as needed.
+- [ ] **`summarize_agent_run` coverage.** The existing `tests/test_builtins.py` coverage for this function may be thin; PRD-549.7 should audit and backfill as needed.
 - [ ] **Follow-up epics.** Same treatment for `cli.py`, `runner.py`, and `invoke.py` is explicitly **out of scope** for this epic. If the pattern works out, each of those gets its own epic; the first to run will revisit the lessons learned here.
 
 ## References
