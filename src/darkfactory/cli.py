@@ -38,6 +38,7 @@ from .prd import (
     normalize_list_field_at,
     parse_id_sort_key,
     set_workflow,
+    update_frontmatter_field_at,
 )
 from .runner import _compute_branch_name, _pick_model, run_workflow
 from .style import Element, Styler, resolve_style_config
@@ -1312,6 +1313,170 @@ def _cmd_run_graph(
     return report.exit_code
 
 
+def _get_merged_prd_prs() -> list[dict[str, Any]]:
+    """Return merged PRs whose head branch matches ``prd/PRD-*``."""
+    result = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "list",
+            "--state",
+            "merged",
+            "--json",
+            "headRefName,mergedAt,number",
+            "--limit",
+            "200",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise SystemExit(f"gh pr list failed: {result.stderr.strip()}")
+    prs: list[dict[str, Any]] = json.loads(result.stdout)
+    return [pr for pr in prs if re.match(r"^prd/PRD-", pr["headRefName"])]
+
+
+def _find_prd_file_for_branch(branch_name: str, prd_dir: Path) -> Path | None:
+    """Return the PRD file for a branch like ``prd/PRD-224.7-reconcile-status``."""
+    m = re.match(r"^prd/(PRD-[\d.]+)", branch_name)
+    if not m:
+        return None
+    prd_id = m.group(1)
+    for f in sorted(prd_dir.glob(f"{prd_id}-*.md")):
+        return f
+    return None
+
+
+def _get_prd_status(path: Path) -> str | None:
+    """Read the ``status`` field from a PRD file's frontmatter."""
+    text = path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        m = re.match(r"^status:\s*(.+)$", line)
+        if m:
+            return m.group(1).strip().strip("\"'")
+    return None
+
+
+def _extract_prd_id_from_path(prd_file: Path) -> str:
+    """Extract the PRD ID (e.g. ``PRD-224.7``) from a filename."""
+    m = re.match(r"^(PRD-[\d.]+)-", prd_file.name)
+    return m.group(1) if m else prd_file.stem
+
+
+def _build_reconcile_commit_msg(
+    candidates: list[tuple[Path, dict[str, Any]]],
+) -> str:
+    """Build the commit message for a reconcile operation."""
+    if len(candidates) == 1:
+        prd_file, pr = candidates[0]
+        prd_id = _extract_prd_id_from_path(prd_file)
+        return (
+            f"chore(prd): mark {prd_id} done "
+            f"(auto-reconciled from merged PR #{pr['number']}) [skip ci]"
+        )
+    return f"chore(prd): reconcile {len(candidates)} merged PRD statuses [skip ci]"
+
+
+def _commit_to_main(
+    candidates: list[tuple[Path, dict[str, Any]]],
+    repo_root: Path,
+) -> None:
+    """Stage changed PRD files and commit directly to main."""
+    files = [str(c[0]) for c in candidates]
+    subprocess.run(["git", "-C", str(repo_root), "add"] + files, check=True)
+    msg = _build_reconcile_commit_msg(candidates)
+    subprocess.run(
+        ["git", "-C", str(repo_root), "commit", "-m", msg],
+        check=True,
+    )
+
+
+def _create_reconcile_pr(
+    candidates: list[tuple[Path, dict[str, Any]]],
+    repo_root: Path,
+) -> None:
+    """Create a PR with the reconciled status changes."""
+    branch = "prd/reconcile-status"
+    subprocess.run(
+        ["git", "-C", str(repo_root), "checkout", "-b", branch],
+        check=True,
+    )
+    files = [str(c[0]) for c in candidates]
+    subprocess.run(["git", "-C", str(repo_root), "add"] + files, check=True)
+    msg = _build_reconcile_commit_msg(candidates)
+    subprocess.run(
+        ["git", "-C", str(repo_root), "commit", "-m", msg],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repo_root), "push", "-u", "origin", branch],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "gh",
+            "pr",
+            "create",
+            "--title",
+            msg,
+            "--body",
+            "Auto-reconciled by `prd reconcile`",
+        ],
+        check=True,
+    )
+
+
+def cmd_reconcile(args: argparse.Namespace) -> int:
+    """Find merged-but-not-flipped PRDs and reconcile their status."""
+    prd_dir = args.prd_dir
+
+    # 1. Get merged PRs with prd/* branches.
+    merged_prs = _get_merged_prd_prs()
+
+    # 2. Find corresponding PRD files still in 'review'.
+    candidates: list[tuple[Path, dict[str, Any]]] = []
+    for pr in merged_prs:
+        prd_file = _find_prd_file_for_branch(pr["headRefName"], prd_dir)
+        if prd_file is None:
+            continue
+        if _get_prd_status(prd_file) == "review":
+            candidates.append((prd_file, pr))
+
+    if not candidates:
+        print("All PRD statuses are up to date.")
+        return 0
+
+    # 3. Print what would change (dry-run).
+    for prd_file, pr in candidates:
+        prd_id = _extract_prd_id_from_path(prd_file)
+        print(f"  {prd_id}: review -> done (from merged PR #{pr['number']})")
+
+    if not args.execute:
+        print("\nDry run. Use --execute to apply changes.")
+        return 0
+
+    # 4. Apply changes.
+    today = date.today().isoformat()
+    for prd_file, _pr in candidates:
+        update_frontmatter_field_at(
+            prd_file, {"status": "done", "updated": f"'{today}'"}
+        )
+
+    # 5. Commit.
+    repo_root = _find_repo_root(prd_dir)
+    if args.commit_to_main:
+        _commit_to_main(candidates, repo_root)
+    else:
+        _create_reconcile_pr(candidates, repo_root)
+
+    return 0
+
+
 def _print_run_event(ev: RunEvent, styler: Styler) -> None:
     if ev.event == "start":
         base = f" (base {ev.base_ref})" if ev.base_ref else ""
@@ -1552,6 +1717,24 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     sub_run.set_defaults(func=cmd_run)
+
+    sub_reconcile = sub.add_parser(
+        "reconcile",
+        help="Find merged-but-not-flipped PRDs and reconcile their status",
+    )
+    sub_reconcile.add_argument(
+        "--execute",
+        action="store_true",
+        help="Apply the status updates (default is dry-run)",
+    )
+    sub_reconcile.add_argument(
+        "--commit-to-main",
+        dest="commit_to_main",
+        action="store_true",
+        default=False,
+        help="Commit directly to main instead of opening a PR",
+    )
+    sub_reconcile.set_defaults(func=cmd_reconcile)
 
     return parser
 
