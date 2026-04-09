@@ -32,6 +32,7 @@ handling and dry-run support.
 from __future__ import annotations
 
 import subprocess  # noqa: F401  # re-exported for test monkeypatching
+import logging
 
 from darkfactory.builtins._registry import BUILTINS, BuiltInFunc, builtin
 from darkfactory.builtins._shared import (
@@ -68,3 +69,19 @@ __all__ = [
     "lint_attribution",
     "cleanup_worktree",
 ]
+
+def _format_tool_counts(tool_counts: dict[str, int]) -> str:
+    """Format tool counts as a compact inline string, e.g. 'Read×5, Edit×3'."""
+    if not tool_counts:
+        return "none"
+    return ", ".join(f"{name}×{count}" for name, count in sorted(tool_counts.items()))
+
+
+def _format_invocations(ctx: ExecutionContext) -> str:
+    """Format agent invocation count from context."""
+    count = ctx.invoke_count
+    if count == 0:
+        return "0"
+    if count == 1:
+        return "1"
+    return str(count)
