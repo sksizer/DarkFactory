@@ -57,6 +57,7 @@ _log = logging.getLogger(__name__)
 
 # Import submodules to trigger @builtin registration.
 from darkfactory.builtins.ensure_worktree import ensure_worktree  # noqa: E402
+from darkfactory.builtins.push_branch import push_branch  # noqa: E402
 
 __all__ = [
     "BUILTINS",
@@ -114,136 +115,6 @@ def _pr_body(ctx: ExecutionContext) -> str:
 # ---------- built-in implementations ----------
 
 
-@builtin("ensure_worktree")
-def ensure_worktree(ctx: ExecutionContext) -> None:
-    """Create (or resume) a git worktree for this PRD.
-
-    Target path: ``{repo_root}/.worktrees/{prd_id}-{slug}``. Branch:
-    ``prd/{prd_id}-{slug}`` created from ``ctx.base_ref``. If the
-    worktree already exists (previous run resumed), reuses it without
-    re-creating. Sets ``ctx.worktree_path`` and ``ctx.cwd`` on success.
-
-    In live mode, acquires a per-PRD advisory file lock at
-    ``.worktrees/{prd_id}.lock`` before any mutation so two concurrent
-    ``prd run`` invocations for the same PRD fail fast with a clear
-    message instead of racing. The lock is auto-released by the kernel
-    when the process exits; the runner also releases it explicitly at the
-    end of the run (see ``_release_worktree_lock``).
-    """
-    worktree_path = _worktree_target(ctx)
-    branch = ctx.branch_name
-
-    if ctx.dry_run:
-        # Dry-run produces no side effects, so no lock needed.
-        ctx.logger.info(
-            "[dry-run] git worktree add -b %s %s %s",
-            branch,
-            worktree_path,
-            ctx.base_ref,
-        )
-        ctx.worktree_path = worktree_path
-        ctx.cwd = worktree_path
-        return
-
-    # Acquire the lock BEFORE the resume-check or any mutation.
-    # The lock file lives at .worktrees/PRD-X.lock and is per-PRD.
-    lock_path = ctx.repo_root / ".worktrees" / f"{ctx.prd.id}.lock"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-
-    lock = FileLock(str(lock_path))
-    try:
-        lock.acquire(timeout=0)  # non-blocking
-    except Timeout:
-        raise RuntimeError(
-            f"{ctx.prd.id} is already being worked on by another `prd run` "
-            f"process (lock held on {lock_path}). If that process died, "
-            f"the lock will auto-release when its file handle is reclaimed. "
-            f"On a stuck lock, delete {lock_path} manually."
-        ) from None
-
-    ctx._worktree_lock = lock
-
-    # ---- existing logic below, now lock-protected ----
-    if worktree_path.exists():
-        status = is_resume_safe(branch, ctx.repo_root)
-        if not status.safe:
-            lock.release()
-            ctx._worktree_lock = None
-            raise RuntimeError(status.reason)
-        ctx.logger.info("resuming existing worktree: %s", worktree_path)
-        ctx.worktree_path = worktree_path
-        ctx.cwd = worktree_path
-        return
-
-    local_exists = _branch_exists_local(ctx.repo_root, branch)
-    remote_exists = _branch_exists_remote(ctx.repo_root, branch)
-    if local_exists or remote_exists:
-        # Release the lock before raising so the error state is clean.
-        lock.release()
-        ctx._worktree_lock = None
-        raise RuntimeError(
-            f"branch {branch!r} already exists but worktree {worktree_path} is gone. "
-            f"Run `prd cleanup {ctx.prd.id}` to release it."
-        )
-
-    # git worktree add -b <branch> <path> <base>
-    # Run from the repo root, not from ctx.cwd (which may not be a git dir yet).
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(ctx.repo_root),
-            "worktree",
-            "add",
-            "-b",
-            branch,
-            str(worktree_path),
-            ctx.base_ref,
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-    ctx.worktree_path = worktree_path
-    ctx.cwd = worktree_path
-@builtin("set_status")
-def set_status(ctx: ExecutionContext, *, to: Status) -> None:
-    """Rewrite the PRD's ``status:`` frontmatter field inside the worktree.
-
-    Targets the worktree's copy of the PRD file, never the source repo.
-    The source repo's working tree must remain untouched by ``prd run`` —
-    status transitions live on the PRD's worktree branch and only reach
-    the source repo via PR merge (see PRD-213).
-
-    Uses :func:`darkfactory.prd.set_status_at`, which surgically rewrites
-    only the ``status:`` and ``updated:`` lines so the resulting commit
-    diff is two lines, not the whole frontmatter block.
-    """
-    if ctx.dry_run:
-        ctx.logger.info(
-            "[dry-run] set status of %s: %s -> %s (worktree=%s)",
-            ctx.prd.id,
-            ctx.prd.status,
-            to,
-            ctx.worktree_path,
-        )
-        return
-
-    if ctx.worktree_path is None:
-        raise RuntimeError(
-            "set_status requires a worktree; ensure_worktree must run first"
-        )
-
-    relative = ctx.prd.path.relative_to(ctx.repo_root)
-    target = ctx.worktree_path / relative
-    prd_module.set_status_at(target, to)
-    # Mirror the field updates onto the in-memory PRD so subsequent
-    # builtins see the new status without re-loading from disk.
-    ctx.prd.status = to
-    from datetime import date as _date
-
-    ctx.prd.updated = _date.today().isoformat()
 
 
 @builtin("commit")
@@ -290,29 +161,6 @@ def commit(ctx: ExecutionContext, *, message: str) -> None:
     # Commit
     subprocess.run(
         ["git", "commit", "-m", formatted],
-        cwd=str(ctx.cwd),
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-
-@builtin("push_branch")
-def push_branch(ctx: ExecutionContext) -> None:
-    """Push the current branch to origin with upstream tracking.
-
-    Runs ``git push -u origin {branch}`` inside the worktree. Required
-    before :func:`create_pr` because ``gh pr create --base`` needs the
-    remote to exist.
-    """
-    cmd = ["git", "push", "-u", "origin", ctx.branch_name]
-
-    if ctx.dry_run:
-        ctx.logger.info("[dry-run] %s", " ".join(cmd))
-        return
-
-    subprocess.run(
-        cmd,
         cwd=str(ctx.cwd),
         check=True,
         capture_output=True,
