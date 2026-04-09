@@ -2,7 +2,7 @@
 id: PRD-530
 title: Set up CI for darkfactory
 kind: task
-status: ready
+status: in-progress
 priority: medium
 effort: s
 capability: simple
@@ -15,7 +15,7 @@ impacts:
 workflow:
 target_version:
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-08'
 tags:
   - harness
   - extraction
