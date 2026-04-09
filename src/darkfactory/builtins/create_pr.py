@@ -105,3 +105,12 @@ def create_pr(ctx: ExecutionContext) -> None:
     # gh prints the PR URL to stdout on success.
     url_line = result.stdout.strip().splitlines()[-1] if result.stdout.strip() else ""
     ctx.pr_url = url_line or None
+
+    if ctx.event_writer:
+        ctx.event_writer.emit(
+            "task",
+            "builtin_effect",
+            task="create_pr",
+            effect="create_pr",
+            detail={"pr_url": ctx.pr_url, "base": ctx.base_ref, "title": title},
+        )

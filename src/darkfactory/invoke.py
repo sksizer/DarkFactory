@@ -42,6 +42,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from .event_log import EventWriter
     from .style import Element, Styler
 
 
@@ -379,6 +380,8 @@ def invoke_claude(
     logger: logging.Logger | None = None,
     styler: "Styler | None" = None,
     _argv_override: list[str] | None = None,
+    event_writer: "EventWriter | None" = None,
+    event_task_name: str | None = None,
 ) -> InvokeResult:
     """Run Claude Code as a subprocess with the given prompt and return the result.
 
@@ -548,6 +551,15 @@ def invoke_claude(
             if not isinstance(event, dict):
                 log.info("agent: %s", stripped)
                 continue
+
+            # Emit agent_event to the structured event log.
+            if event_writer is not None:
+                event_writer.emit(
+                    "task",
+                    "agent_event",
+                    task=event_task_name or "agent",
+                    event=event,
+                )
 
             element, display_text, agent_text = _summarize_stream_event(event)
             # Accumulate tool-call counts from assistant events.

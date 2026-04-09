@@ -29,3 +29,12 @@ def push_branch(ctx: ExecutionContext) -> None:
         capture_output=True,
         text=True,
     )
+
+    if ctx.event_writer:
+        ctx.event_writer.emit(
+            "task",
+            "builtin_effect",
+            task="push_branch",
+            effect="push",
+            detail={"branch": ctx.branch_name},
+        )

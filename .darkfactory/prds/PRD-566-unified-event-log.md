@@ -2,7 +2,7 @@
 id: PRD-566
 title: Unified structured event log for harness execution
 kind: feature
-status: draft
+status: review
 priority: high
 effort: m
 capability: moderate
@@ -20,7 +20,7 @@ assignee:
 reviewers: []
 target_version:
 created: 2026-04-09
-updated: 2026-04-09
+updated: '2026-04-09'
 tags:
   - harness
   - observability
