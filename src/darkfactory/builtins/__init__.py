@@ -38,9 +38,6 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from filelock import FileLock, Timeout
-
-from darkfactory import prd as prd_module
 from darkfactory.builtins._registry import BUILTINS, BuiltInFunc, builtin
 from darkfactory.builtins._shared import (
     _FORBIDDEN_ATTRIBUTION_PATTERNS,
@@ -48,10 +45,7 @@ from darkfactory.builtins._shared import (
     _scan_for_forbidden_attribution,
 )
 from darkfactory.builtins.set_status import set_status  # noqa: F401
-from darkfactory.checks import is_resume_safe
-_log = logging.getLogger(__name__)
-
-from darkfactory.workflow import ExecutionContext, Status
+from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
 
@@ -59,6 +53,7 @@ _log = logging.getLogger(__name__)
 from darkfactory.builtins.commit import commit  # noqa: E402
 from darkfactory.builtins.ensure_worktree import ensure_worktree  # noqa: E402
 from darkfactory.builtins.push_branch import push_branch  # noqa: E402
+from darkfactory.builtins.summarize_agent_run import summarize_agent_run  # noqa: E402
 
 __all__ = [
     "BUILTINS",
@@ -115,6 +110,7 @@ def _pr_body(ctx: ExecutionContext) -> str:
 
 # ---------- built-in implementations ----------
 
+
 def _format_tool_counts(tool_counts: dict[str, int]) -> str:
     """Format tool counts as a compact inline string, e.g. 'Read×5, Edit×3'."""
     if not tool_counts:
@@ -130,26 +126,7 @@ def _format_invocations(ctx: ExecutionContext) -> str:
     if count == 1:
         return "1"
     return str(count)
-
-
-@builtin("summarize_agent_run")
-def summarize_agent_run(ctx: ExecutionContext) -> None:
-    """Aggregate tool-call counts and write a markdown summary to ctx.run_summary."""
-    result = ctx.last_invoke_result
-    if result is None:
-        return
-
-    lines = [
-        "## Harness execution summary",
-        "",
-        f"- **Workflow:** {ctx.workflow.name}",
-        f"- **Model:** {ctx.model or 'unknown'}",
-        f"- **Agent invocations:** {_format_invocations(ctx)}",
-        f"- **Tools used:** {_format_tool_counts(result.tool_counts)}",
-        f"- **Sentinel:** {result.sentinel or 'none'}",
-    ]
-    ctx.run_summary = "\n".join(lines)
-
+  
 
 @builtin("commit_transcript")
 def commit_transcript(ctx: ExecutionContext) -> None:
