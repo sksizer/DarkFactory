@@ -35,7 +35,7 @@ def commit_transcript(ctx: ExecutionContext) -> None:
     """
     src = ctx.repo_root / ".harness-transcripts" / f"{ctx.prd.id}.jsonl"
     if not src.exists():
-        ctx.jsonlger.info("commit_transcript: no transcript found; skipping")
+        ctx.logger.info("commit_transcript: no transcript found; skipping")
         return
 
     if ctx.dry_run:
@@ -43,7 +43,7 @@ def commit_transcript(ctx: ExecutionContext) -> None:
         dest = (
             ctx.cwd / ".darkfactory" / "transcripts" / f"{ctx.prd.id}-{timestamp}.jsonl"
         )
-        ctx.jsonlger.info("[dry-run] copy %s -> %s && git add", src, dest)
+        ctx.logger.info("[dry-run] copy %s -> %s && git add", src, dest)
         return
 
     transcript_dir = ctx.cwd / ".darkfactory" / "transcripts"
@@ -58,4 +58,4 @@ def commit_transcript(ctx: ExecutionContext) -> None:
     shutil.copy2(str(src), str(dest))
 
     subprocess.run(["git", "add", str(dest)], cwd=str(ctx.cwd), check=True)
-    ctx.jsonlger.info("commit_transcript: staged %s", dest.relative_to(ctx.cwd))
+    ctx.logger.info("commit_transcript: staged %s", dest.relative_to(ctx.cwd))

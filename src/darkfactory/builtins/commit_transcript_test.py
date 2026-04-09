@@ -25,8 +25,8 @@ def test_no_transcript_skips_and_logs(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
     # No transcript file created — src will not exist
     commit_transcript(ctx)
-    ctx.jsonlger.info.assert_called()
-    call_args = ctx.jsonlger.info.call_args[0]
+    ctx.logger.info.assert_called()
+    call_args = ctx.logger.info.call_args[0]
     assert "skipping" in call_args[0]
 
 
@@ -48,8 +48,8 @@ def test_dry_run_logs_intended_move(tmp_path: Path) -> None:
 
     commit_transcript(ctx)
 
-    ctx.jsonlger.info.assert_called()
-    log_msg = ctx.jsonlger.info.call_args[0][0]
+    ctx.logger.info.assert_called()
+    log_msg = ctx.logger.info.call_args[0][0]
     assert "[dry-run]" in log_msg
 
 
@@ -114,6 +114,6 @@ def test_successful_run_logs_staged(tmp_path: Path) -> None:
     with patch("darkfactory.builtins.commit_transcript.subprocess.run"):
         commit_transcript(ctx)
 
-    ctx.jsonlger.info.assert_called()
-    log_msg = ctx.jsonlger.info.call_args[0][0]
+    ctx.logger.info.assert_called()
+    log_msg = ctx.logger.info.call_args[0][0]
     assert "staged" in log_msg
