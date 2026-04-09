@@ -7,7 +7,8 @@ from typing import Any
 import pytest
 
 from darkfactory.templates import TemplateViolation, WorkflowTemplate
-from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Workflow
+from darkfactory.templates_builtin import SYSTEM_OPERATION_TEMPLATE
+from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Task, Workflow
 
 
 def _make_template(**kwargs: Any) -> WorkflowTemplate:
@@ -328,3 +329,76 @@ def test_workflow_can_be_constructed_without_template_name() -> None:
     )
     assert wf.template_name is None
     assert len(wf.tasks) == 2
+
+
+# ---------- SYSTEM_OPERATION_TEMPLATE ----------
+
+
+def test_system_operation_template_is_importable() -> None:
+    """SYSTEM_OPERATION_TEMPLATE is importable from darkfactory.templates_builtin."""
+    assert SYSTEM_OPERATION_TEMPLATE is not None
+    assert SYSTEM_OPERATION_TEMPLATE.name == "system-operation"
+
+
+def test_system_operation_template_open_starts_with_acquire_lock() -> None:
+    """The first open task is acquire_global_lock."""
+    assert SYSTEM_OPERATION_TEMPLATE.open[0] == BuiltIn("acquire_global_lock")
+
+
+def test_system_operation_template_close_ends_with_release_lock() -> None:
+    """The last close task is release_global_lock."""
+    assert SYSTEM_OPERATION_TEMPLATE.close[-1] == BuiltIn("release_global_lock")
+
+
+def test_system_operation_template_compose_empty_middle_succeeds() -> None:
+    """Composing with an empty middle is valid (no minimum count constraints)."""
+    wf = SYSTEM_OPERATION_TEMPLATE.compose(
+        name="sys-op",
+        description="test run",
+        applies_to=_dummy_applies_to,
+        priority=0,
+        middle=[],
+    )
+    # open(2) + middle(0) + close(3) = 5
+    assert len(wf.tasks) == 5
+    assert wf.tasks[0] == BuiltIn("acquire_global_lock")
+    assert wf.tasks[-1] == BuiltIn("release_global_lock")
+
+
+def test_system_operation_template_compose_valid_middle() -> None:
+    """Valid composition produces [lock, log_start, *middle, report, log_end, unlock]."""
+    shell = ShellTask(name="run-op", cmd="just operate")
+    agent = AgentTask(name="agent-op")
+    wf = SYSTEM_OPERATION_TEMPLATE.compose(
+        name="sys-op",
+        description="test run",
+        applies_to=_dummy_applies_to,
+        priority=0,
+        middle=[shell, agent],
+    )
+    assert wf.tasks == [
+        BuiltIn("acquire_global_lock"),
+        BuiltIn("log_operation_start"),
+        shell,
+        agent,
+        BuiltIn("write_report"),
+        BuiltIn("log_operation_end"),
+        BuiltIn("release_global_lock"),
+    ]
+
+
+def test_system_operation_template_disallows_unknown_kinds() -> None:
+    """A task kind not in middle_kinds raises TemplateViolation."""
+
+    class ForeignTask(Task):
+        pass
+
+    foreign = ForeignTask()
+    with pytest.raises(TemplateViolation, match="not an allowed middle kind"):
+        SYSTEM_OPERATION_TEMPLATE.compose(
+            name="sys-op",
+            description="",
+            applies_to=_dummy_applies_to,
+            priority=0,
+            middle=[foreign],
+        )
