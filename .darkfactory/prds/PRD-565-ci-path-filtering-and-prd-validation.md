@@ -2,7 +2,7 @@
 id: PRD-565
 title: CI path filtering with dedicated PRD validation workflow
 kind: feature
-status: draft
+status: in-progress
 priority: high
 effort: s
 capability: simple
