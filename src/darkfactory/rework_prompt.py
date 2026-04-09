@@ -45,7 +45,8 @@ def render_rework_feedback(threads: list[ReviewThread]) -> str:
             parts.append("**Thread replies:**")
             for reply in thread.replies:
                 reply_quoted = "\n".join(
-                    f"> {line}" for line in f"**{reply.author}:** {reply.body}".splitlines()
+                    f"> {line}"
+                    for line in f"**{reply.author}:** {reply.body}".splitlines()
                 )
                 parts.append(reply_quoted)
 

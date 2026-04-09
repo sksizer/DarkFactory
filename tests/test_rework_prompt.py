@@ -222,7 +222,10 @@ def test_rework_feedback_inserted_via_extras(tmp_path: Path) -> None:
     )
 
     result = compose_prompt(
-        wf, ["prompts/task.md"], cast(ExecutionContext, ctx), extras={"REWORK_FEEDBACK": feedback}
+        wf,
+        ["prompts/task.md"],
+        cast(ExecutionContext, ctx),
+        extras={"REWORK_FEEDBACK": feedback},
     )
 
     assert "PRD-225" in result
