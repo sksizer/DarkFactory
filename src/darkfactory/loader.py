@@ -86,6 +86,18 @@ def load_workflows(workflows_dir: Path) -> dict[str, Workflow]:
     return workflows
 
 
+def load_builtin_workflows() -> dict[str, Workflow]:
+    """Return all built-in workflows shipped inside the package.
+
+    Delegates to :func:`darkfactory.workflows.get_builtin_workflows` so
+    the loader stays the single public entry point for callers that don't
+    want to import from the workflows sub-package directly.
+    """
+    from darkfactory.workflows import get_builtin_workflows
+
+    return get_builtin_workflows()
+
+
 def _load_workflow_module(workflow_file: Path, subdir: Path) -> Workflow:
     """Import a single workflow.py and return the Workflow instance it exports.
 

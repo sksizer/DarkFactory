@@ -32,9 +32,9 @@ handling and dry-run support.
 from __future__ import annotations
 
 import subprocess  # noqa: F401  # re-exported for test monkeypatching
-import logging
 
 from darkfactory.builtins._registry import BUILTINS, BuiltInFunc, builtin
+from darkfactory.workflow import ExecutionContext
 from darkfactory.builtins._shared import (
     _FORBIDDEN_ATTRIBUTION_PATTERNS,
     _run,
@@ -69,6 +69,7 @@ __all__ = [
     "lint_attribution",
     "cleanup_worktree",
 ]
+
 
 def _format_tool_counts(tool_counts: dict[str, int]) -> str:
     """Format tool counts as a compact inline string, e.g. 'Read×5, Edit×3'."""

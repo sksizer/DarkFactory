@@ -23,8 +23,8 @@ from .conftest import write_prd
 
 
 def _workflows_dir() -> Path:
-    """Return the real workflows/ directory in the repo."""
-    return Path(__file__).resolve().parent.parent / "workflows"
+    """Return the built-in workflows/ directory inside the package."""
+    return Path(__file__).resolve().parent.parent / "src" / "darkfactory" / "workflows"
 
 
 # ---------- loader ----------
