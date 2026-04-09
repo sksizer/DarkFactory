@@ -348,7 +348,8 @@ def test_assign_missing_project_workflows_dir_is_ok(
             str(prd_dir),
             "--workflows-dir",
             str(tmp_path / "does-not-exist"),
-            "assign",
+            "list-workflows",
         ]
     )
     assert exit_code == 0
+    assert "no workflows loaded" in capsys.readouterr().out
