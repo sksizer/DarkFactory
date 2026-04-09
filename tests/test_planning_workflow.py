@@ -120,15 +120,15 @@ def test_agent_task_model_pinned_to_opus() -> None:
     assert agent.model_from_capability is False
 
 
-def test_agent_task_has_no_edit_tool() -> None:
-    """The decompose AgentTask does not include Edit in its tool allowlist."""
+def test_agent_task_has_edit_tool() -> None:
+    """The decompose AgentTask includes Edit in its tool allowlist."""
     from darkfactory.workflow import AgentTask
 
     workflows = load_workflows()
     planning = workflows["planning"]
     agent_tasks = [t for t in planning.tasks if isinstance(t, AgentTask)]
     agent = agent_tasks[0]
-    assert "Edit" not in agent.tools
+    assert "Edit" in agent.tools
 
 
 def test_agent_task_has_write_tool() -> None:
