@@ -38,6 +38,8 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+from filelock import FileLock, Timeout
+
 from darkfactory import prd as prd_module
 from darkfactory.builtins._registry import BUILTINS, BuiltInFunc, builtin
 from darkfactory.builtins._shared import (
@@ -45,6 +47,10 @@ from darkfactory.builtins._shared import (
     _run,
     _scan_for_forbidden_attribution,
 )
+from darkfactory.builtins.set_status import set_status  # noqa: F401
+from darkfactory.checks import is_resume_safe
+_log = logging.getLogger(__name__)
+
 from darkfactory.workflow import ExecutionContext, Status
 
 _log = logging.getLogger(__name__)
@@ -52,6 +58,7 @@ _log = logging.getLogger(__name__)
 # Import submodules to trigger @builtin registration.
 from darkfactory.builtins.commit import commit  # noqa: E402
 from darkfactory.builtins.ensure_worktree import ensure_worktree  # noqa: E402
+from darkfactory.builtins.push_branch import push_branch  # noqa: E402
 
 __all__ = [
     "BUILTINS",
@@ -107,69 +114,6 @@ def _pr_body(ctx: ExecutionContext) -> str:
 
 
 # ---------- built-in implementations ----------
-
-
-@builtin("set_status")
-def set_status(ctx: ExecutionContext, *, to: Status) -> None:
-    """Rewrite the PRD's ``status:`` frontmatter field inside the worktree.
-
-    Targets the worktree's copy of the PRD file, never the source repo.
-    The source repo's working tree must remain untouched by ``prd run`` —
-    status transitions live on the PRD's worktree branch and only reach
-    the source repo via PR merge (see PRD-213).
-
-    Uses :func:`darkfactory.prd.set_status_at`, which surgically rewrites
-    only the ``status:`` and ``updated:`` lines so the resulting commit
-    diff is two lines, not the whole frontmatter block.
-    """
-    if ctx.dry_run:
-        ctx.logger.info(
-            "[dry-run] set status of %s: %s -> %s (worktree=%s)",
-            ctx.prd.id,
-            ctx.prd.status,
-            to,
-            ctx.worktree_path,
-        )
-        return
-
-    if ctx.worktree_path is None:
-        raise RuntimeError(
-            "set_status requires a worktree; ensure_worktree must run first"
-        )
-
-    relative = ctx.prd.path.relative_to(ctx.repo_root)
-    target = ctx.worktree_path / relative
-    prd_module.set_status_at(target, to)
-    # Mirror the field updates onto the in-memory PRD so subsequent
-    # builtins see the new status without re-loading from disk.
-    ctx.prd.status = to
-    from datetime import date as _date
-
-    ctx.prd.updated = _date.today().isoformat()
-
-
-@builtin("push_branch")
-def push_branch(ctx: ExecutionContext) -> None:
-    """Push the current branch to origin with upstream tracking.
-
-    Runs ``git push -u origin {branch}`` inside the worktree. Required
-    before :func:`create_pr` because ``gh pr create --base`` needs the
-    remote to exist.
-    """
-    cmd = ["git", "push", "-u", "origin", ctx.branch_name]
-
-    if ctx.dry_run:
-        ctx.logger.info("[dry-run] %s", " ".join(cmd))
-        return
-
-    subprocess.run(
-        cmd,
-        cwd=str(ctx.cwd),
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
 
 def _format_tool_counts(tool_counts: dict[str, int]) -> str:
     """Format tool counts as a compact inline string, e.g. 'Read×5, Edit×3'."""
