@@ -14,17 +14,7 @@ blocks:
   - "[[PRD-559.3-prompt-template-and-config]]"
   - "[[PRD-559.4-builtin-entry-point]]"
   - "[[PRD-559.5-workflow-integration]]"
-impacts:
-  - src/darkfactory/builtins/__init__.py
-  - src/darkfactory/builtins/analyze_transcript.py
-  - src/darkfactory/builtins/analyze_transcript_test.py
-  - src/darkfactory/builtins/analyze_transcript_detectors.py
-  - src/darkfactory/builtins/analyze_transcript_detectors_test.py
-  - src/darkfactory/builtins/analyze_transcript_prompt.md
-  - .darkfactory/config.toml
-  - src/darkfactory/workflows/default/workflow.py
-  - src/darkfactory/workflows/planning/workflow.py
-  - src/darkfactory/workflows/extraction/workflow.py
+impacts: []
 workflow:
 assignee:
 reviewers: []
