@@ -98,6 +98,24 @@ class InvokeResult:
     sentinel: str | None = None
 
 
+# ---------- terminal result event ----------
+
+
+def _find_terminal_result(output_lines: list[str]) -> dict[str, Any] | None:
+    """Scan output lines for the last {"type": "result", ...} JSON object."""
+    for line in reversed(output_lines):
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            obj: dict[str, Any] = json.loads(line)
+            if obj.get("type") == "result":
+                return obj
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
 # ---------- sentinel parsing ----------
 
 
@@ -544,6 +562,24 @@ def invoke_claude(
     exit_code = -1 if was_timed_out else proc.returncode
 
     if was_timed_out:
+        terminal_result = _find_terminal_result(stdout.splitlines())
+        if terminal_result is not None:
+            log.warning(
+                "Task timed out at %ds but terminal result event found — using result verdict",
+                timeout_seconds,
+            )
+            is_error = terminal_result.get("is_error", True)
+            subtype = terminal_result.get("subtype", "")
+            result_success = not is_error and subtype != "error"
+            return InvokeResult(
+                stdout=stdout,
+                stderr=stderr,
+                exit_code=exit_code,
+                success=result_success,
+                failure_reason=None
+                if result_success
+                else f"result error (timed out at {timeout_seconds}s): subtype={subtype!r}",
+            )
         return InvokeResult(
             stdout=stdout,
             stderr=stderr,
