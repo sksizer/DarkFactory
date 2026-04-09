@@ -81,6 +81,8 @@ class Task:
     the runner's task loop.
     """
 
+    name: str
+
 
 @dataclass
 class BuiltIn(Task):

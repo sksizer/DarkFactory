@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from darkfactory.templates import TemplateViolation, WorkflowTemplate
+from darkfactory.templates_builtin import REWORK_TEMPLATE
 from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Workflow
 
 
@@ -328,3 +329,81 @@ def test_workflow_can_be_constructed_without_template_name() -> None:
     )
     assert wf.template_name is None
     assert len(wf.tasks) == 2
+
+
+# ---------- REWORK_TEMPLATE tests ----------
+
+
+def test_rework_template_is_importable() -> None:
+    """REWORK_TEMPLATE is importable from darkfactory.templates_builtin."""
+    assert REWORK_TEMPLATE is not None
+    assert isinstance(REWORK_TEMPLATE, WorkflowTemplate)
+    assert REWORK_TEMPLATE.name == "rework"
+
+
+def test_rework_template_open_includes_check_pr_exists_and_fetch_review_comments() -> (
+    None
+):
+    """open list includes check_pr_exists and fetch_review_comments."""
+    open_names = [t.name for t in REWORK_TEMPLATE.open]
+    assert "check_pr_exists" in open_names
+    assert "fetch_review_comments" in open_names
+
+
+def test_rework_template_close_does_not_include_create_pr() -> None:
+    """close list does NOT include create_pr."""
+    close_names = [t.name for t in REWORK_TEMPLATE.close]
+    assert "create_pr" not in close_names
+
+
+def test_rework_template_close_includes_push_branch() -> None:
+    """close list includes push_branch instead of create_pr."""
+    close_names = [t.name for t in REWORK_TEMPLATE.close]
+    assert "push_branch" in close_names
+
+
+def test_rework_template_valid_composition() -> None:
+    """Composing with an AgentTask produces correct task order."""
+    agent = AgentTask(name="address-feedback")
+    wf = REWORK_TEMPLATE.compose(
+        name="rework-prd-123",
+        description="Address review feedback",
+        applies_to=lambda prd, prds: True,
+        priority=5,
+        middle=[agent],
+    )
+    open_names = [t.name for t in REWORK_TEMPLATE.open]
+    close_names = [t.name for t in REWORK_TEMPLATE.close]
+    task_list = wf.tasks
+    # open tasks come first
+    for i, name in enumerate(open_names):
+        assert task_list[i].name == name
+    # middle task is next
+    assert task_list[len(open_names)] is agent
+    # close tasks come last
+    for i, name in enumerate(close_names):
+        assert task_list[len(open_names) + 1 + i].name == name
+
+
+def test_rework_template_missing_agent_task_raises() -> None:
+    """Composing with no AgentTask raises TemplateViolation."""
+    with pytest.raises(TemplateViolation, match="at least 1 AgentTask"):
+        REWORK_TEMPLATE.compose(
+            name="rework-wf",
+            description="",
+            applies_to=lambda prd, prds: True,
+            priority=0,
+            middle=[ShellTask(name="verify", cmd="just test")],
+        )
+
+
+def test_rework_template_empty_middle_raises() -> None:
+    """Composing with empty middle raises TemplateViolation (needs AgentTask)."""
+    with pytest.raises(TemplateViolation, match="at least 1 AgentTask"):
+        REWORK_TEMPLATE.compose(
+            name="rework-wf",
+            description="",
+            applies_to=lambda prd, prds: True,
+            priority=0,
+            middle=[],
+        )
