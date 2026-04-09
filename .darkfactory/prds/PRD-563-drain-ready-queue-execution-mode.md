@@ -2,18 +2,20 @@
 id: PRD-563
 title: "Drain-ready-queue execution mode: run all ready PRDs without a target"
 kind: feature
-status: draft
+status: ready
 priority: high
 effort: m
 capability: moderate
 parent:
 depends_on:
   - "[[PRD-220-graph-execution]]"
-blocks: []
-impacts:
-  - src/darkfactory/graph_execution.py
-  - src/darkfactory/cli.py
-  - tests/test_drain_ready_queue.py
+blocks:
+  - "[[PRD-563.1-queue-filters-and-discovery]]"
+  - "[[PRD-563.2-cli-all-flag-and-filters]]"
+  - "[[PRD-563.3-refactor-execution-strategy]]"
+  - "[[PRD-563.4-wire-queue-mode-into-cmd-run]]"
+  - "[[PRD-563.5-drain-ready-queue-tests]]"
+impacts: []
 workflow:
 assignee:
 reviewers: []

@@ -56,6 +56,13 @@ def main(argv: list[str] | None = None) -> int:
         if args.workflows_dir is None:
             args.workflows_dir = darkfactory_dir / "workflows"
 
+    # Derive operations_dir from prd_dir's parent (.darkfactory/) if not explicit.
+    if getattr(args, "operations_dir", None) is None:
+        if darkfactory_dir is not None:
+            args.operations_dir = darkfactory_dir / "operations"
+        else:
+            args.operations_dir = args.prd_dir.parent / "operations"
+
     repo_root = darkfactory_dir.parent if darkfactory_dir is not None else None
 
     # Resolve style config and create a Styler. Any command module that needs
