@@ -183,3 +183,45 @@ def system_check_merged(ctx: SystemContext) -> None:
 def system_mark_done(ctx: SystemContext) -> None:
     """Set status to ``"done"`` for all PRDs in ``ctx.targets``."""
     set_status_bulk(ctx, status="done")
+
+
+@_register("audit_impacts_check")
+def audit_impacts_check(ctx: SystemContext) -> None:
+    """Walk all PRDs and verify that every declared impact path exists on disk.
+
+    For each PRD in ``ctx.prds``, iterates ``prd.impacts`` and checks whether
+    the path exists relative to ``ctx.repo_root``.  Appends human-readable
+    lines to ``ctx.report`` and raises ``ValueError`` if any paths are
+    missing (causing the runner to return a non-zero exit status, useful for
+    CI).
+
+    This builtin is intentionally read-only — it never modifies PRD files.
+    The ``ctx.dry_run`` flag is ignored because no mutations are performed.
+    """
+    total_checked = 0
+    missing: dict[str, list[str]] = {}
+
+    for prd_id, prd in sorted(ctx.prds.items()):
+        if not prd.impacts:
+            continue
+        for path in prd.impacts:
+            total_checked += 1
+            full_path = ctx.repo_root / path
+            if not full_path.exists():
+                missing.setdefault(prd_id, []).append(path)
+            else:
+                ctx.logger.debug("audit_impacts_check: %s OK  %s", prd_id, path)
+
+    total_missing = sum(len(v) for v in missing.values())
+    ctx.report.append(
+        f"audit-impacts: {total_checked} path(s) checked, {total_missing} missing"
+    )
+
+    if missing:
+        ctx.report.append("Missing impact paths by PRD:")
+        for prd_id, paths in sorted(missing.items()):
+            for path in paths:
+                ctx.report.append(f"  {prd_id}: {path}")
+        raise ValueError(
+            f"{total_missing} declared impact path(s) do not exist on disk"
+        )
