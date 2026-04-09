@@ -8,7 +8,13 @@ effort: l
 capability: complex
 parent:
 depends_on: []
-blocks: []
+blocks:
+  - "[[PRD-567.1-worktree-lifecycle-resilience]]"
+  - "[[PRD-567.2-agent-permission-hygiene]]"
+  - "[[PRD-567.3-file-operation-permissions]]"
+  - "[[PRD-567.4-filesystem-containment-hardening]]"
+  - "[[PRD-567.5-planning-workflow-template-alignment]]"
+  - "[[PRD-567.6-structured-failure-context-in-events]]"
 impacts: []
 workflow:
 assignee:
