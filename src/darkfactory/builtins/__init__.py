@@ -38,9 +38,6 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from filelock import FileLock, Timeout
-
-from darkfactory import prd as prd_module
 from darkfactory.builtins._registry import BUILTINS, BuiltInFunc, builtin
 from darkfactory.builtins._shared import (
     _FORBIDDEN_ATTRIBUTION_PATTERNS,
@@ -48,16 +45,14 @@ from darkfactory.builtins._shared import (
     _scan_for_forbidden_attribution,
 )
 from darkfactory.builtins.set_status import set_status  # noqa: F401
-from darkfactory.checks import is_resume_safe
-_log = logging.getLogger(__name__)
-
-from darkfactory.workflow import ExecutionContext, Status
+from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
 
 # Import submodules to trigger @builtin registration.
 from darkfactory.builtins.commit import commit  # noqa: E402
 from darkfactory.builtins.ensure_worktree import ensure_worktree  # noqa: E402
+from darkfactory.builtins.lint_attribution import lint_attribution  # noqa: E402
 from darkfactory.builtins.push_branch import push_branch  # noqa: E402
 
 __all__ = [
@@ -114,6 +109,7 @@ def _pr_body(ctx: ExecutionContext) -> str:
 
 
 # ---------- built-in implementations ----------
+
 
 def _format_tool_counts(tool_counts: dict[str, int]) -> str:
     """Format tool counts as a compact inline string, e.g. 'Read×5, Edit×3'."""
@@ -259,49 +255,6 @@ def create_pr(ctx: ExecutionContext) -> None:
     # gh prints the PR URL to stdout on success.
     url_line = result.stdout.strip().splitlines()[-1] if result.stdout.strip() else ""
     ctx.pr_url = url_line or None
-
-
-@builtin("lint_attribution")
-def lint_attribution(ctx: ExecutionContext) -> None:
-    """Fail if any commit on the branch or the run summary credits Claude/Anthropic.
-
-    Scans:
-
-    - Every commit message in ``{base_ref}..HEAD`` on the current branch
-    - ``ctx.run_summary`` (which feeds the PR body)
-
-    Intended to run after the agent + verification phases and before
-    ``push_branch`` / ``create_pr``, so violations abort the workflow
-    before anything lands on the remote or in a PR. Dry-run is a no-op
-    because there are no real commits to scan.
-    """
-    if ctx.dry_run:
-        ctx.logger.info("[dry-run] lint_attribution: skipped")
-        return
-
-    _scan_for_forbidden_attribution(
-        ctx.run_summary or "", source=f"run summary for {ctx.prd.id}"
-    )
-
-    result = subprocess.run(
-        ["git", "log", f"{ctx.base_ref}..HEAD", "--format=%H%x00%B%x1e"],
-        cwd=str(ctx.cwd),
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    # Record separator \x1e between commits; field separator \x00 between
-    # sha and body. Keeps us robust against newlines in commit messages.
-    for entry in result.stdout.split("\x1e"):
-        entry = entry.strip()
-        if not entry:
-            continue
-        sha, _, body = entry.partition("\x00")
-        _scan_for_forbidden_attribution(
-            body, source=f"commit {sha[:12]} on {ctx.branch_name}"
-        )
-
-    ctx.logger.info("lint_attribution: clean")
 
 
 @builtin("cleanup_worktree")
