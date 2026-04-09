@@ -44,12 +44,12 @@ def test_find_stale_worktrees_returns_merged(tmp_path: Path) -> None:
     _make_worktree_dir(tmp_path, "PRD-001-some-feature")
     _make_worktree_dir(tmp_path, "PRD-002-another")
 
-    def fake_pr_state(branch: str, repo_root: Path) -> str:
-        if "PRD-001" in branch:
-            return "MERGED"
-        return "OPEN"
+    fake_states = {
+        "prd/PRD-001-some-feature": "MERGED",
+        "prd/PRD-002-another": "OPEN",
+    }
 
-    with patch("darkfactory.checks._get_pr_state", side_effect=fake_pr_state):
+    with patch("darkfactory.checks._fetch_all_pr_states", return_value=fake_states):
         result = find_stale_worktrees(tmp_path)
 
     assert len(result) == 1
@@ -62,7 +62,10 @@ def test_find_stale_worktrees_returns_closed(tmp_path: Path) -> None:
     _init_git_repo(tmp_path)
     _make_worktree_dir(tmp_path, "PRD-003-closed-one")
 
-    with patch("darkfactory.checks._get_pr_state", return_value="CLOSED"):
+    with patch(
+        "darkfactory.checks._fetch_all_pr_states",
+        return_value={"prd/PRD-003-closed-one": "CLOSED"},
+    ):
         result = find_stale_worktrees(tmp_path)
 
     assert len(result) == 1

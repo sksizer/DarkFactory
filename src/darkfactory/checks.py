@@ -198,7 +198,12 @@ def _get_pr_state(branch: str, repo_root: Path) -> str:
             prs = json.loads(result.stdout)
             if prs:
                 return str(prs[0]["state"])
-    except (FileNotFoundError, json.JSONDecodeError, ValueError, subprocess.TimeoutExpired):
+    except (
+        FileNotFoundError,
+        json.JSONDecodeError,
+        ValueError,
+        subprocess.TimeoutExpired,
+    ):
         pass
     return "UNKNOWN"
 
@@ -231,7 +236,12 @@ def _fetch_all_pr_states(repo_root: Path) -> dict[str, str]:
         if result.returncode != 0:
             return {}
         prs = json.loads(result.stdout)
-    except (FileNotFoundError, json.JSONDecodeError, ValueError, subprocess.TimeoutExpired):
+    except (
+        FileNotFoundError,
+        json.JSONDecodeError,
+        ValueError,
+        subprocess.TimeoutExpired,
+    ):
         return {}
 
     # If a branch has multiple PRs (e.g. one MERGED, one OPEN), prefer MERGED.
