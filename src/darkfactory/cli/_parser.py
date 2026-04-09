@@ -235,7 +235,33 @@ def build_parser() -> argparse.ArgumentParser:
         "run",
         help="Run a workflow against a PRD (dry-run unless --execute)",
     )
-    sub_run.add_argument("prd_id")
+    sub_run.add_argument("prd_id", nargs="?", default=None)
+    sub_run.add_argument(
+        "--all",
+        dest="run_all",
+        action="store_true",
+        help="Drain the ready queue: run all ready PRDs without a target",
+    )
+    sub_run.add_argument(
+        "--priority",
+        default=None,
+        choices=["critical", "high", "medium", "low"],
+        help="Only run PRDs at or above this priority",
+    )
+    sub_run.add_argument(
+        "--tag",
+        dest="tags",
+        action="append",
+        default=None,
+        help="Only run PRDs with this tag (repeatable, OR semantics)",
+    )
+    sub_run.add_argument(
+        "--exclude",
+        dest="exclude_ids",
+        action="append",
+        default=None,
+        help="Exclude specific PRD IDs (repeatable)",
+    )
     sub_run.add_argument(
         "--execute",
         action="store_true",
