@@ -10,6 +10,7 @@ parent: null
 depends_on:
   - "[[PRD-228-planning-workflow-initial]]"
   - "[[PRD-227-workflow-templates]]"
+  - "[[PRD-549-builtins-package-split]]"
 blocks: []
 impacts:
   - workflows/planning/workflow.py

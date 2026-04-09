@@ -7,7 +7,8 @@ priority: high
 effort: m
 capability: moderate
 parent:
-depends_on: []
+depends_on:
+  - "[[PRD-549-builtins-package-split]]"
 blocks:
   - "[[PRD-220-graph-execution]]"
 impacts:

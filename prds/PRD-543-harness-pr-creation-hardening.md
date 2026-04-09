@@ -7,7 +7,8 @@ priority: high
 effort: s
 capability: simple
 parent:
-depends_on: []
+depends_on:
+  - "[[PRD-549-builtins-package-split]]"
 blocks: []
 impacts:
   - src/darkfactory/builtins.py
