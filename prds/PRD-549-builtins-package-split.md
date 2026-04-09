@@ -2,17 +2,26 @@
 id: PRD-549
 title: Split builtins.py into a package of per-function modules with colocated unit tests
 kind: epic
-status: ready
+status: review
 priority: medium
 effort: l
 capability: moderate
 parent:
 depends_on: []
-blocks: []
-impacts:
-  - src/darkfactory/builtins.py
-  - tests/test_builtins.py
-  - pyproject.toml
+blocks:
+  - "[[PRD-549.1-pytest-config-wheel-conftest]]"
+  - "[[PRD-549.2-scaffold-builtins-package]]"
+  - "[[PRD-549.3-move-ensure-worktree]]"
+  - "[[PRD-549.4-move-set-status]]"
+  - "[[PRD-549.5-move-commit]]"
+  - "[[PRD-549.6-move-push-branch]]"
+  - "[[PRD-549.7-move-summarize-agent-run]]"
+  - "[[PRD-549.8-move-commit-transcript]]"
+  - "[[PRD-549.9-move-create-pr]]"
+  - "[[PRD-549.10-move-lint-attribution]]"
+  - "[[PRD-549.11-move-cleanup-worktree]]"
+  - "[[PRD-549.12-final-cleanup]]"
+impacts: []
 workflow: planning
 assignee:
 reviewers: []
@@ -215,22 +224,22 @@ Nine sibling PRDs, one per public builtin:
 - **PRD-549.7** `summarize_agent_run` → `builtins/summarize_agent_run.py` + `summarize_agent_run_test.py`
 - **PRD-549.8** `commit_transcript` → `builtins/commit_transcript.py` + `commit_transcript_test.py`
 - **PRD-549.9** `create_pr` → `builtins/create_pr.py` + `create_pr_test.py`
-- **PRD-549.10** `cleanup_worktree` → `builtins/cleanup_worktree.py` + `cleanup_worktree_test.py`
-- **PRD-549.11** Promote any shared helpers identified during 549.3–549.10 to `builtins/_shared.py` (may be a trailing cleanup rather than a parallel sibling).
+- **PRD-549.10** `lint_attribution` → `builtins/lint_attribution.py` + `lint_attribution_test.py`
+- **PRD-549.11** `cleanup_worktree` → `builtins/cleanup_worktree.py` + `cleanup_worktree_test.py`
 
 Each PRD in this fan-out:
 1. Creates the new submodule file, moves the relevant function + its exclusively-used helpers, adds colocated `*_test.py` with unit tests covering the function's branches.
-2. Deletes the function from `src/darkfactory/builtins.py` (the old monolith). By the end of PRD-549.11, `builtins.py` should contain only the `@builtin`/registry import shim or be deletable.
+2. Deletes the function from `src/darkfactory/builtins/__init__.py` (the old monolith content). By the end of PRD-549.11, `__init__.py` should contain only imports and re-exports.
 3. Passes `just test && just lint && just typecheck && just format-check`.
-4. Is independent of its siblings — any conflict on the shrinking `builtins.py` file is a known friction point worth observing for DAG execution.
+4. Is independent of its siblings — any conflict on the shrinking `__init__.py` file is a known friction point worth observing for DAG execution.
 
-**DAG friction note.** All nine children modify the same file (`src/darkfactory/builtins.py` — deleting different functions from it). This will produce merge conflicts on the file if they land in parallel. Two options:
+**DAG friction note.** All nine children modify the same file (`src/darkfactory/builtins/__init__.py` — deleting different functions from it). This will produce merge conflicts on the file if they land in parallel. Two options:
 - **(a)** Accept the conflict and let the harness handle rebases. This is a *good* DAG stress test — it exposes whether the harness can rebase child PRDs of an epic cleanly.
 - **(b)** Have PRD-549.2 also pre-delete `builtins.py` entirely and move its contents into a temporary `_legacy.py` that each child imports from and chips away at. More complex but avoids the conflict.
 - Recommendation: **(a)** — the point of this epic *is* to stress-test the harness, and avoiding the conflict would defeat that.
 
 ### PRD-549.12 — Final cleanup
-- Delete `tests/test_builtins.py` (its coverage has been migrated into the colocated files by 549.3–549.10).
+- Delete `tests/test_builtins.py` (its coverage has been migrated into the colocated files by 549.3–549.11).
 - Delete `src/darkfactory/builtins.py` if it still exists as a stub; otherwise no-op.
 - Verify the `builtins/` directory is the single source of truth and re-exports everything needed.
 
