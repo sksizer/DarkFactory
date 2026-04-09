@@ -2,7 +2,7 @@
 id: PRD-563
 title: "Drain-ready-queue execution mode: run all ready PRDs without a target"
 kind: feature
-status: draft
+status: in-progress
 priority: high
 effort: m
 capability: moderate
@@ -19,7 +19,7 @@ assignee:
 reviewers: []
 target_version:
 created: 2026-04-09
-updated: 2026-04-09
+updated: '2026-04-09'
 tags:
   - harness
   - execution
