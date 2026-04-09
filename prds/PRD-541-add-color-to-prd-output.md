@@ -2,7 +2,7 @@
 id: PRD-541
 title: Add color to prd output
 kind: feature
-status: review
+status: done
 priority: medium
 effort: m
 capability: moderate
