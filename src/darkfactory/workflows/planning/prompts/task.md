@@ -21,13 +21,13 @@ context.
 
 ### 2. Study the PRD format
 
-Read `prds/_template.md` if it exists. If not, find an existing
-well-formed `kind: task` PRD in the `prds/` directory and use it as
+Read `.darkfactory/prds/_template.md` if it exists. If not, find an existing
+well-formed `kind: task` PRD in the `.darkfactory/prds/` directory and use it as
 a reference for the format.
 
 ### 3. Survey existing PRDs
 
-Glob `prds/PRD-*.md` to see what PRDs already exist. Note the ID
+Glob `.darkfactory/prds/PRD-*.md` to see what PRDs already exist. Note the ID
 numbering scheme so your new children don't collide.
 
 ### 4. Identify decomposition seams
@@ -49,7 +49,7 @@ Before writing any files, plan the ordering:
 
 ### 6. Write the child PRD files
 
-For each task, use `Write` to create a new file in `prds/`:
+For each task, use `Write` to create a new file in `.darkfactory/prds/`:
 
 - Filename: `PRD-{parent_number}.{index}-{slug}.md`
 - Include all required frontmatter fields
@@ -70,7 +70,7 @@ validation passes cleanly.
 ### 9. Stage your changes
 
 ```bash
-git add prds/
+git add .darkfactory/prds/
 git status
 ```
 

@@ -18,7 +18,7 @@ jobs:
         run: |
           BRANCH="${{ github.event.pull_request.head.ref }}"
           PRD_ID=$(echo "$BRANCH" | sed -E 's|^prd/(PRD-[0-9.]+).*|\1|')
-          FILE=$(ls prds/${PRD_ID}-*.md 2>/dev/null || true)
+          FILE=$(ls .darkfactory/prds/${PRD_ID}-*.md 2>/dev/null || true)
           if [ -z "$FILE" ]; then
             echo "No PRD file matching $PRD_ID -- skipping"
             exit 0

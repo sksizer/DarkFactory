@@ -16,7 +16,7 @@ def _make_ctx(*, dry_run: bool = False, worktree_path: Path | None = None) -> Ma
     ctx.worktree_path = worktree_path
     ctx.prd.id = "PRD-999"
     ctx.prd.status = "ready"
-    ctx.prd.path = Path("/repo/prds/PRD-999-test.md")
+    ctx.prd.path = Path("/repo/.darkfactory/prds/PRD-999-test.md")
     ctx.repo_root = Path("/repo")
     return ctx
 
@@ -43,13 +43,13 @@ def test_missing_worktree_raises_runtime_error() -> None:
 def test_successful_update_calls_set_status_at_and_updates_ctx() -> None:
     worktree = Path("/worktrees/PRD-999")
     ctx = _make_ctx(dry_run=False, worktree_path=worktree)
-    ctx.prd.path = Path("/repo/prds/PRD-999-test.md")
+    ctx.prd.path = Path("/repo/.darkfactory/prds/PRD-999-test.md")
     ctx.repo_root = Path("/repo")
 
     with patch("darkfactory.builtins.set_status.prd_module") as mock_prd:
         set_status(ctx, to="done")
 
-    expected_target = worktree / "prds" / "PRD-999-test.md"
+    expected_target = worktree / ".darkfactory" / "prds" / "PRD-999-test.md"
     mock_prd.set_status_at.assert_called_once_with(expected_target, "done")
     assert ctx.prd.status == "done"
     assert ctx.prd.updated is not None

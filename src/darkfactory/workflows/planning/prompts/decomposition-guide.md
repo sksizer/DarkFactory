@@ -31,7 +31,7 @@ Follow these heuristics when breaking an epic or feature into tasks.
 - Use **hierarchical IDs**: children of `PRD-X` get `PRD-X.1`,
   `PRD-X.2`, etc.
 - Pick the next unused sibling index by globbing
-  `prds/PRD-{parent_number}.*.md` to see what already exists.
+  `.darkfactory/prds/PRD-{parent_number}.*.md` to see what already exists.
 - The slug in the filename should be a short kebab-case summary:
   `PRD-222.1-define-tool-schema.md`.
 
