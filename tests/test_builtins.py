@@ -1356,7 +1356,8 @@ def test_commit_transcript_registered() -> None:
 
 
 def test_commit_transcript_noop_when_no_transcript(tmp_path: Path) -> None:
-    """AC-5: When no .harness-agent-output.log exists, commit_transcript is a no-op."""
+    """AC-5: When no transcript exists at repo_root/.harness-transcripts/,
+    commit_transcript is a no-op."""
     prd_dir = tmp_path / "prds"
     prd_dir.mkdir()
     write_prd(prd_dir, "PRD-070", "task")
@@ -1376,8 +1377,15 @@ def test_commit_transcript_noop_when_no_transcript(tmp_path: Path) -> None:
     assert not (tmp_path / ".darkfactory" / "transcripts").exists()
 
 
-def test_commit_transcript_moves_and_stages(tmp_git_repo: Path) -> None:
-    """AC-2/AC-3: commit_transcript moves transcript to .darkfactory/transcripts/ and stages it."""
+def test_commit_transcript_copies_from_repo_root_and_stages(
+    tmp_git_repo: Path,
+) -> None:
+    """AC-2/AC-3: commit_transcript copies transcript from the external
+    repo_root/.harness-transcripts/ location into .darkfactory/transcripts/
+    inside the worktree and stages it. The source copy survives (local
+    diagnostic) — the runner writes transcripts outside every worktree so
+    git add -A can't sweep them; commit_transcript is the one opt-in path
+    that brings them inside the worktree for committing."""
     prd_dir = tmp_git_repo / "docs" / "prd"
     prd_dir.mkdir(parents=True)
     write_prd(prd_dir, "PRD-070", "transcript-test")
@@ -1396,14 +1404,18 @@ def test_commit_transcript_moves_and_stages(tmp_git_repo: Path) -> None:
     builtins.ensure_worktree(ctx)
     assert ctx.worktree_path is not None
 
-    # Write a fake transcript at the expected source location
-    src = ctx.cwd / ".harness-agent-output.log"
+    # Write a fake transcript at the external repo-root location where
+    # runner._run_agent writes in production.
+    transcripts_dir = ctx.repo_root / ".harness-transcripts"
+    transcripts_dir.mkdir(parents=True, exist_ok=True)
+    src = transcripts_dir / "PRD-070.log"
     src.write_text("# fake transcript\ncontent here\n", encoding="utf-8")
 
     builtins.commit_transcript(ctx)
 
-    # Source should be gone
-    assert not src.exists()
+    # Source should survive (copy semantic, not move).
+    assert src.exists()
+    assert src.read_text(encoding="utf-8") == "# fake transcript\ncontent here\n"
 
     # Destination should exist under .darkfactory/transcripts/
     transcript_dir = ctx.cwd / ".darkfactory" / "transcripts"
@@ -1447,9 +1459,11 @@ def test_commit_transcript_multiple_invocations_separate_files(
     assert ctx.worktree_path is not None
 
     transcript_dir = ctx.cwd / ".darkfactory" / "transcripts"
+    external_dir = ctx.repo_root / ".harness-transcripts"
+    external_dir.mkdir(parents=True, exist_ok=True)
+    src = external_dir / "PRD-070.log"
 
     # First invocation
-    src = ctx.cwd / ".harness-agent-output.log"
     src.write_text("first transcript\n", encoding="utf-8")
     builtins.commit_transcript(ctx)
     assert len(list(transcript_dir.glob("PRD-070-*.log"))) == 1
@@ -1457,7 +1471,7 @@ def test_commit_transcript_multiple_invocations_separate_files(
     # Wait a second so timestamps differ
     time.sleep(1)
 
-    # Second invocation
+    # Second invocation (source overwritten by a simulated re-run of the runner)
     src.write_text("second transcript\n", encoding="utf-8")
     builtins.commit_transcript(ctx)
 
@@ -1484,7 +1498,9 @@ def test_commit_transcript_dry_run_noop(tmp_path: Path) -> None:
         dry_run=True,
     )
 
-    src = tmp_path / ".harness-agent-output.log"
+    external_dir = tmp_path / ".harness-transcripts"
+    external_dir.mkdir(parents=True, exist_ok=True)
+    src = external_dir / "PRD-070.log"
     src.write_text("dry run transcript\n", encoding="utf-8")
 
     with patch("subprocess.run") as mock_run:

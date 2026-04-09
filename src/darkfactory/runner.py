@@ -310,14 +310,20 @@ def _run_agent(
     # signature stable.
     setattr(ctx, "_last_agent_result", result)
 
-    # Dump the raw agent transcript to a file inside the worktree so any
-    # 'no sentinel found' / 'unexpected output' failures can be diagnosed
-    # post-mortem without re-running. The file lives at the worktree root
-    # and is overwritten on each invocation (one transcript per agent
-    # task per run). Diagnostic dump must never fail the workflow.
-    if not ctx.dry_run and ctx.cwd:
+    # Dump the raw agent transcript to a predictable path **outside** any
+    # worktree so ``git add -A`` inside a worktree can never sweep it into
+    # a commit. File lives at ``<repo_root>/.harness-transcripts/<prd>.log``
+    # where repo_root is the main checkout (not the worktree). The worktree
+    # is at ``<repo_root>/.worktrees/<name>/``, which is a strict subtree —
+    # writing the transcript one level up at ``<repo_root>/.harness-transcripts/``
+    # is physically outside every worktree's working tree. One file per PRD,
+    # overwritten on each agent-task invocation. Diagnostic dump must never
+    # fail the workflow. See docs/agent-verification-model.md.
+    if not ctx.dry_run and ctx.repo_root:
         try:
-            transcript = ctx.cwd / ".harness-agent-output.log"
+            transcripts_dir = ctx.repo_root / ".harness-transcripts"
+            transcripts_dir.mkdir(parents=True, exist_ok=True)
+            transcript = transcripts_dir / f"{ctx.prd.id}.log"
             transcript.write_text(
                 "\n".join(
                     [
