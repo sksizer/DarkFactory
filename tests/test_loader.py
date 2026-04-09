@@ -46,13 +46,13 @@ workflow = Workflow(
 
 def test_load_workflows_missing_directory(tmp_path: Path) -> None:
     """A nonexistent directory returns an empty dict (not an error)."""
-    result = load_workflows(tmp_path / "does-not-exist")
+    result = load_workflows(tmp_path / "does-not-exist", include_builtins=False)
     assert result == {}
 
 
 def test_load_workflows_empty_directory(tmp_path: Path) -> None:
     """An empty directory returns an empty dict."""
-    result = load_workflows(tmp_path)
+    result = load_workflows(tmp_path, include_builtins=False)
     assert result == {}
 
 
@@ -60,7 +60,7 @@ def test_load_workflows_skips_file_only_entries(tmp_path: Path) -> None:
     """Files at the top level are ignored; only subdirectories are scanned."""
     (tmp_path / "stray.py").write_text("# not a workflow")
     (tmp_path / "README.md").write_text("# top-level")
-    result = load_workflows(tmp_path)
+    result = load_workflows(tmp_path, include_builtins=False)
     assert result == {}
 
 
@@ -69,7 +69,7 @@ def test_load_workflows_skips_file_only_entries(tmp_path: Path) -> None:
 
 def test_load_single_workflow(tmp_path: Path) -> None:
     _write_workflow(tmp_path, "default")
-    result = load_workflows(tmp_path)
+    result = load_workflows(tmp_path, include_builtins=False)
     assert "default" in result
     wf = result["default"]
     assert isinstance(wf, Workflow)
@@ -83,7 +83,7 @@ def test_load_single_workflow(tmp_path: Path) -> None:
 def test_workflow_dir_is_set(tmp_path: Path) -> None:
     """The loader sets workflow.workflow_dir to the subdirectory path."""
     _write_workflow(tmp_path, "default")
-    result = load_workflows(tmp_path)
+    result = load_workflows(tmp_path, include_builtins=False)
     assert result["default"].workflow_dir == tmp_path / "default"
 
 
@@ -91,7 +91,7 @@ def test_load_multiple_workflows(tmp_path: Path) -> None:
     _write_workflow(tmp_path, "alpha")
     _write_workflow(tmp_path, "bravo")
     _write_workflow(tmp_path, "charlie")
-    result = load_workflows(tmp_path)
+    result = load_workflows(tmp_path, include_builtins=False)
     assert set(result.keys()) == {"alpha", "bravo", "charlie"}
 
 
@@ -103,7 +103,7 @@ def test_load_skips_hidden_and_underscore_dirs(tmp_path: Path) -> None:
     _write_workflow(tmp_path, "visible")
     _write_workflow(tmp_path, ".hidden")
     _write_workflow(tmp_path, "_private")
-    result = load_workflows(tmp_path)
+    result = load_workflows(tmp_path, include_builtins=False)
     assert set(result.keys()) == {"visible"}
 
 
@@ -112,7 +112,7 @@ def test_load_skips_dirs_without_workflow_py(tmp_path: Path) -> None:
     _write_workflow(tmp_path, "has-workflow")
     (tmp_path / "no-workflow").mkdir()
     (tmp_path / "no-workflow" / "other.py").write_text("# not workflow.py")
-    result = load_workflows(tmp_path)
+    result = load_workflows(tmp_path, include_builtins=False)
     assert set(result.keys()) == {"has-workflow"}
 
 
@@ -130,7 +130,7 @@ def test_load_skips_workflows_with_syntax_errors(
         body="this is not valid python syntax !@#$%\n",
     )
     with caplog.at_level(logging.WARNING, logger="darkfactory.loader"):
-        result = load_workflows(tmp_path)
+        result = load_workflows(tmp_path, include_builtins=False)
     assert "good" in result
     assert "broken" not in result
     assert any("failed to load workflow" in rec.message for rec in caplog.records)
@@ -146,7 +146,7 @@ def test_load_skips_workflows_missing_attribute(
         body="x = 42\n",  # no `workflow` attribute
     )
     with caplog.at_level(logging.WARNING, logger="darkfactory.loader"):
-        result = load_workflows(tmp_path)
+        result = load_workflows(tmp_path, include_builtins=False)
     assert result == {}
     assert any("failed to load workflow" in rec.message for rec in caplog.records)
 
@@ -161,7 +161,7 @@ def test_load_skips_workflows_with_wrong_type(
         body="workflow = 'not a Workflow instance'\n",
     )
     with caplog.at_level(logging.WARNING, logger="darkfactory.loader"):
-        result = load_workflows(tmp_path)
+        result = load_workflows(tmp_path, include_builtins=False)
     assert result == {}
 
 
@@ -176,4 +176,4 @@ workflow = Workflow(name="first")  # deliberate collision
 """,
     )
     with pytest.raises(ValueError, match="duplicate workflow name"):
-        load_workflows(tmp_path)
+        load_workflows(tmp_path, include_builtins=False)

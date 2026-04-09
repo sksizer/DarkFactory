@@ -16,3 +16,6 @@ build/
 # Harness runtime diagnostics (never commit — see docs/agent-verification-model.md)
 .harness-agent-output.log
 .harness-transcripts/
+
+
+.darkfactor/prds/.obsidian

@@ -4,6 +4,35 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _isolate_builtin_workflows(
+    tmp_path_factory: pytest.TempPathFactory,
+    monkeypatch: pytest.MonkeyPatch,
+    request: pytest.FixtureRequest,
+) -> None:
+    """Point ``DARKFACTORY_BUILTINS_DIR`` at an empty dir by default.
+
+    Most tests create fixture workflows in a tmp dir and don't expect
+    the real bundled system workflows (``default``, ``extraction``,
+    ``planning``) to appear alongside them — that would produce name
+    collisions and spurious entries. A test that *does* want the real
+    built-ins should request the ``real_builtin_workflows`` fixture,
+    which removes this override.
+    """
+    if "real_builtin_workflows" in request.fixturenames:
+        return
+    empty = tmp_path_factory.mktemp("empty-builtins")
+    monkeypatch.setenv("DARKFACTORY_BUILTINS_DIR", str(empty))
+
+
+@pytest.fixture
+def real_builtin_workflows() -> None:
+    """Opt out of the default built-in isolation (see autouse fixture)."""
+    return None
+
 
 def write_prd(
     dir_path: Path,

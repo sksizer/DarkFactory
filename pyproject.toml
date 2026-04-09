@@ -37,6 +37,6 @@ no_implicit_optional = true
 files = ["src", "tests"]
 
 [tool.pytest.ini_options]
-testpaths = ["src", "tests", "workflows"]
+testpaths = ["src", "tests"]
 python_files = ["test_*.py", "*_test.py"]
 addopts = "--import-mode=importlib"

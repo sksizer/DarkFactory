@@ -81,6 +81,8 @@ class Task:
     the runner's task loop.
     """
 
+    name: str
+
 
 @dataclass
 class BuiltIn(Task):
@@ -194,6 +196,7 @@ class Workflow:
     priority: int = 0
     tasks: list[Task] = field(default_factory=list)
     workflow_dir: Path | None = None
+    template_name: str | None = None
 
 
 # ---------- ExecutionContext ----------

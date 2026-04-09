@@ -31,28 +31,26 @@ handling and dry-run support.
 
 from __future__ import annotations
 
-import logging
-import subprocess
+import subprocess  # noqa: F401  # re-exported for test monkeypatching
 
 from darkfactory.builtins._registry import BUILTINS, BuiltInFunc, builtin
+from darkfactory.workflow import ExecutionContext
 from darkfactory.builtins._shared import (
     _FORBIDDEN_ATTRIBUTION_PATTERNS,
     _run,
     _scan_for_forbidden_attribution,
 )
-from darkfactory.builtins.set_status import set_status  # noqa: F401
-from darkfactory.workflow import ExecutionContext
-
-_log = logging.getLogger(__name__)
 
 # Import submodules to trigger @builtin registration.
-from darkfactory.builtins.commit import commit  # noqa: E402
-from darkfactory.builtins.create_pr import create_pr  # noqa: E402
-from darkfactory.builtins.commit_transcript import commit_transcript  # noqa: E402
-from darkfactory.builtins.ensure_worktree import ensure_worktree  # noqa: E402
-from darkfactory.builtins.lint_attribution import lint_attribution  # noqa: E402
-from darkfactory.builtins.push_branch import push_branch  # noqa: E402
-from darkfactory.builtins.summarize_agent_run import summarize_agent_run  # noqa: E402
+from darkfactory.builtins.cleanup_worktree import cleanup_worktree
+from darkfactory.builtins.commit import commit
+from darkfactory.builtins.commit_transcript import commit_transcript
+from darkfactory.builtins.create_pr import create_pr
+from darkfactory.builtins.ensure_worktree import ensure_worktree
+from darkfactory.builtins.lint_attribution import lint_attribution
+from darkfactory.builtins.push_branch import push_branch
+from darkfactory.builtins.set_status import set_status
+from darkfactory.builtins.summarize_agent_run import summarize_agent_run
 
 __all__ = [
     "BUILTINS",
@@ -73,9 +71,6 @@ __all__ = [
 ]
 
 
-# ---------- built-in implementations ----------
-
-
 def _format_tool_counts(tool_counts: dict[str, int]) -> str:
     """Format tool counts as a compact inline string, e.g. 'Read×5, Edit×3'."""
     if not tool_counts:
@@ -91,38 +86,3 @@ def _format_invocations(ctx: ExecutionContext) -> str:
     if count == 1:
         return "1"
     return str(count)
-
-
-@builtin("cleanup_worktree")
-def cleanup_worktree(ctx: ExecutionContext) -> None:
-    """Remove the worktree after a successful run.
-
-    Idempotent — if the worktree is already gone, logs and returns.
-    Normally skipped during chain execution so downstream worktrees
-    can base on this branch; called explicitly via ``prd cleanup``
-    after the whole chain is done.
-    """
-    if ctx.worktree_path is None:
-        ctx.logger.info("cleanup_worktree: no worktree path set, skipping")
-        return
-
-    if not ctx.worktree_path.exists():
-        ctx.logger.info(
-            "cleanup_worktree: %s already gone, skipping", ctx.worktree_path
-        )
-        return
-
-    cmd = [
-        "git",
-        "-C",
-        str(ctx.repo_root),
-        "worktree",
-        "remove",
-        str(ctx.worktree_path),
-    ]
-
-    if ctx.dry_run:
-        ctx.logger.info("[dry-run] %s", " ".join(cmd))
-        return
-
-    subprocess.run(cmd, check=True, capture_output=True, text=True)
