@@ -25,6 +25,7 @@ import os
 import sys
 from pathlib import Path
 
+from .system import SystemOperation
 from .workflow import Workflow
 
 logger = logging.getLogger("darkfactory.loader")
@@ -124,6 +125,87 @@ def load_workflows(
             workflows[wf.name] = wf
 
     return workflows
+
+
+def load_operations(operations_dir: Path) -> dict[str, SystemOperation]:
+    """Discover system operations from a directory of ``operation.py`` modules.
+
+    Mirrors :func:`load_workflows` but scans for ``operation.py`` files and
+    expects each to export an ``operation`` attribute that is a
+    :class:`~darkfactory.system.SystemOperation` instance.
+
+    A nonexistent or non-directory ``operations_dir`` returns an empty dict.
+    Import errors in individual modules are logged at WARNING level and the
+    module is skipped.  Duplicate operation *names* raise ``ValueError``.
+    """
+    operations: dict[str, SystemOperation] = {}
+
+    if not operations_dir.exists() or not operations_dir.is_dir():
+        logger.debug("operations directory not found: %s", operations_dir)
+        return operations
+
+    for subdir in sorted(operations_dir.iterdir()):
+        if (
+            not subdir.is_dir()
+            or subdir.name.startswith("_")
+            or subdir.name.startswith(".")
+        ):
+            continue
+        operation_file = subdir / "operation.py"
+        if not operation_file.exists():
+            continue
+
+        try:
+            op = _load_operation_module(operation_file, subdir)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("failed to load operation from %s: %s", operation_file, exc)
+            continue
+
+        if op.name in operations:
+            existing = operations[op.name].operation_dir
+            raise ValueError(
+                f"duplicate operation name {op.name!r}: "
+                f"defined in both {existing} and {subdir}"
+            )
+        operations[op.name] = op
+
+    return operations
+
+
+def _load_operation_module(operation_file: Path, subdir: Path) -> SystemOperation:
+    """Import a single operation.py and return the SystemOperation it exports.
+
+    Raises ``ImportError`` if the file can't be compiled, ``AttributeError``
+    if the module has no top-level ``operation``, and ``TypeError`` if
+    ``operation`` is not a :class:`~darkfactory.system.SystemOperation` instance.
+    """
+    module_name = f"_darkfactory_operation_{subdir.name}"
+    spec = importlib.util.spec_from_file_location(module_name, operation_file)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"could not create import spec for {operation_file}")
+
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(module_name, None)
+        raise
+
+    if not hasattr(module, "operation"):
+        raise AttributeError(
+            f"{operation_file}: module does not export an 'operation' attribute"
+        )
+
+    op = module.operation
+    if not isinstance(op, SystemOperation):
+        raise TypeError(
+            f"{operation_file}: 'operation' is not a SystemOperation instance "
+            f"(got {type(op).__name__})"
+        )
+
+    op.operation_dir = subdir
+    return op
 
 
 def _load_workflow_module(workflow_file: Path, subdir: Path) -> Workflow:
