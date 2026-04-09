@@ -228,7 +228,9 @@ def test_reconcile_multiple_execute_batched_commit_msg(
 
     captured_msg: list[str] = []
 
-    def fake_commit(candidates: list[tuple[Path, dict[str, Any]]], repo_root: Path) -> None:
+    def fake_commit(
+        candidates: list[tuple[Path, dict[str, Any]]], repo_root: Path
+    ) -> None:
         from darkfactory.cli import _build_reconcile_commit_msg
 
         captured_msg.append(_build_reconcile_commit_msg(candidates))
@@ -258,7 +260,9 @@ def test_reconcile_single_commit_msg_format(
 
     captured_msg: list[str] = []
 
-    def fake_commit(candidates: list[tuple[Path, dict[str, Any]]], repo_root: Path) -> None:
+    def fake_commit(
+        candidates: list[tuple[Path, dict[str, Any]]], repo_root: Path
+    ) -> None:
         from darkfactory.cli import _build_reconcile_commit_msg
 
         captured_msg.append(_build_reconcile_commit_msg(candidates))
