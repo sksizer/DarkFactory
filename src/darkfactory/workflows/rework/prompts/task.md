@@ -5,7 +5,7 @@ Read the PRD at `{{PRD_PATH}}` for context on what was implemented.
 
 ## Your previous work
 The git history on this branch shows what you committed. Use
-`git log` and `git diff main...HEAD` to see what's already done.
+`git log` and `git diff {{BASE_REF}}...HEAD` to see what's already done.
 
 ## Review feedback to address
 

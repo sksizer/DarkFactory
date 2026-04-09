@@ -133,6 +133,38 @@ def test_path_without_line() -> None:
     assert "None" not in result
 
 
+# ---------- multiline body ----------
+
+
+def test_multiline_body_fully_blockquoted() -> None:
+    """Every line of a multiline body should be blockquoted."""
+    body = "First line\nSecond line\nThird line"
+    threads = [_thread(body=body)]
+    result = render_rework_feedback(threads)
+
+    assert "> First line" in result
+    assert "> Second line" in result
+    assert "> Third line" in result
+    # No unquoted body lines
+    for line in result.splitlines():
+        if "First line" in line or "Second line" in line or "Third line" in line:
+            assert line.startswith(">"), f"Unquoted body line: {line!r}"
+
+
+def test_multiline_reply_fully_blockquoted() -> None:
+    """Every line of a multiline reply body should be blockquoted."""
+    reply = ReviewComment(
+        author="bob",
+        body="Line one\nLine two",
+        posted_at="2026-04-07T11:00:00Z",
+    )
+    threads = [_thread(body="Original.", replies=[reply])]
+    result = render_rework_feedback(threads)
+
+    assert "> **bob:** Line one" in result
+    assert "> Line two" in result
+
+
 # ---------- empty thread list ----------
 
 

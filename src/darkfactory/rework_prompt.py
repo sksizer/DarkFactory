@@ -37,13 +37,17 @@ def render_rework_feedback(threads: list[ReviewThread]) -> str:
                 header += f":{thread.line}"
         parts.append(header)
         parts.append("")
-        parts.append(f"> {thread.body}")
+        body_quoted = "\n".join(f"> {line}" for line in thread.body.splitlines())
+        parts.append(body_quoted)
 
         if thread.replies:
             parts.append("")
             parts.append("**Thread replies:**")
             for reply in thread.replies:
-                parts.append(f"> **{reply.author}:** {reply.body}")
+                reply_quoted = "\n".join(
+                    f"> {line}" for line in f"**{reply.author}:** {reply.body}".splitlines()
+                )
+                parts.append(reply_quoted)
 
         parts.append("")
         parts.append("---")
