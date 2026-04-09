@@ -23,7 +23,8 @@ pluggable implementation.
 
 from __future__ import annotations
 
-from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Workflow
+from darkfactory.templates_builtin import PRD_IMPLEMENTATION_TEMPLATE
+from darkfactory.workflow import AgentTask, ShellTask
 
 
 def _applies_to_everything(prd, prds):  # type: ignore[no-untyped-def]
@@ -36,7 +37,7 @@ def _applies_to_everything(prd, prds):  # type: ignore[no-untyped-def]
     return True
 
 
-workflow = Workflow(
+workflow = PRD_IMPLEMENTATION_TEMPLATE.compose(
     name="default",
     description=(
         "General-purpose PRD implementation — the fallback workflow for "
@@ -44,14 +45,7 @@ workflow = Workflow(
     ),
     applies_to=_applies_to_everything,
     priority=0,  # catchall: lowest priority
-    tasks=[
-        # ----- setup phase -----
-        BuiltIn("ensure_worktree"),
-        BuiltIn("set_status", kwargs={"to": "in-progress"}),
-        BuiltIn(
-            "commit",
-            kwargs={"message": "chore(prd): {prd_id} start work"},
-        ),
+    middle=[
         # ----- agent implementation -----
         AgentTask(
             name="implement",
@@ -90,23 +84,5 @@ workflow = Workflow(
         ShellTask("format", cmd="just format", on_failure="fail"),
         ShellTask("lint", cmd="just lint format-check", on_failure="retry_agent"),
         ShellTask("typecheck", cmd="just typecheck", on_failure="retry_agent"),
-        # ----- teardown phase -----
-        # set_status BEFORE the final commit so the review-status change
-        # lands in the commit that gets pushed. Doing set_status after
-        # commit leaves the status mutation uncommitted and the pushed
-        # branch (and merged PR) shows status: in-progress instead of
-        # review.
-        BuiltIn("set_status", kwargs={"to": "review"}),
-        BuiltIn("commit_transcript"),
-        BuiltIn(
-            "commit",
-            kwargs={"message": "chore(prd): {prd_id} ready for review"},
-        ),
-        BuiltIn("summarize_agent_run"),
-        # Reject any commit / run summary that credits Claude or Anthropic
-        # before we push or open a PR. See builtins._scan_for_forbidden_attribution.
-        BuiltIn("lint_attribution"),
-        BuiltIn("push_branch"),
-        BuiltIn("create_pr"),
     ],
 )

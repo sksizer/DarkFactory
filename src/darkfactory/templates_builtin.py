@@ -28,6 +28,7 @@ PRD_IMPLEMENTATION_TEMPLATE = WorkflowTemplate(
         BuiltIn("commit_transcript"),
         BuiltIn("set_status", kwargs={"to": "review"}),
         BuiltIn("commit", kwargs={"message": "chore(prd): {prd_id} ready for review"}),
+        BuiltIn("lint_attribution"),
         BuiltIn("push_branch"),
         BuiltIn("create_pr"),
     ],
