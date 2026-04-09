@@ -43,6 +43,7 @@ from .prd import (
     update_frontmatter_field_at,
 )
 from .runner import _compute_branch_name, _pick_model, run_workflow
+from .config import resolve_config
 from .style import Element, Styler, resolve_style_config
 from .workflow import AgentTask, BuiltIn, ShellTask, Task, Workflow
 
@@ -1807,16 +1808,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.workflows_dir is None:
             args.workflows_dir = darkfactory_dir / "workflows"
 
-    repo_root = darkfactory_dir.parent if darkfactory_dir is not None else None
-
-    # Resolve style config and create a Styler. Any command module that needs
-    # styled output reads args.styler — it never constructs one itself.
-    # JSON-output paths must NOT call styler.render() — they use plain print().
+    # Resolve the full config cascade (files + env vars), then build Styler.
+    # Any command module that needs styled output reads args.styler — it never
+    # constructs one itself. JSON-output paths must NOT call styler.render().
+    resolved_config = resolve_config(darkfactory_dir)
     style_config = resolve_style_config(
+        config=resolved_config,
         theme=getattr(args, "theme", None),
         icon_set=getattr(args, "icon_set", None),
         no_color=getattr(args, "no_color", False),
-        repo_root=repo_root,
     )
     args.styler = Styler(style_config)
 
