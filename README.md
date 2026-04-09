@@ -6,30 +6,32 @@ Standalone PRD harness: DAG orchestration, declarative workflows, agent invocati
 
 This is the extracted standalone version of the harness originally developed inside [pumice](https://github.com/sksizer/pumice) under `tools/prd-harness`. See [PRD-110](https://github.com/sksizer/pumice/blob/main/docs/prd/PRD-110-prd-harness.md) for the full design history.
 
-## Quick start
+## Quickstart
+
+### Install
 
 ```bash
-# Install tools (requires mise)
-mise install
-
-# Install Python dependencies
-uv sync
-
-# Install git hooks (prevents accidental direct pushes to main)
-./scripts/install-hooks.sh
-
-# Run the CLI
-uv run prd status
+uv tool install darkfactory
+# or: pipx install darkfactory
 ```
 
-Or use the justfile recipes:
+### Set up a project
 
 ```bash
-just prd status
-just prd validate
-just prd tree PRD-001
-just prd next --limit 5
+cd ~/my-project
+prd init        # creates .darkfactory/ directory
+prd status      # view PRD status
 ```
+
+### Project layout
+
+darkfactory stores all project state under `.darkfactory/` at your repo root:
+- `.darkfactory/prds/` — PRD files (tracked in git)
+- `.darkfactory/workflows/` — custom workflows (tracked; optional)
+- `.darkfactory/config.toml` — project config (tracked; optional)
+- `.darkfactory/worktrees/` — runtime state (git-ignored)
+
+This convention applies universally — darkfactory's own repo uses the same `.darkfactory/` layout with no special cases.
 
 ## Recipes
 

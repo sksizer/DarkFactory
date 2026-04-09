@@ -12,6 +12,7 @@ dependencies = [
 
 [project.scripts]
 prd = "darkfactory.cli:main"
+darkfactory = "darkfactory.cli:main"
 
 [dependency-groups]
 dev = [
