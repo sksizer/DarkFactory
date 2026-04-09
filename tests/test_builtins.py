@@ -26,9 +26,11 @@ import pytest
 from darkfactory import builtins
 from darkfactory.builtins import (
     BUILTINS,
+    builtin,
+)
+from darkfactory.builtins.create_pr import (
     _extract_acceptance_criteria,
     _pr_body,
-    builtin,
 )
 from darkfactory.builtins.ensure_worktree import (
     _branch_exists_local,
