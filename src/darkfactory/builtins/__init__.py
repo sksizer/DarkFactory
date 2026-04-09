@@ -424,17 +424,25 @@ def summarize_agent_run(ctx: ExecutionContext) -> None:
 
 @builtin("commit_transcript")
 def commit_transcript(ctx: ExecutionContext) -> None:
-    """Move agent transcript to .darkfactory/transcripts/ and stage it.
+    """Copy agent transcript into the worktree and stage it.
 
-    Source: ``.harness-agent-output.log`` written by the runner after each
-    agent invocation. Destination:
+    Source: ``<repo_root>/.harness-transcripts/{prd_id}.log`` written by the
+    runner after each agent invocation (outside any worktree — see
+    ``runner._run_agent``). Destination inside the worktree:
     ``.darkfactory/transcripts/{prd_id}-{timestamp}.log``.
+
+    The runner writes transcripts *outside* every worktree so ``git add -A``
+    can never accidentally sweep them. This builtin is the one place that
+    opts the transcript *into* the worktree — workflows that want the
+    transcript committed alongside the PRD work must include this builtin
+    explicitly. Workflows that omit it leave the transcript at the repo-root
+    path where it survives as a local-only diagnostic.
 
     Timestamps use the wall-clock at the time this builtin runs, which is
     unique enough for sequential runs. If no transcript exists (dry-run,
     or the runner didn't produce one), this is a no-op.
     """
-    src = ctx.cwd / ".harness-agent-output.log"
+    src = ctx.repo_root / ".harness-transcripts" / f"{ctx.prd.id}.log"
     if not src.exists():
         ctx.logger.info("commit_transcript: no transcript found; skipping")
         return
@@ -444,7 +452,7 @@ def commit_transcript(ctx: ExecutionContext) -> None:
         dest = (
             ctx.cwd / ".darkfactory" / "transcripts" / f"{ctx.prd.id}-{timestamp}.log"
         )
-        ctx.logger.info("[dry-run] move %s -> %s && git add", src, dest)
+        ctx.logger.info("[dry-run] copy %s -> %s && git add", src, dest)
         return
 
     transcript_dir = ctx.cwd / ".darkfactory" / "transcripts"
@@ -453,7 +461,10 @@ def commit_transcript(ctx: ExecutionContext) -> None:
     timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
     dest = transcript_dir / f"{ctx.prd.id}-{timestamp}.log"
 
-    shutil.move(str(src), str(dest))
+    # Copy (not move) so the repo-root transcript persists as a local-only
+    # diagnostic even after this builtin runs. If the same PRD is re-run,
+    # the runner overwrites the source file anyway.
+    shutil.copy2(str(src), str(dest))
 
     subprocess.run(["git", "add", str(dest)], cwd=str(ctx.cwd), check=True)
     ctx.logger.info("commit_transcript: staged %s", dest.relative_to(ctx.cwd))
