@@ -12,3 +12,7 @@ build/
 
 # Git worktrees
 .worktrees/
+
+# Harness runtime diagnostics (never commit — see docs/agent-verification-model.md)
+.harness-agent-output.log
+.harness-transcripts/
