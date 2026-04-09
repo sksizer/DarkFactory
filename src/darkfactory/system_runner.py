@@ -44,9 +44,18 @@ SYSTEM_BUILTINS: dict[str, SystemBuiltInFunc] = {}
 """Registry mapping system built-in names to their implementing functions.
 
 Analogous to :data:`~darkfactory.builtins.BUILTINS` but scoped to system
-operations. Populated by decorating functions with
-:func:`system_builtin` or by direct assignment during testing.
+operations. Populated at import time by importing
+:mod:`~darkfactory.builtins.system_builtins` (which registers each builtin
+via its own ``_register`` decorator), and can be extended by direct
+assignment during testing.
 """
+
+# Import system_builtins to trigger side-effect registration into this dict.
+# The module populates its own SYSTEM_BUILTINS dict; we merge that here so
+# run_system_operation can dispatch against all registered implementations.
+from .builtins.system_builtins import SYSTEM_BUILTINS as _impl_builtins  # noqa: E402
+
+SYSTEM_BUILTINS.update(_impl_builtins)
 
 
 def system_builtin(name: str) -> Callable[[SystemBuiltInFunc], SystemBuiltInFunc]:
