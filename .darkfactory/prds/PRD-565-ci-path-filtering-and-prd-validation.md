@@ -2,16 +2,17 @@
 id: PRD-565
 title: CI path filtering with dedicated PRD validation workflow
 kind: feature
-status: draft
+status: review
 priority: high
 effort: s
 capability: simple
 parent:
 depends_on: []
-blocks: []
-impacts:
-  - .github/workflows/ci.yml
-  - .github/workflows/prd-validate.yml
+blocks:
+  - "[[PRD-565.1-ci-path-filter]]"
+  - "[[PRD-565.2-prd-validate-workflow]]"
+  - "[[PRD-565.3-branch-protection-config]]"
+impacts: []
 workflow:
 assignee:
 reviewers: []
