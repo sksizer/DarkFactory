@@ -120,6 +120,10 @@ def cmd_system_run(args: argparse.Namespace) -> int:
         raise SystemExit(
             f"operation {args.name!r} does not accept a --target (accepts_target=False)"
         )
+    if target_prd is None and operation.accepts_target:
+        raise SystemExit(
+            f"operation {args.name!r} requires --target (accepts_target=True)"
+        )
 
     repo_root = _find_repo_root(args.prd_dir)
     dry_run = not getattr(args, "execute", False)
