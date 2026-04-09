@@ -2,13 +2,21 @@
 id: PRD-222
 title: Make darkfactory a general-purpose CLI tool installable anywhere
 kind: epic
-status: in-progress
+status: review
 priority: high
 effort: l
 capability: moderate
 parent:
 depends_on: []
-blocks: []
+blocks:
+  - "[[PRD-222.1-config-directory-discovery]]"
+  - "[[PRD-222.2-prd-init-subcommand]]"
+  - "[[PRD-222.3-bundle-builtin-workflows]]"
+  - "[[PRD-222.4-user-config-directory]]"
+  - "[[PRD-222.5-cascade-resolver-workflows]]"
+  - "[[PRD-222.6-cascade-resolver-config]]"
+  - "[[PRD-222.7-package-metadata-installability]]"
+  - "[[PRD-222.8-dogfood-move-state]]"
 impacts: []
 workflow:
 target_version:
