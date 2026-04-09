@@ -13,6 +13,9 @@ mise install
 # Install Python dependencies
 uv sync
 
+# Install git hooks (prevents accidental direct pushes to main)
+./scripts/install-hooks.sh
+
 # Run the CLI
 uv run prd status
 ```

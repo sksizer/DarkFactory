@@ -26,6 +26,8 @@ from pathlib import Path
 from typing import Any
 
 from . import assign, checks, containment, graph, impacts
+from .checks import StaleWorktree, find_stale_worktrees, is_safe_to_remove
+from .graph_execution import RunEvent, execute_graph, plan_execution
 from .invoke import capability_to_model
 from .loader import load_workflows
 from .prd import (
@@ -36,6 +38,7 @@ from .prd import (
     normalize_list_field_at,
     parse_id_sort_key,
     set_workflow,
+    update_frontmatter_field_at,
 )
 from .runner import _compute_branch_name, _pick_model, run_workflow
 from .style import Element, Styler, resolve_style_config
@@ -266,7 +269,169 @@ def cmd_status(args: argparse.Namespace) -> int:
             print(
                 f"  {prd.id:14} [{prd.kind}/{prd.effort}/{prd.capability}]  {prd.title}"
             )
+
+    try:
+        repo_root = _find_repo_root(args.prd_dir)
+        stale = find_stale_worktrees(repo_root)
+        if stale:
+            print(
+                f"\n{len(stale)} worktrees for merged PRDs"
+                " (run 'prd cleanup --merged' to remove)"
+            )
+    except (SystemExit, Exception):  # noqa: BLE001 — best-effort outside a git repo
+        pass
+
     return 0
+
+
+def _remove_worktree(worktree: StaleWorktree, repo_root: Path) -> None:
+    """Remove a worktree directory and delete the local branch."""
+    subprocess.run(
+        ["git", "worktree", "remove", "--force", str(worktree.worktree_path)],
+        cwd=repo_root,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "branch", "-D", worktree.branch.removeprefix("prd/")],
+        cwd=repo_root,
+        capture_output=True,
+    )
+
+
+def _find_worktree_for_prd(prd_id: str, repo_root: Path) -> StaleWorktree | None:
+    """Find the worktree entry for the given PRD id, regardless of PR state."""
+    worktrees_dir = repo_root / ".worktrees"
+    if not worktrees_dir.exists():
+        return None
+    for entry in sorted(worktrees_dir.iterdir()):
+        if not entry.is_dir():
+            continue
+        name = entry.name
+        m = re.match(r"^(PRD-[\d.]+)", name)
+        if not m:
+            continue
+        if m.group(1) != prd_id:
+            continue
+        branch = f"prd/{name}"
+        pr_state = checks._get_pr_state(branch, repo_root)
+        return StaleWorktree(
+            prd_id=prd_id,
+            branch=branch,
+            worktree_path=entry,
+            pr_state=pr_state,
+        )
+    return None
+
+
+def _cleanup_single(prd_id: str, force: bool, repo_root: Path) -> int:
+    worktree = _find_worktree_for_prd(prd_id, repo_root)
+    if worktree is None:
+        print(f"No worktree found for {prd_id}")
+        return 1
+    status = is_safe_to_remove(worktree, force=force)
+    if not status.safe:
+        print(f"Cannot remove {prd_id}: {status.reason}")
+        return 1
+    _remove_worktree(worktree, repo_root)
+    print(f"Removed worktree and branch for {prd_id}")
+    return 0
+
+
+def _cleanup_merged(force: bool, repo_root: Path) -> int:
+    stale = find_stale_worktrees(repo_root)
+    if not stale:
+        print("No stale worktrees found")
+        return 0
+    removed = 0
+    skipped = 0
+    for worktree in stale:
+        status = is_safe_to_remove(worktree, force=force)
+        if not status.safe:
+            print(f"Skipping {worktree.prd_id}: {status.reason}")
+            skipped += 1
+            continue
+        _remove_worktree(worktree, repo_root)
+        print(f"Removed {worktree.prd_id}")
+        removed += 1
+    print(f"Removed {removed}, skipped {skipped}")
+    return 0 if skipped == 0 else 1
+
+
+def _cleanup_all(force: bool, repo_root: Path) -> int:
+    worktrees_dir = repo_root / ".worktrees"
+    if not worktrees_dir.exists():
+        print("No .worktrees directory found")
+        return 0
+
+    all_worktrees: list[StaleWorktree] = []
+    for entry in sorted(worktrees_dir.iterdir()):
+        if not entry.is_dir():
+            continue
+        name = entry.name
+        m = re.match(r"^(PRD-[\d.]+)", name)
+        if not m:
+            continue
+        prd_id = m.group(1)
+        branch = f"prd/{name}"
+        pr_state = checks._get_pr_state(branch, repo_root)
+        all_worktrees.append(
+            StaleWorktree(
+                prd_id=prd_id,
+                branch=branch,
+                worktree_path=entry,
+                pr_state=pr_state,
+            )
+        )
+
+    if not all_worktrees:
+        print("No worktrees found")
+        return 0
+
+    open_prs = [w for w in all_worktrees if w.pr_state == "OPEN"]
+    if open_prs:
+        print(f"Warning: {len(open_prs)} worktree(s) have open PRs:")
+        for w in open_prs:
+            print(f"  {w.prd_id} ({w.branch})")
+
+    confirm = (
+        input(f"Remove all {len(all_worktrees)} worktree(s)? [y/N] ").strip().lower()
+    )
+    if confirm not in ("y", "yes"):
+        print("Aborted")
+        return 1
+
+    removed = 0
+    skipped = 0
+    for worktree in all_worktrees:
+        status = is_safe_to_remove(worktree, force=force)
+        if not status.safe:
+            print(f"Skipping {worktree.prd_id}: {status.reason}")
+            skipped += 1
+            continue
+        _remove_worktree(worktree, repo_root)
+        print(f"Removed {worktree.prd_id}")
+        removed += 1
+    print(f"Removed {removed}, skipped {skipped}")
+    return 0 if skipped == 0 else 1
+
+
+def cmd_cleanup(args: argparse.Namespace) -> int:
+    """Remove worktrees for completed PRDs."""
+    repo_root = _find_repo_root(args.prd_dir)
+    prd_id: str | None = getattr(args, "prd_id", None)
+    merged: bool = getattr(args, "merged", False)
+    all_: bool = getattr(args, "all_", False)
+    force: bool = getattr(args, "force", False)
+
+    if prd_id:
+        return _cleanup_single(prd_id, force, repo_root)
+    elif merged:
+        return _cleanup_merged(force, repo_root)
+    elif all_:
+        return _cleanup_all(force, repo_root)
+    else:
+        print("Specify PRD-X, --merged, or --all")
+        return 1
 
 
 def cmd_next(args: argparse.Namespace) -> int:
@@ -923,14 +1088,34 @@ def cmd_plan(args: argparse.Namespace) -> int:
     return 0
 
 
+def _is_graph_target(prd: PRD, prds: dict[str, PRD]) -> bool:
+    """True if ``prd run`` should walk the DAG rather than run a single PRD.
+
+    Routes through the graph executor when the target has children (epic
+    or feature with decomposition) or any unfinished ``depends_on`` —
+    both cases require multi-PRD orchestration. A plain ready leaf with
+    all deps satisfied goes through the legacy single-PRD path.
+    """
+    if not containment.is_leaf(prd, prds):
+        return True
+    for dep_id in prd.depends_on:
+        dep = prds.get(dep_id)
+        if dep is None:
+            continue
+        if dep.status != "done":
+            return True
+    return False
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     """Run a workflow against a PRD. Defaults to dry-run; opt in via --execute.
 
-    In dry-run mode, this is effectively a more detailed version of
-    ``prd plan`` — it walks the runner's dispatch loop but each task
-    only logs what it would do. With ``--execute``, the runner actually
-    creates the worktree, invokes the agent, runs checks, pushes, and
-    creates the PR.
+    - **Single leaf with deps satisfied:** legacy path — one worktree,
+      one workflow run.
+    - **Epic/feature with children, or leaf with unmet deps:** graph
+      execution — walks the DAG in topological order, running each
+      actionable leaf in its own worktree. Sequential only (PRD-220).
+      Parallel fan-out is PRD-551.
     """
     prds = _load(args.prd_dir)
     if args.prd_id not in prds:
@@ -939,7 +1124,24 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     workflows = _load_workflows_or_fail(args.workflows_dir)
 
-    # Resolve workflow.
+    repo_root = _find_repo_root(args.prd_dir)
+    base_ref = _resolve_base_ref(args.base, repo_root)
+    dry_run = not args.execute
+    styler: Styler = args.styler
+
+    if _is_graph_target(prd, prds):
+        return _cmd_run_graph(
+            args=args,
+            prd=prd,
+            prds=prds,
+            workflows=workflows,
+            repo_root=repo_root,
+            default_base=base_ref,
+            dry_run=dry_run,
+            styler=styler,
+        )
+
+    # Legacy single-PRD path.
     if args.workflow:
         if args.workflow not in workflows:
             raise SystemExit(f"unknown workflow: {args.workflow}")
@@ -950,18 +1152,10 @@ def cmd_run(args: argparse.Namespace) -> int:
         except KeyError as exc:
             raise SystemExit(str(exc))
 
-    # Runnability check only applies when actually executing. Dry-run
-    # should be allowed on any PRD for discovery.
     if args.execute:
         err = _check_runnable(prd, prds)
         if err:
             raise SystemExit(f"cannot run: {err}")
-
-    repo_root = _find_repo_root(args.prd_dir)
-    base_ref = _resolve_base_ref(args.base, repo_root)
-
-    dry_run = not args.execute
-    styler: Styler = args.styler
 
     header_label = "Dry-run" if dry_run else "Executing"
     print(
@@ -1002,6 +1196,301 @@ def cmd_run(args: argparse.Namespace) -> int:
             f"  Result: {styler.render(Element.RUN_FAILURE, '✗ FAILED')} — {result.failure_reason}"
         )
         return 1
+
+
+def _cmd_run_graph(
+    *,
+    args: argparse.Namespace,
+    prd: PRD,
+    prds: dict[str, PRD],
+    workflows: dict[str, Workflow],
+    repo_root: Path,
+    default_base: str,
+    dry_run: bool,
+    styler: Styler,
+) -> int:
+    """Graph-execution path for ``prd run``.
+
+    In dry-run (the default), prints the full DAG + the execution slice
+    that would run under ``--max-runs``. With ``--execute``, actually
+    walks the DAG via :func:`graph_execution.execute_graph`, streaming
+    events and returning a non-zero exit on any failure.
+    """
+    max_runs: int | None = args.max_runs
+
+    if dry_run:
+        plan = plan_execution(
+            prd,
+            prds,
+            max_runs=max_runs,
+            default_base=default_base,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "root": prd.id,
+                        "default_base": default_base,
+                        "full_dag": plan.full_dag,
+                        "execution_slice": plan.execution_slice,
+                        "skipped": [
+                            {"prd_id": pid, "reason": reason}
+                            for pid, reason in plan.skipped
+                        ],
+                        "max_runs": max_runs,
+                    },
+                    indent=2,
+                )
+            )
+            return 0
+
+        print(
+            styler.render(
+                Element.RUN_HEADER,
+                f"# Dry-run graph: {prd.id} (base {default_base})",
+            )
+        )
+        print()
+        print(f"  Full DAG ({len(plan.full_dag)} runnable PRDs):")
+        for i, pid in enumerate(plan.full_dag, start=1):
+            status = prds[pid].status if pid in prds else "?"
+            print(f"    {i:>2}. {pid} [{status}]")
+        print()
+        print(f"  Execution slice ({len(plan.execution_slice)} PRDs will run):")
+        if not plan.execution_slice:
+            print("    (nothing to run)")
+        for i, pid in enumerate(plan.execution_slice, start=1):
+            print(f"    {i:>2}. {pid}")
+        if plan.skipped:
+            print()
+            print("  Skipped:")
+            for pid, reason in plan.skipped:
+                print(f"    - {pid}: {reason}")
+        return 0
+
+    # --execute path.
+    print(
+        styler.render(
+            Element.RUN_HEADER,
+            f"# Executing graph: {prd.id} (base {default_base})",
+        )
+    )
+
+    events: list[RunEvent] = []
+
+    def sink(ev: RunEvent) -> None:
+        events.append(ev)
+        if args.json:
+            print(json.dumps(ev.as_dict()), flush=True)
+        else:
+            _print_run_event(ev, styler)
+
+    report = execute_graph(
+        root_id=prd.id,
+        prd_dir=args.prd_dir,
+        repo_root=repo_root,
+        workflows=workflows,
+        default_base=default_base,
+        max_runs=max_runs,
+        model_override=args.model,
+        workflow_override=args.workflow,
+        dry_run=False,
+        event_sink=sink,
+    )
+
+    print()
+    print(f"  Completed: {len(report.completed)}")
+    for pid in report.completed:
+        print(f"    {styler.render(Element.RUN_SUCCESS, '✓')} {pid}")
+    if report.failed:
+        print(f"  Failed: {len(report.failed)}")
+        for pid, reason in report.failed:
+            print(f"    {styler.render(Element.RUN_FAILURE, '✗')} {pid} — {reason}")
+    if report.skipped:
+        print(f"  Skipped: {len(report.skipped)}")
+        for pid, reason in report.skipped:
+            print(f"    - {pid}: {reason}")
+    return report.exit_code
+
+
+def _get_merged_prd_prs() -> list[dict[str, Any]]:
+    """Return merged PRs whose head branch matches ``prd/PRD-*``."""
+    result = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "list",
+            "--state",
+            "merged",
+            "--json",
+            "headRefName,mergedAt,number",
+            "--limit",
+            "200",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise SystemExit(f"gh pr list failed: {result.stderr.strip()}")
+    prs: list[dict[str, Any]] = json.loads(result.stdout)
+    return [pr for pr in prs if re.match(r"^prd/PRD-", pr["headRefName"])]
+
+
+def _find_prd_file_for_branch(branch_name: str, prd_dir: Path) -> Path | None:
+    """Return the PRD file for a branch like ``prd/PRD-224.7-reconcile-status``."""
+    m = re.match(r"^prd/(PRD-[\d.]+)", branch_name)
+    if not m:
+        return None
+    prd_id = m.group(1)
+    for f in sorted(prd_dir.glob(f"{prd_id}-*.md")):
+        return f
+    return None
+
+
+def _get_prd_status(path: Path) -> str | None:
+    """Read the ``status`` field from a PRD file's frontmatter."""
+    text = path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        m = re.match(r"^status:\s*(.+)$", line)
+        if m:
+            return m.group(1).strip().strip("\"'")
+    return None
+
+
+def _extract_prd_id_from_path(prd_file: Path) -> str:
+    """Extract the PRD ID (e.g. ``PRD-224.7``) from a filename."""
+    m = re.match(r"^(PRD-[\d.]+)-", prd_file.name)
+    return m.group(1) if m else prd_file.stem
+
+
+def _build_reconcile_commit_msg(
+    candidates: list[tuple[Path, dict[str, Any]]],
+) -> str:
+    """Build the commit message for a reconcile operation."""
+    if len(candidates) == 1:
+        prd_file, pr = candidates[0]
+        prd_id = _extract_prd_id_from_path(prd_file)
+        return (
+            f"chore(prd): mark {prd_id} done "
+            f"(auto-reconciled from merged PR #{pr['number']}) [skip ci]"
+        )
+    return f"chore(prd): reconcile {len(candidates)} merged PRD statuses [skip ci]"
+
+
+def _commit_to_main(
+    candidates: list[tuple[Path, dict[str, Any]]],
+    repo_root: Path,
+) -> None:
+    """Stage changed PRD files and commit directly to main."""
+    files = [str(c[0]) for c in candidates]
+    subprocess.run(["git", "-C", str(repo_root), "add"] + files, check=True)
+    msg = _build_reconcile_commit_msg(candidates)
+    subprocess.run(
+        ["git", "-C", str(repo_root), "commit", "-m", msg],
+        check=True,
+    )
+
+
+def _create_reconcile_pr(
+    candidates: list[tuple[Path, dict[str, Any]]],
+    repo_root: Path,
+) -> None:
+    """Create a PR with the reconciled status changes."""
+    branch = "prd/reconcile-status"
+    subprocess.run(
+        ["git", "-C", str(repo_root), "checkout", "-b", branch],
+        check=True,
+    )
+    files = [str(c[0]) for c in candidates]
+    subprocess.run(["git", "-C", str(repo_root), "add"] + files, check=True)
+    msg = _build_reconcile_commit_msg(candidates)
+    subprocess.run(
+        ["git", "-C", str(repo_root), "commit", "-m", msg],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repo_root), "push", "-u", "origin", branch],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "gh",
+            "pr",
+            "create",
+            "--title",
+            msg,
+            "--body",
+            "Auto-reconciled by `prd reconcile`",
+        ],
+        check=True,
+    )
+
+
+def cmd_reconcile(args: argparse.Namespace) -> int:
+    """Find merged-but-not-flipped PRDs and reconcile their status."""
+    prd_dir = args.prd_dir
+
+    # 1. Get merged PRs with prd/* branches.
+    merged_prs = _get_merged_prd_prs()
+
+    # 2. Find corresponding PRD files still in 'review'.
+    candidates: list[tuple[Path, dict[str, Any]]] = []
+    for pr in merged_prs:
+        prd_file = _find_prd_file_for_branch(pr["headRefName"], prd_dir)
+        if prd_file is None:
+            continue
+        if _get_prd_status(prd_file) == "review":
+            candidates.append((prd_file, pr))
+
+    if not candidates:
+        print("All PRD statuses are up to date.")
+        return 0
+
+    # 3. Print what would change (dry-run).
+    for prd_file, pr in candidates:
+        prd_id = _extract_prd_id_from_path(prd_file)
+        print(f"  {prd_id}: review -> done (from merged PR #{pr['number']})")
+
+    if not args.execute:
+        print("\nDry run. Use --execute to apply changes.")
+        return 0
+
+    # 4. Apply changes.
+    today = date.today().isoformat()
+    for prd_file, _pr in candidates:
+        update_frontmatter_field_at(
+            prd_file, {"status": "done", "updated": f"'{today}'"}
+        )
+
+    # 5. Commit.
+    repo_root = _find_repo_root(prd_dir)
+    if args.commit_to_main:
+        _commit_to_main(candidates, repo_root)
+    else:
+        _create_reconcile_pr(candidates, repo_root)
+
+    return 0
+
+
+def _print_run_event(ev: RunEvent, styler: Styler) -> None:
+    if ev.event == "start":
+        base = f" (base {ev.base_ref})" if ev.base_ref else ""
+        print(f"  → start {ev.prd_id}{base}")
+    elif ev.event == "finish":
+        if ev.success:
+            marker = styler.render(Element.RUN_SUCCESS, "✓")
+            pr = f" {ev.pr_url}" if ev.pr_url else ""
+            print(f"  {marker} finish {ev.prd_id}{pr}")
+        else:
+            marker = styler.render(Element.RUN_FAILURE, "✗")
+            print(f"  {marker} finish {ev.prd_id} — {ev.failure_reason or 'failed'}")
+    elif ev.event == "skip":
+        print(f"  ↷ skip {ev.prd_id}: {ev.reason}")
 
 
 # ---------- argparse plumbing ----------
@@ -1074,6 +1563,31 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub_status = sub.add_parser("status", help="DAG overview and counts")
     sub_status.set_defaults(func=cmd_status)
+
+    sub_cleanup = sub.add_parser("cleanup", help="Remove worktrees for completed PRDs")
+    sub_cleanup.add_argument(
+        "prd_id",
+        nargs="?",
+        default=None,
+        help="PRD id to clean up (e.g. PRD-224.4)",
+    )
+    sub_cleanup.add_argument(
+        "--merged",
+        action="store_true",
+        help="Remove all worktrees for merged-PR PRDs",
+    )
+    sub_cleanup.add_argument(
+        "--all",
+        dest="all_",
+        action="store_true",
+        help="Remove all worktrees (with confirmation prompt)",
+    )
+    sub_cleanup.add_argument(
+        "--force",
+        action="store_true",
+        help="Remove even if there are unpushed commits",
+    )
+    sub_cleanup.set_defaults(func=cmd_cleanup)
 
     sub_next = sub.add_parser("next", help="List actionable PRDs")
     sub_next.add_argument("--limit", type=int, default=10)
@@ -1191,7 +1705,36 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Override the capability->model mapping (e.g. opus)",
     )
+    sub_run.add_argument(
+        "--max-runs",
+        type=int,
+        default=None,
+        dest="max_runs",
+        help=(
+            "In graph mode, cap the total number of PRD runs this "
+            "invocation may execute (counts successes, failures, and "
+            "mid-run introduced PRDs). Default: unbounded."
+        ),
+    )
     sub_run.set_defaults(func=cmd_run)
+
+    sub_reconcile = sub.add_parser(
+        "reconcile",
+        help="Find merged-but-not-flipped PRDs and reconcile their status",
+    )
+    sub_reconcile.add_argument(
+        "--execute",
+        action="store_true",
+        help="Apply the status updates (default is dry-run)",
+    )
+    sub_reconcile.add_argument(
+        "--commit-to-main",
+        dest="commit_to_main",
+        action="store_true",
+        default=False,
+        help="Commit directly to main instead of opening a PR",
+    )
+    sub_reconcile.set_defaults(func=cmd_reconcile)
 
     return parser
 

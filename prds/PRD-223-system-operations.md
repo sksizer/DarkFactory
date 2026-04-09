@@ -1,19 +1,20 @@
 ---
-id: "PRD-223"
+id: PRD-223
 title: "System operations: reuse the workflow harness for non-PRD-bound tasks"
 kind: epic
 status: draft
 priority: medium
 effort: m
 capability: moderate
-parent: null
-depends_on: []
+parent:
+depends_on:
+  - "[[PRD-222-general-purpose-tool]]"
 blocks: []
-impacts: []  # epic — children declare their own
-workflow: null
-target_version: null
+impacts: []
+workflow:
+target_version:
 created: 2026-04-08
-updated: '2026-04-08'
+updated: 2026-04-08
 tags:
   - harness
   - workflow
@@ -148,10 +149,10 @@ System ops are NOT in `prd next` / `prd plan` / `prd run` — those are PRD-boun
 
 ### How operations are loaded
 
-Same loader pattern as workflows. New directory `system/` (or `operations/`) at the repo root or under `.darkfactory/system/`:
+Same loader pattern as workflows. Operations live under `.darkfactory/operations/` in the target project (PRD-222's convention — this PRD depends on 222 landing first specifically to avoid a migration step later):
 
 ```
-operations/
+.darkfactory/operations/
 ├── reconcile-status/
 │   ├── operation.py        # exposes `operation = SystemOperation(...)`
 │   └── prompts/
@@ -243,7 +244,7 @@ This is an epic. Suggested breakdown:
 
 ## Open Questions
 
-- [ ] Should system ops live at `operations/` repo root or `.darkfactory/operations/` (under PRD-222's proposed layout)? Recommendation: `.darkfactory/operations/` once PRD-222.4 lands; until then, `operations/` at repo root with auto-migration.
+- [x] ~~Should system ops live at `operations/` repo root or `.darkfactory/operations/`?~~ Resolved: `.darkfactory/operations/`. This PRD depends on PRD-222 so the convention is in place before any operation code lands — no repo-root staging, no migration.
 - [ ] Should reconcile mutate the source repo directly (violates PRD-213 invariant) or use a one-off worktree branch like `system/reconcile-2026-04-08`? Recommendation: dedicated worktree with branch + PR — preserves the invariant and matches how other batched changes get reviewed.
 - [ ] How does the agent verify-merge step decide "merge matches the PRD's intent"? The simplest: read the PRD's Acceptance Criteria, read the merge commit's diff, sentinel `MATCH` or `MISMATCH: <reason>`. More sophisticated approaches (read tests, run them, etc.) belong in a separate operation.
 - [ ] Do we want a `prd system schedule <name>` later for cron-like recurring operations (e.g. nightly reconcile)? Recommendation: out of scope for this epic.
