@@ -51,6 +51,7 @@ _log = logging.getLogger(__name__)
 
 # Import submodules to trigger @builtin registration.
 from darkfactory.builtins.ensure_worktree import ensure_worktree  # noqa: E402
+from darkfactory.builtins.push_branch import push_branch  # noqa: E402
 
 __all__ = [
     "BUILTINS",
@@ -191,29 +192,6 @@ def commit(ctx: ExecutionContext, *, message: str) -> None:
     # Commit
     subprocess.run(
         ["git", "commit", "-m", formatted],
-        cwd=str(ctx.cwd),
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-
-@builtin("push_branch")
-def push_branch(ctx: ExecutionContext) -> None:
-    """Push the current branch to origin with upstream tracking.
-
-    Runs ``git push -u origin {branch}`` inside the worktree. Required
-    before :func:`create_pr` because ``gh pr create --base`` needs the
-    remote to exist.
-    """
-    cmd = ["git", "push", "-u", "origin", ctx.branch_name]
-
-    if ctx.dry_run:
-        ctx.logger.info("[dry-run] %s", " ".join(cmd))
-        return
-
-    subprocess.run(
-        cmd,
         cwd=str(ctx.cwd),
         check=True,
         capture_output=True,
