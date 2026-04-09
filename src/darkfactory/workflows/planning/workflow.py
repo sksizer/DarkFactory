@@ -67,10 +67,10 @@ workflow = Workflow(
                 # Self-validate
                 "Bash(uv run prd validate*)",
                 "Bash(uv run prd:*)",
-                # Stage changes (scoped to prds/)
-                "Bash(git add prds/:*)",
+                # Stage changes (scoped to .darkfactory/prds/)
+                "Bash(git add .darkfactory/prds/:*)",
                 "Bash(git status:*)",
-                "Bash(git diff prds/:*)",
+                "Bash(git diff .darkfactory/prds/:*)",
                 # Inspect existing structure (read-only)
                 "Bash(git log:*)",
             ],
