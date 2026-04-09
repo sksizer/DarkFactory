@@ -86,10 +86,14 @@ def _find_repo_root(start: Path) -> Path:
 
 
 def _load_workflows_or_fail(workflows_dir: Path) -> dict[str, Workflow]:
-    """Load workflows with a user-friendly error if the directory is missing."""
-    if not workflows_dir.exists():
-        raise SystemExit(f"workflows directory not found: {workflows_dir}")
-    return load_workflows(workflows_dir)
+    """Load built-in and project-level workflows.
+
+    Built-in (system) workflows ship inside the package and are always
+    available. ``workflows_dir`` is the optional project-level layer
+    (``<project>/.darkfactory/workflows/``); if it doesn't exist we just
+    return the built-ins.
+    """
+    return load_workflows(workflows_dir if workflows_dir.exists() else None)
 
 
 def _action_sort_key(prd: PRD) -> tuple[int, int, tuple[int, ...]]:

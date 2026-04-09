@@ -22,9 +22,21 @@ from darkfactory.prd import load_all
 from .conftest import write_prd
 
 
-def _workflows_dir() -> Path:
-    """Return the real workflows/ directory in the repo."""
-    return Path(__file__).resolve().parent.parent / "workflows"
+pytestmark = pytest.mark.usefixtures("real_builtin_workflows")
+
+
+def _workflows_dir(tmp_path: Path) -> Path:
+    """Return an empty project-level workflows dir.
+
+    The planning workflow is now a bundled system workflow loaded from
+    inside the package, so there's no on-disk workflows directory in the
+    target project. Tests that need a `--workflows-dir` argument get a
+    throwaway empty one — the loader will still find ``planning`` in the
+    built-in layer.
+    """
+    d = tmp_path / "workflows"
+    d.mkdir(exist_ok=True)
+    return d
 
 
 # ---------- loader ----------
@@ -32,19 +44,19 @@ def _workflows_dir() -> Path:
 
 def test_planning_workflow_loads() -> None:
     """The planning workflow is discovered by the loader."""
-    workflows = load_workflows(_workflows_dir())
+    workflows = load_workflows()
     assert "planning" in workflows
 
 
 def test_planning_workflow_priority() -> None:
     """Priority is 5 — above default (0)."""
-    workflows = load_workflows(_workflows_dir())
+    workflows = load_workflows()
     assert workflows["planning"].priority == 5
 
 
 def test_planning_workflow_description() -> None:
     """Description is non-empty and mentions decomposition."""
-    workflows = load_workflows(_workflows_dir())
+    workflows = load_workflows()
     assert "decompose" in workflows["planning"].description.lower()
 
 
@@ -55,7 +67,7 @@ def test_applies_to_undecomposed_epic(tmp_prd_dir: Path) -> None:
     """An undecomposed epic in ready status matches the planning workflow."""
     write_prd(tmp_prd_dir, "PRD-100", "big-epic", kind="epic", status="ready")
     prds = load_all(tmp_prd_dir)
-    workflows = load_workflows(_workflows_dir())
+    workflows = load_workflows()
     assert workflows["planning"].applies_to(prds["PRD-100"], prds)
 
 
@@ -63,7 +75,7 @@ def test_applies_to_undecomposed_feature(tmp_prd_dir: Path) -> None:
     """An undecomposed feature in ready status matches the planning workflow."""
     write_prd(tmp_prd_dir, "PRD-100", "big-feat", kind="feature", status="ready")
     prds = load_all(tmp_prd_dir)
-    workflows = load_workflows(_workflows_dir())
+    workflows = load_workflows()
     assert workflows["planning"].applies_to(prds["PRD-100"], prds)
 
 
@@ -71,7 +83,7 @@ def test_does_not_apply_to_task(tmp_prd_dir: Path) -> None:
     """A task PRD does not match the planning workflow."""
     write_prd(tmp_prd_dir, "PRD-100", "leaf-task", kind="task", status="ready")
     prds = load_all(tmp_prd_dir)
-    workflows = load_workflows(_workflows_dir())
+    workflows = load_workflows()
     assert not workflows["planning"].applies_to(prds["PRD-100"], prds)
 
 
@@ -80,7 +92,7 @@ def test_does_not_apply_to_decomposed_epic(tmp_prd_dir: Path) -> None:
     write_prd(tmp_prd_dir, "PRD-100", "epic", kind="epic", status="ready")
     write_prd(tmp_prd_dir, "PRD-100.1", "child-task", kind="task", parent="PRD-100")
     prds = load_all(tmp_prd_dir)
-    workflows = load_workflows(_workflows_dir())
+    workflows = load_workflows()
     assert not workflows["planning"].applies_to(prds["PRD-100"], prds)
 
 
@@ -88,7 +100,7 @@ def test_does_not_apply_to_non_ready_epic(tmp_prd_dir: Path) -> None:
     """An epic not in ready status doesn't match."""
     write_prd(tmp_prd_dir, "PRD-100", "epic", kind="epic", status="draft")
     prds = load_all(tmp_prd_dir)
-    workflows = load_workflows(_workflows_dir())
+    workflows = load_workflows()
     assert not workflows["planning"].applies_to(prds["PRD-100"], prds)
 
 
@@ -99,7 +111,7 @@ def test_agent_task_model_pinned_to_opus() -> None:
     """The decompose AgentTask is pinned to opus."""
     from darkfactory.workflow import AgentTask
 
-    workflows = load_workflows(_workflows_dir())
+    workflows = load_workflows()
     planning = workflows["planning"]
     agent_tasks = [t for t in planning.tasks if isinstance(t, AgentTask)]
     assert len(agent_tasks) == 1
@@ -112,7 +124,7 @@ def test_agent_task_has_no_edit_tool() -> None:
     """The decompose AgentTask does not include Edit in its tool allowlist."""
     from darkfactory.workflow import AgentTask
 
-    workflows = load_workflows(_workflows_dir())
+    workflows = load_workflows()
     planning = workflows["planning"]
     agent_tasks = [t for t in planning.tasks if isinstance(t, AgentTask)]
     agent = agent_tasks[0]
@@ -123,7 +135,7 @@ def test_agent_task_has_write_tool() -> None:
     """The decompose AgentTask includes Write for creating PRD files."""
     from darkfactory.workflow import AgentTask
 
-    workflows = load_workflows(_workflows_dir())
+    workflows = load_workflows()
     planning = workflows["planning"]
     agent_tasks = [t for t in planning.tasks if isinstance(t, AgentTask)]
     agent = agent_tasks[0]
@@ -146,7 +158,7 @@ def test_list_workflows_shows_planning(
             "--prd-dir",
             str(prd_dir),
             "--workflows-dir",
-            str(_workflows_dir()),
+            str(_workflows_dir(tmp_path)),
             "list-workflows",
         ]
     )
@@ -175,7 +187,7 @@ def test_plan_routes_epic_to_planning(
             "--prd-dir",
             str(prd_dir),
             "--workflows-dir",
-            str(_workflows_dir()),
+            str(_workflows_dir(tmp_path)),
             "plan",
             "PRD-100",
         ]
@@ -200,7 +212,7 @@ def test_plan_does_not_route_task_to_planning(
             "--prd-dir",
             str(prd_dir),
             "--workflows-dir",
-            str(_workflows_dir()),
+            str(_workflows_dir(tmp_path)),
             "plan",
             "PRD-001",
         ]
@@ -225,7 +237,7 @@ def test_plan_json_routes_epic_to_planning(
             "--prd-dir",
             str(prd_dir),
             "--workflows-dir",
-            str(_workflows_dir()),
+            str(_workflows_dir(tmp_path)),
             "--json",
             "plan",
             "PRD-100",

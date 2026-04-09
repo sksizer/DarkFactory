@@ -328,21 +328,27 @@ def test_assign_write_is_idempotent(tmp_path: Path) -> None:
     assert after["PRD-002"].workflow == "default"
 
 
-def test_assign_missing_workflows_dir_errors(
+def test_assign_missing_project_workflows_dir_is_ok(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Missing workflows directory produces a friendly SystemExit."""
+    """A missing project-level workflows dir is not an error.
+
+    Built-in system workflows are always available; the project layer
+    at ``.darkfactory/workflows/`` is purely optional. This test runs
+    with the isolation fixture stubbing built-ins to an empty dir, so
+    no workflows load at all — but the command still exits cleanly.
+    """
     prd_dir = tmp_path / "prds"
     prd_dir.mkdir()
     write_prd(prd_dir, "PRD-001", "first")
 
-    with pytest.raises(SystemExit, match="workflows directory not found"):
-        main(
-            [
-                "--prd-dir",
-                str(prd_dir),
-                "--workflows-dir",
-                str(tmp_path / "does-not-exist"),
-                "assign",
-            ]
-        )
+    exit_code = main(
+        [
+            "--prd-dir",
+            str(prd_dir),
+            "--workflows-dir",
+            str(tmp_path / "does-not-exist"),
+            "assign",
+        ]
+    )
+    assert exit_code == 0
