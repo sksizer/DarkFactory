@@ -794,6 +794,9 @@ def cmd_assign(args: argparse.Namespace) -> int:
     prds = _load(args.prd_dir)
     workflows = _load_workflows_or_fail(args.workflows_dir)
 
+    if not workflows:
+        return 0
+
     try:
         assignments = assign.assign_all(prds, workflows)
     except KeyError as exc:
