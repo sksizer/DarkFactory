@@ -2,7 +2,7 @@
 id: PRD-227
 title: "Workflow templates: enforced opening/closing with configurable middle"
 kind: epic
-status: ready
+status: in-progress
 priority: high
 effort: m
 capability: moderate
@@ -14,7 +14,7 @@ impacts: []
 workflow: planning
 target_version:
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-08'
 tags:
   - harness
   - workflow
