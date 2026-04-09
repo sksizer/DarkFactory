@@ -2,24 +2,39 @@
 id: PRD-556
 title: Split src/darkfactory/cli.py into a package of per-subcommand modules with colocated tests
 kind: epic
-status: ready
+status: review
 priority: medium
 effort: l
 capability: moderate
 parent:
 depends_on:
   - "[[PRD-549-builtins-package-split]]"
-blocks: []
-impacts:
-  - src/darkfactory/cli.py
-  - tests/test_cli_run.py
-  - tests/test_cli_workflows.py
+blocks:
+  - "[[PRD-556.1-scaffold-cli-package]]"
+  - "[[PRD-556.2-move-new]]"
+  - "[[PRD-556.3-move-status]]"
+  - "[[PRD-556.4-move-cleanup]]"
+  - "[[PRD-556.5-move-next]]"
+  - "[[PRD-556.6-move-validate]]"
+  - "[[PRD-556.7-move-tree]]"
+  - "[[PRD-556.8-move-children]]"
+  - "[[PRD-556.9-move-orphans]]"
+  - "[[PRD-556.10-move-undecomposed]]"
+  - "[[PRD-556.11-move-conflicts]]"
+  - "[[PRD-556.12-move-list-workflows]]"
+  - "[[PRD-556.13-move-assign]]"
+  - "[[PRD-556.14-move-normalize]]"
+  - "[[PRD-556.15-move-plan]]"
+  - "[[PRD-556.16-move-run]]"
+  - "[[PRD-556.17-move-reconcile]]"
+  - "[[PRD-556.18-final-cleanup]]"
+impacts: []
 workflow:
 assignee:
 reviewers: []
 target_version:
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-08'
 tags:
   - refactor
   - tests
