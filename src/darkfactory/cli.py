@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from . import assign, checks, containment, graph, impacts
+from .discovery import resolve_project_root
 from .checks import StaleWorktree, find_stale_worktrees, is_safe_to_remove
 from .graph_execution import RunEvent, execute_graph, plan_execution
 from .invoke import capability_to_model
@@ -56,35 +57,17 @@ CAPABILITY_ORDER: dict[str, int] = {
 
 
 def _find_repo_root(start: Path) -> Path:
-    """Walk up from ``start`` until a ``.git`` directory is found."""
+    """Walk up from ``start`` until a ``.git`` directory is found.
+
+    Used for git-specific operations (worktrees, tracked files, branches).
+    Project discovery uses ``resolve_project_root`` from ``discovery`` instead.
+    """
     current = start.resolve()
     while current != current.parent:
         if (current / ".git").exists():
             return current
         current = current.parent
     raise SystemExit(f"could not locate git repo root from {start}")
-
-
-def _default_prd_dir() -> Path:
-    """Locate ``prds/`` at the repo root.
-
-    darkfactory ships its own PRDs under ``prds/`` rather than the
-    nested ``docs/prd/`` layout the harness used inside pumice.
-    Overridable via ``--prd-dir`` for repos that prefer a different
-    location.
-    """
-    repo = _find_repo_root(Path.cwd())
-    return repo / "prds"
-
-
-def _default_workflows_dir() -> Path:
-    """Locate ``workflows/`` at the repo root.
-
-    All built-in workflows ship under this path. Overridable via
-    ``--workflows-dir``.
-    """
-    repo = _find_repo_root(Path.cwd())
-    return repo / "workflows"
 
 
 def _load_workflows_or_fail(workflows_dir: Path) -> dict[str, Workflow]:
@@ -1499,6 +1482,14 @@ def _print_run_event(ev: RunEvent, styler: Styler) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="prd", description="Pumice PRD harness CLI")
     parser.add_argument(
+        "--directory",
+        "-C",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help="Project root containing .darkfactory/ (overrides DARKFACTORY_DIR env and walk-up)",
+    )
+    parser.add_argument(
         "--prd-dir",
         type=Path,
         default=None,
@@ -1766,18 +1757,28 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     _configure_logging(verbose=getattr(args, "verbose", False))
-    if args.prd_dir is None:
-        args.prd_dir = _default_prd_dir()
-    if args.workflows_dir is None:
-        args.workflows_dir = _default_workflows_dir()
+
+    darkfactory_dir: Path | None = None
+    if args.prd_dir is None or args.workflows_dir is None:
+        darkfactory_dir = resolve_project_root(
+            cli_dir=getattr(args, "directory", None),
+        )
+        if darkfactory_dir is None:
+            print(
+                "No `.darkfactory/` directory found. Run `prd init` to set up this project.",
+                file=sys.stderr,
+            )
+            return 1
+        if args.prd_dir is None:
+            args.prd_dir = darkfactory_dir / "prds"
+        if args.workflows_dir is None:
+            args.workflows_dir = darkfactory_dir / "workflows"
+
+    repo_root = darkfactory_dir.parent if darkfactory_dir is not None else None
 
     # Resolve style config and create a Styler. Any command module that needs
     # styled output reads args.styler — it never constructs one itself.
     # JSON-output paths must NOT call styler.render() — they use plain print().
-    try:
-        repo_root = _find_repo_root(args.prd_dir)
-    except SystemExit:
-        repo_root = None
     style_config = resolve_style_config(
         theme=getattr(args, "theme", None),
         icon_set=getattr(args, "icon_set", None),

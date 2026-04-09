@@ -32,11 +32,7 @@ handling and dry-run support.
 from __future__ import annotations
 
 import logging
-import shutil
 import subprocess
-from datetime import datetime
-import re
-from pathlib import Path
 
 from darkfactory.builtins._registry import BUILTINS, BuiltInFunc, builtin
 from darkfactory.builtins._shared import (
@@ -95,7 +91,7 @@ def _format_invocations(ctx: ExecutionContext) -> str:
     if count == 1:
         return "1"
     return str(count)
-  
+
 
 @builtin("cleanup_worktree")
 def cleanup_worktree(ctx: ExecutionContext) -> None:
