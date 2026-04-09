@@ -11,7 +11,7 @@ from __future__ import annotations
 import subprocess
 from typing import Callable
 
-from darkfactory import prd as prd_module
+from darkfactory import containment, prd as prd_module
 from darkfactory.system import SystemContext
 
 SYSTEM_BUILTINS: dict[str, Callable[..., None]] = {}
@@ -185,43 +185,70 @@ def system_mark_done(ctx: SystemContext) -> None:
     set_status_bulk(ctx, status="done")
 
 
+_COMPLETED_STATUSES = {"done", "review"}
+
+
 @_register("audit_impacts_check")
 def audit_impacts_check(ctx: SystemContext) -> None:
-    """Walk all PRDs and verify that every declared impact path exists on disk.
+    """Walk all PRDs and verify that declared impact paths exist on disk.
 
-    For each PRD in ``ctx.prds``, iterates ``prd.impacts`` and checks whether
-    the path exists relative to ``ctx.repo_root``.  Appends human-readable
-    lines to ``ctx.report`` and raises ``ValueError`` if any paths are
-    missing (causing the runner to return a non-zero exit status, useful for
-    CI).
+    Severity depends on PRD status:
+
+    - **done/review** PRDs: missing impacts are **errors** — the work is
+      complete, so every declared file should exist.
+    - **ready/in_progress/draft** PRDs: missing impacts are **warnings** —
+      the PRD hasn't been implemented yet, so files it plans to create
+      won't exist.
+
+    Raises ``ValueError`` only when completed PRDs have missing impacts
+    (causing the runner to return a non-zero exit status, useful for CI).
 
     This builtin is intentionally read-only — it never modifies PRD files.
     The ``ctx.dry_run`` flag is ignored because no mutations are performed.
     """
     total_checked = 0
-    missing: dict[str, list[str]] = {}
+    errors: dict[str, list[str]] = {}
+    warnings: dict[str, list[str]] = {}
 
     for prd_id, prd in sorted(ctx.prds.items()):
+        # Skip containers — their impacts are aggregated from descendants.
+        # Each leaf is checked individually by its own status.
+        if containment.children(prd_id, ctx.prds):
+            continue
         if not prd.impacts:
             continue
+        is_completed = prd.status in _COMPLETED_STATUSES
         for path in prd.impacts:
             total_checked += 1
             full_path = ctx.repo_root / path
             if not full_path.exists():
-                missing.setdefault(prd_id, []).append(path)
+                if is_completed:
+                    errors.setdefault(prd_id, []).append(path)
+                else:
+                    warnings.setdefault(prd_id, []).append(path)
             else:
                 ctx.logger.debug("audit_impacts_check: %s OK  %s", prd_id, path)
 
-    total_missing = sum(len(v) for v in missing.values())
+    total_errors = sum(len(v) for v in errors.values())
+    total_warnings = sum(len(v) for v in warnings.values())
     ctx.report.append(
-        f"audit-impacts: {total_checked} path(s) checked, {total_missing} missing"
+        f"audit-impacts: {total_checked} path(s) checked, "
+        f"{total_errors} error(s), {total_warnings} warning(s)"
     )
 
-    if missing:
-        ctx.report.append("Missing impact paths by PRD:")
-        for prd_id, paths in sorted(missing.items()):
+    if errors:
+        ctx.report.append("ERRORS — missing impacts on completed PRDs:")
+        for prd_id, paths in sorted(errors.items()):
             for path in paths:
-                ctx.report.append(f"  {prd_id}: {path}")
+                ctx.report.append(f"  {prd_id} [{ctx.prds[prd_id].status}]: {path}")
+
+    if warnings:
+        ctx.report.append("WARNINGS — missing impacts on incomplete PRDs (expected):")
+        for prd_id, paths in sorted(warnings.items()):
+            for path in paths:
+                ctx.report.append(f"  {prd_id} [{ctx.prds[prd_id].status}]: {path}")
+
+    if errors:
         raise ValueError(
-            f"{total_missing} declared impact path(s) do not exist on disk"
+            f"{total_errors} declared impact path(s) missing on completed PRDs"
         )
