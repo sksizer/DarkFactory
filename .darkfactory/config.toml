@@ -10,3 +10,8 @@ trivial = 1.0
 simple = 1.0
 moderate = 1.25
 complex = 1.5
+
+[analysis]
+# min_severity = "warning"
+# model_default = "haiku"
+# model_severe = "sonnet"
