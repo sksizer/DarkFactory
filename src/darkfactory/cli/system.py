@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 
 from darkfactory.loader import load_operations
 from darkfactory.style import Element, Styler

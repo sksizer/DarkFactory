@@ -52,9 +52,7 @@ def _make_ctx(
     return ctx
 
 
-def _write_and_parse(
-    tmp_path: Path, prd_id: str, slug: str, **kwargs: Any
-) -> PRD:
+def _write_and_parse(tmp_path: Path, prd_id: str, slug: str, **kwargs: Any) -> PRD:
     """Write a PRD fixture to disk and parse it back."""
     write_prd(tmp_path, prd_id, slug, **kwargs)
     return parse_prd(tmp_path / f"{prd_id}-{slug}.md")
