@@ -36,5 +36,5 @@ no_implicit_optional = true
 files = ["src", "tests"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
+testpaths = ["tests", "src"]
+python_files = ["test_*.py", "*_test.py"]
