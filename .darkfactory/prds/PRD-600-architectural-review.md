@@ -8,7 +8,11 @@ effort: xl
 capability: complex
 parent:
 depends_on: []
-blocks: []
+blocks:
+  - "[[PRD-600.1-safety-and-correctness]]"
+  - "[[PRD-600.2-tooling-and-ci]]"
+  - "[[PRD-600.3-operational-hardening]]"
+  - "[[PRD-600.4-frontend-optionality]]"
 impacts: []
 workflow:
 assignee:
