@@ -1061,6 +1061,7 @@ def _cmd_run_graph(
         workflow_override=args.workflow,
         dry_run=False,
         event_sink=sink,
+        styler=styler,
     )
 
     print()
