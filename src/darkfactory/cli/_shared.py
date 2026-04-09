@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
-from darkfactory.loader import load_workflows
 from darkfactory.prd import PRD, load_all, parse_id_sort_key
 from darkfactory.workflow import Workflow
 
@@ -34,14 +34,32 @@ def _find_repo_root(start: Path) -> Path:
 
 
 def _load_workflows_or_fail(workflows_dir: Path) -> dict[str, Workflow]:
-    """Load built-in and project-level workflows.
+    """Load workflows from all layers via the cascade registry.
 
     Built-in (system) workflows ship inside the package and are always
-    available. ``workflows_dir`` is the optional project-level layer
-    (``<project>/.darkfactory/workflows/``); if it doesn't exist we just
-    return the built-ins.
+    available. ``workflows_dir`` is the project-level layer
+    (``<project>/.darkfactory/workflows/``); its parent is the
+    ``.darkfactory/`` directory used as ``project_dir``.
+
+    A :class:`~darkfactory.registry.WorkflowNameCollision` or
+    :class:`~darkfactory.registry.InvalidWorkflow` error is fatal — the
+    message is printed to stderr and the process exits with code 1.
     """
-    return load_workflows(workflows_dir if workflows_dir.exists() else None)
+    from darkfactory.registry import (
+        InvalidWorkflow,
+        WorkflowNameCollision,
+        build_workflow_registry,
+    )
+
+    darkfactory_dir = workflows_dir.parent
+    try:
+        return build_workflow_registry(darkfactory_dir)
+    except WorkflowNameCollision as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(1) from exc
+    except InvalidWorkflow as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(1) from exc
 
 
 def _action_sort_key(prd: PRD) -> tuple[int, int, tuple[int, ...]]:
