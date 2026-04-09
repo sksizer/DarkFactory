@@ -325,11 +325,69 @@ def _find_worktree_for_prd(prd_id: str, repo_root: Path) -> StaleWorktree | None
     return None
 
 
+def _find_orphaned_branch(prd_id: str, repo_root: Path) -> str | None:
+    """Find a local branch for *prd_id* when the worktree dir is gone."""
+    result = subprocess.run(
+        ["git", "branch", "--list", f"prd/{prd_id}-*"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+    for line in result.stdout.splitlines():
+        branch = line.strip().lstrip("* ")
+        if branch:
+            return branch
+    return None
+
+
+def _orphaned_branch_commit_count(
+    branch: str, repo_root: Path, base: str = "main"
+) -> int:
+    """Count commits on *branch* ahead of *base*."""
+    result = subprocess.run(
+        ["git", "rev-list", "--count", f"{base}..{branch}"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return int(result.stdout.strip() or "0")
+    return 0
+
+
 def _cleanup_single(prd_id: str, force: bool, repo_root: Path) -> int:
     worktree = _find_worktree_for_prd(prd_id, repo_root)
     if worktree is None:
-        print(f"No worktree found for {prd_id}")
-        return 1
+        # Worktree dir is gone — check for an orphaned branch.
+        orphaned = _find_orphaned_branch(prd_id, repo_root)
+        if orphaned is None:
+            print(f"No worktree or orphaned branch found for {prd_id}")
+            return 1
+        ahead = _orphaned_branch_commit_count(orphaned, repo_root)
+        if ahead > 0 and not force:
+            print(
+                f"Orphaned branch '{orphaned}' has {ahead} commit(s) "
+                f"not on main. Use --force to delete it."
+            )
+            return 1
+        # Prune any stale git worktree bookkeeping for the missing directory.
+        subprocess.run(
+            ["git", "worktree", "prune"],
+            cwd=repo_root,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "branch", "-D", orphaned],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        label = f"orphaned branch '{orphaned}'"
+        if ahead > 0:
+            label += f" ({ahead} commit(s) ahead of main)"
+        print(f"Removed {label} for {prd_id}")
+        return 0
     status = is_safe_to_remove(worktree, force=force)
     if not status.safe:
         print(f"Cannot remove {prd_id}: {status.reason}")

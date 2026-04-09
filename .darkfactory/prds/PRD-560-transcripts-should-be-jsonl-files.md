@@ -8,7 +8,11 @@ effort: m
 capability: moderate
 parent:
 depends_on: []
-blocks: []
+blocks:
+  - "[[PRD-560.1-rewrite-transcript-assembly-jsonl]]"
+  - "[[PRD-560.2-update-commit-transcript-extension]]"
+  - "[[PRD-560.3-verify-invoke-parsing]]"
+  - "[[PRD-560.4-update-gitignore-patterns]]"
 impacts: []
 workflow:
 assignee:
@@ -89,4 +93,3 @@ Switching to pure JSONL makes transcripts a first-class structured format that a
 - `src/darkfactory/runner.py:356-377` — current transcript writing
 - `src/darkfactory/builtins/commit_transcript.py:36-58` — transcript commit logic
 - `src/darkfactory/invoke.py:104-343` — transcript parsing
-
