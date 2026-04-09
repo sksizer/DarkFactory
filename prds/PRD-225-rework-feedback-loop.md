@@ -2,14 +2,21 @@
 id: PRD-225
 title: "Rework loop: feed PR review comments back to the agent"
 kind: epic
-status: in-progress
+status: review
 priority: high
 effort: m
 capability: moderate
 parent:
 depends_on:
   - "[[PRD-224-harness-invariants-honest-state]]"
-blocks: []
+blocks:
+  - "[[PRD-225.1-rework-subcommand-skeleton]]"
+  - "[[PRD-225.2-pull-pr-comments]]"
+  - "[[PRD-225.3-rework-prompt-template]]"
+  - "[[PRD-225.4-rework-workflow]]"
+  - "[[PRD-225.5-auto-reply-comments]]"
+  - "[[PRD-225.6-rework-watch-daemon]]"
+  - "[[PRD-225.7-loop-detection]]"
 impacts: []
 workflow:
 target_version:
