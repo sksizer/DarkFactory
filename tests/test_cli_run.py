@@ -534,3 +534,152 @@ def test_resolve_base_ref_explicit_overrides_env(
     monkeypatch.setenv("DARKFACTORY_BASE_REF", "staging")
     result = _resolve_base_ref("explicit-branch", tmp_path)
     assert result == "explicit-branch"
+
+
+# ---------- run --all (queue mode) ----------
+
+
+def test_run_all_mutual_exclusivity(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """AC-3: --all and a PRD ID are mutually exclusive."""
+    _init_git_repo(tmp_path)
+    workflows_dir = tmp_path / "workflows"
+    _write_workflow_with_prompts(workflows_dir)
+
+    prd_dir = tmp_path / "prds"
+    prd_dir.mkdir()
+    write_prd(prd_dir, "PRD-070", "task")
+
+    exit_code = main(
+        [
+            "--prd-dir",
+            str(prd_dir),
+            "--workflows-dir",
+            str(workflows_dir),
+            "run",
+            "PRD-070",
+            "--all",
+        ]
+    )
+    assert exit_code == 1
+    err = capsys.readouterr().err
+    assert "mutually exclusive" in err
+
+
+def test_run_no_args_errors(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """AC-4: `prd run` with no PRD ID and no --all exits with a clear message."""
+    _init_git_repo(tmp_path)
+    workflows_dir = tmp_path / "workflows"
+    _write_workflow_with_prompts(workflows_dir)
+
+    prd_dir = tmp_path / "prds"
+    prd_dir.mkdir()
+
+    exit_code = main(
+        [
+            "--prd-dir",
+            str(prd_dir),
+            "--workflows-dir",
+            str(workflows_dir),
+            "run",
+        ]
+    )
+    assert exit_code == 1
+    err = capsys.readouterr().err
+    assert "PRD ID" in err or "--all" in err
+
+
+def test_run_all_dry_run_shows_queue(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """AC-1: `prd run --all` in dry-run prints the ordered ready queue."""
+    _init_git_repo(tmp_path)
+    workflows_dir = tmp_path / "workflows"
+    _write_workflow_with_prompts(workflows_dir)
+
+    prd_dir = tmp_path / "prds"
+    prd_dir.mkdir()
+    write_prd(prd_dir, "PRD-001", "first", priority="high")
+    write_prd(prd_dir, "PRD-002", "second", priority="medium")
+    write_prd(prd_dir, "PRD-003", "done-skip", status="done")
+
+    exit_code = main(
+        [
+            "--prd-dir",
+            str(prd_dir),
+            "--workflows-dir",
+            str(workflows_dir),
+            "run",
+            "--all",
+        ]
+    )
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "--all" in out or "queue" in out.lower()
+    assert "PRD-001" in out
+    assert "PRD-002" in out
+    # Done PRDs should not appear in the queue
+    assert "PRD-003" not in out
+
+
+def test_run_all_dry_run_filters(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """AC-5: --priority, --tag, and --exclude are passed through to the queue."""
+    _init_git_repo(tmp_path)
+    workflows_dir = tmp_path / "workflows"
+    _write_workflow_with_prompts(workflows_dir)
+
+    prd_dir = tmp_path / "prds"
+    prd_dir.mkdir()
+    write_prd(prd_dir, "PRD-001", "high-pri", priority="high")
+    write_prd(prd_dir, "PRD-002", "low-pri", priority="low")
+
+    exit_code = main(
+        [
+            "--prd-dir",
+            str(prd_dir),
+            "--workflows-dir",
+            str(workflows_dir),
+            "run",
+            "--all",
+            "--priority",
+            "high",
+        ]
+    )
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "PRD-001" in out
+    assert "PRD-002" not in out
+
+
+def test_run_all_dry_run_exclude(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """AC-5: --exclude filters out specific PRD IDs."""
+    _init_git_repo(tmp_path)
+    workflows_dir = tmp_path / "workflows"
+    _write_workflow_with_prompts(workflows_dir)
+
+    prd_dir = tmp_path / "prds"
+    prd_dir.mkdir()
+    write_prd(prd_dir, "PRD-001", "keep")
+    write_prd(prd_dir, "PRD-002", "exclude-me")
+
+    exit_code = main(
+        [
+            "--prd-dir",
+            str(prd_dir),
+            "--workflows-dir",
+            str(workflows_dir),
+            "run",
+            "--all",
+            "--exclude",
+            "PRD-002",
+        ]
+    )
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "PRD-001" in out
+    assert "PRD-002" not in out

@@ -23,6 +23,7 @@ from darkfactory.graph_execution import (
     QueueFilters,
     QueueStrategy,
     RunEvent,
+    deps_satisfied,
     execute_graph,
     plan_execution,
 )
@@ -891,7 +892,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     prd_id = getattr(args, "prd_id", None)
 
     if run_all and prd_id:
-        print("error: --all and prd_id are mutually exclusive", file=sys.stderr)
+        print("error: --all and PRD ID are mutually exclusive", file=sys.stderr)
         return 1
     if not run_all and not prd_id:
         print("error: provide either a PRD ID or --all", file=sys.stderr)
@@ -1064,12 +1065,11 @@ def _cmd_run_queue(
             prd = prds.get(pid)
             title = prd.title if prd else "?"
             priority = prd.priority if prd else "?"
-            deps_done = (
-                all(prds[d].status == "done" for d in prd.depends_on if d in prds)
+            dep_note = (
+                ("deps satisfied" if deps_satisfied(prd, prds) else "deps pending")
                 if prd
-                else False
+                else "?"
             )
-            dep_note = "deps satisfied" if deps_done else "deps pending"
             print(f"    {i:>2}. {pid} [{priority}] {title!r} — {dep_note}")
 
         if plan.skipped:
