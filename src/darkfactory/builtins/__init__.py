@@ -40,6 +40,7 @@ from pathlib import Path
 
 from filelock import FileLock, Timeout
 
+from darkfactory import prd as prd_module
 from darkfactory.builtins._registry import BUILTINS, BuiltInFunc, builtin
 from darkfactory.builtins._shared import (
     _FORBIDDEN_ATTRIBUTION_PATTERNS,
@@ -48,9 +49,14 @@ from darkfactory.builtins._shared import (
 )
 from darkfactory.builtins.set_status import set_status  # noqa: F401
 from darkfactory.checks import is_resume_safe
-from darkfactory.workflow import ExecutionContext
+_log = logging.getLogger(__name__)
+
+from darkfactory.workflow import ExecutionContext, Status
 
 _log = logging.getLogger(__name__)
+
+# Import submodules to trigger @builtin registration.
+from darkfactory.builtins.ensure_worktree import ensure_worktree  # noqa: E402
 
 __all__ = [
     "BUILTINS",
@@ -69,73 +75,6 @@ __all__ = [
     "lint_attribution",
     "cleanup_worktree",
 ]
-
-
-# ---------- internal helpers ----------
-
-
-def _worktree_target(ctx: ExecutionContext) -> Path:
-    """Compute the worktree path for this PRD under ``.worktrees/``.
-
-    Separated out so tests can assert the path without a whole
-    subprocess invocation.
-    """
-    return ctx.repo_root / ".worktrees" / f"{ctx.prd.id}-{ctx.prd.slug}"
-
-
-def _branch_exists_local(repo_root: Path, branch: str) -> bool:
-    """Return True if ``branch`` exists in the local repo's refs."""
-    result = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(repo_root),
-            "rev-parse",
-            "--verify",
-            "--quiet",
-            f"refs/heads/{branch}",
-        ],
-        capture_output=True,
-        text=True,
-    )
-    return result.returncode == 0
-
-
-def _branch_exists_remote(repo_root: Path, branch: str) -> bool:
-    """Return True if ``branch`` exists on origin.
-
-    Best-effort: returns False (and logs a warning) on timeout or any
-    subprocess error so the caller can fall back to the local check.
-    """
-    try:
-        result = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(repo_root),
-                "ls-remote",
-                "--exit-code",
-                "origin",
-                f"refs/heads/{branch}",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-    except subprocess.TimeoutExpired:
-        _log.warning(
-            "git ls-remote timed out checking remote branch %r — skipping remote check",
-            branch,
-        )
-        return False
-    except Exception as exc:
-        _log.warning(
-            "git ls-remote failed checking remote branch %r (%s) — skipping remote check",
-            branch,
-            exc,
-        )
-        return False
-    return result.returncode == 0
 
 
 _AC_LINE_RE = re.compile(r"^\s*-\s*\[\s*\]\s*(AC-\d+.*)$", re.MULTILINE)
@@ -268,6 +207,43 @@ def ensure_worktree(ctx: ExecutionContext) -> None:
 
     ctx.worktree_path = worktree_path
     ctx.cwd = worktree_path
+@builtin("set_status")
+def set_status(ctx: ExecutionContext, *, to: Status) -> None:
+    """Rewrite the PRD's ``status:`` frontmatter field inside the worktree.
+
+    Targets the worktree's copy of the PRD file, never the source repo.
+    The source repo's working tree must remain untouched by ``prd run`` —
+    status transitions live on the PRD's worktree branch and only reach
+    the source repo via PR merge (see PRD-213).
+
+    Uses :func:`darkfactory.prd.set_status_at`, which surgically rewrites
+    only the ``status:`` and ``updated:`` lines so the resulting commit
+    diff is two lines, not the whole frontmatter block.
+    """
+    if ctx.dry_run:
+        ctx.logger.info(
+            "[dry-run] set status of %s: %s -> %s (worktree=%s)",
+            ctx.prd.id,
+            ctx.prd.status,
+            to,
+            ctx.worktree_path,
+        )
+        return
+
+    if ctx.worktree_path is None:
+        raise RuntimeError(
+            "set_status requires a worktree; ensure_worktree must run first"
+        )
+
+    relative = ctx.prd.path.relative_to(ctx.repo_root)
+    target = ctx.worktree_path / relative
+    prd_module.set_status_at(target, to)
+    # Mirror the field updates onto the in-memory PRD so subsequent
+    # builtins see the new status without re-loading from disk.
+    ctx.prd.status = to
+    from datetime import date as _date
+
+    ctx.prd.updated = _date.today().isoformat()
 
 
 @builtin("commit")
@@ -382,17 +358,25 @@ def summarize_agent_run(ctx: ExecutionContext) -> None:
 
 @builtin("commit_transcript")
 def commit_transcript(ctx: ExecutionContext) -> None:
-    """Move agent transcript to .darkfactory/transcripts/ and stage it.
+    """Copy agent transcript into the worktree and stage it.
 
-    Source: ``.harness-agent-output.log`` written by the runner after each
-    agent invocation. Destination:
+    Source: ``<repo_root>/.harness-transcripts/{prd_id}.log`` written by the
+    runner after each agent invocation (outside any worktree — see
+    ``runner._run_agent``). Destination inside the worktree:
     ``.darkfactory/transcripts/{prd_id}-{timestamp}.log``.
+
+    The runner writes transcripts *outside* every worktree so ``git add -A``
+    can never accidentally sweep them. This builtin is the one place that
+    opts the transcript *into* the worktree — workflows that want the
+    transcript committed alongside the PRD work must include this builtin
+    explicitly. Workflows that omit it leave the transcript at the repo-root
+    path where it survives as a local-only diagnostic.
 
     Timestamps use the wall-clock at the time this builtin runs, which is
     unique enough for sequential runs. If no transcript exists (dry-run,
     or the runner didn't produce one), this is a no-op.
     """
-    src = ctx.cwd / ".harness-agent-output.log"
+    src = ctx.repo_root / ".harness-transcripts" / f"{ctx.prd.id}.log"
     if not src.exists():
         ctx.logger.info("commit_transcript: no transcript found; skipping")
         return
@@ -402,7 +386,7 @@ def commit_transcript(ctx: ExecutionContext) -> None:
         dest = (
             ctx.cwd / ".darkfactory" / "transcripts" / f"{ctx.prd.id}-{timestamp}.log"
         )
-        ctx.logger.info("[dry-run] move %s -> %s && git add", src, dest)
+        ctx.logger.info("[dry-run] copy %s -> %s && git add", src, dest)
         return
 
     transcript_dir = ctx.cwd / ".darkfactory" / "transcripts"
@@ -411,7 +395,10 @@ def commit_transcript(ctx: ExecutionContext) -> None:
     timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
     dest = transcript_dir / f"{ctx.prd.id}-{timestamp}.log"
 
-    shutil.move(str(src), str(dest))
+    # Copy (not move) so the repo-root transcript persists as a local-only
+    # diagnostic even after this builtin runs. If the same PRD is re-run,
+    # the runner overwrites the source file anyway.
+    shutil.copy2(str(src), str(dest))
 
     subprocess.run(["git", "add", str(dest)], cwd=str(ctx.cwd), check=True)
     ctx.logger.info("commit_transcript: staged %s", dest.relative_to(ctx.cwd))
