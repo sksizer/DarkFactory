@@ -2,7 +2,7 @@
 id: PRD-223
 title: "System operations: reuse the workflow harness for non-PRD-bound tasks"
 kind: epic
-status: draft
+status: ready
 priority: medium
 effort: m
 capability: moderate
