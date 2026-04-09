@@ -2,7 +2,7 @@
 id: PRD-225
 title: "Rework loop: feed PR review comments back to the agent"
 kind: epic
-status: ready
+status: in-progress
 priority: high
 effort: m
 capability: moderate
@@ -14,7 +14,7 @@ impacts: []
 workflow:
 target_version:
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-08'
 tags:
   - harness
   - workflow
