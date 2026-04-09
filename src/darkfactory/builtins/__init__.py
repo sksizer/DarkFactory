@@ -48,6 +48,7 @@ from darkfactory.builtins.ensure_worktree import ensure_worktree
 from darkfactory.builtins.lint_attribution import lint_attribution
 from darkfactory.builtins.push_branch import push_branch
 from darkfactory.builtins.set_status import set_status
+from darkfactory.builtins.analyze_transcript import analyze_transcript  # noqa: F401
 from darkfactory.builtins.summarize_agent_run import summarize_agent_run
 
 __all__ = [
@@ -66,4 +67,5 @@ __all__ = [
     "create_pr",
     "lint_attribution",
     "cleanup_worktree",
+    "analyze_transcript",
 ]

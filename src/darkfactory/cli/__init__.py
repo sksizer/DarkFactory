@@ -1526,7 +1526,9 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
         for prd_file, pr in clobbered:
             prd_id = _extract_prd_id_from_path(prd_file)
             sha = (pr.get("mergeCommit") or {}).get("oid", "???")[:10]
-            print(f"  {prd_id}: PR #{pr['number']} merge commit {sha} missing from HEAD")
+            print(
+                f"  {prd_id}: PR #{pr['number']} merge commit {sha} missing from HEAD"
+            )
         print()
 
     candidates = verified
