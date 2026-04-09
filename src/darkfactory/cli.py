@@ -28,6 +28,7 @@ from typing import Any
 
 from . import assign, checks, containment, graph, impacts
 from .discovery import resolve_project_root
+from .init import init_project
 from .checks import StaleWorktree, find_stale_worktrees, is_safe_to_remove
 from .graph_execution import RunEvent, execute_graph, plan_execution
 from .invoke import capability_to_model
@@ -108,6 +109,17 @@ def _load(prd_dir: Path) -> dict[str, PRD]:
 
 
 # ---------- subcommand implementations ----------
+
+
+def cmd_init(args: argparse.Namespace) -> int:
+    target = (args.directory or Path.cwd()).resolve()
+    try:
+        msg = init_project(target)
+    except SystemExit as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    print(msg)
+    return 0
 
 
 def _slugify(title: str) -> str:
@@ -1547,6 +1559,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub = parser.add_subparsers(dest="subcommand", required=True)
 
+    sub_init = sub.add_parser(
+        "init", help="Scaffold .darkfactory/ in the current project"
+    )
+    sub_init.set_defaults(func=cmd_init)
+
     sub_new = sub.add_parser("new", help="Create a new draft PRD from a template")
     sub_new.add_argument("title", help="PRD title (positional)")
     sub_new.add_argument(
@@ -1785,7 +1802,9 @@ def main(argv: list[str] | None = None) -> int:
     _configure_logging(verbose=getattr(args, "verbose", False))
 
     darkfactory_dir: Path | None = None
-    if args.prd_dir is None or args.workflows_dir is None:
+    if args.subcommand != "init" and (
+        args.prd_dir is None or args.workflows_dir is None
+    ):
         darkfactory_dir = resolve_project_root(
             cli_dir=getattr(args, "directory", None),
         )
