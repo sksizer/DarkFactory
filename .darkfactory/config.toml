@@ -1,0 +1,12 @@
+[timeouts]
+xs = 5       # minutes
+s = 10
+m = 20
+l = 40
+xl = 75
+
+[timeouts.capability_multipliers]
+trivial = 1.0
+simple = 1.0
+moderate = 1.25
+complex = 1.5

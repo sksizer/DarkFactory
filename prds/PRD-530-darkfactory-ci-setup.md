@@ -1,8 +1,8 @@
 ---
-id: "PRD-530"
-title: "Set up CI for darkfactory"
+id: PRD-530
+title: Set up CI for darkfactory
 kind: task
-status: draft
+status: ready
 priority: medium
 effort: s
 capability: simple
@@ -12,8 +12,8 @@ depends_on:
 blocks: []
 impacts:
   - (darkfactory repo) .github/workflows/ci.yml
-workflow: null
-target_version: null
+workflow:
+target_version:
 created: 2026-04-08
 updated: 2026-04-08
 tags:
