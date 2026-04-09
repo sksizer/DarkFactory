@@ -1,8 +1,9 @@
-"""Built-in WorkflowTemplate instances bundled with the harness package.
+"""Built-in workflow templates for DarkFactory.
 
-Provides :data:`PRD_IMPLEMENTATION_TEMPLATE`, the standard PRD implementation
-lifecycle with PRD-224 invariants enforced. Most workflows compose from this
-template rather than building open/close lists from scratch.
+This module defines the canonical templates used by PRD workflows.
+Templates are importable directly::
+
+    from darkfactory.templates_builtin import PRD_IMPLEMENTATION_TEMPLATE, REWORK_TEMPLATE
 """
 
 from __future__ import annotations
@@ -30,5 +31,29 @@ PRD_IMPLEMENTATION_TEMPLATE = WorkflowTemplate(
         BuiltIn("commit", kwargs={"message": "chore(prd): {prd_id} ready for review"}),
         BuiltIn("push_branch"),
         BuiltIn("create_pr"),
+    ],
+)
+
+REWORK_TEMPLATE = WorkflowTemplate(
+    name="rework",
+    description="Rework lifecycle: resume existing PR, address feedback, push updates.",
+    open=[
+        BuiltIn("check_pr_exists"),
+        BuiltIn("resume_worktree"),
+        BuiltIn("fetch_review_comments"),
+        BuiltIn("set_status", kwargs={"to": "in-progress"}),
+    ],
+    middle_kinds=[AgentTask, ShellTask],
+    middle_required={
+        AgentTask: (1, None),
+    },
+    close=[
+        BuiltIn("summarize_agent_run"),
+        BuiltIn("commit_transcript"),
+        BuiltIn("set_status", kwargs={"to": "review"}),
+        BuiltIn(
+            "commit", kwargs={"message": "chore(prd): {prd_id} address review feedback"}
+        ),
+        BuiltIn("push_branch"),
     ],
 )
