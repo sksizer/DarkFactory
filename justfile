@@ -8,10 +8,10 @@ test:
     uv run pytest
 
 typecheck:
-    uv run mypy src tests workflows
+    uv run mypy src tests
 
 format:
-    uv run ruff format src tests workflows
+    uv run ruff format src tests
 
 lint:
     uv run ruff check src tests
