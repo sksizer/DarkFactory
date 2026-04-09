@@ -254,7 +254,7 @@ def test_cleanup_orphaned_branch_no_commits_force(
             return_value="prd/PRD-001-my-feature",
         ),
         patch("darkfactory.cli._orphaned_branch_commit_count", return_value=0),
-        patch("darkfactory.cli.subprocess") as mock_sp,
+        patch("darkfactory.cli.subprocess"),
     ):
         rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001", "--force"])
 
@@ -298,7 +298,7 @@ def test_cleanup_orphaned_branch_with_commits_force_succeeds(
             return_value="prd/PRD-001-my-feature",
         ),
         patch("darkfactory.cli._orphaned_branch_commit_count", return_value=5),
-        patch("darkfactory.cli.subprocess") as mock_sp,
+        patch("darkfactory.cli.subprocess"),
     ):
         rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001", "--force"])
 
@@ -337,7 +337,7 @@ def test_cleanup_orphaned_branch_no_commits_without_force(
             return_value="prd/PRD-001-my-feature",
         ),
         patch("darkfactory.cli._orphaned_branch_commit_count", return_value=0),
-        patch("darkfactory.cli.subprocess") as mock_sp,
+        patch("darkfactory.cli.subprocess"),
     ):
         rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001"])
 
