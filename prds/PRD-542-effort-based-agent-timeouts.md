@@ -2,7 +2,7 @@
 id: PRD-542
 title: Scale agent task timeouts by estimated effort
 kind: feature
-status: draft
+status: ready
 priority: medium
 effort: s
 capability: simple
