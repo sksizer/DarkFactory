@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Protocol
 
 from . import assign, containment, graph
 from .prd import PRD, load_all, set_status_at
@@ -304,6 +304,46 @@ def discover_ready_queue(prds: dict[str, PRD], filters: QueueFilters) -> list[PR
     return topo_sort_with_tiebreak(ready, prds)
 
 
+# ---- Candidate strategies -------------------------------------------------
+
+
+class CandidateStrategy(Protocol):
+    """Strategy for selecting which PRD candidates to consider each iteration."""
+
+    def candidates(self, prds: dict[str, PRD]) -> list[str]:
+        """Return ordered candidate PRD IDs for this iteration."""
+        ...
+
+
+class RootedStrategy:
+    """Candidate strategy for a DAG rooted at a single PRD.
+
+    Reproduces the existing ``graph_scope`` + ``actionable_order`` traversal.
+    """
+
+    def __init__(self, root_id: str) -> None:
+        self.root_id = root_id
+
+    def candidates(self, prds: dict[str, PRD]) -> list[str]:
+        scope = graph_scope(self.root_id, prds)
+        return actionable_order(scope, prds)
+
+
+class QueueStrategy:
+    """Candidate strategy that discovers all ready PRDs repo-wide.
+
+    Re-runs ``discover_ready_queue`` on each call so PRDs that become ready
+    mid-run (because a dependency just completed) are picked up on the next
+    iteration (AC-6).
+    """
+
+    def __init__(self, filters: QueueFilters) -> None:
+        self.filters = filters
+
+    def candidates(self, prds: dict[str, PRD]) -> list[str]:
+        return [p.id for p in discover_ready_queue(prds, self.filters)]
+
+
 # ---- Dry-run plan ---------------------------------------------------------
 
 
@@ -324,15 +364,24 @@ class ExecutionSlice:
 
 
 def plan_execution(
-    root: PRD,
+    root: PRD | None,
     prds: dict[str, PRD],
     *,
     max_runs: int | None,
     default_base: str,
+    strategy: CandidateStrategy | None = None,
 ) -> ExecutionSlice:
-    """Compute the dry-run plan for a root PRD."""
-    scope = graph_scope(root.id, prds)
-    order = actionable_order(scope, prds)
+    """Compute the dry-run plan for a root PRD or a candidate strategy.
+
+    ``root`` is the backward-compatible entry point (creates a
+    :class:`RootedStrategy` internally). Pass ``strategy`` directly to use
+    queue mode or any other custom traversal.
+    """
+    if strategy is None:
+        if root is None:
+            raise ValueError("Either strategy or root must be provided")
+        strategy = RootedStrategy(root.id)
+    order = strategy.candidates(prds)
 
     skipped: list[tuple[str, str]] = []
     slice_ids: list[str] = []
@@ -386,11 +435,12 @@ def plan_execution(
 
 
 def execute_graph(
-    root_id: str,
     prd_dir: Path,
     repo_root: Path,
     workflows: dict[str, Workflow],
     *,
+    strategy: CandidateStrategy | None = None,
+    root_id: str | None = None,
     default_base: str,
     max_runs: int | None = None,
     model_override: str | None = None,
@@ -399,12 +449,23 @@ def execute_graph(
     event_sink: EventSink | None = None,
     run_workflow_fn: Callable[..., RunResult] = run_workflow,
 ) -> ExecutionReport:
-    """Walk the DAG rooted at ``root_id`` and run each actionable leaf.
+    """Walk the candidate PRDs produced by ``strategy`` and run each in turn.
 
     Sequential execution. Re-loads PRDs between runs so planning workflows
-    can grow the DAG mid-invocation. ``run_workflow_fn`` is injectable for
-    testing — production code uses the default (:func:`runner.run_workflow`).
+    can grow the DAG mid-invocation, and so :class:`QueueStrategy` can pick
+    up newly-ready PRDs on each iteration. ``run_workflow_fn`` is injectable
+    for testing — production code uses the default
+    (:func:`runner.run_workflow`).
+
+    Pass ``root_id`` (keyword) for the backward-compatible rooted mode; this
+    creates a :class:`RootedStrategy` internally. Pass ``strategy`` to use
+    queue mode or any other traversal.
     """
+    if strategy is None:
+        if root_id is None:
+            raise ValueError("Either strategy or root_id must be provided")
+        strategy = RootedStrategy(root_id)
+
     report = ExecutionReport()
 
     def emit(ev: RunEvent) -> None:
@@ -421,12 +482,13 @@ def execute_graph(
 
     while True:
         prds = load_all(prd_dir)
-        if root_id not in prds:
-            report.skipped.append((root_id, "root PRD not found after reload"))
+
+        # For rooted mode, verify the root still exists after reload.
+        if isinstance(strategy, RootedStrategy) and strategy.root_id not in prds:
+            report.skipped.append((strategy.root_id, "root PRD not found after reload"))
             break
 
-        scope = graph_scope(root_id, prds)
-        order = actionable_order(scope, prds)
+        order = strategy.candidates(prds)
 
         # Prune dependents of anything failed/blocked/multi-dep/skipped.
         effective_skipped: set[str] = set(sticky_skipped.keys()) | blocked_ids
