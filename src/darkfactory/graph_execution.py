@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from .style import Styler
 
 from . import assign, containment, graph
+from .event_log import EventWriter
 from .prd import PRD, load_all, set_status_at
 from .runner import RunResult, _compute_branch_name, run_workflow
 from .workflow import Workflow
@@ -452,6 +453,7 @@ def execute_graph(
     event_sink: EventSink | None = None,
     run_workflow_fn: Callable[..., RunResult] = run_workflow,
     styler: "Styler | None" = None,
+    session_id: str | None = None,
 ) -> ExecutionReport:
     """Walk the candidate PRDs produced by ``strategy`` and run each in turn.
 
@@ -475,6 +477,16 @@ def execute_graph(
     def emit(ev: RunEvent) -> None:
         if event_sink is not None:
             event_sink(ev)
+
+    def _emit_dag_event(target_prd_id: str, event_type: str, **fields: object) -> None:
+        """Write a DAG-level event to a per-PRD event file."""
+        if session_id and not dry_run:
+            try:
+                writer = EventWriter(repo_root, session_id, target_prd_id)
+                writer.emit("dag", event_type, **fields)
+                writer.close()
+            except OSError:
+                logger.warning("failed to write DAG event for %s", target_prd_id)
 
     completed_this_run: dict[str, str] = {}
     # Explicit skip list that persists across iterations (e.g. multi-dep
@@ -529,6 +541,9 @@ def execute_graph(
 
         if max_runs is not None and total_runs >= max_runs:
             emit(RunEvent(event="skip", prd_id=picked.id, reason="max_runs"))
+            _emit_dag_event(
+                picked.id, "prd_skipped", prd_id=picked.id, reason="max_runs"
+            )
             report.skipped.append((picked.id, "max_runs"))
             break
 
@@ -544,6 +559,12 @@ def execute_graph(
                     prd_id=picked.id,
                     reason=f"multi_dep (PRD-552 needed): {exc.unmet}",
                 )
+            )
+            _emit_dag_event(
+                picked.id,
+                "prd_skipped",
+                prd_id=picked.id,
+                reason=f"multi_dep (PRD-552 needed): {exc.unmet}",
             )
             continue
 
@@ -563,9 +584,22 @@ def execute_graph(
                     reason=f"workflow_assign_failed: {exc}",
                 )
             )
+            _emit_dag_event(
+                picked.id,
+                "prd_skipped",
+                prd_id=picked.id,
+                reason=f"workflow_assign_failed: {exc}",
+            )
             continue
 
         emit(RunEvent(event="start", prd_id=picked.id, base_ref=base_ref))
+        _emit_dag_event(
+            picked.id,
+            "prd_picked",
+            prd_id=picked.id,
+            base_ref=base_ref,
+            workflow=workflow.name,
+        )
         total_runs += 1
 
         result = run_workflow_fn(
@@ -576,6 +610,7 @@ def execute_graph(
             dry_run=dry_run,
             model_override=model_override,
             styler=styler,
+            session_id=session_id,
         )
 
         if result.success:
@@ -588,6 +623,13 @@ def execute_graph(
                     success=True,
                     pr_url=result.pr_url,
                 )
+            )
+            _emit_dag_event(
+                picked.id,
+                "prd_finished",
+                prd_id=picked.id,
+                success=True,
+                pr_url=result.pr_url,
             )
         else:
             report.failed.append((picked.id, result.failure_reason or "unknown"))
@@ -607,6 +649,19 @@ def execute_graph(
                     success=False,
                     failure_reason=result.failure_reason,
                 )
+            )
+            _emit_dag_event(
+                picked.id,
+                "prd_finished",
+                prd_id=picked.id,
+                success=False,
+                failure_reason=result.failure_reason,
+            )
+            _emit_dag_event(
+                picked.id,
+                "prd_blocked",
+                prd_id=picked.id,
+                reason=result.failure_reason or "unknown",
             )
 
     return report

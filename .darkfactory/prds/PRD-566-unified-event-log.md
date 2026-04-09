@@ -2,7 +2,7 @@
 id: PRD-566
 title: Unified structured event log for harness execution
 kind: feature
-status: in-progress
+status: review
 priority: high
 effort: m
 capability: moderate

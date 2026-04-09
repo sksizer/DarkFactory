@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from darkfactory import assign, checks, containment, graph, impacts
+from darkfactory.event_log import generate_session_id
 from darkfactory.graph_execution import RunEvent, execute_graph, plan_execution
 from darkfactory.invoke import capability_to_model
 from darkfactory.prd import (
@@ -927,6 +928,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     )
 
     config_timeouts = _read_config_timeouts(repo_root)
+    session = generate_session_id() if not dry_run else None
 
     result = run_workflow(
         prd=prd,
@@ -938,6 +940,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         cli_timeout_minutes=getattr(args, "timeout", None),
         config_timeouts=config_timeouts,
         styler=styler,
+        session_id=session,
     )
 
     print()
@@ -1050,6 +1053,8 @@ def _cmd_run_graph(
         else:
             _print_run_event(ev, styler)
 
+    session = generate_session_id()
+
     report = execute_graph(
         root_id=prd.id,
         prd_dir=args.prd_dir,
@@ -1062,6 +1067,7 @@ def _cmd_run_graph(
         dry_run=False,
         event_sink=sink,
         styler=styler,
+        session_id=session,
     )
 
     print()

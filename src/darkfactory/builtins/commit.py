@@ -51,10 +51,28 @@ def commit(ctx: ExecutionContext, *, message: str) -> None:
         return
 
     # Commit
-    subprocess.run(
+    commit_result = subprocess.run(
         ["git", "commit", "-m", formatted],
         cwd=str(ctx.cwd),
         check=True,
         capture_output=True,
         text=True,
     )
+
+    if ctx.event_writer:
+        # Extract the short SHA from git commit output.
+        sha = ""
+        for line in commit_result.stdout.splitlines():
+            if line.strip():
+                # git commit output starts with "[branch sha] message"
+                parts = line.strip().split()
+                if len(parts) >= 2:
+                    sha = parts[1].rstrip("]")
+                break
+        ctx.event_writer.emit(
+            "task",
+            "builtin_effect",
+            task="commit",
+            effect="commit",
+            detail={"sha": sha, "message": formatted},
+        )
