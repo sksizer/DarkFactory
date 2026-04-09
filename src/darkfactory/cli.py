@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from . import assign, checks, containment, graph, impacts
+from .checks import StaleWorktree, find_stale_worktrees, is_safe_to_remove
 from .graph_execution import RunEvent, execute_graph, plan_execution
 from .invoke import capability_to_model
 from .loader import load_workflows
@@ -267,7 +268,169 @@ def cmd_status(args: argparse.Namespace) -> int:
             print(
                 f"  {prd.id:14} [{prd.kind}/{prd.effort}/{prd.capability}]  {prd.title}"
             )
+
+    try:
+        repo_root = _find_repo_root(args.prd_dir)
+        stale = find_stale_worktrees(repo_root)
+        if stale:
+            print(
+                f"\n{len(stale)} worktrees for merged PRDs"
+                " (run 'prd cleanup --merged' to remove)"
+            )
+    except (SystemExit, Exception):  # noqa: BLE001 — best-effort outside a git repo
+        pass
+
     return 0
+
+
+def _remove_worktree(worktree: StaleWorktree, repo_root: Path) -> None:
+    """Remove a worktree directory and delete the local branch."""
+    subprocess.run(
+        ["git", "worktree", "remove", "--force", str(worktree.worktree_path)],
+        cwd=repo_root,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "branch", "-D", worktree.branch.removeprefix("prd/")],
+        cwd=repo_root,
+        capture_output=True,
+    )
+
+
+def _find_worktree_for_prd(prd_id: str, repo_root: Path) -> StaleWorktree | None:
+    """Find the worktree entry for the given PRD id, regardless of PR state."""
+    worktrees_dir = repo_root / ".worktrees"
+    if not worktrees_dir.exists():
+        return None
+    for entry in sorted(worktrees_dir.iterdir()):
+        if not entry.is_dir():
+            continue
+        name = entry.name
+        m = re.match(r"^(PRD-[\d.]+)", name)
+        if not m:
+            continue
+        if m.group(1) != prd_id:
+            continue
+        branch = f"prd/{name}"
+        pr_state = checks._get_pr_state(branch, repo_root)
+        return StaleWorktree(
+            prd_id=prd_id,
+            branch=branch,
+            worktree_path=entry,
+            pr_state=pr_state,
+        )
+    return None
+
+
+def _cleanup_single(prd_id: str, force: bool, repo_root: Path) -> int:
+    worktree = _find_worktree_for_prd(prd_id, repo_root)
+    if worktree is None:
+        print(f"No worktree found for {prd_id}")
+        return 1
+    status = is_safe_to_remove(worktree, force=force)
+    if not status.safe:
+        print(f"Cannot remove {prd_id}: {status.reason}")
+        return 1
+    _remove_worktree(worktree, repo_root)
+    print(f"Removed worktree and branch for {prd_id}")
+    return 0
+
+
+def _cleanup_merged(force: bool, repo_root: Path) -> int:
+    stale = find_stale_worktrees(repo_root)
+    if not stale:
+        print("No stale worktrees found")
+        return 0
+    removed = 0
+    skipped = 0
+    for worktree in stale:
+        status = is_safe_to_remove(worktree, force=force)
+        if not status.safe:
+            print(f"Skipping {worktree.prd_id}: {status.reason}")
+            skipped += 1
+            continue
+        _remove_worktree(worktree, repo_root)
+        print(f"Removed {worktree.prd_id}")
+        removed += 1
+    print(f"Removed {removed}, skipped {skipped}")
+    return 0 if skipped == 0 else 1
+
+
+def _cleanup_all(force: bool, repo_root: Path) -> int:
+    worktrees_dir = repo_root / ".worktrees"
+    if not worktrees_dir.exists():
+        print("No .worktrees directory found")
+        return 0
+
+    all_worktrees: list[StaleWorktree] = []
+    for entry in sorted(worktrees_dir.iterdir()):
+        if not entry.is_dir():
+            continue
+        name = entry.name
+        m = re.match(r"^(PRD-[\d.]+)", name)
+        if not m:
+            continue
+        prd_id = m.group(1)
+        branch = f"prd/{name}"
+        pr_state = checks._get_pr_state(branch, repo_root)
+        all_worktrees.append(
+            StaleWorktree(
+                prd_id=prd_id,
+                branch=branch,
+                worktree_path=entry,
+                pr_state=pr_state,
+            )
+        )
+
+    if not all_worktrees:
+        print("No worktrees found")
+        return 0
+
+    open_prs = [w for w in all_worktrees if w.pr_state == "OPEN"]
+    if open_prs:
+        print(f"Warning: {len(open_prs)} worktree(s) have open PRs:")
+        for w in open_prs:
+            print(f"  {w.prd_id} ({w.branch})")
+
+    confirm = (
+        input(f"Remove all {len(all_worktrees)} worktree(s)? [y/N] ").strip().lower()
+    )
+    if confirm not in ("y", "yes"):
+        print("Aborted")
+        return 1
+
+    removed = 0
+    skipped = 0
+    for worktree in all_worktrees:
+        status = is_safe_to_remove(worktree, force=force)
+        if not status.safe:
+            print(f"Skipping {worktree.prd_id}: {status.reason}")
+            skipped += 1
+            continue
+        _remove_worktree(worktree, repo_root)
+        print(f"Removed {worktree.prd_id}")
+        removed += 1
+    print(f"Removed {removed}, skipped {skipped}")
+    return 0 if skipped == 0 else 1
+
+
+def cmd_cleanup(args: argparse.Namespace) -> int:
+    """Remove worktrees for completed PRDs."""
+    repo_root = _find_repo_root(args.prd_dir)
+    prd_id: str | None = getattr(args, "prd_id", None)
+    merged: bool = getattr(args, "merged", False)
+    all_: bool = getattr(args, "all_", False)
+    force: bool = getattr(args, "force", False)
+
+    if prd_id:
+        return _cleanup_single(prd_id, force, repo_root)
+    elif merged:
+        return _cleanup_merged(force, repo_root)
+    elif all_:
+        return _cleanup_all(force, repo_root)
+    else:
+        print("Specify PRD-X, --merged, or --all")
+        return 1
 
 
 def cmd_next(args: argparse.Namespace) -> int:
@@ -1235,6 +1398,31 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub_status = sub.add_parser("status", help="DAG overview and counts")
     sub_status.set_defaults(func=cmd_status)
+
+    sub_cleanup = sub.add_parser("cleanup", help="Remove worktrees for completed PRDs")
+    sub_cleanup.add_argument(
+        "prd_id",
+        nargs="?",
+        default=None,
+        help="PRD id to clean up (e.g. PRD-224.4)",
+    )
+    sub_cleanup.add_argument(
+        "--merged",
+        action="store_true",
+        help="Remove all worktrees for merged-PR PRDs",
+    )
+    sub_cleanup.add_argument(
+        "--all",
+        dest="all_",
+        action="store_true",
+        help="Remove all worktrees (with confirmation prompt)",
+    )
+    sub_cleanup.add_argument(
+        "--force",
+        action="store_true",
+        help="Remove even if there are unpushed commits",
+    )
+    sub_cleanup.set_defaults(func=cmd_cleanup)
 
     sub_next = sub.add_parser("next", help="List actionable PRDs")
     sub_next.add_argument("--limit", type=int, default=10)
