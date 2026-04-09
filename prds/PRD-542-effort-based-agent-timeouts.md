@@ -2,13 +2,16 @@
 id: PRD-542
 title: Scale agent task timeouts by estimated effort
 kind: feature
-status: in-progress
+status: review
 priority: medium
 effort: s
 capability: simple
 parent:
 depends_on: []
-blocks: []
+blocks:
+  - "[[PRD-542.1-timeout-resolution-module]]"
+  - "[[PRD-542.2-integrate-timeout-into-runner]]"
+  - "[[PRD-542.3-graceful-timeout-handling]]"
 impacts: []
 workflow:
 assignee:
