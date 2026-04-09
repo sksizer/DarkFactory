@@ -11,7 +11,7 @@ from __future__ import annotations
 import subprocess
 from typing import Callable
 
-from darkfactory import prd as prd_module
+from darkfactory import containment, prd as prd_module
 from darkfactory.system import SystemContext
 
 SYSTEM_BUILTINS: dict[str, Callable[..., None]] = {}
@@ -211,6 +211,10 @@ def audit_impacts_check(ctx: SystemContext) -> None:
     warnings: dict[str, list[str]] = {}
 
     for prd_id, prd in sorted(ctx.prds.items()):
+        # Skip containers — their impacts are aggregated from descendants.
+        # Each leaf is checked individually by its own status.
+        if containment.children(prd_id, ctx.prds):
+            continue
         if not prd.impacts:
             continue
         is_completed = prd.status in _COMPLETED_STATUSES
