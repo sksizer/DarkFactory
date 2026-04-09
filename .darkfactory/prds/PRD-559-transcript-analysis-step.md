@@ -2,13 +2,18 @@
 id: PRD-559
 title: Add transcript analysis step that surfaces problems and recommendations from agent runs
 kind: feature
-status: draft
+status: ready
 priority: medium
 effort: m
 capability: moderate
 parent:
 depends_on: []
-blocks: []
+blocks:
+  - "[[PRD-559.1-finding-dataclass-detector-registry]]"
+  - "[[PRD-559.2-initial-detectors]]"
+  - "[[PRD-559.3-prompt-template-and-config]]"
+  - "[[PRD-559.4-builtin-entry-point]]"
+  - "[[PRD-559.5-workflow-integration]]"
 impacts:
   - src/darkfactory/builtins/__init__.py
   - src/darkfactory/builtins/analyze_transcript.py
