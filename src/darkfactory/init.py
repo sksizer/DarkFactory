@@ -7,6 +7,7 @@ from pathlib import Path
 GITIGNORE_ENTRIES = [
     ".darkfactory/worktrees/",
     ".darkfactory/transcripts/",
+    ".harness-transcripts/",
 ]
 
 CONFIG_SKELETON = """\

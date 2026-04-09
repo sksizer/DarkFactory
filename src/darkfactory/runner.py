@@ -34,6 +34,7 @@ synthetic success result via :func:`~darkfactory.invoke.invoke_claude`'s
 
 from __future__ import annotations
 
+import json
 import logging
 import subprocess
 import time
@@ -376,6 +377,59 @@ def _run_builtin(task: BuiltIn, ctx: ExecutionContext) -> TaskStep:
     return TaskStep(name=task.name, kind="builtin", success=True)
 
 
+def _write_transcript(
+    repo_root: Path,
+    prd_id: str,
+    task_name: str,
+    model: str,
+    result: InvokeResult,
+) -> None:
+    """Write a JSONL transcript to ``.harness-transcripts/{prd_id}.jsonl``.
+
+    The transcript is a valid JSONL file: every line parses as JSON.
+
+    Line 1: ``darkfactory_metadata`` — task name, model, success, exit code,
+    and failure reason.
+
+    Line 2: ``darkfactory_section`` for stdout, followed by the raw stdout
+    lines (already JSONL from Claude Code's ``--output-format stream-json``).
+
+    Final lines: ``darkfactory_section`` for stderr, then a single
+    ``darkfactory_stderr`` line wrapping the full stderr text (if any).
+    """
+    transcript_dir = repo_root / ".harness-transcripts"
+    transcript_dir.mkdir(parents=True, exist_ok=True)
+    transcript_path = transcript_dir / f"{prd_id}.jsonl"
+
+    lines: list[str] = []
+
+    # Metadata envelope
+    lines.append(
+        json.dumps(
+            {
+                "type": "darkfactory_metadata",
+                "task": task_name,
+                "model": model,
+                "success": result.success,
+                "exit_code": result.exit_code,
+                "failure_reason": result.failure_reason,
+            }
+        )
+    )
+
+    # stdout section
+    lines.append(json.dumps({"type": "darkfactory_section", "section": "stdout"}))
+    for raw_line in result.stdout.splitlines():
+        lines.append(raw_line)
+
+    # stderr section
+    lines.append(json.dumps({"type": "darkfactory_section", "section": "stderr"}))
+    if result.stderr:
+        lines.append(json.dumps({"type": "darkfactory_stderr", "text": result.stderr}))
+
+    transcript_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def _run_agent(
     task: AgentTask,
     ctx: ExecutionContext,
@@ -421,6 +475,8 @@ def _run_agent(
     # Side channel for the retry-on-failure path — keeps the function
     # signature stable.
     setattr(ctx, "_last_agent_result", result)
+
+    _write_transcript(ctx.repo_root, ctx.prd.id, task.name, model, result)
 
     return TaskStep(
         name=task.name,
