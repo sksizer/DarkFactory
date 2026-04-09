@@ -1,4 +1,4 @@
-"""Prompt file loading and variable substitution for AgentTasks.
+"""Prompt file loading, variable substitution, and WorkflowTemplate abstraction.
 
 When the runner executes an :class:`~darkfactory.workflow.AgentTask`,
 it needs to build the prompt the Claude Code subprocess will receive.
@@ -26,16 +26,26 @@ different purposes:
 
 The split also prevents accidental collisions between Python format
 strings in Bash commands and agent-prompt placeholders.
+
+:class:`WorkflowTemplate` is the foundational primitive for PRD-227
+workflow templates. A template defines required opening tasks, a
+constrained middle slot, and required closing tasks. ``.compose()``
+concatenates ``[*open, *middle, *close]`` into a :class:`Workflow`,
+validating the middle against ``middle_kinds`` and ``middle_required``
+constraints.
 """
 
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Mapping
+from typing import TYPE_CHECKING, Any, Callable, Mapping
+
+from .workflow import BuiltIn, Workflow
 
 if TYPE_CHECKING:
-    from .workflow import ExecutionContext, Workflow
+    from .workflow import ExecutionContext
 
 
 PLACEHOLDER_RE = re.compile(r"\{\{(\w+)\}\}")
@@ -94,9 +104,9 @@ def substitute_placeholders(template: str, context: Mapping[str, object]) -> str
 
 
 def compose_prompt(
-    workflow: "Workflow",
+    workflow: Workflow,
     prompts: list[str],
-    execution_context: "ExecutionContext",
+    execution_context: ExecutionContext,
     extras: Mapping[str, object] | None = None,
 ) -> str:
     """End-to-end: load prompt files and substitute context placeholders.
@@ -145,3 +155,83 @@ def compose_prompt(
         context.update(extras)
 
     return substitute_placeholders(raw, context)
+
+
+# ---------- WorkflowTemplate ----------
+
+
+class TemplateViolation(Exception):
+    """Raised when a composed middle violates the template's constraints."""
+
+
+@dataclass(frozen=True)
+class WorkflowTemplate:
+    """A reusable recipe that stamps out :class:`Workflow` instances.
+
+    A template defines:
+
+    - Required **opening** tasks that always run first (``open``).
+    - A constrained **middle** slot for caller-supplied tasks.
+    - Required **closing** tasks that always run last (``close``).
+
+    :meth:`compose` validates the caller's middle tasks against
+    ``middle_kinds`` and ``middle_required``, then returns a
+    :class:`Workflow` whose task list is ``[*open, *middle, *close]``
+    with ``template_name`` set to this template's ``name``.
+    """
+
+    name: str
+    description: str
+    open: list[BuiltIn]
+    close: list[BuiltIn]
+    middle_kinds: list[type] = field(default_factory=list)
+    middle_required: dict[type, tuple[int, int | None]] = field(default_factory=dict)
+
+    def compose(
+        self,
+        name: str,
+        description: str,
+        applies_to: Callable[..., bool],
+        priority: int,
+        middle: list[Any],
+    ) -> Workflow:
+        """Validate ``middle`` and return a complete :class:`Workflow`.
+
+        Parameters match :class:`Workflow` constructor arguments for the
+        caller-supplied fields. ``tasks`` and ``template_name`` are set
+        by this method.
+
+        Raises :class:`TemplateViolation` if any task in ``middle`` is
+        not an instance of one of ``middle_kinds``, or if the count of
+        any required kind falls outside the ``middle_required`` bounds.
+        """
+        self._validate_middle(middle)
+        return Workflow(
+            name=name,
+            description=description,
+            applies_to=applies_to,
+            priority=priority,
+            tasks=[*self.open, *middle, *self.close],
+            template_name=self.name,
+        )
+
+    def _validate_middle(self, middle: list[Any]) -> None:
+        if self.middle_kinds:
+            for task in middle:
+                if not isinstance(task, tuple(self.middle_kinds)):
+                    raise TemplateViolation(
+                        f"Task {task!r} is not an allowed middle kind "
+                        f"(allowed: {[k.__name__ for k in self.middle_kinds]})"
+                    )
+        for kind, (min_count, max_count) in self.middle_required.items():
+            actual = sum(1 for t in middle if isinstance(t, kind))
+            if actual < min_count:
+                raise TemplateViolation(
+                    f"Template requires at least {min_count} {kind.__name__} "
+                    f"in the middle, got {actual}"
+                )
+            if max_count is not None and actual > max_count:
+                raise TemplateViolation(
+                    f"Template allows at most {max_count} {kind.__name__} "
+                    f"in the middle, got {actual}"
+                )
