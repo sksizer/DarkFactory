@@ -20,6 +20,7 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 from collections import Counter
 from datetime import date
 from pathlib import Path
@@ -53,6 +54,20 @@ CAPABILITY_ORDER: dict[str, int] = {
     "moderate": 2,
     "complex": 3,
 }
+
+
+def _read_config_timeouts(repo_root: Path) -> dict[str, object] | None:
+    """Return the ``[timeouts]`` section from ``.darkfactory/config.toml``, or None."""
+    config_path = repo_root / ".darkfactory" / "config.toml"
+    if not config_path.exists():
+        return None
+    try:
+        with open(config_path, "rb") as fh:
+            data = tomllib.load(fh)
+        section = data.get("timeouts")
+        return section if isinstance(section, dict) else None
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _find_repo_root(start: Path) -> Path:
@@ -1165,6 +1180,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         )
     )
 
+    config_timeouts = _read_config_timeouts(repo_root)
+
     result = run_workflow(
         prd=prd,
         workflow=workflow,
@@ -1172,6 +1189,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         base_ref=base_ref,
         dry_run=dry_run,
         model_override=args.model,
+        cli_timeout_minutes=getattr(args, "timeout", None),
+        config_timeouts=config_timeouts,
         styler=styler,
     )
 
@@ -1715,6 +1734,13 @@ def build_parser() -> argparse.ArgumentParser:
             "invocation may execute (counts successes, failures, and "
             "mid-run introduced PRDs). Default: unbounded."
         ),
+    )
+    sub_run.add_argument(
+        "--timeout",
+        type=int,
+        default=None,
+        dest="timeout",
+        help="Override timeout in minutes (overrides all other timeout sources)",
     )
     sub_run.set_defaults(func=cmd_run)
 

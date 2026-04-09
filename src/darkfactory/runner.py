@@ -43,6 +43,7 @@ from typing import TYPE_CHECKING
 from .builtins import BUILTINS
 from .invoke import InvokeResult, capability_to_model, invoke_claude
 from .templates import compose_prompt
+from .timeouts import resolve_timeout
 from .workflow import (
     AgentTask,
     BuiltIn,
@@ -123,6 +124,8 @@ def run_workflow(
     *,
     dry_run: bool = True,
     model_override: str | None = None,
+    cli_timeout_minutes: int | None = None,
+    config_timeouts: dict[str, object] | None = None,
     styler: "Styler | None" = None,
 ) -> RunResult:
     """Execute a workflow against a single PRD and return the result.
@@ -163,6 +166,8 @@ def run_workflow(
                     model_override,
                     last_agent_task,
                     last_agent_result,
+                    cli_timeout_minutes=cli_timeout_minutes,
+                    config_timeouts=config_timeouts,
                     styler=styler,
                 )
                 result.steps.append(step)
@@ -241,15 +246,32 @@ def _dispatch(
     last_agent_task: AgentTask | None,
     last_agent_result: InvokeResult | None,
     *,
+    cli_timeout_minutes: int | None = None,
+    config_timeouts: dict[str, object] | None = None,
     styler: "Styler | None" = None,
 ) -> TaskStep:
     """Dispatch a single task by type and return a TaskStep describing the outcome."""
     if isinstance(task, BuiltIn):
         return _run_builtin(task, ctx)
     if isinstance(task, AgentTask):
-        return _run_agent(task, ctx, model_override, styler=styler)
+        return _run_agent(
+            task,
+            ctx,
+            model_override,
+            cli_timeout_minutes=cli_timeout_minutes,
+            config_timeouts=config_timeouts,
+            styler=styler,
+        )
     if isinstance(task, ShellTask):
-        return _run_shell(task, ctx, last_agent_task, model_override, styler=styler)
+        return _run_shell(
+            task,
+            ctx,
+            last_agent_task,
+            model_override,
+            cli_timeout_minutes=cli_timeout_minutes,
+            config_timeouts=config_timeouts,
+            styler=styler,
+        )
     raise TypeError(f"unknown task type: {type(task).__name__}")
 
 
@@ -284,11 +306,22 @@ def _run_agent(
     model_override: str | None,
     *,
     extras: dict[str, object] | None = None,
+    cli_timeout_minutes: int | None = None,
+    config_timeouts: dict[str, object] | None = None,
     styler: "Styler | None" = None,
 ) -> TaskStep:
     """Compose prompts, invoke Claude Code, and record the result on context."""
     prompt = compose_prompt(ctx.workflow, task.prompts, ctx, extras=extras)
     model = _pick_model(task, ctx.prd, override=model_override)
+
+    timeout_seconds, timeout_source = resolve_timeout(
+        effort=ctx.prd.effort,
+        capability=ctx.prd.capability,
+        timeout_minutes_frontmatter=ctx.prd.raw_frontmatter.get("timeout_minutes"),
+        config_timeouts=config_timeouts,
+        cli_override=cli_timeout_minutes,
+    )
+    logger.info("Timeout: %ds (source: %s)", timeout_seconds, timeout_source)
 
     result = invoke_claude(
         prompt=prompt,
@@ -298,6 +331,7 @@ def _run_agent(
         sentinel_success=task.sentinel_success,
         sentinel_failure=task.sentinel_failure,
         dry_run=ctx.dry_run,
+        timeout_seconds=timeout_seconds,
         styler=styler,
     )
 
@@ -358,6 +392,8 @@ def _run_shell(
     last_agent_task: AgentTask | None,
     model_override: str | None,
     *,
+    cli_timeout_minutes: int | None = None,
+    config_timeouts: dict[str, object] | None = None,
     styler: "Styler | None" = None,
 ) -> TaskStep:
     """Run a shell command, handling on_failure policy with agent retry if configured."""
@@ -418,6 +454,8 @@ def _run_shell(
         ctx,
         model_override,
         extras={"CHECK_OUTPUT": failure_output},
+        cli_timeout_minutes=cli_timeout_minutes,
+        config_timeouts=config_timeouts,
         styler=styler,
     )
     if not agent_step.success:
