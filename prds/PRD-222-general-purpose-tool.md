@@ -2,7 +2,7 @@
 id: PRD-222
 title: Make darkfactory a general-purpose CLI tool installable anywhere
 kind: epic
-status: ready
+status: in-progress
 priority: high
 effort: l
 capability: moderate
@@ -13,7 +13,7 @@ impacts: []
 workflow:
 target_version:
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-08'
 tags:
   - harness
   - cli
