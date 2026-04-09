@@ -2,7 +2,7 @@
 id: PRD-549
 title: Split builtins.py into a package of per-function modules with colocated unit tests
 kind: epic
-status: review
+status: done
 priority: medium
 effort: l
 capability: moderate
@@ -27,7 +27,7 @@ assignee:
 reviewers: []
 target_version:
 created: 2026-04-08
-updated: '2026-04-08'
+updated: '2026-04-09'
 tags:
   - refactor
   - tests
