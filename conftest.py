@@ -1,8 +1,16 @@
-"""Integration-test fixtures and helpers for the tests/ suite."""
+"""Project-wide pytest fixtures available to both tests/ and colocated unit tests."""
 
 from __future__ import annotations
 
 from pathlib import Path
+
+import pytest
+
+
+@pytest.fixture
+def tmp_prd_dir(tmp_path: Path) -> Path:
+    """An empty temporary directory for PRD fixtures."""
+    return tmp_path
 
 
 def write_prd(
