@@ -253,7 +253,9 @@ def detect_large_thinking_burst(
 
 
 @detector("forbidden_attribution_attempt")
-def detect_forbidden_attribution_attempt(events: list[dict[str, object]]) -> list[Finding]:
+def detect_forbidden_attribution_attempt(
+    events: list[dict[str, object]],
+) -> list[Finding]:
     """Detect attribution patterns in assistant messages (advisory)."""
     findings = []
     for event in events:

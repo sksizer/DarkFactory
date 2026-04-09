@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 
 from darkfactory.loader import load_operations
 from darkfactory.style import Element, Styler
@@ -120,6 +119,10 @@ def cmd_system_run(args: argparse.Namespace) -> int:
     if target_prd is not None and not operation.accepts_target:
         raise SystemExit(
             f"operation {args.name!r} does not accept a --target (accepts_target=False)"
+        )
+    if target_prd is None and operation.accepts_target:
+        raise SystemExit(
+            f"operation {args.name!r} requires --target (accepts_target=True)"
         )
 
     repo_root = _find_repo_root(args.prd_dir)

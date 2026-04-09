@@ -216,6 +216,94 @@ class MultiDepUnsupported(Exception):
         )
 
 
+# ---- Queue filters and discovery ------------------------------------------
+
+
+@dataclass
+class QueueFilters:
+    min_priority: str | None = None
+    tags: list[str] = field(default_factory=list)
+    exclude_ids: list[str] = field(default_factory=list)
+
+
+PRIORITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+
+
+def matches_filters(prd: PRD, filters: QueueFilters) -> bool:
+    if filters.min_priority:
+        threshold = PRIORITY_RANK.get(filters.min_priority, 2)
+        if PRIORITY_RANK.get(prd.priority, 2) > threshold:
+            return False
+    if filters.tags and not any(t in prd.tags for t in filters.tags):
+        return False
+    if prd.id in filters.exclude_ids:
+        return False
+    return True
+
+
+def deps_satisfied(prd: PRD, prds: dict[str, PRD]) -> bool:
+    for dep_id in prd.depends_on:
+        dep = prds.get(dep_id)
+        if dep is None or dep.status not in ("done", "review"):
+            return False
+    return True
+
+
+def _prd_sort_key(prd: PRD) -> tuple[int, tuple[int, ...]]:
+    from .prd import parse_id_sort_key
+
+    return (PRIORITY_RANK.get(prd.priority, 2), parse_id_sort_key(prd.id))
+
+
+def topo_sort_with_tiebreak(ready: list[PRD], prds: dict[str, PRD]) -> list[PRD]:
+    """Topological sort of ``ready`` PRDs with priority-then-number tiebreak.
+
+    Edges in the sub-graph are restricted to those where both endpoints are in
+    the ready set. Within a wave of zero-in-degree nodes, higher-priority and
+    lower-numbered PRDs come first.
+    """
+    ready_ids = {p.id for p in ready}
+    prd_by_id = {p.id: p for p in ready}
+
+    # Build in-degree and downstream adjacency restricted to the ready set.
+    in_degree: dict[str, int] = {p.id: 0 for p in ready}
+    downstream: dict[str, list[str]] = {p.id: [] for p in ready}
+    for p in ready:
+        for dep_id in p.depends_on:
+            if dep_id in ready_ids:
+                in_degree[p.id] += 1
+                downstream[dep_id].append(p.id)
+
+    # Kahn's algorithm with tiebreak.
+    wave = sorted(
+        [pid for pid, deg in in_degree.items() if deg == 0],
+        key=lambda pid: _prd_sort_key(prd_by_id[pid]),
+    )
+    out: list[PRD] = []
+
+    while wave:
+        pid = wave.pop(0)
+        out.append(prd_by_id[pid])
+        for successor in downstream[pid]:
+            in_degree[successor] -= 1
+            if in_degree[successor] == 0:
+                wave.append(successor)
+                wave.sort(key=lambda s: _prd_sort_key(prd_by_id[s]))
+
+    return out
+
+
+def discover_ready_queue(prds: dict[str, PRD], filters: QueueFilters) -> list[PRD]:
+    ready = [
+        p
+        for p in prds.values()
+        if p.status == "ready"
+        and deps_satisfied(p, prds)
+        and matches_filters(p, filters)
+    ]
+    return topo_sort_with_tiebreak(ready, prds)
+
+
 # ---- Dry-run plan ---------------------------------------------------------
 
 
