@@ -77,7 +77,7 @@ def _apply_env_vars(config: Config, env: dict[str, str]) -> None:
     for key, value in env.items():
         if not key.startswith(prefix):
             continue
-        rest = key[len(prefix):]
+        rest = key[len(prefix) :]
         parts = rest.split("_", 1)
         if len(parts) != 2:
             continue
