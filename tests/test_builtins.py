@@ -1430,7 +1430,7 @@ def test_commit_transcript_copies_from_repo_root_and_stages(
     # runner._run_agent writes in production.
     transcripts_dir = ctx.repo_root / ".harness-transcripts"
     transcripts_dir.mkdir(parents=True, exist_ok=True)
-    src = transcripts_dir / "PRD-070.log"
+    src = transcripts_dir / "PRD-070.jsonl"
     src.write_text("# fake transcript\ncontent here\n", encoding="utf-8")
 
     builtins.commit_transcript(ctx)
@@ -1442,7 +1442,7 @@ def test_commit_transcript_copies_from_repo_root_and_stages(
     # Destination should exist under .darkfactory/transcripts/
     transcript_dir = ctx.cwd / ".darkfactory" / "transcripts"
     assert transcript_dir.exists()
-    logs = list(transcript_dir.glob("PRD-070-*.log"))
+    logs = list(transcript_dir.glob("PRD-070-*.jsonl"))
     assert len(logs) == 1
     assert logs[0].read_text(encoding="utf-8") == "# fake transcript\ncontent here\n"
 
@@ -1483,12 +1483,12 @@ def test_commit_transcript_multiple_invocations_separate_files(
     transcript_dir = ctx.cwd / ".darkfactory" / "transcripts"
     external_dir = ctx.repo_root / ".harness-transcripts"
     external_dir.mkdir(parents=True, exist_ok=True)
-    src = external_dir / "PRD-070.log"
+    src = external_dir / "PRD-070.jsonl"
 
     # First invocation
     src.write_text("first transcript\n", encoding="utf-8")
     builtins.commit_transcript(ctx)
-    assert len(list(transcript_dir.glob("PRD-070-*.log"))) == 1
+    assert len(list(transcript_dir.glob("PRD-070-*.jsonl"))) == 1
 
     # Wait a second so timestamps differ
     time.sleep(1)
@@ -1497,7 +1497,7 @@ def test_commit_transcript_multiple_invocations_separate_files(
     src.write_text("second transcript\n", encoding="utf-8")
     builtins.commit_transcript(ctx)
 
-    logs = sorted(transcript_dir.glob("PRD-070-*.log"))
+    logs = sorted(transcript_dir.glob("PRD-070-*.jsonl"))
     assert len(logs) == 2, "Each invocation must produce a separate file"
     # Files should have different names (timestamps)
     assert logs[0].name != logs[1].name
@@ -1522,7 +1522,7 @@ def test_commit_transcript_dry_run_noop(tmp_path: Path) -> None:
 
     external_dir = tmp_path / ".harness-transcripts"
     external_dir.mkdir(parents=True, exist_ok=True)
-    src = external_dir / "PRD-070.log"
+    src = external_dir / "PRD-070.jsonl"
     src.write_text("dry run transcript\n", encoding="utf-8")
 
     with patch("subprocess.run") as mock_run:

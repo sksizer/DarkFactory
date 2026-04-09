@@ -44,7 +44,7 @@ def test_dry_run_logs_intended_move(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, dry_run=True)
     transcript_dir = tmp_path / ".harness-transcripts"
     transcript_dir.mkdir()
-    (transcript_dir / "PRD-549.8.log").write_text("transcript content")
+    (transcript_dir / "PRD-549.8.jsonl").write_text("transcript content")
 
     commit_transcript(ctx)
 
@@ -57,7 +57,7 @@ def test_dry_run_no_subprocess(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, dry_run=True)
     transcript_dir = tmp_path / ".harness-transcripts"
     transcript_dir.mkdir()
-    (transcript_dir / "PRD-549.8.log").write_text("transcript content")
+    (transcript_dir / "PRD-549.8.jsonl").write_text("transcript content")
 
     with patch("darkfactory.builtins.commit_transcript.subprocess.run") as mock_run:
         commit_transcript(ctx)
@@ -68,7 +68,7 @@ def test_dry_run_no_file_created(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, dry_run=True)
     transcript_dir = tmp_path / ".harness-transcripts"
     transcript_dir.mkdir()
-    (transcript_dir / "PRD-549.8.log").write_text("transcript content")
+    (transcript_dir / "PRD-549.8.jsonl").write_text("transcript content")
 
     commit_transcript(ctx)
 
@@ -83,7 +83,7 @@ def test_successful_run_creates_dest_and_stages(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, dry_run=False)
     transcript_dir = tmp_path / ".harness-transcripts"
     transcript_dir.mkdir()
-    src = transcript_dir / "PRD-549.8.log"
+    src = transcript_dir / "PRD-549.8.jsonl"
     src.write_text("transcript content")
 
     with patch("darkfactory.builtins.commit_transcript.subprocess.run") as mock_run:
@@ -94,7 +94,7 @@ def test_successful_run_creates_dest_and_stages(tmp_path: Path) -> None:
     assert dest_dir.exists()
 
     # A file matching the pattern should exist
-    files = list(dest_dir.glob("PRD-549.8-*.log"))
+    files = list(dest_dir.glob("PRD-549.8-*.jsonl"))
     assert len(files) == 1
     assert files[0].read_text() == "transcript content"
 
@@ -109,7 +109,7 @@ def test_successful_run_logs_staged(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, dry_run=False)
     transcript_dir = tmp_path / ".harness-transcripts"
     transcript_dir.mkdir()
-    (transcript_dir / "PRD-549.8.log").write_text("data")
+    (transcript_dir / "PRD-549.8.jsonl").write_text("data")
 
     with patch("darkfactory.builtins.commit_transcript.subprocess.run"):
         commit_transcript(ctx)
