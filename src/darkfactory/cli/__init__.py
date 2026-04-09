@@ -1456,6 +1456,11 @@ def _create_reconcile_pr(
 ) -> None:
     """Create a PR with the reconciled status changes."""
     branch = "prd/reconcile-status"
+    # Delete stale branch from a previous run, if any.
+    subprocess.run(
+        ["git", "-C", str(repo_root), "branch", "-D", branch],
+        capture_output=True,
+    )
     subprocess.run(
         ["git", "-C", str(repo_root), "checkout", "-b", branch],
         check=True,
