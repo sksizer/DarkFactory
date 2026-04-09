@@ -109,6 +109,8 @@ def _find_terminal_result(output_lines: list[str]) -> dict[str, Any] | None:
             continue
         try:
             obj: dict[str, Any] = json.loads(line)
+            if obj.get("type", "").startswith("darkfactory_"):
+                continue
             if obj.get("type") == "result":
                 return obj
         except json.JSONDecodeError:
@@ -143,6 +145,23 @@ def _parse_sentinels(
     output, we treat it as failure — the agent shouldn't emit both and
     the conservative interpretation is "something went wrong mid-task".
     """
+    # Pre-filter: remove darkfactory envelope lines so their JSON values
+    # cannot produce false sentinel matches. A darkfactory_stderr line
+    # whose "text" field contains a sentinel string (e.g. if the agent's
+    # stderr captured a prior sentinel) would otherwise match the regex.
+    filtered: list[str] = []
+    for raw_line in stdout.splitlines(keepends=True):
+        stripped = raw_line.strip()
+        if stripped.startswith("{"):
+            try:
+                parsed = json.loads(stripped)
+                if parsed.get("type", "").startswith("darkfactory_"):
+                    continue
+            except json.JSONDecodeError:
+                pass
+        filtered.append(raw_line)
+    stdout = "".join(filtered)
+
     # Custom marker fast path: if the caller specified non-default markers,
     # fall back to substring matching since we can't know their regex shape.
     if success_marker != "PRD_EXECUTE_OK" or failure_marker != "PRD_EXECUTE_FAILED":

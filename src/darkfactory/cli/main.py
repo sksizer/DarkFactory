@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from darkfactory.cli._parser import build_parser
+from darkfactory.config import resolve_config
 from darkfactory.discovery import resolve_project_root
 from darkfactory.style import Styler, resolve_style_config
 
@@ -41,7 +42,9 @@ def main(argv: list[str] | None = None) -> int:
     _configure_logging(verbose=getattr(args, "verbose", False))
 
     darkfactory_dir: Path | None = None
-    if args.prd_dir is None or args.workflows_dir is None:
+    if args.subcommand != "init" and (
+        args.prd_dir is None or args.workflows_dir is None
+    ):
         darkfactory_dir = resolve_project_root(
             cli_dir=getattr(args, "directory", None),
         )
@@ -63,16 +66,15 @@ def main(argv: list[str] | None = None) -> int:
         else:
             args.operations_dir = args.prd_dir.parent / "operations"
 
-    repo_root = darkfactory_dir.parent if darkfactory_dir is not None else None
-
-    # Resolve style config and create a Styler. Any command module that needs
-    # styled output reads args.styler — it never constructs one itself.
-    # JSON-output paths must NOT call styler.render() — they use plain print().
+    # Resolve the full config cascade (files + env vars), then build Styler.
+    # Any command module that needs styled output reads args.styler — it never
+    # constructs one itself. JSON-output paths must NOT call styler.render().
+    resolved_config = resolve_config(darkfactory_dir)
     style_config = resolve_style_config(
+        config=resolved_config,
         theme=getattr(args, "theme", None),
         icon_set=getattr(args, "icon_set", None),
         no_color=getattr(args, "no_color", False),
-        repo_root=repo_root,
     )
     args.styler = Styler(style_config)
 
