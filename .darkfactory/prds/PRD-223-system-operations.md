@@ -2,19 +2,24 @@
 id: PRD-223
 title: "System operations: reuse the workflow harness for non-PRD-bound tasks"
 kind: epic
-status: ready
+status: done
 priority: medium
 effort: m
 capability: moderate
 parent:
 depends_on:
   - "[[PRD-222-general-purpose-tool]]"
-blocks: []
+blocks:
+  - "[[PRD-223.1-system-operation-core]]"
+  - "[[PRD-223.2-system-cli]]"
+  - "[[PRD-223.3-bulk-mutation-builtins]]"
+  - "[[PRD-223.5-audit-impacts-operation]]"
+  - "[[PRD-223.6-planning-as-system-op]]"
 impacts: []
 workflow:
 target_version:
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-09'
 tags:
   - harness
   - workflow

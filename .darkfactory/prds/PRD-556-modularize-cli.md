@@ -2,7 +2,7 @@
 id: PRD-556
 title: Split src/darkfactory/cli.py into a package of per-subcommand modules with colocated tests
 kind: epic
-status: done
+status: ready
 priority: medium
 effort: l
 capability: moderate
@@ -34,7 +34,7 @@ assignee:
 reviewers: []
 target_version:
 created: 2026-04-08
-updated: '2026-04-09'
+updated: 2026-04-09
 tags:
   - refactor
   - tests

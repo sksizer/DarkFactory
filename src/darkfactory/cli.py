@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from . import assign, checks, containment, graph, impacts
+from .discovery import resolve_project_root
 from .checks import StaleWorktree, find_stale_worktrees, is_safe_to_remove
 from .graph_execution import RunEvent, execute_graph, plan_execution
 from .invoke import capability_to_model
@@ -71,7 +72,11 @@ def _read_config_timeouts(repo_root: Path) -> dict[str, object] | None:
 
 
 def _find_repo_root(start: Path) -> Path:
-    """Walk up from ``start`` until a ``.git`` directory is found."""
+    """Walk up from ``start`` until a ``.git`` directory is found.
+
+    Used for git-specific operations (worktrees, tracked files, branches).
+    Project discovery uses ``resolve_project_root`` from ``discovery`` instead.
+    """
     current = start.resolve()
     while current != current.parent:
         if (current / ".git").exists():
@@ -80,33 +85,15 @@ def _find_repo_root(start: Path) -> Path:
     raise SystemExit(f"could not locate git repo root from {start}")
 
 
-def _default_prd_dir() -> Path:
-    """Locate ``prds/`` at the repo root.
-
-    darkfactory ships its own PRDs under ``prds/`` rather than the
-    nested ``docs/prd/`` layout the harness used inside pumice.
-    Overridable via ``--prd-dir`` for repos that prefer a different
-    location.
-    """
-    repo = _find_repo_root(Path.cwd())
-    return repo / "prds"
-
-
-def _default_workflows_dir() -> Path:
-    """Locate ``workflows/`` at the repo root.
-
-    All built-in workflows ship under this path. Overridable via
-    ``--workflows-dir``.
-    """
-    repo = _find_repo_root(Path.cwd())
-    return repo / "workflows"
-
-
 def _load_workflows_or_fail(workflows_dir: Path) -> dict[str, Workflow]:
-    """Load workflows with a user-friendly error if the directory is missing."""
-    if not workflows_dir.exists():
-        raise SystemExit(f"workflows directory not found: {workflows_dir}")
-    return load_workflows(workflows_dir)
+    """Load built-in and project-level workflows.
+
+    Built-in (system) workflows ship inside the package and are always
+    available. ``workflows_dir`` is the optional project-level layer
+    (``<project>/.darkfactory/workflows/``); if it doesn't exist we just
+    return the built-ins.
+    """
+    return load_workflows(workflows_dir if workflows_dir.exists() else None)
 
 
 def _action_sort_key(prd: PRD) -> tuple[int, int, tuple[int, ...]]:
@@ -807,6 +794,14 @@ def cmd_assign(args: argparse.Namespace) -> int:
     prds = _load(args.prd_dir)
     workflows = _load_workflows_or_fail(args.workflows_dir)
 
+    if not workflows:
+        if args.json:
+            print(json.dumps([], indent=2))
+        else:
+            print(f"{'PRD':14} {'Workflow':20} Source")
+            print("-" * 50)
+        return 0
+
     try:
         assignments = assign.assign_all(prds, workflows)
     except KeyError as exc:
@@ -1332,6 +1327,103 @@ def _cmd_run_graph(
     return report.exit_code
 
 
+def find_worktree(prd_id: str, repo_root: Path) -> Path | None:
+    """Find the worktree path for the given PRD id using git worktree list.
+
+    Returns the worktree path if found, or None if no worktree exists.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "worktree", "list", "--porcelain"],
+            capture_output=True,
+            text=True,
+            cwd=repo_root,
+        )
+        if result.returncode != 0:
+            return None
+    except FileNotFoundError:
+        return None
+
+    current_path: str | None = None
+    for line in result.stdout.splitlines():
+        if line.startswith("worktree "):
+            current_path = line[len("worktree ") :]
+        elif line.startswith("branch "):
+            branch_ref = line[len("branch ") :]
+            # branch refs/heads/prd/PRD-NNN-slug
+            branch = branch_ref.removeprefix("refs/heads/")
+            if re.match(rf"^prd/{re.escape(prd_id)}-", branch):
+                return Path(current_path) if current_path else None
+    return None
+
+
+def find_open_pr(branch_name: str, repo_root: Path) -> int | None:
+    """Find the PR number for an open PR on the given branch.
+
+    Returns the PR number if an open PR exists, or None otherwise.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "gh",
+                "pr",
+                "list",
+                "--head",
+                branch_name,
+                "--state",
+                "open",
+                "--json",
+                "number",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=repo_root,
+        )
+        if result.returncode != 0:
+            return None
+        prs: list[dict[str, Any]] = json.loads(result.stdout)
+        if prs:
+            return int(prs[0]["number"])
+    except (FileNotFoundError, json.JSONDecodeError, ValueError):
+        pass
+    return None
+
+
+def cmd_rework(args: argparse.Namespace) -> int:
+    """Rework a PRD by addressing PR review feedback. Defaults to dry-run; opt in via --execute."""
+    prds = _load(args.prd_dir)
+    prd_id = args.prd_id
+    if prd_id not in prds:
+        raise SystemExit(f"unknown PRD id: {prd_id}")
+    prd = prds[prd_id]
+
+    if prd.status != "review":
+        raise SystemExit(f"ERROR: {prd_id} is in '{prd.status}', not 'review'")
+
+    repo_root = _find_repo_root(args.prd_dir)
+
+    worktree_path = find_worktree(prd_id, repo_root)
+    if worktree_path is None:
+        raise SystemExit(
+            f"ERROR: No worktree found for {prd_id}. Run 'prd run {prd_id}' first."
+        )
+
+    branch_name = _compute_branch_name(prd)
+    pr_number = find_open_pr(branch_name, repo_root)
+    if pr_number is None:
+        raise SystemExit(f"ERROR: No open PR found for {prd_id}")
+
+    if not args.execute:
+        print(f"Would rework {prd_id}")
+        print(f"  Worktree: {worktree_path}")
+        print(f"  PR: #{pr_number}")
+        print(f"  Branch: {branch_name}")
+        return 0
+
+    # Set up execution context for the rework workflow (PRD-225.4)
+    return 0
+
+
 def _get_merged_prd_prs() -> list[dict[str, Any]]:
     """Return merged PRs whose head branch matches ``prd/PRD-*``."""
     result = subprocess.run(
@@ -1517,6 +1609,14 @@ def _print_run_event(ev: RunEvent, styler: Styler) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="prd", description="Pumice PRD harness CLI")
+    parser.add_argument(
+        "--directory",
+        "-C",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help="Project root containing .darkfactory/ (overrides DARKFACTORY_DIR env and walk-up)",
+    )
     parser.add_argument(
         "--prd-dir",
         type=Path,
@@ -1744,6 +1844,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub_run.set_defaults(func=cmd_run)
 
+    p_rework = sub.add_parser("rework", help="Address PR review feedback for a PRD")
+    p_rework.add_argument("prd_id", help="PRD ID to rework")
+    p_rework.add_argument("--execute", action="store_true")
+    p_rework.add_argument("--all", action="store_true", help="Include resolved threads")
+    p_rework.add_argument("--since", help="Only comments after this commit")
+    p_rework.add_argument("--reviewer", help="Only comments from this reviewer")
+    p_rework.add_argument("--from-pr-comment", help="Address a single comment by ID")
+    p_rework.add_argument(
+        "--reply-to-comments",
+        action="store_true",
+        help="Post replies on addressed comments",
+    )
+    p_rework.set_defaults(func=cmd_rework)
+
     sub_reconcile = sub.add_parser(
         "reconcile",
         help="Find merged-but-not-flipped PRDs and reconcile their status",
@@ -1792,18 +1906,28 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     _configure_logging(verbose=getattr(args, "verbose", False))
-    if args.prd_dir is None:
-        args.prd_dir = _default_prd_dir()
-    if args.workflows_dir is None:
-        args.workflows_dir = _default_workflows_dir()
+
+    darkfactory_dir: Path | None = None
+    if args.prd_dir is None or args.workflows_dir is None:
+        darkfactory_dir = resolve_project_root(
+            cli_dir=getattr(args, "directory", None),
+        )
+        if darkfactory_dir is None:
+            print(
+                "No `.darkfactory/` directory found. Run `prd init` to set up this project.",
+                file=sys.stderr,
+            )
+            return 1
+        if args.prd_dir is None:
+            args.prd_dir = darkfactory_dir / "prds"
+        if args.workflows_dir is None:
+            args.workflows_dir = darkfactory_dir / "workflows"
+
+    repo_root = darkfactory_dir.parent if darkfactory_dir is not None else None
 
     # Resolve style config and create a Styler. Any command module that needs
     # styled output reads args.styler — it never constructs one itself.
     # JSON-output paths must NOT call styler.render() — they use plain print().
-    try:
-        repo_root = _find_repo_root(args.prd_dir)
-    except SystemExit:
-        repo_root = None
     style_config = resolve_style_config(
         theme=getattr(args, "theme", None),
         icon_set=getattr(args, "icon_set", None),
