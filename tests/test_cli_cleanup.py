@@ -62,10 +62,13 @@ def test_find_stale_worktrees_returns_closed(tmp_path: Path) -> None:
     _init_git_repo(tmp_path)
     _make_worktree_dir(tmp_path, "PRD-003-closed-one")
 
-    fake_states = {"prd/PRD-003-closed-one": "CLOSED"}
 
-    with patch("darkfactory.checks._fetch_all_pr_states", return_value=fake_states):
-        result = find_stale_worktrees(tmp_path)
+    with patch(
+        "darkfactory.checks._fetch_all_pr_states",
+        return_value={"prd/PRD-003-closed-one": "CLOSED"},
+    ):
+
+    result = find_stale_worktrees(tmp_path)
 
     assert len(result) == 1
     assert result[0].pr_state == "CLOSED"
