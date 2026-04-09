@@ -54,6 +54,7 @@ from darkfactory.builtins.commit import commit  # noqa: E402
 from darkfactory.builtins.create_pr import create_pr  # noqa: E402
 from darkfactory.builtins.commit_transcript import commit_transcript  # noqa: E402
 from darkfactory.builtins.ensure_worktree import ensure_worktree  # noqa: E402
+from darkfactory.builtins.lint_attribution import lint_attribution  # noqa: E402
 from darkfactory.builtins.push_branch import push_branch  # noqa: E402
 from darkfactory.builtins.summarize_agent_run import summarize_agent_run  # noqa: E402
 
@@ -95,49 +96,6 @@ def _format_invocations(ctx: ExecutionContext) -> str:
         return "1"
     return str(count)
   
-
-@builtin("lint_attribution")
-def lint_attribution(ctx: ExecutionContext) -> None:
-    """Fail if any commit on the branch or the run summary credits Claude/Anthropic.
-
-    Scans:
-
-    - Every commit message in ``{base_ref}..HEAD`` on the current branch
-    - ``ctx.run_summary`` (which feeds the PR body)
-
-    Intended to run after the agent + verification phases and before
-    ``push_branch`` / ``create_pr``, so violations abort the workflow
-    before anything lands on the remote or in a PR. Dry-run is a no-op
-    because there are no real commits to scan.
-    """
-    if ctx.dry_run:
-        ctx.logger.info("[dry-run] lint_attribution: skipped")
-        return
-
-    _scan_for_forbidden_attribution(
-        ctx.run_summary or "", source=f"run summary for {ctx.prd.id}"
-    )
-
-    result = subprocess.run(
-        ["git", "log", f"{ctx.base_ref}..HEAD", "--format=%H%x00%B%x1e"],
-        cwd=str(ctx.cwd),
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    # Record separator \x1e between commits; field separator \x00 between
-    # sha and body. Keeps us robust against newlines in commit messages.
-    for entry in result.stdout.split("\x1e"):
-        entry = entry.strip()
-        if not entry:
-            continue
-        sha, _, body = entry.partition("\x00")
-        _scan_for_forbidden_attribution(
-            body, source=f"commit {sha[:12]} on {ctx.branch_name}"
-        )
-
-    ctx.logger.info("lint_attribution: clean")
-
 
 @builtin("cleanup_worktree")
 def cleanup_worktree(ctx: ExecutionContext) -> None:
