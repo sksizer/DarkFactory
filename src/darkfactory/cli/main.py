@@ -41,7 +41,9 @@ def main(argv: list[str] | None = None) -> int:
     _configure_logging(verbose=getattr(args, "verbose", False))
 
     darkfactory_dir: Path | None = None
-    if args.prd_dir is None or args.workflows_dir is None:
+    if args.subcommand != "init" and (
+        args.prd_dir is None or args.workflows_dir is None
+    ):
         darkfactory_dir = resolve_project_root(
             cli_dir=getattr(args, "directory", None),
         )

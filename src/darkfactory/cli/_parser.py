@@ -13,6 +13,7 @@ def build_parser() -> argparse.ArgumentParser:
         cmd_children,
         cmd_cleanup,
         cmd_conflicts,
+        cmd_init,
         cmd_list_workflows,
         cmd_new,
         cmd_next,
@@ -87,6 +88,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     sub = parser.add_subparsers(dest="subcommand", required=True)
+
+    sub_init = sub.add_parser(
+        "init", help="Scaffold .darkfactory/ in the current project"
+    )
+    sub_init.set_defaults(func=cmd_init)
 
     sub_new = sub.add_parser("new", help="Create a new draft PRD from a template")
     sub_new.add_argument("title", help="PRD title (positional)")

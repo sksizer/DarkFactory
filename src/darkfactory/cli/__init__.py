@@ -34,6 +34,8 @@ from darkfactory.runner import _compute_branch_name, _pick_model, run_workflow
 from darkfactory.style import Element, Styler
 from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Task, Workflow
 
+from darkfactory.init import init_project
+
 from darkfactory.cli._shared import (
     PRIORITY_ORDER,  # noqa: F401
     EFFORT_ORDER,  # noqa: F401
@@ -116,6 +118,17 @@ DRAFT_TEMPLATE_BODY = """# {title}
 ## References
 
 """
+
+
+def cmd_init(args: argparse.Namespace) -> int:
+    target = (args.directory or Path.cwd()).resolve()
+    try:
+        msg = init_project(target)
+    except SystemExit as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    print(msg)
+    return 0
 
 
 def cmd_new(args: argparse.Namespace) -> int:
