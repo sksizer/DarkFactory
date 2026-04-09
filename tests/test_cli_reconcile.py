@@ -19,11 +19,12 @@ def _init_git_repo(path: Path) -> None:
     (path / ".git").mkdir(exist_ok=True)
 
 
-def _fake_pr(head_ref: str, number: int) -> dict[str, Any]:
+def _fake_pr(head_ref: str, number: int, *, sha: str = "abc123") -> dict[str, Any]:
     return {
         "headRefName": head_ref,
         "mergedAt": "2026-04-08T00:00:00Z",
         "number": number,
+        "mergeCommit": {"oid": sha},
     }
 
 
@@ -44,7 +45,10 @@ def test_reconcile_dryrun_lists_candidates(
 
     prs = [_fake_pr("prd/PRD-224-reconcile-test", 42)]
 
-    with patch("darkfactory.cli._get_merged_prd_prs", return_value=prs):
+    with (
+        patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
+        patch("darkfactory.cli._merge_commit_is_ancestor", return_value=True),
+    ):
         rc = main(["--prd-dir", str(prd_dir), "reconcile"])
 
     assert rc == 0
@@ -112,6 +116,7 @@ def test_reconcile_execute_flips_status(
 
     with (
         patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
+        patch("darkfactory.cli._merge_commit_is_ancestor", return_value=True),
         patch("darkfactory.cli._create_reconcile_pr"),
     ):
         rc = main(["--prd-dir", str(prd_dir), "reconcile", "--execute"])
@@ -141,6 +146,7 @@ def test_reconcile_execute_creates_pr(
 
     with (
         patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
+        patch("darkfactory.cli._merge_commit_is_ancestor", return_value=True),
         patch("darkfactory.cli._create_reconcile_pr", mock_create_pr),
     ):
         rc = main(["--prd-dir", str(prd_dir), "reconcile", "--execute"])
@@ -170,6 +176,7 @@ def test_reconcile_execute_commit_to_main(
 
     with (
         patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
+        patch("darkfactory.cli._merge_commit_is_ancestor", return_value=True),
         patch("darkfactory.cli._commit_to_main", mock_commit),
         patch("darkfactory.cli._create_reconcile_pr", mock_create_pr),
     ):
@@ -202,7 +209,10 @@ def test_reconcile_multiple_candidates_batched(
         _fake_pr("prd/PRD-101-beta", 101),
     ]
 
-    with patch("darkfactory.cli._get_merged_prd_prs", return_value=prs):
+    with (
+        patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
+        patch("darkfactory.cli._merge_commit_is_ancestor", return_value=True),
+    ):
         rc = main(["--prd-dir", str(prd_dir), "reconcile"])
 
     assert rc == 0
@@ -237,6 +247,7 @@ def test_reconcile_multiple_execute_batched_commit_msg(
 
     with (
         patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
+        patch("darkfactory.cli._merge_commit_is_ancestor", return_value=True),
         patch("darkfactory.cli._create_reconcile_pr", fake_commit),
     ):
         rc = main(["--prd-dir", str(prd_dir), "reconcile", "--execute"])
@@ -269,6 +280,7 @@ def test_reconcile_single_commit_msg_format(
 
     with (
         patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
+        patch("darkfactory.cli._merge_commit_is_ancestor", return_value=True),
         patch("darkfactory.cli._create_reconcile_pr", fake_commit),
     ):
         rc = main(["--prd-dir", str(prd_dir), "reconcile", "--execute"])
@@ -280,3 +292,79 @@ def test_reconcile_single_commit_msg_format(
     assert "#55" in msg
     assert "auto-reconciled" in msg
     assert "[skip ci]" in msg
+
+
+# ---------------------------------------------------------------------------
+# Merge-commit ancestry verification
+# ---------------------------------------------------------------------------
+
+
+def _fake_pr_with_sha(head_ref: str, number: int, sha: str) -> dict[str, Any]:
+    return {
+        "headRefName": head_ref,
+        "mergedAt": "2026-04-08T00:00:00Z",
+        "number": number,
+        "mergeCommit": {"oid": sha},
+    }
+
+
+def test_reconcile_warns_on_clobbered_merge_commit(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """When a merge commit is not reachable from HEAD, warn and skip the PRD."""
+    _init_git_repo(tmp_path)
+    prd_dir = tmp_path / "prds"
+    prd_dir.mkdir()
+    write_prd(prd_dir, "PRD-400", "clobbered", status="review")
+
+    prs = [_fake_pr_with_sha("prd/PRD-400-clobbered", 40, "deadbeef1234")]
+
+    with (
+        patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
+        patch(
+            "darkfactory.cli._merge_commit_is_ancestor",
+            return_value=False,
+        ),
+    ):
+        rc = main(["--prd-dir", str(prd_dir), "reconcile"])
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "WARNING" in out
+    assert "PRD-400" in out
+    assert "deadbeef12" in out  # truncated sha
+    assert "No PRDs to reconcile" in out
+
+
+def test_reconcile_skips_clobbered_but_flips_valid(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Mixed case: one clobbered, one valid — only the valid one is a candidate."""
+    _init_git_repo(tmp_path)
+    prd_dir = tmp_path / "prds"
+    prd_dir.mkdir()
+    write_prd(prd_dir, "PRD-500", "bad", status="review")
+    write_prd(prd_dir, "PRD-501", "good", status="review")
+
+    prs = [
+        _fake_pr_with_sha("prd/PRD-500-bad", 50, "bad0000000"),
+        _fake_pr_with_sha("prd/PRD-501-good", 51, "good111111"),
+    ]
+
+    def fake_ancestor(pr: dict[str, Any], repo_root: Path) -> bool:
+        sha = pr["mergeCommit"]["oid"]
+        return sha == "good111111"
+
+    with (
+        patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
+        patch("darkfactory.cli._merge_commit_is_ancestor", side_effect=fake_ancestor),
+    ):
+        rc = main(["--prd-dir", str(prd_dir), "reconcile"])
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "WARNING" in out
+    assert "PRD-500" in out
+    # Valid candidate still listed
+    assert "PRD-501" in out
+    assert "review -> done" in out
