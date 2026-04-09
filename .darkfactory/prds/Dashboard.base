@@ -26,3 +26,11 @@ views:
       - status
       - parent
     imageAspectRatio: 1
+  - type: table
+    name: BLOCKED
+    filters:
+      and:
+        - status == "blocked"
+    order:
+      - file.name
+      - status

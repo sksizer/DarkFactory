@@ -34,6 +34,7 @@ synthetic success result via :func:`~darkfactory.invoke.invoke_claude`'s
 
 from __future__ import annotations
 
+import json
 import logging
 import subprocess
 from dataclasses import dataclass, field
@@ -357,22 +358,35 @@ def _run_agent(
         try:
             transcripts_dir = ctx.repo_root / ".harness-transcripts"
             transcripts_dir.mkdir(parents=True, exist_ok=True)
-            transcript = transcripts_dir / f"{ctx.prd.id}.log"
+            transcript = transcripts_dir / f"{ctx.prd.id}.jsonl"
+            metadata_line = (
+                json.dumps(
+                    {
+                        "type": "darkfactory_metadata",
+                        "task": task.name,
+                        "model": model,
+                        "success": result.success,
+                        "exit_code": result.exit_code,
+                        "failure_reason": result.failure_reason,
+                    }
+                )
+                + "\n"
+            )
+            stdout_section = (
+                json.dumps({"type": "darkfactory_section", "section": "stdout"}) + "\n"
+            )
+            stderr_section = (
+                json.dumps({"type": "darkfactory_section", "section": "stderr"}) + "\n"
+            )
+            stderr_line = (
+                json.dumps({"type": "darkfactory_stderr", "text": result.stderr}) + "\n"
+            )
             transcript.write_text(
-                "\n".join(
-                    [
-                        f"# task: {task.name}",
-                        f"# model: {model}",
-                        f"# success: {result.success}",
-                        f"# exit_code: {result.exit_code}",
-                        f"# failure_reason: {result.failure_reason or ''}",
-                        "# ---- stdout ----",
-                        result.stdout,
-                        "# ---- stderr ----",
-                        result.stderr,
-                        "",
-                    ]
-                ),
+                metadata_line
+                + stdout_section
+                + result.stdout
+                + stderr_section
+                + stderr_line,
                 encoding="utf-8",
             )
         except OSError as exc:
