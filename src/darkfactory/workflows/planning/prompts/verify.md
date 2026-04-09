@@ -23,7 +23,7 @@ is giving you one retry to fix the issue.
 4. Re-run `uv run prd validate` to verify the fix.
 5. Stage your changes:
    ```bash
-   git add prds/
+   git add .darkfactory/prds/
    git status
    ```
 6. Emit the sentinel line:
