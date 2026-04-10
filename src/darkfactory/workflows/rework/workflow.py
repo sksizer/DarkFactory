@@ -62,5 +62,9 @@ workflow = Workflow(
         ),
         # Push to the existing branch — the open PR auto-updates.
         BuiltIn("push_branch"),
+        # Optionally post bot replies to addressed PR comment threads.
+        # Only runs when --reply-to-comments is passed. Failures are
+        # logged as warnings and do not fail the rework run.
+        BuiltIn("reply_pr_comments"),
     ],
 )

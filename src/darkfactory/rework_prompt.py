@@ -35,6 +35,7 @@ def render_rework_feedback(threads: list[ReviewThread]) -> str:
             header += f" on `{thread.path}`"
             if thread.line is not None:
                 header += f":{thread.line}"
+        header += f" (thread_id: `{thread.thread_id}`)"
         parts.append(header)
         parts.append("")
         body_quoted = "\n".join(f"> {line}" for line in thread.body.splitlines())

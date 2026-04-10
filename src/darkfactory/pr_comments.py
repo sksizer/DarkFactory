@@ -4,14 +4,23 @@ This module provides ``fetch_pr_comments`` which shells out to ``gh pr view``
 to retrieve review threads, then applies configurable filters before returning
 structured ``ReviewThread`` dataclasses suitable for composing into a feedback
 prompt.
+
+It also provides ``post_comment_replies`` for posting bot replies back to
+addressed threads, and ``parse_agent_replies`` for extracting structured reply
+notes from agent output.
 """
 
 from __future__ import annotations
 
 import json
+import logging
+import re
 import subprocess
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -174,6 +183,143 @@ def _parse_threads(raw: dict[str, Any]) -> list[ReviewThread]:
         )
 
     return threads
+
+
+@dataclass
+class CommentReply:
+    """A reply to post on a specific review thread."""
+
+    thread_id: str
+    body: str
+
+
+# Fenced code block marker emitted by the rework agent:
+#   ```json-reply-notes
+#   [{"thread_id": "...", "note": "..."}]
+#   ```
+_REPLY_NOTES_RE = re.compile(
+    r"```json-reply-notes\s*\n(.*?)\n```",
+    re.DOTALL,
+)
+
+
+def parse_agent_replies(agent_output: str) -> list[CommentReply]:
+    """Parse structured reply notes from rework agent output.
+
+    The agent is instructed to emit a fenced code block tagged
+    ``json-reply-notes`` containing a JSON array of objects with
+    ``thread_id`` and ``note`` keys::
+
+        ```json-reply-notes
+        [{"thread_id": "IC_abc123", "note": "Addressed: renamed the method."}]
+        ```
+
+    Returns a list of :class:`CommentReply` objects.  Malformed or
+    missing blocks return an empty list — callers log a warning rather
+    than failing.
+    """
+    match = _REPLY_NOTES_RE.search(agent_output)
+    if not match:
+        return []
+
+    raw_json = match.group(1).strip()
+    try:
+        items = json.loads(raw_json)
+    except json.JSONDecodeError as exc:
+        _log.warning("parse_agent_replies: invalid JSON in reply-notes block: %s", exc)
+        return []
+
+    if not isinstance(items, list):
+        _log.warning(
+            "parse_agent_replies: expected JSON array, got %s", type(items).__name__
+        )
+        return []
+
+    replies: list[CommentReply] = []
+    for item in items:
+        if not isinstance(item, dict):
+            _log.warning("parse_agent_replies: skipping non-dict item: %r", item)
+            continue
+        thread_id = item.get("thread_id")
+        note = item.get("note")
+        if not thread_id or not note:
+            _log.warning(
+                "parse_agent_replies: skipping item missing thread_id or note: %r",
+                item,
+            )
+            continue
+        replies.append(CommentReply(thread_id=str(thread_id), body=str(note)))
+
+    return replies
+
+
+def post_comment_replies(
+    pr_number: int,
+    replies: list[CommentReply],
+    commit_sha: str,
+    repo_root: Path,
+) -> list[tuple[str, bool]]:
+    """Post replies to PR comment threads.
+
+    For each :class:`CommentReply`, posts a reply on the specified review
+    thread via ``gh api``.  The reply body is prefixed with
+    ``[harness] addressed in {commit_sha}: `` so reviewers can easily
+    distinguish bot replies from human ones.
+
+    Returns a list of ``(thread_id, success)`` pairs.  Failures are
+    logged as warnings but do not raise — the caller decides whether to
+    surface them.
+
+    ``repo_root`` is used as the ``cwd`` for ``gh`` subprocess calls.
+    """
+    results: list[tuple[str, bool]] = []
+
+    for reply in replies:
+        prefix = f"[harness] addressed in {commit_sha}: "
+        body = prefix + reply.body
+
+        # gh api POST to create a reply on the specific pull request review comment.
+        # GitHub REST endpoint: POST /repos/{owner}/{repo}/pulls/{pull_number}/comments/{comment_id}/replies
+        # We use `gh api` which auto-resolves the repo from the remote.
+        cmd = [
+            "gh",
+            "api",
+            "--method",
+            "POST",
+            f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/comments/{reply.thread_id}/replies",
+            "-f",
+            f"body={body}",
+        ]
+
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=str(repo_root),
+            )
+            if result.returncode != 0:
+                _log.warning(
+                    "post_comment_replies: gh api failed for thread %s (exit %d): %s",
+                    reply.thread_id,
+                    result.returncode,
+                    result.stderr.strip(),
+                )
+                results.append((reply.thread_id, False))
+            else:
+                _log.info(
+                    "post_comment_replies: posted reply to thread %s", reply.thread_id
+                )
+                results.append((reply.thread_id, True))
+        except Exception as exc:
+            _log.warning(
+                "post_comment_replies: exception posting reply to thread %s: %s",
+                reply.thread_id,
+                exc,
+            )
+            results.append((reply.thread_id, False))
+
+    return results
 
 
 def _resolve_commit_timestamp(commit: str) -> str:
