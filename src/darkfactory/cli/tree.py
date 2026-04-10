@@ -12,7 +12,7 @@ from darkfactory.style import Element, Styler
 
 
 def _format_tree_node(prd: PRD, styler: Styler) -> str:
-    """Return a styled inline descriptor for a tree node: ``[kind/status]  title``."""
+    """Return a styled inline descriptor for a tree node: ``id  [kind/status/priority]  title``."""
     kind_elem = styler.kind_element(prd.kind)
     kind_icon = styler.icon(prd.kind)
     status_icon = styler.icon(prd.status)
