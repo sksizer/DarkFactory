@@ -142,12 +142,6 @@ def cmd_tree(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_orphans(args: argparse.Namespace) -> int:
-    prds = _load(args.prd_dir)
-    rs = containment.roots(prds)
-    for prd in rs:
-        print(f"{prd.id:14} [{prd.kind}/{prd.status}]  {prd.title}")
-    return 0
 
 
 def cmd_undecomposed(args: argparse.Namespace) -> int:
