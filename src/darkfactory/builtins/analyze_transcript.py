@@ -29,6 +29,7 @@ from darkfactory.builtins.analyze_transcript_detectors import (
     DETECTORS,
     Finding,
 )
+from darkfactory.utils.secrets import redact
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -44,14 +45,26 @@ _SEVERITY_ORDER: dict[str, int] = {"info": 0, "warning": 1, "error": 2}
 
 
 def _load_analysis_config(repo_root: Path) -> dict[str, str]:
-    """Return the ``[analysis]`` section from ``.darkfactory/config.toml``."""
+    """Return analysis config from ``.darkfactory/config.toml``.
+
+    Reads from ``[workflow.analysis]`` section. Falls back to ``[analysis]``
+    for backwards compatibility.
+
+    Config keys:
+        commit          -- "true" to stage analysis files for commit (default: false)
+        min_severity    -- minimum severity to trigger Stage 2 LLM (default: "warning")
+        model_default   -- model for warning-severity runs (default: "haiku")
+        model_severe    -- model for error-severity runs (default: "sonnet")
+    """
     config_path = repo_root / ".darkfactory" / "config.toml"
     if not config_path.exists():
         return {}
     try:
         with open(config_path, "rb") as fh:
             data = tomllib.load(fh)
-        cfg = data.get("analysis", {})
+        # Prefer [workflow.analysis], fall back to [analysis]
+        workflow_cfg = data.get("workflow", {})
+        cfg = workflow_cfg.get("analysis", data.get("analysis", {}))
         return {str(k): str(v) for k, v in cfg.items()}
     except Exception as exc:
         _log.warning("analyze_transcript: failed to read config: %s", exc)
@@ -309,6 +322,16 @@ def analyze_transcript(ctx: ExecutionContext) -> None:
         )
 
     file_content = "\n".join(body_parts) + "\n"
+
+    # --- Secrets filtering (always on) ---
+    redaction = redact(file_content)
+    if redaction.redaction_count > 0:
+        ctx.logger.info(
+            "analyze_transcript: redacted %d secret(s) (%s)",
+            redaction.redaction_count,
+            ", ".join(redaction.patterns_matched),
+        )
+        file_content = redaction.text
 
     # --- Write and stage analysis file ---
     transcript_dir = ctx.cwd / ".darkfactory" / "transcripts"
