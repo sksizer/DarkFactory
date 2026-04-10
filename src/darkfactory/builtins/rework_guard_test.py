@@ -70,7 +70,9 @@ def test_with_changes_resets_counter(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
     status_result = MagicMock()
     status_result.stdout = " M file.py\n"
-    with patch("darkfactory.builtins.rework_guard.subprocess.run", return_value=status_result):
+    with patch(
+        "darkfactory.builtins.rework_guard.subprocess.run", return_value=status_result
+    ):
         check_rework_guard(ctx)  # should not raise
 
     fresh_guard = ReworkGuard(tmp_path)
@@ -81,7 +83,9 @@ def test_with_changes_logs_info(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
     status_result = MagicMock()
     status_result.stdout = " M file.py\n"
-    with patch("darkfactory.builtins.rework_guard.subprocess.run", return_value=status_result):
+    with patch(
+        "darkfactory.builtins.rework_guard.subprocess.run", return_value=status_result
+    ):
         check_rework_guard(ctx)
     ctx.logger.info.assert_called()
 
@@ -93,7 +97,9 @@ def test_no_changes_below_threshold_does_not_raise(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
     status_result = MagicMock()
     status_result.stdout = ""
-    with patch("darkfactory.builtins.rework_guard.subprocess.run", return_value=status_result):
+    with patch(
+        "darkfactory.builtins.rework_guard.subprocess.run", return_value=status_result
+    ):
         check_rework_guard(ctx)  # should not raise — first no-change (below N=2)
 
 
@@ -101,7 +107,9 @@ def test_no_changes_increments_counter(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
     status_result = MagicMock()
     status_result.stdout = ""
-    with patch("darkfactory.builtins.rework_guard.subprocess.run", return_value=status_result):
+    with patch(
+        "darkfactory.builtins.rework_guard.subprocess.run", return_value=status_result
+    ):
         check_rework_guard(ctx)
 
     guard = ReworkGuard(tmp_path)
@@ -119,7 +127,9 @@ def test_no_changes_at_threshold_raises(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
     status_result = MagicMock()
     status_result.stdout = ""
-    with patch("darkfactory.builtins.rework_guard.subprocess.run", return_value=status_result):
+    with patch(
+        "darkfactory.builtins.rework_guard.subprocess.run", return_value=status_result
+    ):
         with pytest.raises(RuntimeError, match="REWORK LOOP BLOCKED"):
             check_rework_guard(ctx)
 
@@ -131,7 +141,9 @@ def test_blocked_error_message_contains_prd_id(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, prd_id="PRD-042")
     status_result = MagicMock()
     status_result.stdout = ""
-    with patch("darkfactory.builtins.rework_guard.subprocess.run", return_value=status_result):
+    with patch(
+        "darkfactory.builtins.rework_guard.subprocess.run", return_value=status_result
+    ):
         with pytest.raises(RuntimeError, match="PRD-042"):
             check_rework_guard(ctx)
 
@@ -144,7 +156,9 @@ def test_event_writer_called_with_changes(tmp_path: Path) -> None:
     ctx.event_writer = MagicMock()
     status_result = MagicMock()
     status_result.stdout = " M file.py\n"
-    with patch("darkfactory.builtins.rework_guard.subprocess.run", return_value=status_result):
+    with patch(
+        "darkfactory.builtins.rework_guard.subprocess.run", return_value=status_result
+    ):
         check_rework_guard(ctx)
     ctx.event_writer.emit.assert_called_once()
     call_kwargs = ctx.event_writer.emit.call_args
@@ -157,7 +171,9 @@ def test_event_writer_called_without_changes(tmp_path: Path) -> None:
     ctx.event_writer = MagicMock()
     status_result = MagicMock()
     status_result.stdout = ""
-    with patch("darkfactory.builtins.rework_guard.subprocess.run", return_value=status_result):
+    with patch(
+        "darkfactory.builtins.rework_guard.subprocess.run", return_value=status_result
+    ):
         check_rework_guard(ctx)
     ctx.event_writer.emit.assert_called_once()
     call_kwargs = ctx.event_writer.emit.call_args

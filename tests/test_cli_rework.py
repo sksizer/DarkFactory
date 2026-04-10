@@ -174,8 +174,13 @@ def test_rework_execute_with_comments_invokes_workflow(
         patch("darkfactory.cli.rework.find_worktree", return_value=fake_worktree),
         patch("darkfactory.cli.rework.find_open_pr", return_value=42),
         patch("darkfactory.cli.rework.fetch_pr_comments", return_value=[thread]),
-        patch("darkfactory.cli.rework.load_workflows", return_value={"rework": fake_rework_wf}),
-        patch("darkfactory.cli.rework.run_workflow", return_value=RunResult(success=True)) as mock_run,
+        patch(
+            "darkfactory.cli.rework.load_workflows",
+            return_value={"rework": fake_rework_wf},
+        ),
+        patch(
+            "darkfactory.cli.rework.run_workflow", return_value=RunResult(success=True)
+        ) as mock_run,
     ):
         result = main([*_base_args(prds_dir), "PRD-001", "--execute"])
 
