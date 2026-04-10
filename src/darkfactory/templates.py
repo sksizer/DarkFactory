@@ -151,6 +151,11 @@ def compose_prompt(
             else ""
         ),
     }
+    review_threads = getattr(execution_context, "review_threads", None)
+    if review_threads is not None:
+        from .rework_prompt import render_rework_feedback
+
+        context["REWORK_FEEDBACK"] = render_rework_feedback(review_threads)
     if extras:
         context.update(extras)
 

@@ -46,6 +46,7 @@ from darkfactory.builtins.commit_events import commit_events
 from darkfactory.builtins.commit_transcript import commit_transcript
 from darkfactory.builtins.create_pr import create_pr
 from darkfactory.builtins.ensure_worktree import ensure_worktree
+from darkfactory.builtins.fetch_pr_comments import fetch_pr_comments
 from darkfactory.builtins.lint_attribution import lint_attribution
 from darkfactory.builtins.push_branch import push_branch
 from darkfactory.builtins.set_status import set_status
@@ -65,6 +66,7 @@ __all__ = [
     "commit_events",
     "commit_transcript",
     "create_pr",
+    "fetch_pr_comments",
     "lint_attribution",
     "cleanup_worktree",
     "analyze_transcript",
