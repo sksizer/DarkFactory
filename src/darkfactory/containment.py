@@ -8,17 +8,19 @@ the dependency DAG (``depends_on``/``blocks``).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from .prd import PRD, parse_id_sort_key
 
 
-def children(prd_id: str, prds: dict[str, PRD]) -> list[PRD]:
+def children(prd_id: str, prds: Mapping[str, PRD]) -> list[PRD]:
     """Direct children of ``prd_id`` (PRDs whose ``parent`` matches), naturally sorted."""
     matched = [p for p in prds.values() if p.parent == prd_id]
     matched.sort(key=lambda p: parse_id_sort_key(p.id))
     return matched
 
 
-def descendants(prd_id: str, prds: dict[str, PRD]) -> list[PRD]:
+def descendants(prd_id: str, prds: Mapping[str, PRD]) -> list[PRD]:
     """All transitive children, BFS order."""
     out: list[PRD] = []
     queue = children(prd_id, prds)
@@ -29,7 +31,7 @@ def descendants(prd_id: str, prds: dict[str, PRD]) -> list[PRD]:
     return out
 
 
-def ancestors(prd_id: str, prds: dict[str, PRD]) -> list[PRD]:
+def ancestors(prd_id: str, prds: Mapping[str, PRD]) -> list[PRD]:
     """Walk up the parent chain. Returns parents in order from immediate to root."""
     out: list[PRD] = []
     seen: set[str] = set()
@@ -44,19 +46,19 @@ def ancestors(prd_id: str, prds: dict[str, PRD]) -> list[PRD]:
     return out
 
 
-def roots(prds: dict[str, PRD]) -> list[PRD]:
+def roots(prds: Mapping[str, PRD]) -> list[PRD]:
     """Top-level PRDs (no parent), naturally sorted."""
     rs = [p for p in prds.values() if p.parent is None]
     rs.sort(key=lambda p: parse_id_sort_key(p.id))
     return rs
 
 
-def is_leaf(prd: PRD, prds: dict[str, PRD]) -> bool:
+def is_leaf(prd: PRD, prds: Mapping[str, PRD]) -> bool:
     """True if ``prd`` has no children."""
     return not children(prd.id, prds)
 
 
-def is_fully_decomposed(prd: PRD, prds: dict[str, PRD]) -> bool:
+def is_fully_decomposed(prd: PRD, prds: Mapping[str, PRD]) -> bool:
     """True if ``prd`` has at least one ``task``-kind descendant.
 
     An epic or feature with no task descendants is considered not yet
@@ -65,7 +67,7 @@ def is_fully_decomposed(prd: PRD, prds: dict[str, PRD]) -> bool:
     return any(d.kind == "task" for d in descendants(prd.id, prds))
 
 
-def is_runnable(prd: PRD, prds: dict[str, PRD]) -> bool:
+def is_runnable(prd: PRD, prds: Mapping[str, PRD]) -> bool:
     """True if ``prd`` can be executed by an implementation workflow.
 
     A PRD is runnable when it is itself a task OR a leaf in the containment
