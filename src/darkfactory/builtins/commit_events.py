@@ -34,7 +34,9 @@ def commit_events(ctx: ExecutionContext) -> None:
         workflow_cfg = config.get("workflow", {})
         events_config = workflow_cfg.get("events", config.get("events", {}))
         if not events_config.get("commit", False):
-            ctx.logger.info("commit_events: disabled (workflow.events.commit != true); skipping")
+            ctx.logger.info(
+                "commit_events: disabled (workflow.events.commit != true); skipping"
+            )
             return
     else:
         ctx.logger.info("commit_events: no config.toml found; skipping (default off)")

@@ -146,9 +146,7 @@ def _make_transcript_file(tmp_path: Path) -> Path:
     path = td / "PRD-559-2026-01-01T00-00-00.jsonl"
     ok_event = {
         "type": "assistant",
-        "message": {
-            "content": [{"type": "text", "text": "PRD_EXECUTE_OK: PRD-559"}]
-        },
+        "message": {"content": [{"type": "text", "text": "PRD_EXECUTE_OK: PRD-559"}]},
     }
     content = json.dumps(ok_event) + "\n"
     path.write_text(content)
@@ -397,7 +395,9 @@ def test_llm_failure_does_not_fail_workflow(tmp_path: Path) -> None:
     td.mkdir(parents=True)
     path = td / "PRD-559-2026-01-01T00-00-00.jsonl"
     # No sentinel OK -> sentinel_failure = error -> LLM fires
-    content = '{"type":"assistant","message":{"content":[{"type":"text","text":"done"}]}}\n'
+    content = (
+        '{"type":"assistant","message":{"content":[{"type":"text","text":"done"}]}}\n'
+    )
     path.write_text(content)
     ctx = _make_ctx(tmp_path)
 

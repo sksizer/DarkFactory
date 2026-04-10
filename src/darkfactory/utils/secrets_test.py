@@ -24,7 +24,7 @@ def test_scan_finds_private_key_header() -> None:
 
 
 def test_scan_finds_bearer_token() -> None:
-    text = 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig'
+    text = "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig"
     hits = scan(text)
     assert any(name == "bearer_token" for name, _ in hits)
 
