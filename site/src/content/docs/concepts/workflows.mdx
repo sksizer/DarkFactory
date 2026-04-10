@@ -159,7 +159,7 @@ Workflow(
     name="default",
     description="Standard implementation workflow",
     applies_to=["task", "component"],   # PRD kinds this workflow handles
-    priority=0,                          # lower = higher priority when multiple match
+    priority=0,                          # higher = higher priority when multiple match
     tasks=[...],                         # ordered list of Task objects
     workflow_dir=Path(".darkfactory/workflows/default/"),
     template_name="implement",
