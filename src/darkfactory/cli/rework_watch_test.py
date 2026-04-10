@@ -105,9 +105,7 @@ def test_is_rate_limited_true_at_cap() -> None:
 def test_is_rate_limited_ignores_old_timestamps() -> None:
     now = time.time()
     # All 3 timestamps are older than 1 hour
-    pr_state = PRWatchState(
-        rework_timestamps=[now - 4000, now - 5000, now - 6000]
-    )
+    pr_state = PRWatchState(rework_timestamps=[now - 4000, now - 5000, now - 6000])
     assert not is_rate_limited(pr_state, max_per_hour=3, now=now)
 
 
@@ -144,10 +142,7 @@ def test_worktree_exists_returns_true(tmp_path: Path) -> None:
 
 def test_worktree_exists_returns_false_when_not_found(tmp_path: Path) -> None:
     porcelain_output = (
-        "worktree /some/path\n"
-        "HEAD abc123\n"
-        "branch refs/heads/prd/PRD-999-other\n"
-        "\n"
+        "worktree /some/path\nHEAD abc123\nbranch refs/heads/prd/PRD-999-other\n\n"
     )
     with patch("subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0, stdout=porcelain_output)
@@ -262,7 +257,9 @@ def test_cmd_resume_removes_file(tmp_path: Path) -> None:
     assert not pf.exists()
 
 
-def test_cmd_resume_noop_when_not_paused(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_cmd_resume_noop_when_not_paused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     rc = _cmd_resume(tmp_path)
     assert rc == 0
     out = capsys.readouterr().out
@@ -272,14 +269,18 @@ def test_cmd_resume_noop_when_not_paused(tmp_path: Path, capsys: pytest.CaptureF
 # ── Status / stop ─────────────────────────────────────────────────────────────
 
 
-def test_cmd_status_no_pid_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_cmd_status_no_pid_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     rc = _cmd_status(tmp_path)
     assert rc == 0
     out = capsys.readouterr().out
     assert "not running" in out
 
 
-def test_cmd_status_alive_process(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_cmd_status_alive_process(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     pid_file = tmp_path / ".darkfactory" / "state" / "rework-watch.pid"
     pid_file.parent.mkdir(parents=True)
     pid_file.write_text(str(os.getpid()))  # current PID is always alive
@@ -382,7 +383,9 @@ def test_poll_loop_triggers_rework_on_new_comments(tmp_path: Path) -> None:
             return_value=(True, {"new-id"}),
         ),
         patch("darkfactory.cli.rework_watch._prd_is_locked", return_value=False),
-        patch("darkfactory.cli.rework_watch._trigger_rework", return_value=0) as mock_trigger,
+        patch(
+            "darkfactory.cli.rework_watch._trigger_rework", return_value=0
+        ) as mock_trigger,
         patch("darkfactory.cli.rework_watch.time") as mock_time,
     ):
         mock_time.time.return_value = 1000.0
@@ -417,9 +420,7 @@ def test_poll_loop_skips_rework_when_rate_limited(tmp_path: Path) -> None:
             "darkfactory.cli.rework_watch.is_rate_limited",
             return_value=True,
         ),
-        patch(
-            "darkfactory.cli.rework_watch._trigger_rework"
-        ) as mock_trigger,
+        patch("darkfactory.cli.rework_watch._trigger_rework") as mock_trigger,
         patch("darkfactory.cli.rework_watch.time") as mock_time,
     ):
         mock_time.time.return_value = now
