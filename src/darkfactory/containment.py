@@ -67,6 +67,24 @@ def is_fully_decomposed(prd: PRD, prds: Mapping[str, PRD]) -> bool:
     return any(d.kind == "task" for d in descendants(prd.id, prds))
 
 
+def is_partially_decomposed(prd: PRD, prds: Mapping[str, PRD]) -> bool:
+    """True if the PRD has at least one task descendant but is not marked complete.
+
+    Heuristic: True if has task descendants AND the parent has not
+    been explicitly marked complete via a frontmatter flag
+    ``decomposition: complete``. False if the flag is set OR if there
+    are zero task descendants (initial planning's territory).
+    """
+    descendants_list = descendants(prd.id, prds)
+    has_tasks = any(d.kind == "task" for d in descendants_list)
+    if not has_tasks:
+        return False  # zero children — initial planning handles this
+    fm = prd.raw_frontmatter or {}
+    if fm.get("decomposition") == "complete":
+        return False  # explicitly marked complete by author
+    return True
+
+
 def is_runnable(prd: PRD, prds: Mapping[str, PRD]) -> bool:
     """True if ``prd`` can be executed by an implementation workflow.
 
