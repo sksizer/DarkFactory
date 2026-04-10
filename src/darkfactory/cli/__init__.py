@@ -84,13 +84,6 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-    return 0
-
-
-
-
-
-
 def cmd_undecomposed(args: argparse.Namespace) -> int:
     prds = _load(args.prd_dir)
     candidates = [
