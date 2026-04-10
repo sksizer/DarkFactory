@@ -2,7 +2,7 @@
 id: PRD-606
 title: Allow task workflow agents to run git commit
 kind: task
-status: review
+status: in-progress
 priority: high
 effort: s
 capability: simple
