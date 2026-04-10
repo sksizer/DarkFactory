@@ -1,0 +1,49 @@
+---
+title: "prd validate"
+description: "Check for cycles, missing dependencies, orphan references, and schema errors"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd validate [flags]
+```
+
+## Description
+
+Performs structural integrity checks on the PRD graph. Detects dependency cycles, references to non-existent PRDs, orphaned parent references, and frontmatter schema violations.
+
+Validation runs automatically as part of `prd run` and `prd plan`. Invoke directly in CI pipelines or pre-commit hooks.
+
+## Examples
+
+```bash frame="terminal" title="Validate with errors"
+$ prd validate
+Checking 47 PRDs...
+ERROR: Cycle detected: PRD-12 -> PRD-15 -> PRD-12
+WARNING: PRD-33 depends on PRD-99 which does not exist
+WARNING: PRD-41 references parent PRD-999 which does not exist
+
+2 errors, 2 warnings
+```
+
+```bash frame="terminal" title="Clean validation"
+$ prd validate
+Checking 47 PRDs...
+All checks passed.
+```
+
+```bash frame="terminal" title="CI usage"
+$ prd validate --json || exit 1
+```
+
+## Behavior
+
+- Exit code `0` if all checks pass. Exit code `1` if any errors found.
+- Checks performed: cycle detection, missing dependency references, orphan parent references, frontmatter schema validation.
+- Warnings (e.g. missing deps) do not cause a non-zero exit by themselves unless they are errors.
+
+## Related
+
+- [`prd status`](/reference/cli/status/) -- Quick overview including validation warnings
+- [`prd normalize`](/reference/cli/normalize/) -- Fix formatting issues in frontmatter

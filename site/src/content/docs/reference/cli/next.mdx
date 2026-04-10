@@ -1,0 +1,45 @@
+---
+title: "prd next"
+description: "List actionable PRDs that are ready to work on"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd next [flags]
+```
+
+## Description
+
+Identifies PRDs with status `ready` whose dependencies are all satisfied. These are candidates for immediate execution. Use `--capability` to filter by implementation complexity and `--limit` to cap results.
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--limit` | | Maximum number of results |
+| `--capability` | | Filter by capability: `trivial`, `simple`, `moderate`, `complex` (comma-separated) |
+
+## Examples
+
+```bash frame="terminal" title="List next actionable PRDs"
+$ prd next --limit 5
+1. PRD-16 [task] (high)   Prometheus exporter         capability:moderate
+2. PRD-22 [task] (high)   Fix auth token refresh      capability:simple
+3. PRD-31 [bug]  (medium) Stale worktree on cleanup   capability:trivial
+4. PRD-28 [task] (medium) Add --dry-run to reconcile  capability:simple
+5. PRD-34 [task] (medium) Evaluate DAG visualizer     capability:moderate
+```
+
+```bash frame="terminal" title="Filter by capability"
+$ prd next --capability trivial,simple
+1. PRD-22 [task] (high)   Fix auth token refresh      capability:simple
+2. PRD-31 [bug]  (medium) Stale worktree on cleanup   capability:trivial
+3. PRD-28 [task] (medium) Add --dry-run to reconcile  capability:simple
+```
+
+## Related
+
+- [`prd status`](/reference/cli/status/) -- Broader overview including non-actionable PRDs
+- [`prd run`](/reference/cli/run/) -- Execute actionable PRDs
+- [`prd run --all`](/reference/cli/run/) -- Drain the ready queue automatically

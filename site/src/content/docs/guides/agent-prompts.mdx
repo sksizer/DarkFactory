@@ -1,0 +1,171 @@
+---
+title: "Agent Prompts"
+description: "How to write prompt files for AgentTasks, including placeholder substitution, tool allowlists, and sentinel contracts."
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+AgentTasks delegate implementation work to an AI coding agent. Each AgentTask references a prompt file -- a Markdown document that tells the agent what to do, what context it has, and what constraints to follow. Well-crafted prompts are the difference between a one-shot implementation and an expensive cycle of rework.
+
+## Prompt File Location
+
+Prompt files are relative to the workflow directory's `prompts/` subdirectory:
+
+```
+.darkfactory/workflows/
+  frontend/
+    workflow.py
+    prompts/
+      implement.md      ← referenced as "implement.md"
+      verify.md         ← referenced as "verify.md"
+```
+
+When an `AgentTask` specifies `prompt_file="implement.md"`, the harness resolves it to `<workflow_dir>/prompts/implement.md`.
+
+## Placeholder Substitution
+
+The harness replaces `\{{PLACEHOLDER}}` tokens with values drawn from the PRD and execution context before sending the prompt to the agent.
+
+### Built-in Placeholders
+
+| Placeholder | Source | Description |
+|-------------|--------|-------------|
+| `\{{PRD_ID}}` | Frontmatter | The PRD identifier, e.g. `PRD-227` |
+| `\{{PRD_TITLE}}` | Frontmatter | The PRD title |
+| `\{{PRD_PATH}}` | Runtime | Absolute path to the PRD file |
+| `\{{PRD_BODY}}` | Body | Full Markdown body of the PRD (below frontmatter) |
+| `\{{CHECK_OUTPUT}}` | Runtime | Output from the preceding failed ShellTask (only populated during `retry_agent` flows) |
+
+### Example Prompt
+
+```text
+# Task: Implement \{{PRD_TITLE}}
+
+You are implementing \{{PRD_ID}}. The full specification is below.
+
+## PRD Specification
+\{{PRD_BODY}}
+
+## Constraints
+- Only modify files listed in the PRD impacts section
+- Ensure all existing tests continue to pass
+- Follow the project's existing code style and naming conventions
+
+## When Complete
+Print the sentinel: PRD_EXECUTE_OK
+If you cannot complete the work, print: PRD_EXECUTE_FAILED
+```
+
+## Tool Allowlists
+
+Each `AgentTask` can restrict which tools the agent may use. The allowlist is a list of strings that support glob-style patterns for `Bash` subcommands.
+
+```python
+AgentTask(
+    name="implement",
+    prompt_file="implement.md",
+    allowed_tools=[
+        "Read",
+        "Edit",
+        "Write",
+        "Glob",
+        "Grep",
+        "Bash(cargo:*)",     # Allow any cargo subcommand
+        "Bash(pytest:*)",    # Allow any pytest invocation
+    ],
+)
+```
+
+<Aside type="caution">
+The tool allowlist is enforced by the harness, not by the agent itself. An agent cannot bypass the allowlist. Omitting destructive tools like `Bash(git push:*)` or `Bash(rm -rf:*)` from the list prevents the agent from performing those operations entirely.
+</Aside>
+
+### Common Allowlist Patterns
+
+<Tabs>
+<TabItem label="Python Project">
+```python
+allowed_tools=[
+    "Read", "Edit", "Write", "Glob", "Grep",
+    "Bash(python:*)",
+    "Bash(pytest:*)",
+    "Bash(pip:*)",
+    "Bash(mypy:*)",
+    "Bash(ruff:*)",
+]
+```
+</TabItem>
+<TabItem label="Rust Project">
+```python
+allowed_tools=[
+    "Read", "Edit", "Write", "Glob", "Grep",
+    "Bash(cargo:*)",
+    "Bash(rustfmt:*)",
+]
+```
+</TabItem>
+<TabItem label="Node.js Project">
+```python
+allowed_tools=[
+    "Read", "Edit", "Write", "Glob", "Grep",
+    "Bash(npm:*)",
+    "Bash(npx:*)",
+    "Bash(node:*)",
+]
+```
+</TabItem>
+</Tabs>
+
+## Sentinel Contract
+
+The harness determines whether an agent task succeeded by scanning the agent's output for sentinel strings:
+
+| Sentinel | Meaning |
+|----------|---------|
+| `PRD_EXECUTE_OK` | Agent completed the task successfully |
+| `PRD_EXECUTE_FAILED` | Agent could not complete the task |
+
+The sentinel must appear as a standalone line in the agent's output. If neither sentinel is found, the harness treats the task as failed.
+
+```markdown
+## When You Are Done
+After making all changes and verifying they work:
+- If everything is complete, print exactly: PRD_EXECUTE_OK
+- If you hit a blocker you cannot resolve, print: PRD_EXECUTE_FAILED
+  followed by a description of the blocker on the next line.
+```
+
+<Aside type="tip">
+Always include sentinel instructions at the end of your prompt. Without them, the harness cannot distinguish a successful agent run from one that silently failed or ran out of context.
+</Aside>
+
+## Verify Prompts and `\{{CHECK_OUTPUT}}`
+
+When a ShellTask with `on_failure="retry_agent"` fails, the harness re-invokes the previous AgentTask using **verify prompts** instead of the original prompt. Verify prompts receive the `\{{CHECK_OUTPUT}}` placeholder populated with the shell command's stderr/stdout.
+
+```text
+# Fix Verification Failure for \{{PRD_TITLE}}
+
+The previous implementation attempt for \{{PRD_ID}} failed verification.
+
+## Failure Output
+\{{CHECK_OUTPUT}}
+
+## Instructions
+Analyze the failure output above and fix the issues.
+Do not start from scratch -- modify the existing implementation.
+
+When fixed, print: PRD_EXECUTE_OK
+```
+
+Place verify prompts alongside implementation prompts in your `prompts/` directory and reference them in the AgentTask:
+
+```python
+AgentTask(
+    name="implement",
+    prompt_file="implement.md",
+    verify_prompts=["fix-verification.md"],
+)
+```
+
+The harness sends the verify prompt, waits for the agent to apply fixes, then re-runs the failed ShellTask exactly once. If it fails again, the workflow aborts.

@@ -1,0 +1,49 @@
+---
+title: "prd tree"
+description: "Display the containment tree of PRDs"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd tree [PRD-ID]
+```
+
+## Description
+
+Renders the parent-child containment hierarchy as an indented tree. Each node shows the PRD's ID, kind, status, and title.
+
+When called with a PRD ID, the tree is rooted at that node. Without an argument, the full forest of all root-level PRDs is displayed.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `PRD-ID` | No | Root the tree at this PRD. Omit for full forest. |
+
+## Examples
+
+```bash frame="terminal" title="Subtree rooted at a specific PRD"
+$ prd tree PRD-10
+PRD-10 [epic] (in-progress) Platform Observability
+  PRD-11 [feature] (done) Structured Logging
+    PRD-14 [task] (done) Add log correlation IDs
+    PRD-15 [task] (done) JSON log formatter
+  PRD-12 [feature] (ready) Metrics Dashboard
+    PRD-16 [task] (draft) Prometheus exporter
+    PRD-17 [task] (draft) Grafana templates
+```
+
+```bash frame="terminal" title="Full forest"
+$ prd tree
+PRD-10 [epic] (in-progress) Platform Observability
+  PRD-11 [feature] (done) Structured Logging
+  PRD-12 [feature] (ready) Metrics Dashboard
+PRD-20 [epic] (draft) Auth Overhaul
+  PRD-21 [feature] (draft) OAuth2 provider
+```
+
+## Related
+
+- [`prd children`](/reference/cli/children/) -- List direct children only (no subtree)
+- [`prd orphans`](/reference/cli/orphans/) -- Find PRDs missing from the tree

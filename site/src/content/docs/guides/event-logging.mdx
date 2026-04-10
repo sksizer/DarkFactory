@@ -1,0 +1,153 @@
+---
+title: "Event Logging"
+description: "How DarkFactory records execution events as JSONL files for debugging and post-mortem analysis."
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+Every time DarkFactory executes a task, it emits structured events to a JSONL (JSON Lines) log file. These logs are the definitive record of what happened during a run -- which tasks ran, what they produced, how long they took, and whether they succeeded.
+
+## Log File Location
+
+Event logs are written to `.darkfactory/events/` as per-PRD JSONL files. The `EventWriter` class creates one file per PRD per execution session:
+
+```
+.darkfactory/events/
+  PRD-042_session-abc123.jsonl
+  PRD-045_session-abc123.jsonl
+  PRD-048_session-def456.jsonl
+```
+
+This directory is git-ignored. Event files are runtime artifacts, not tracked in version control.
+
+## Event Types
+
+Each line in a JSONL file is a self-contained JSON object. The `EventWriter` class emits five event types:
+
+| Event | When | Key Fields |
+|-------|------|-----------|
+| `workflow_start` | Workflow begins for a PRD | `prd_id`, `workflow_name`, `session_id` |
+| `task_start` | Individual task begins | `prd_id`, `task_name`, `task_type` |
+| `task_finish` | Individual task completes | `prd_id`, `task_name`, `exit_code`, `duration_s` |
+| `shell_output` | ShellTask produces stdout/stderr | `prd_id`, `task_name`, `stream`, `content` |
+| `workflow_finish` | Workflow completes for a PRD | `prd_id`, `workflow_name`, `status`, `duration_s` |
+
+## Event Schema
+
+Every event shares a common base:
+
+```json
+{
+  "ts": "2026-04-09T14:32:01.847Z",
+  "session_id": "abc123",
+  "event": "task_start",
+  "prd_id": "PRD-042",
+  "task_name": "implement",
+  "task_type": "agent"
+}
+```
+
+Task completion events add outcome fields:
+
+```json
+{
+  "ts": "2026-04-09T14:33:47.203Z",
+  "session_id": "abc123",
+  "event": "task_finish",
+  "prd_id": "PRD-042",
+  "task_name": "implement",
+  "task_type": "agent",
+  "exit_code": 0,
+  "duration_s": 106,
+  "sentinel": "PRD_EXECUTE_OK"
+}
+```
+
+Failed tasks include failure details:
+
+```json
+{
+  "ts": "2026-04-09T14:34:12.891Z",
+  "session_id": "abc123",
+  "event": "task_finish",
+  "prd_id": "PRD-042",
+  "task_name": "test",
+  "task_type": "shell",
+  "exit_code": 1,
+  "duration_s": 24,
+  "stderr": "FAILED tests/test_api.py::test_create - AssertionError"
+}
+```
+
+## Session IDs
+
+A session ID is generated at the start of each `prd execute` invocation. All events within that run -- across multiple PRDs in a DAG execution -- share the same session ID. This makes it straightforward to correlate events across PRDs that were processed in the same batch.
+
+```bash frame="terminal" title="Find all events for a session"
+cat .darkfactory/events/*.jsonl | jq 'select(.session_id == "abc123")'
+```
+
+## Post-Mortem Analysis
+
+JSONL files are designed for streaming analysis with `jq`.
+
+### Find All Failed Tasks
+
+```bash frame="terminal" title="Show failures"
+cat .darkfactory/events/*.jsonl | jq 'select(.event == "task_finish" and .exit_code != 0)'
+```
+
+### Execution Time per PRD
+
+```bash frame="terminal" title="Duration by PRD"
+cat .darkfactory/events/*.jsonl | jq -s '
+  map(select(.event == "workflow_finish"))
+  | sort_by(.duration_s) | reverse
+  | .[] | {prd_id, duration_s, status}
+'
+```
+
+### Slowest Tasks Across All Sessions
+
+```bash frame="terminal" title="Top 5 slowest tasks"
+cat .darkfactory/events/*.jsonl | jq -s '
+  map(select(.event == "task_finish"))
+  | sort_by(.duration_s) | reverse
+  | .[:5] | .[] | {prd_id, task_name, duration_s}
+'
+```
+
+### Retry Frequency
+
+```bash frame="terminal" title="Count retry_agent invocations"
+cat .darkfactory/events/*.jsonl | jq -s '
+  map(select(.event == "task_start" and .task_name == "implement" and .is_retry))
+  | length
+'
+```
+
+<Aside type="tip">
+Pipe event logs into dashboards or alerting systems by tailing the JSONL file during execution: `tail -f .darkfactory/events/*.jsonl | jq --unbuffered '.event'`.
+</Aside>
+
+## The EventWriter Class
+
+Internally, the `EventWriter` class manages file handles and ensures atomic writes. Key behaviors:
+
+- Events are flushed to disk after every write (no buffering)
+- File handles are opened lazily on first event for each PRD
+- The writer is safe for sequential access but not thread-safe (DAG execution is sequential)
+- Shell output events are capped at 10KB per write to prevent log explosion from verbose commands
+
+```python
+# Internal usage (you don't call this directly)
+writer = EventWriter(session_id="abc123", events_dir=".darkfactory/events/")
+writer.emit("task_start", prd_id="PRD-042", task_name="implement", task_type="agent")
+# ... task runs ...
+writer.emit("task_finish", prd_id="PRD-042", task_name="implement", exit_code=0, duration_s=106)
+writer.close()
+```
+
+<Aside type="caution">
+Event files can grow large for long-running DAG executions. The harness does not automatically rotate or prune event files. Consider adding a cleanup step to your CI pipeline that archives or deletes old event files.
+</Aside>

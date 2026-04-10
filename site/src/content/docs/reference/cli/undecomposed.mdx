@@ -1,0 +1,38 @@
+---
+title: "prd undecomposed"
+description: "List epics and features lacking task children"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd undecomposed
+```
+
+## Description
+
+Finds epics and features that have no child PRDs. These are high-level requirements that haven't been broken down into actionable work items. A feature without children cannot be directly executed by a workflow -- it must be decomposed first.
+
+Candidates for the planning/decomposition workflow.
+
+## Examples
+
+```bash frame="terminal" title="Find undecomposed PRDs"
+$ prd undecomposed
+Undecomposed PRDs (no children):
+  PRD-12  [feature] (ready)   Metrics Dashboard
+  PRD-25  [epic]    (draft)   Mobile Support
+
+2 PRDs need decomposition
+```
+
+## Behavior
+
+- Only reports PRDs of kind `epic` or `feature`. Tasks are leaf nodes by design.
+- Use `prd system run decompose --target PRD-ID` to break these down into tasks.
+
+## Related
+
+- [`prd orphans`](/reference/cli/orphans/) -- The inverse: PRDs missing parents
+- [`prd tree`](/reference/cli/tree/) -- Visualize the hierarchy
+- [`prd system`](/reference/cli/system/) -- Run the decompose operation

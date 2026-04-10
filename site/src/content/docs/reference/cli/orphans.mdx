@@ -1,0 +1,38 @@
+---
+title: "prd orphans"
+description: "List top-level PRDs with no parent"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd orphans
+```
+
+## Description
+
+Identifies PRDs that have no parent in the containment hierarchy. Top-level epics are expected to be parentless. Tasks and features without parents indicate incomplete decomposition or forgotten linkage.
+
+## Examples
+
+```bash frame="terminal" title="Find orphaned PRDs"
+$ prd orphans
+Orphaned PRDs (no parent):
+  PRD-10  [epic]    Platform Observability
+  PRD-20  [epic]    Auth Overhaul
+  PRD-33  [task]    Fix login redirect
+  PRD-41  [feature] Dark mode support
+
+4 orphaned PRDs
+```
+
+## Behavior
+
+- Top-level epics are expected orphans. The output lists all parentless PRDs regardless of kind.
+- Most useful for finding tasks and features that should be nested under a parent.
+
+## Related
+
+- [`prd tree`](/reference/cli/tree/) -- Visualize the full containment hierarchy
+- [`prd undecomposed`](/reference/cli/undecomposed/) -- Find parents lacking children (the inverse problem)
+- [`prd children`](/reference/cli/children/) -- Check children of a specific PRD

@@ -1,0 +1,152 @@
+---
+title: "Project Layout"
+description: "Reference for the .darkfactory/ directory structure and git tracking status."
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+DarkFactory stores all configuration, PRDs, workflows, operations, and runtime artifacts in a `.darkfactory/` directory at the root of your repository. This page documents every file and subdirectory, including what is tracked in git and what is generated at runtime.
+
+## Directory Structure
+
+```
+.darkfactory/
+  config.toml                          # Project configuration
+  prds/                                # PRD documents
+    PRD-001-auth-refactor.md
+    PRD-002-add-logging.md
+    PRD-010-epic-runner-v2.md
+  workflows/                           # Custom workflow definitions
+    frontend/
+      workflow.py
+      prompts/
+        implement.md
+        verify.md
+    rust-service/
+      workflow.py
+      prompts/
+        implement.md
+  operations/                          # Custom system operations
+    upgrade-deps/
+      operation.py
+    rotate-secrets/
+      operation.py
+  worktrees/                           # Runtime: git worktrees
+    prd-042/
+    prd-045/
+  transcripts/                         # Runtime: agent conversation logs
+    PRD-042/
+      session-abc123.md
+    PRD-045/
+      session-abc123.md
+  events/                              # Runtime: JSONL event logs
+    PRD-042_session-abc123.jsonl
+    PRD-045_session-abc123.jsonl
+```
+
+## Git Tracking Status
+
+| Path | Tracked | Notes |
+|------|---------|-------|
+| `config.toml` | Yes (optional) | Project configuration. Committed to share settings across team. |
+| `prds/` | Yes | PRD documents. These are the source of truth for all work items. |
+| `workflows/` | Yes (optional) | Custom workflow definitions. Committed to share workflow logic. |
+| `operations/` | Yes (optional) | Custom system operations. Committed to share operational scripts. |
+| `worktrees/` | No (git-ignored) | Runtime artifact. Created by `ensure_worktree`, removed by `cleanup_worktree`. |
+| `transcripts/` | No (git-ignored) | Runtime artifact. Agent conversation logs for debugging. |
+| `events/` | No (git-ignored) | Runtime artifact. JSONL event logs for post-mortem analysis. |
+
+The `.gitignore` entries for runtime directories:
+
+```gitignore
+# .darkfactory/.gitignore
+worktrees/
+transcripts/
+events/
+```
+
+## `config.toml`
+
+Project configuration file. Controls model selection, timeout tiers, capability multipliers, and output styling. See the [Configuration Reference](/reference/config/) for the complete schema.
+
+This file is optional. DarkFactory uses sensible defaults for all settings. Create it only when you need to override defaults.
+
+## `prds/`
+
+Contains all PRD documents as Markdown files with YAML frontmatter. This is the primary data store for DarkFactory -- the harness reads PRDs from this directory on every invocation.
+
+**File naming**: `PRD-NNN-slug.md` (e.g., `PRD-042-add-retry-logic.md`). The frontmatter `id` field is authoritative; the filename is for human convenience.
+
+**Subdirectories**: Not supported. All PRDs must be direct children of `prds/`. The containment hierarchy is expressed via the `parent` frontmatter field, not via filesystem nesting.
+
+See the [PRD Frontmatter Schema](/reference/frontmatter/) for field definitions.
+
+<Aside type="caution">
+Do not nest PRDs in subdirectories. The harness scans `prds/*.md` (not recursive). PRDs in subdirectories will not be discovered.
+</Aside>
+
+## `workflows/`
+
+Custom workflow definitions. Each workflow lives in its own directory containing a `workflow.py` and optional `prompts/` subdirectory.
+
+```
+workflows/
+  <name>/
+    workflow.py          # Exports `workflow` attribute (Workflow dataclass)
+    prompts/             # Prompt templates for AgentTasks
+      implement.md
+      verify.md
+```
+
+The harness discovers workflows by scanning for `workflows/*/workflow.py` files at startup. See [Custom Workflows](/guides/custom-workflows/) for authoring details and [Workflow API](/reference/workflow-api/) for the dataclass schema.
+
+## `operations/`
+
+Custom system operations. Each operation lives in its own directory containing an `operation.py`.
+
+```
+operations/
+  <name>/
+    operation.py         # Exports `operation` attribute (Operation dataclass)
+```
+
+Operations are discovered by scanning `operations/*/operation.py` at startup. See [System Operations](/guides/system-operations/) for authoring details.
+
+## `worktrees/`
+
+Git worktrees created during PRD execution. Each PRD gets its own worktree directory. Created by the `ensure_worktree` builtin, removed by `cleanup_worktree`.
+
+This directory is git-ignored and can grow large during DAG execution with many PRDs. Worktrees are cleaned up automatically on successful runs. Failed runs leave worktrees intact for debugging -- clean them up manually with:
+
+```bash frame="terminal" title="Clean up stale worktrees"
+git worktree prune
+rm -rf .darkfactory/worktrees/*
+```
+
+## `transcripts/`
+
+Agent conversation transcripts. Each PRD execution creates a transcript file containing the full agent conversation: system prompt, user messages, agent responses, and tool calls.
+
+Transcripts are invaluable for debugging failed agent tasks. They show exactly what the agent saw and what it decided to do.
+
+```bash frame="terminal" title="View a transcript"
+cat .darkfactory/transcripts/PRD-042/session-abc123.md
+```
+
+## `events/`
+
+JSONL event log files. One file per PRD per session. Contains structured events for every workflow and task execution: start/finish timestamps, exit codes, durations, and shell output.
+
+See [Event Logging](/guides/event-logging/) for the event schema and analysis recipes.
+
+<Aside type="tip">
+To keep the `.darkfactory/` directory clean, periodically prune runtime artifacts. Worktrees from completed PRDs can be removed. Old transcripts and event logs can be archived or deleted. The harness does not depend on historical runtime artifacts.
+</Aside>
+
+## Initializing a New Project
+
+```bash frame="terminal" title="Initialize DarkFactory in a project"
+prd init
+```
+
+This creates the `.darkfactory/` directory with a default `config.toml` and the `prds/` directory. The `.gitignore` for runtime directories is created automatically.

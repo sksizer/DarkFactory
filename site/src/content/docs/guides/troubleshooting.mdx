@@ -1,0 +1,383 @@
+---
+title: "Troubleshooting"
+description: "Common issues, error messages, and their fixes — drawn from real DarkFactory production runs."
+---
+
+import { Tabs, TabItem, Steps, Aside } from '@astrojs/starlight/components';
+
+Every issue below has occurred in real DarkFactory runs. Error messages are exact.
+
+## Orphaned Worktree Branches
+
+**Symptom:**
+
+```bash frame="terminal" title="prd run PRD-42 --execute"
+branch 'prd/PRD-42-add-login-endpoint' already exists but worktree
+/Users/you/project/.darkfactory/worktrees/PRD-42-add-login-endpoint is gone.
+Run 'prd cleanup PRD-42' to release it.
+```
+
+**Cause:** The worktree directory was deleted (manually, by a crashed process, or by a failed cleanup) but the git branch still exists. The `ensure_worktree` builtin detects this mismatch and refuses to proceed.
+
+**Fix:**
+
+```bash frame="terminal" title="Release the orphaned branch"
+$ prd cleanup PRD-42
+Cleaned up worktree for PRD-42
+
+$ prd run PRD-42 --execute
+# Now succeeds — fresh worktree created
+```
+
+If `prd cleanup` doesn't resolve it, the branch may need manual deletion:
+
+```bash frame="terminal" title="Manual branch cleanup"
+$ git branch -D prd/PRD-42-add-login-endpoint
+$ git worktree prune
+```
+
+<Aside type="caution">
+`git branch -D` is destructive. Only use it after confirming the branch has been merged or its changes are not needed.
+</Aside>
+
+**Prevention:** Always use `prd cleanup` instead of manually deleting worktree directories. After a system crash, run `prd cleanup --merged` to clear all stale worktrees for already-merged PRs.
+
+---
+
+## Missing Sentinel in Agent Output
+
+**Symptom:**
+
+```bash frame="terminal" title="Agent task fails"
+[3/6] implement ........ FAILED
+  agent output contained no PRD_EXECUTE_OK or PRD_EXECUTE_FAILED sentinel
+```
+
+Or during a retry:
+
+```
+retry agent failed: agent output contained no PRD_EXECUTE_OK
+or PRD_EXECUTE_FAILED sentinel
+```
+
+**Cause:** The agent ran to completion (or hit its context limit) without printing `PRD_EXECUTE_OK` or `PRD_EXECUTE_FAILED` as a standalone line. Common reasons:
+
+1. **Context window exhaustion** — the agent ran out of tokens before reaching the sentinel instruction
+2. **Agent got stuck** — looped on a problem and never reached the completion phase
+3. **Prompt missing sentinel instructions** — the prompt template doesn't tell the agent what to print
+
+**Fix:**
+
+<Steps>
+
+1. Check the agent transcript in `.darkfactory/transcripts/` for the PRD. Search for what the agent was doing when it stopped.
+
+2. If the agent ran out of context, reduce the PRD scope or increase the timeout:
+   ```yaml
+   effort: l          # bumped from m — gives more time
+   capability: complex # maps to opus model with more capacity
+   ```
+
+3. Ensure your prompt ends with explicit sentinel instructions:
+   ```text
+   When all changes are complete and tests pass, print exactly:
+   PRD_EXECUTE_OK
+   
+   If you cannot complete this work, print exactly:
+   PRD_EXECUTE_FAILED
+   followed by a description of the blocker.
+   ```
+
+4. Re-run:
+   ```bash frame="terminal"
+   $ prd run PRD-42 --execute
+   ```
+
+</Steps>
+
+---
+
+## PR Creation Failures
+
+**Symptom:**
+
+```
+Command ['gh', 'pr', 'create', '--base', 'main', '--title', 'PRD-42: ...']
+returned non-zero exit status 1
+```
+
+**Common causes:**
+
+| Cause | Check | Fix |
+|-------|-------|-----|
+| PR already exists for this branch | `gh pr list --head prd/PRD-42-...` | Close the stale PR, or use `prd rework` |
+| GitHub auth expired | `gh auth status` | `gh auth login` |
+| Rate limiting | Wait and retry | Add delay between DAG runs with `--max-runs 3` |
+| Branch not pushed | `git branch -r \| grep PRD-42` | Usually a `push_branch` failure upstream — check earlier steps |
+| Base branch doesn't exist | Stacked PR whose dependency wasn't merged | Merge the dependency PR first, then `prd reconcile --execute` |
+
+**Diagnostic:** Check the event log for the full subprocess output:
+
+```bash frame="terminal" title="Inspect the event log"
+$ cat .darkfactory/events/PRD-42-*.jsonl | grep create_pr
+```
+
+---
+
+## Timeout During Agent Execution
+
+**Symptom:**
+
+```
+[3/6] implement ........ FAILED (timeout after 600s)
+```
+
+**Cause:** The agent didn't complete within the resolved timeout. Timeout is calculated as:
+
+```
+base_minutes(effort) × capability_multiplier = timeout
+```
+
+| Effort | Base | × trivial (1.0) | × simple (1.0) | × moderate (1.25) | × complex (1.5) |
+|--------|------|-----------------|-----------------|-------------------|-----------------|
+| xs | 5m | 5m | 5m | 6m 15s | 7m 30s |
+| s | 10m | 10m | 10m | 12m 30s | 15m |
+| m | 20m | 20m | 20m | 25m | 30m |
+| l | 40m | 40m | 40m | 50m | 60m |
+| xl | 75m | 75m | 75m | 93m 45s | 112m 30s |
+
+**Fixes:**
+
+1. **Increase effort** in the PRD frontmatter:
+   ```yaml
+   effort: l  # was m
+   ```
+
+2. **Override timeout directly** on the CLI:
+   ```bash frame="terminal"
+   $ prd run PRD-42 --execute --timeout 45
+   ```
+
+3. **Reduce scope** — split a large PRD into smaller tasks with dependencies
+
+<Aside type="tip">
+Check the transcript to see if the agent was productive when it timed out. If it was close to finishing, bump the effort one level. If it was stuck in a loop, the problem is scope or prompt clarity, not timeout.
+</Aside>
+
+---
+
+## Stale Worktrees Accumulating
+
+**Symptom:** Disk usage growing, `git worktree list` shows dozens of old worktrees.
+
+```bash frame="terminal" title="Check worktree count"
+$ git worktree list | wc -l
+47
+```
+
+**Fix:**
+
+```bash frame="terminal" title="Clean up merged worktrees"
+# Remove worktrees for PRDs whose PRs have been merged
+$ prd cleanup --merged
+Cleaned 12 worktrees.
+
+# Or remove ALL worktrees (prompts for confirmation)
+$ prd cleanup --all
+Remove 47 worktrees? [y/N] y
+```
+
+**Prevention:** Run `prd cleanup --merged` regularly, or after each batch of DAG executions. The `create_pr` builtin does NOT auto-cleanup — worktrees persist until explicitly cleaned.
+
+---
+
+## Multi-Dependency PRD Skipped
+
+**Symptom:**
+
+```bash frame="terminal" title="DAG execution skips a PRD"
+PRD-42 has multiple unmerged dependencies [PRD-40, PRD-41];
+multi-dep execution requires PRD-552 (merge-upstream task). Skipping.
+```
+
+**Cause:** The PRD depends on two or more PRDs that completed in this run but haven't been merged to main yet. DarkFactory can stack a branch on top of one dependency, but not two — it can't automatically merge two upstream branches.
+
+**Fix:**
+
+1. **Merge the dependency PRs** into main, then re-run:
+   ```bash frame="terminal"
+   # Merge PRD-40 and PRD-41 PRs first, then:
+   $ prd reconcile --execute
+   $ prd run PRD-42 --execute
+   ```
+
+2. **Restructure dependencies** so PRDs have at most one unmerged dependency:
+   ```yaml
+   # Instead of:
+   depends_on:
+     - "[[PRD-40-feature-a]]"
+     - "[[PRD-41-feature-b]]"
+   
+   # Create a merge-point PRD:
+   # PRD-41.5 depends on PRD-40 and PRD-41
+   # PRD-42 depends only on PRD-41.5
+   ```
+
+---
+
+## Sibling Conflicts in Large Epics
+
+**Symptom:** When running an epic with many children that touch similar files, the first child succeeds but subsequent siblings fail because they branched from the same base and create conflicting changes.
+
+**Cause:** Siblings that share file impacts but don't have explicit `depends_on` edges run against the same base. Each succeeds independently but can't all merge.
+
+**Fix:**
+
+1. **Add explicit dependency chains** between siblings that touch the same files:
+   ```yaml
+   # PRD-200.2 (second child)
+   depends_on:
+     - "[[PRD-200.1-first-child]]"
+   ```
+   This serializes them — each builds on the previous.
+
+2. **Use `prd conflicts`** to detect overlaps before running:
+   ```bash frame="terminal"
+   $ prd conflicts PRD-200.1
+   PRD-200.1 impacts overlap with:
+     PRD-200.2  src/darkfactory/cli.py
+     PRD-200.3  src/darkfactory/cli.py
+   ```
+
+3. **Limit concurrent runs** with `--max-runs 1` and merge between each.
+
+---
+
+## Agent Blocked by Sandbox Permissions
+
+**Symptom:** Agent transcript shows repeated attempts to run a command, each blocked:
+
+```
+Tool blocked: Bash(rm src/old_file.py)
+Tool blocked: Bash(mv src/old.py src/new.py)
+Tool blocked: Bash(git rm src/old_file.py)
+```
+
+**Cause:** The workflow's tool allowlist doesn't include destructive operations. This is by design — see [Agent Verification Model](/philosophy/agent-verification/).
+
+**Fix:** Do NOT add destructive tools to the allowlist. Instead:
+
+1. **Clarify the prompt** so the agent doesn't need to delete/rename files
+2. **Add a post-agent ShellTask** or BuiltIn that handles cleanup in trusted Python
+3. **If the agent created invalid files**, use a verification shell task to detect and report them, then let the harness handle cleanup
+
+<Aside type="caution">
+Adding `Bash(rm:*)` or `Bash(git rm:*)` to a workflow's tool allowlist is an anti-pattern. It grants the agent destructive capability across ALL runs of that workflow, not just the one where you need it. See the [PRD-549 incident](/philosophy/agent-verification/) for a detailed case study.
+</Aside>
+
+---
+
+## Reconcile Finds No PRDs to Update
+
+**Symptom:**
+
+```bash frame="terminal" title="Reconcile dry run"
+$ prd reconcile
+No PRDs with merged branches found.
+```
+
+But you know PRs were merged.
+
+**Common causes:**
+
+| Cause | Check |
+|-------|-------|
+| PRD already has status `done` | `prd status` — may have been updated by the GitHub Action |
+| Branch name doesn't match convention | Branch must be `prd/PRD-*` to be detected |
+| PR merged to a branch other than main | Reconcile checks merge into main/master only |
+| PRD status is not `review` | Reconcile only flips `review` → `done` |
+
+---
+
+## Lock File Contention
+
+**Symptom:**
+
+```
+Cannot acquire lock for PRD-42: .darkfactory/worktrees/PRD-42-add-login.lock
+Another process may be running this PRD.
+```
+
+**Cause:** Advisory file locking (via `filelock`) prevents two `prd run` invocations on the same PRD simultaneously. The lock file wasn't released — either because a process crashed or is still running.
+
+**Fix:**
+
+1. **Check if a process is still running:**
+   ```bash frame="terminal"
+   $ ps aux | grep "prd run"
+   ```
+
+2. **If no process is running**, the lock is stale. Remove it:
+   ```bash frame="terminal"
+   $ rm .darkfactory/worktrees/PRD-42-add-login.lock
+   ```
+
+<Aside type="note">
+Lock files are advisory — removing them is safe if you're certain no other process is working on that PRD. The lock is re-acquired on the next `prd run`.
+</Aside>
+
+---
+
+## Tips for Reliable Runs
+
+### Start with Dry Runs
+
+Always preview before executing:
+
+```bash frame="terminal" title="Preview, then execute"
+$ prd plan PRD-42
+# Review the plan...
+
+$ prd run PRD-42 --execute
+```
+
+### Cap DAG Runs
+
+When running epics, start with a low `--max-runs` and increase as you gain confidence:
+
+```bash frame="terminal" title="Incremental DAG execution"
+$ prd run PRD-200 --execute --max-runs 3
+# Review the 3 PRs...
+# Merge them...
+
+$ prd reconcile --execute
+$ prd run PRD-200 --execute --max-runs 5
+```
+
+### Check Events After Failures
+
+Event logs contain structured data that CLI output doesn't:
+
+```bash frame="terminal" title="Inspect failure events"
+$ cat .darkfactory/events/PRD-42-*.jsonl \
+  | python -m json.tool --no-ensure-ascii \
+  | grep -A5 '"success": false'
+```
+
+### Validate Before Running
+
+Catch structural issues early:
+
+```bash frame="terminal" title="Pre-flight checks"
+$ prd validate
+$ prd conflicts PRD-42
+$ prd next
+```
+
+### Clean Up Regularly
+
+```bash frame="terminal" title="Maintenance routine"
+$ prd cleanup --merged     # Remove worktrees for merged PRs
+$ prd reconcile --execute  # Sync statuses for merged PRs
+$ prd validate             # Check for structural issues
+```

@@ -1,0 +1,287 @@
+---
+title: "Custom Workflows"
+description: "How to create and configure custom workflow files that control how DarkFactory plans and executes PRD implementation."
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+DarkFactory ships with four built-in workflows: `default`, `planning`, `task`, and `extraction`. When your project needs specialized behavior -- different test runners, additional linting, domain-specific code generation -- you define a custom workflow.
+
+## Workflow File Location
+
+Custom workflows live at `.darkfactory/workflows/<name>/workflow.py`. Each directory contains a `workflow.py` that exports a `workflow` attribute, plus an optional `prompts/` subdirectory for agent prompt templates.
+
+```
+.darkfactory/workflows/
+  frontend/
+    workflow.py
+    prompts/
+      implement.md
+      verify.md
+  security-review/
+    workflow.py
+    prompts/
+      review.md
+```
+
+## The Workflow Dataclass
+
+A workflow is a Python `Workflow` dataclass with a predicate, priority, and a list of tasks.
+
+```python
+from darkfactory.workflow import Workflow, AgentTask, ShellTask, BuiltIn
+
+workflow = Workflow(
+    name="frontend-components",
+    description="Workflow for PRDs that touch React component files",
+    priority=10,
+    applies_to=lambda prd, prds: any(
+        impact.startswith("src/components/") for impact in prd.impacts
+    ),
+    tasks=[
+        AgentTask(
+            name="implement",
+            prompt_file="implement.md",
+        ),
+        ShellTask(
+            name="lint",
+            command="npm run lint -- --fix",
+            on_failure="retry_agent",
+        ),
+        ShellTask(
+            name="test",
+            command="npm run test -- --coverage",
+            on_failure="fail",
+        ),
+    ],
+)
+```
+
+## The `applies_to` Predicate
+
+The `applies_to` field is a callable with two arguments:
+
+| Argument | Type | Description |
+|----------|------|-------------|
+| `prd` | `PRD` | The candidate PRD being matched |
+| `prds` | `list[PRD]` | All PRDs in the project (for cross-PRD logic) |
+
+```python
+# Match PRDs tagged "security" that have auth impacts
+applies_to=lambda prd, prds: (
+    "security" in prd.tags
+    and any(i.startswith("src/auth/") for i in prd.impacts)
+)
+
+# Match any PRD whose parent is an epic with tag "migration"
+applies_to=lambda prd, prds: (
+    prd.parent
+    and any(p.id == prd.parent and "migration" in p.tags for p in prds)
+)
+```
+
+The second argument enables cross-PRD decisions -- matching based on sibling count, parent tags, or dependency chain properties.
+
+<Aside type="caution">
+If two custom workflows have the same priority and both match a PRD, the harness raises an ambiguity error. Ensure predicates are mutually exclusive or assign distinct priorities.
+</Aside>
+
+## Priority Ordering
+
+Priority is an integer. Higher values take precedence. The built-in workflows use low priorities (0-5), so any custom workflow with `priority >= 10` overrides them.
+
+| Range | Convention |
+|-------|-----------|
+| 0-5 | Built-in workflows |
+| 10-50 | Project-specific workflows |
+| 51-99 | Domain-specific overrides |
+| 100+ | Emergency overrides (use sparingly) |
+
+When no custom workflow matches, the built-in `default` workflow is selected.
+
+## Using the Standard Envelope
+
+Most custom workflows only need to customize the middle -- the implementation and verification steps. The open/close envelope (worktree setup, status transitions, commit, PR creation) is standard. Use `PRD_IMPLEMENTATION_TEMPLATE.compose()` to wrap your custom tasks with the standard envelope:
+
+```python
+from darkfactory.workflow import (
+    Workflow, AgentTask, ShellTask,
+    PRD_IMPLEMENTATION_TEMPLATE,
+)
+
+workflow = Workflow(
+    name="rust-service",
+    description="Workflow for Rust microservice PRDs",
+    priority=20,
+    applies_to=lambda prd, prds: any(
+        i.startswith("services/") and i.endswith(".rs") for i in prd.impacts
+    ),
+    tasks=PRD_IMPLEMENTATION_TEMPLATE.compose(
+        implement=AgentTask(
+            name="implement",
+            prompt_file="implement.md",
+        ),
+        verify=[
+            ShellTask(name="build", command="cargo build"),
+            ShellTask(name="test", command="cargo test", on_failure="retry_agent"),
+            ShellTask(name="clippy", command="cargo clippy -- -D warnings"),
+        ],
+    ),
+)
+```
+
+The `compose()` method inserts your tasks between the standard open sequence (`ensure_worktree`, `set_status`) and close sequence (`commit`, `push_branch`, `create_pr`, `cleanup_worktree`). This guarantees every workflow follows the same lifecycle invariants.
+
+## Complete Example
+
+A full custom workflow for a Python data pipeline project:
+
+```python
+from darkfactory.workflow import (
+    Workflow, AgentTask, ShellTask,
+    PRD_IMPLEMENTATION_TEMPLATE,
+)
+
+workflow = Workflow(
+    name="data-pipeline",
+    description="Workflow for ETL pipeline PRDs",
+    priority=15,
+    applies_to=lambda prd, prds: "etl" in prd.tags,
+    tasks=PRD_IMPLEMENTATION_TEMPLATE.compose(
+        implement=AgentTask(
+            name="implement",
+            prompt_file="implement.md",
+            allowed_tools=[
+                "Read", "Edit", "Write", "Glob", "Grep",
+                "Bash(python:*)", "Bash(pytest:*)",
+            ],
+        ),
+        verify=[
+            ShellTask(
+                name="type-check",
+                command="mypy src/pipelines/",
+                on_failure="retry_agent",
+            ),
+            ShellTask(
+                name="test",
+                command="pytest tests/pipelines/ -x",
+                on_failure="fail",
+            ),
+            ShellTask(
+                name="schema-validate",
+                command="python -m pipelines.validate_schemas",
+                on_failure="fail",
+            ),
+        ],
+    ),
+)
+```
+
+<Aside type="tip">
+Run `prd plan PRD-NNN` to see which workflow would be selected for a PRD without executing anything. This is the fastest way to verify your `applies_to` predicate and priority are correct.
+</Aside>
+
+## Example: Rust Service Workflow
+
+A complete workflow for a Rust project that uses `cargo test`, `cargo clippy`, and `cargo fmt` for verification. This workflow matches any PRD tagged `rust`.
+
+Directory structure:
+
+```
+.darkfactory/workflows/
+  rust-service/
+    workflow.py
+    prompts/
+      implement.md
+      verify.md
+```
+
+The workflow file:
+
+```python
+# .darkfactory/workflows/rust-service/workflow.py
+
+from darkfactory.workflow import (
+    Workflow, AgentTask, ShellTask,
+    PRD_IMPLEMENTATION_TEMPLATE,
+)
+
+workflow = Workflow(
+    name="rust-service",
+    description="Workflow for Rust service PRDs",
+    priority=10,
+    applies_to=lambda prd, prds: "rust" in prd.tags,
+    tasks=PRD_IMPLEMENTATION_TEMPLATE.compose(
+        implement=AgentTask(
+            name="implement",
+            prompt_file="implement.md",
+            verify_prompts=["verify.md"],
+            allowed_tools=[
+                "Read", "Edit", "Write", "Glob", "Grep",
+                "Bash(cargo:*)", "Bash(just:*)",
+                "Bash(git add:*)", "Bash(git status:*)",
+                "Bash(git diff:*)", "Bash(git log:*)",
+            ],
+        ),
+        verify=[
+            ShellTask(
+                name="fmt-check",
+                command="cargo fmt -- --check",
+                on_failure="retry_agent",
+            ),
+            ShellTask(
+                name="clippy",
+                command="cargo clippy -- -D warnings",
+                on_failure="retry_agent",
+            ),
+            ShellTask(
+                name="test",
+                command="cargo test",
+                on_failure="fail",
+            ),
+        ],
+    ),
+)
+```
+
+The implement prompt:
+
+```markdown
+<!-- .darkfactory/workflows/rust-service/prompts/implement.md -->
+
+You are implementing a Rust service change. The PRD and its
+acceptance criteria are provided below.
+
+Rules:
+- Use `thiserror` for error types, not manual `impl Display`
+- All public functions must have doc comments
+- No `unwrap()` in library code -- use `?` or explicit error handling
+- Add unit tests in the same file using `#[cfg(test)]` modules
+
+When finished, emit PRD_EXECUTE_OK on its own line.
+```
+
+The verify prompt, used when `fmt-check` or `clippy` triggers a retry:
+
+```markdown
+<!-- .darkfactory/workflows/rust-service/prompts/verify.md -->
+
+The verification step failed. Fix the issues below and
+re-emit PRD_EXECUTE_OK.
+
+Failure output:
+\{{CHECK_OUTPUT}}
+```
+
+Confirm the workflow resolves correctly before executing:
+
+```bash frame="terminal" title="Check workflow selection"
+prd plan PRD-227
+```
+
+```bash frame="terminal" title="Expected output"
+PRD-227  Add rate limiter to auth service
+  tags: rust, auth
+  workflow: rust-service (priority 10, matched on tag "rust")
+  tasks: ensure_worktree → set_status → implement → fmt-check → clippy → test → commit → push_branch → create_pr → cleanup_worktree
+```

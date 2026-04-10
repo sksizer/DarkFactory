@@ -1,0 +1,66 @@
+---
+title: "prd plan"
+description: "Show execution plan without executing"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd plan PRD-ID [flags]
+```
+
+## Description
+
+Resolves the workflow for a PRD and displays the full execution plan -- task ordering, parameters, and computed scope. Nothing is modified: no branches created, no agents invoked. This is a dry-run preview.
+
+Use this to verify workflow assignment and inspect task ordering before committing to `prd run`.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `PRD-ID` | Yes | The PRD to plan |
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--workflow` | auto | Override the workflow assignment |
+| `--base` | `HEAD` | Base ref for new branch |
+| `--model` | config default | Override capability-to-model mapping |
+
+## Examples
+
+```bash frame="terminal" title="Plan a single PRD"
+$ prd plan PRD-42
+Workflow: implement-task (auto-assigned)
+Base: HEAD
+
+Tasks:
+  1. create-branch       (builtin)
+  2. analyze-scope       (agent)   model=sonnet  files=12
+  3. implement           (agent)   model=sonnet  files=12
+  4. run-tests           (shell)   cmd="pytest tests/"
+  5. create-pr           (builtin)
+  6. update-status       (builtin) status=in-progress
+```
+
+```bash frame="terminal" title="Override workflow and base"
+$ prd plan PRD-42 --workflow fix-bug --base release/2.0
+Workflow: fix-bug (explicit override)
+Base: release/2.0
+
+Tasks:
+  1. create-branch       (builtin)
+  2. diagnose            (agent)   model=sonnet
+  3. fix                 (agent)   model=sonnet
+  4. run-tests           (shell)   cmd="pytest tests/"
+  5. create-pr           (builtin)
+  6. update-status       (builtin) status=in-progress
+```
+
+## Related
+
+- [`prd run`](/reference/cli/run/) -- Execute the plan
+- [`prd assign`](/reference/cli/assign/) -- See how workflows are assigned
+- [`prd list-workflows`](/reference/cli/list-workflows/) -- Available workflows

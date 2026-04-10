@@ -1,0 +1,86 @@
+---
+title: Your First Workflow
+description: Run a DarkFactory workflow and understand what happens under the hood.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+Now that you have a ready PRD, let's execute a workflow against it. DarkFactory will create a branch, invoke an agent to implement the work, verify the result, and open a pull request.
+
+<Steps>
+
+1. **Preview the execution plan**
+
+   Always start with a dry run to see what will happen:
+
+   ```bash frame="terminal"
+   $ prd plan PRD-1
+   PRD-1 Add login endpoint
+     workflow: default (6 tasks)
+     1. ensure_worktree  -> branch prd/PRD-1-add-login-endpoint
+     2. set_status       -> in-progress
+     3. implement        -> AgentTask (model=sonnet, timeout=10m)
+     4. verify           -> ShellTask: just test
+     5. commit + push    -> push branch, create PR
+     6. set_status       -> review
+   ```
+
+   The `default` workflow was automatically assigned because this is a `task`-kind PRD with no explicit workflow override.
+
+2. **Execute the workflow**
+
+   When you're satisfied with the plan, add `--execute`:
+
+   ```bash frame="terminal"
+   $ prd run PRD-1 --execute
+   [1/6] ensure_worktree ... created .darkfactory/worktrees/PRD-1-add-login-endpoint/
+   [2/6] set_status ....... PRD-1 -> in-progress
+   [3/6] implement ........ invoking claude (model=sonnet, timeout=10m)
+         ... agent working ...
+   [4/6] verify ........... running: just test
+         ... 12 tests passed ...
+   [5/6] commit + push .... pushed prd/PRD-1-add-login-endpoint
+   [6/6] set_status ....... PRD-1 -> review
+   
+   PR created: https://github.com/you/project/pull/42
+   ```
+
+3. **Understand what happened**
+
+   DarkFactory executed these steps in the `default` workflow:
+
+   | Step | Type | What it did |
+   |------|------|------------|
+   | `ensure_worktree` | BuiltIn | Created a git worktree so work happens in isolation |
+   | `set_status` | BuiltIn | Marked the PRD as `in-progress` |
+   | `implement` | AgentTask | Invoked Claude Code with the PRD body as context |
+   | `verify` | ShellTask | Ran your project's test suite to validate the work |
+   | `commit + push` | BuiltIn | Committed changes and pushed the branch |
+   | `create_pr` | BuiltIn | Opened a PR linking back to the PRD |
+
+   <Aside type="note">
+     If the `verify` step fails, the workflow retries the agent with the error output as feedback. The retry policy is configurable per workflow.
+   </Aside>
+
+4. **Check the result**
+
+   ```bash frame="terminal"
+   $ prd status
+   PRDs: 1 total
+     review: 1
+   
+   PRD-1  Add login endpoint  [review]  PR #42
+   ```
+
+   Review the PR, merge it, and DarkFactory's GitHub Action will automatically flip the status to `done`.
+
+</Steps>
+
+## What's next?
+
+You've completed the quick start. From here:
+
+- **[Concepts: PRDs](/concepts/prds/)** — Deep dive into the PRD data model
+- **[Concepts: Workflows](/concepts/workflows/)** — Understand the task hierarchy and composition model
+- **[Guides: DAG Execution](/guides/dag-execution/)** — Run entire epics with dependency resolution
+- **[CLI Reference](/reference/cli/)** — Every command and flag

@@ -1,0 +1,53 @@
+---
+title: "prd reconcile"
+description: "Find merged-but-not-flipped PRDs and update their status to done"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd reconcile [flags]
+```
+
+## Description
+
+Scans for PRDs with associated pull requests that have been merged but whose frontmatter status has not been updated to `done`. Bridges the gap between GitHub merge state and PRD status tracking.
+
+Default is dry-run. Pass `--execute` to write status changes. Optionally commit directly to main with `--commit-to-main`.
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--execute` | `false` | Apply status updates |
+| `--commit-to-main` | `false` | Commit changes directly to main branch |
+
+## Examples
+
+```bash frame="terminal" title="Preview reconciliation"
+$ prd reconcile
+Would update:
+  PRD-14: review -> done (PR #87 merged)
+  PRD-15: review -> done (PR #89 merged)
+
+2 PRDs to reconcile. Pass --execute to apply.
+```
+
+```bash frame="terminal" title="Execute and commit to main"
+$ prd reconcile --execute --commit-to-main
+Updated PRD-14: review -> done
+Updated PRD-15: review -> done
+Committed to main: "chore(prd): reconcile 2 merged PRD statuses"
+```
+
+## Behavior
+
+- Detects PRDs in `review` or `in-progress` status whose associated PRs are merged.
+- Without `--commit-to-main`, changes are written to files but not committed.
+- Intended for regular use in CI or as a post-merge hook.
+
+## Related
+
+- [`prd run`](/reference/cli/run/) -- Initial execution that creates the PR
+- [`prd cleanup`](/reference/cli/cleanup/) -- Remove worktrees after reconciliation
+- [`prd status`](/reference/cli/status/) -- Verify updated counts

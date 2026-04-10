@@ -1,0 +1,126 @@
+---
+title: "Declarative First"
+description: "Why DarkFactory workflows are data, not code."
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+DarkFactory workflows are lists of Task dataclasses, not imperative programs. This is not a technical limitation -- it is a deliberate design choice that prioritizes inspectability, testability, and safety over expressiveness.
+
+## Workflows Are Data
+
+A workflow declares *what* should happen, not *how*. It is a Python dataclass containing an ordered list of Task dataclasses. There are no conditionals, no loops, no variable assignments, no callbacks.
+
+```python
+from darkfactory.workflow import (
+    Workflow, AgentTask, ShellTask,
+    PRD_IMPLEMENTATION_TEMPLATE,
+)
+
+workflow = Workflow(
+    name="implement-task",
+    description="Standard task implementation workflow",
+    priority=5,
+    applies_to=lambda prd, prds: prd.kind == "task",
+    tasks=PRD_IMPLEMENTATION_TEMPLATE.compose(
+        implement=AgentTask(
+            name="implement",
+            prompt_file="implement.md",
+        ),
+        verify=[
+            ShellTask(name="test", command="pytest tests/ -x", on_failure="fail"),
+            ShellTask(name="lint", command="ruff check .", on_failure="retry_agent"),
+        ],
+    ),
+)
+```
+
+This workflow is fully transparent. Anyone reading it knows exactly what will happen, in what order, with what parameters. There is no hidden control flow.
+
+## `PRD_IMPLEMENTATION_TEMPLATE.compose()`
+
+Most workflows follow the same lifecycle: set up a worktree, implement, verify, commit, create a PR, clean up. The `PRD_IMPLEMENTATION_TEMPLATE` encodes this lifecycle as an immutable template with two extension points: `implement` and `verify`.
+
+```python
+PRD_IMPLEMENTATION_TEMPLATE.compose(
+    implement=AgentTask(...),   # Your implementation step
+    verify=[ShellTask(...)],    # Your verification steps
+)
+```
+
+This produces the full task list:
+
+```
+1. ensure_worktree      (builtin - from template)
+2. set_status            (builtin - from template, sets "in-progress")
+3. implement             (agent - YOUR task)
+4. test                  (shell - YOUR verification)
+5. lint                  (shell - YOUR verification)
+6. commit                (builtin - from template)
+7. push_branch           (builtin - from template)
+8. create_pr             (builtin - from template)
+9. cleanup_worktree      (builtin - from template)
+```
+
+The template enforces open/close invariants. You cannot forget to create a worktree, cannot forget to commit, cannot forget to clean up. The standard envelope is always present.
+
+<Aside type="tip">
+If you need to skip the standard envelope (e.g., for a workflow that only analyzes code without creating a PR), define the `tasks` list directly instead of using `compose()`.
+</Aside>
+
+## Benefits of Declarative Workflows
+
+### Inspectable
+
+`prd plan` can display the full task list for any PRD without executing anything. Because workflows are data, the harness can serialize them to human-readable output:
+
+```bash frame="terminal" title="Inspect a workflow"
+prd plan PRD-042
+```
+
+```
+Workflow: implement-task (priority 5)
+Tasks:
+  1. [builtin]  ensure_worktree
+  2. [builtin]  set_status → in-progress
+  3. [agent]    implement (model: sonnet, prompt: implement.md)
+  4. [shell]    pytest tests/ -x (on_failure: fail)
+  5. [shell]    ruff check . (on_failure: retry_agent)
+  6. [builtin]  commit
+  7. [builtin]  push_branch
+  8. [builtin]  create_pr
+  9. [builtin]  cleanup_worktree
+```
+
+### Testable
+
+Workflows are dataclasses. You can assert on their structure in unit tests without invoking the runner:
+
+```python
+def test_workflow_has_test_step():
+    assert any(
+        isinstance(t, ShellTask) and "pytest" in t.command
+        for t in workflow.tasks
+    )
+
+def test_workflow_matches_task_prds():
+    prd = make_prd(kind="task")
+    assert workflow.applies_to(prd, [])
+```
+
+### Serializable
+
+Workflows can be serialized to JSON or TOML for logging, diffing, and auditing. The event log records the exact task list that was executed for every PRD, enabling post-mortem analysis of what ran and in what order.
+
+## Why Not Code?
+
+Code-based workflows (like CI pipelines in some systems) invite complexity creep. Once you can write `if/else` in a workflow, you will. Once you can call functions, workflows become programs. Programs need testing, debugging, and maintenance.
+
+DarkFactory sidesteps this entirely. If you need logic that a task list cannot express, the answer is not to make workflows more expressive. Encode that logic in a built-in task (Layer 2) or in the harness (Layer 1), and reference it from the workflow. The workflow layer stays auditable. The complexity lives where it can be properly tested and maintained.
+
+| Need | Wrong Approach | Right Approach |
+|------|---------------|---------------|
+| Conditional test command | `if` in workflow | Built-in that detects test framework |
+| Skip step on tag | `if "skip-lint" in tags` in workflow | Separate workflow with different `applies_to` |
+| Retry with backoff | Loop in workflow | `on_failure="retry_agent"` policy on ShellTask |
+| Dynamic file list | Variable in workflow | Scope computation in the harness |

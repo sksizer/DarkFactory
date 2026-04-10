@@ -1,0 +1,159 @@
+---
+title: Product Requirements Documents
+description: PRDs are the atomic unit of work in DarkFactory, encoding what needs to be built and how it relates to the rest of the project.
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+A **PRD** is a Markdown file with YAML frontmatter stored in `.darkfactory/prds/`. Each file follows the naming convention `PRD-{id}-{slug}.md` -- for example, `PRD-070-retry-webhook.md`.
+
+## Frontmatter Schema
+
+Complete field reference with types and constraints:
+
+```yaml
+---
+id: PRD-070
+title: Add retry logic to webhook dispatcher
+kind: task
+status: ready
+priority: high
+effort: m
+capability: moderate
+parent: "[[PRD-030-webhook-system]]"
+depends_on:
+  - "[[PRD-068-http-client]]"
+  - "[[PRD-069-backoff-config]]"
+blocks:
+  - "[[PRD-075-webhook-monitoring]]"
+impacts:
+  - "src/webhooks/**/*.py"
+  - "tests/webhooks/**/*.py"
+workflow: null
+assignee: null
+reviewers: []
+target_version: "0.5.0"
+created: 2026-03-15
+updated: 2026-04-01
+tags:
+  - reliability
+  - webhooks
+---
+```
+
+### Field Reference
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `str` | Unique identifier. Flat (`PRD-070`) or hierarchical (`PRD-4.1.1`). Regex: `^PRD-\d+(?:\.\d+)*$` |
+| `path` | `Path` | Set automatically by the loader from the file path. Not in frontmatter. |
+| `slug` | `str` | Extracted from filename: `PRD-070-retry-webhook.md` yields `retry-webhook`. Not in frontmatter. |
+| `title` | `str` | Human-readable name. |
+| `kind` | `str` | One of: `epic`, `feature`, `component`, `task`. Controls [containment](/concepts/containment) and runnability. |
+| `status` | `str` | One of: `draft`, `ready`, `in-progress`, `review`, `done`, `blocked`, `cancelled`. See [status lifecycle](/concepts/status-lifecycle). |
+| `priority` | `str` | One of: `critical`, `high`, `medium`, `low`. Tie-breaker in [topological sort](/concepts/dag). |
+| `effort` | `str` | Sizing: `xs` (5m), `s` (10m), `m` (20m), `l` (40m), `xl` (75m). Drives agent timeout calculation. |
+| `capability` | `str` | Complexity: `trivial`, `simple`, `moderate`, `complex`. Drives [model selection](/concepts/agent-model). |
+| `parent` | `str \| None` | Wikilink to containing PRD. See [containment](/concepts/containment). |
+| `depends_on` | `list[str]` | Wikilinks to PRDs that must be `done` before this one starts. See [DAG](/concepts/dag). |
+| `blocks` | `list[str]` | Wikilinks to PRDs that cannot start until this one is `done`. Inverse of `depends_on`. |
+| `impacts` | `list[str]` | File glob patterns indicating which source files this PRD touches. |
+| `workflow` | `str \| None` | Override automatic [workflow](/concepts/workflows) assignment. `null` uses default. |
+| `assignee` | `str \| None` | Who is responsible for this PRD. |
+| `reviewers` | `list[str]` | Who should review the PR. |
+| `target_version` | `str \| None` | Release version this PRD targets. |
+| `created` | `date` | When the PRD was created. |
+| `updated` | `date` | When the PRD was last modified. |
+| `tags` | `list[str]` | Freeform labels for filtering and grouping. |
+
+### ID Schemes
+
+<Tabs>
+  <TabItem label="Flat IDs">
+    Flat IDs use a single integer: `PRD-070`, `PRD-123`. Suitable for projects with a simple, linear backlog.
+
+    ```
+    PRD-001
+    PRD-002
+    PRD-070
+    PRD-123
+    ```
+  </TabItem>
+  <TabItem label="Hierarchical IDs">
+    Hierarchical IDs use dot-separated components: `PRD-4.1.1`, `PRD-4.1.2`. Useful for epics with numbered sub-features and sub-tasks.
+
+    ```
+    PRD-4       (epic)
+    PRD-4.1     (feature)
+    PRD-4.1.1   (task)
+    PRD-4.1.2   (task)
+    PRD-4.2     (feature)
+    ```
+
+    Natural sort splits on `.` and compares each component as an integer, so `PRD-4.2` sorts before `PRD-4.10`.
+  </TabItem>
+</Tabs>
+
+### Wikilink Syntax
+
+The `parent`, `depends_on`, and `blocks` fields use wikilink format:
+
+```yaml
+depends_on:
+  - "[[PRD-068-http-client]]"
+  - "[[PRD-069-backoff-config]]"
+```
+
+The slug portion after the ID is for human readability only. DarkFactory parses out the ID (`PRD-068`) and discards the rest. You can write `[[PRD-068]]` or `[[PRD-068-http-client]]` -- both resolve to the same PRD.
+
+## Markdown Body
+
+Below the frontmatter, the body follows a conventional structure:
+
+```markdown
+## Summary
+
+One-paragraph description of what this PRD delivers.
+
+## Requirements
+
+- Functional requirement 1
+- Functional requirement 2
+- Non-functional: must handle 1000 req/s
+
+## Technical Approach
+
+Describe the implementation strategy. Reference specific files,
+functions, or modules.
+
+## Acceptance Criteria
+
+- [ ] Webhook retries up to 3 times with exponential backoff
+- [ ] Failed webhooks logged with correlation ID
+- [ ] Retry count exposed in /metrics endpoint
+
+## Open Questions
+
+- Should we cap total retry duration at 5 minutes?
+- Do we need a dead-letter queue for permanently failed webhooks?
+```
+
+<Aside type="tip">
+The body is passed directly to the agent as its primary task specification. Concrete acceptance criteria produce better agent output than vague descriptions.
+</Aside>
+
+## File Organization
+
+All PRDs live in a single flat directory:
+
+```bash frame="terminal" title="PRD directory structure"
+.darkfactory/prds/
+  PRD-001-project-init.md
+  PRD-030-webhook-system.md
+  PRD-068-http-client.md
+  PRD-069-backoff-config.md
+  PRD-070-retry-webhook.md
+  PRD-4.1.1-auth-hashing.md
+```
+
+The filename must match the pattern `PRD-{id}-{slug}.md`. The loader uses this to derive the `slug` field and cross-reference with the `id` in frontmatter.

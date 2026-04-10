@@ -1,0 +1,157 @@
+---
+title: "System Operations"
+description: "How to define and run system-level operations that apply across your entire project, outside the scope of individual PRDs."
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+Not every task maps to a single PRD. Codebase-wide refactors, dependency upgrades, linting sweeps, and infrastructure migrations are better modeled as system operations. DarkFactory supports these through operation definitions in `.darkfactory/operations/`, managed via the `prd system` subcommands.
+
+## Operation File Location
+
+Each operation lives in its own directory under `.darkfactory/operations/`:
+
+```
+.darkfactory/operations/
+  upgrade-dependencies/
+    operation.py
+  rotate-secrets/
+    operation.py
+  run-benchmarks/
+    operation.py
+```
+
+The directory name becomes the operation identifier used in CLI commands.
+
+## Defining an Operation
+
+An operation file exports an `operation` attribute -- an `Operation` dataclass with a name, description, and task sequence. Operations use the same `ShellTask` and `AgentTask` primitives as workflows.
+
+```python
+from darkfactory.operations import Operation
+from darkfactory.workflow import ShellTask, AgentTask
+
+operation = Operation(
+    name="upgrade-dependencies",
+    description="Update all Python dependencies to latest compatible versions and run tests",
+    tasks=[
+        ShellTask(
+            name="compile",
+            command="pip-compile --upgrade requirements.in",
+        ),
+        ShellTask(
+            name="install",
+            command="pip install -r requirements.txt",
+        ),
+        ShellTask(
+            name="test",
+            command="pytest --tb=short -q",
+            on_failure="fail",
+        ),
+    ],
+)
+```
+
+Operations can also include `AgentTask` steps for work that benefits from AI reasoning:
+
+```python
+operation = Operation(
+    name="migrate-api-v2",
+    description="Migrate deprecated v1 API calls to v2 equivalents",
+    tasks=[
+        AgentTask(
+            name="analyze",
+            prompt_file="find-v1-calls.md",
+        ),
+        AgentTask(
+            name="migrate",
+            prompt_file="apply-migration.md",
+        ),
+        ShellTask(
+            name="verify",
+            command="pytest tests/ && mypy src/",
+            on_failure="fail",
+        ),
+    ],
+)
+```
+
+## Listing Operations
+
+```bash frame="terminal" title="List all registered operations"
+prd system list
+```
+
+Output:
+
+```bash frame="terminal" title="Operation list output"
+OPERATION              DESCRIPTION
+upgrade-dependencies   Update all Python dependencies to latest compatible versions and run tests
+migrate-api-v2         Migrate deprecated v1 API calls to v2 equivalents
+run-benchmarks         Execute performance benchmarks and report regressions
+```
+
+## Inspecting an Operation
+
+```bash frame="terminal" title="Describe a specific operation"
+prd system describe upgrade-dependencies
+```
+
+The `describe` subcommand prints the operation's description, its task sequence with types and commands, and any parameters it accepts. Use this to review an operation before executing it, especially in CI environments where you want to audit what will run.
+
+## Running an Operation
+
+```bash frame="terminal" title="Execute an operation"
+prd system run upgrade-dependencies
+```
+
+Execution follows the same task runner as PRD workflows: tasks run in sequence, JSONL events are emitted to `.darkfactory/events/`, and failures are handled according to each task's `on_failure` policy.
+
+Key differences from PRD workflows:
+
+| Aspect | PRD Workflow | System Operation |
+|--------|-------------|-----------------|
+| Worktree | Dedicated worktree per PRD | Current working tree |
+| Branch | Auto-created from PRD ID | No branch management |
+| Status lifecycle | `ready` -> `in-progress` -> `done` | No status tracking |
+| PR creation | Automatic | Not applicable |
+| Event logging | Per-PRD event file | Shared operation event file |
+
+<Aside type="caution">
+System operations run in the current working tree, not in an isolated worktree. Changes are applied directly. Ensure your working tree is clean before running operations that modify files.
+</Aside>
+
+## Operations with Parameters
+
+Operations can accept runtime parameters passed via the CLI:
+
+```bash frame="terminal" title="Pass parameters to an operation"
+prd system run upgrade-dependencies --param target=requirements-dev.in
+```
+
+Define accepted parameters in your operation:
+
+```python
+operation = Operation(
+    name="upgrade-dependencies",
+    description="Update dependencies to latest compatible versions",
+    params={
+        "target": {
+            "type": "string",
+            "default": "requirements.in",
+            "description": "The requirements file to compile",
+        },
+    },
+    tasks=[
+        ShellTask(
+            name="compile",
+            command="pip-compile --upgrade {{target}}",
+        ),
+        # ...
+    ],
+)
+```
+
+<Aside type="tip">
+Use `prd system list` in CI scripts to verify that expected operations are registered before attempting to run them. Missing operation directories are silently ignored during discovery.
+</Aside>

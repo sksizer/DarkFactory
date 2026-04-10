@@ -1,0 +1,43 @@
+---
+title: "prd children"
+description: "List direct children of a PRD"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd children PRD-ID
+```
+
+## Description
+
+Lists all PRDs that declare the given PRD as their parent. Shows only direct children, not the full subtree. Each child is displayed with its ID, kind, status, and title.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `PRD-ID` | Yes | The parent PRD to list children of |
+
+## Examples
+
+```bash frame="terminal" title="List children of an epic"
+$ prd children PRD-10
+Children of PRD-10 (Platform Observability):
+  PRD-11  [feature] (done)        Structured Logging
+  PRD-12  [feature] (ready)       Metrics Dashboard
+  PRD-13  [feature] (draft)       Distributed Tracing
+
+3 direct children
+```
+
+```bash frame="terminal" title="Leaf node with no children"
+$ prd children PRD-14
+PRD-14 has no children.
+```
+
+## Related
+
+- [`prd tree`](/reference/cli/tree/) -- Full subtree (recursive)
+- [`prd undecomposed`](/reference/cli/undecomposed/) -- Find PRDs that need children
+- [`prd orphans`](/reference/cli/orphans/) -- Find PRDs missing parents

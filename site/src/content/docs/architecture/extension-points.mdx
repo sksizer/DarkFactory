@@ -1,0 +1,177 @@
+---
+title: "Extension Points"
+description: "Where and how to extend DarkFactory: custom workflows, system operations, config cascade, and prompt templates."
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+DarkFactory is designed to be extended without modifying core code. Four extension points are available, ordered from most common to most specialized.
+
+## 1. Custom Workflows
+
+The primary extension point. Create a directory in `.darkfactory/workflows/<name>/` with a `workflow.py` that exports a `workflow` attribute.
+
+```
+.darkfactory/workflows/
+  rust-service/
+    workflow.py
+    prompts/
+      implement.md
+      fix-lint.md
+```
+
+The workflow dataclass defines when it applies and what tasks it contains:
+
+```python
+from darkfactory.workflow import (
+    Workflow, AgentTask, ShellTask,
+    PRD_IMPLEMENTATION_TEMPLATE,
+)
+
+workflow = Workflow(
+    name="rust-service",
+    description="Workflow for Rust microservice PRDs",
+    priority=20,
+    applies_to=lambda prd, prds: any(
+        i.endswith(".rs") for i in prd.impacts
+    ),
+    tasks=PRD_IMPLEMENTATION_TEMPLATE.compose(
+        implement=AgentTask(name="implement", prompt_file="implement.md"),
+        verify=[
+            ShellTask(name="build", command="cargo build"),
+            ShellTask(name="test", command="cargo test"),
+            ShellTask(name="clippy", command="cargo clippy -- -D warnings",
+                      on_failure="retry_agent"),
+        ],
+    ),
+)
+```
+
+The harness discovers all workflow directories at startup, evaluates their `applies_to` predicates against the current PRD, and selects the highest-priority match. If no custom workflow matches, the built-in `default` workflow is used.
+
+<Aside type="tip">
+Use `prd plan PRD-NNN` to see which workflow would be selected for a given PRD. This verifies your predicate and priority without executing anything.
+</Aside>
+
+## 2. Custom System Operations
+
+System operations extend the `prd system` command group for project-wide tasks that do not map to individual PRDs.
+
+```
+.darkfactory/operations/
+  upgrade-deps/
+    operation.py
+  rotate-secrets/
+    operation.py
+```
+
+Each `operation.py` exports an `operation` attribute:
+
+```python
+from darkfactory.operations import Operation
+from darkfactory.workflow import ShellTask
+
+operation = Operation(
+    name="upgrade-deps",
+    description="Update Python dependencies and verify tests pass",
+    tasks=[
+        ShellTask(name="compile", command="pip-compile --upgrade requirements.in"),
+        ShellTask(name="install", command="pip install -r requirements.txt"),
+        ShellTask(name="test", command="pytest --tb=short -q", on_failure="fail"),
+    ],
+)
+```
+
+Operations appear in `prd system list` and can be inspected with `prd system describe <name>` before running with `prd system run <name>`.
+
+## 3. Config Cascade
+
+Project configuration in `.darkfactory/config.toml` overrides built-in defaults. The cascade order:
+
+<Steps>
+1. Built-in defaults (hardcoded in DarkFactory)
+2. Project config (`.darkfactory/config.toml`)
+3. Environment variables (`DARKFACTORY_MODEL_TRIVIAL`, `DARKFACTORY_STYLE_THEME`, etc.)
+4. CLI flags (highest priority)
+</Steps>
+
+```toml
+# .darkfactory/config.toml
+
+[model]
+trivial = "haiku"
+simple = "sonnet"
+moderate = "sonnet"
+complex = "opus"
+
+[timeouts]
+xs = 5
+s = 10
+m = 20
+l = 40
+xl = 75
+
+[style]
+theme = "dark"
+icon_set = "nerd-font"
+no_color = false
+```
+
+Every config key has a corresponding environment variable formed by uppercasing and prefixing with `DARKFACTORY_`. Nested keys use underscores: `[model] complex` becomes `DARKFACTORY_MODEL_COMPLEX`.
+
+<Aside type="caution">
+Environment variables override config.toml values. This is intentional for CI environments where you want to set model or timeout overrides without modifying the checked-in config file.
+</Aside>
+
+## 4. Prompt Templates
+
+Each workflow can include a `prompts/` directory containing Markdown files used by AgentTasks. Prompts support `\{{PLACEHOLDER}}` substitution with PRD metadata and execution context values.
+
+```
+.darkfactory/workflows/rust-service/prompts/
+  implement.md
+  fix-lint.md
+  fix-test.md
+```
+
+Prompt files are resolved relative to the workflow directory. An AgentTask with `prompt_file="implement.md"` loads from `<workflow_dir>/prompts/implement.md`.
+
+### Creating Effective Prompts
+
+A prompt template has three sections:
+
+```text
+# Task: Implement \{{PRD_TITLE}}
+
+## Context
+\{{PRD_BODY}}
+
+## Constraints
+- Only modify files listed in the impacts section
+- Run tests before declaring completion
+- Follow existing code patterns
+
+## Completion
+When done, print: PRD_EXECUTE_OK
+If blocked, print: PRD_EXECUTE_FAILED
+```
+
+Verify prompts (used during `retry_agent` flows) receive the additional `\{{CHECK_OUTPUT}}` placeholder:
+
+```text
+# Fix: \{{PRD_TITLE}}
+
+## Failure Output
+\{{CHECK_OUTPUT}}
+
+Fix the issues above. When done, print: PRD_EXECUTE_OK
+```
+
+## Extension Point Summary
+
+| Extension | Location | Requires Code? | Affects |
+|-----------|----------|---------------|---------|
+| Custom workflows | `.darkfactory/workflows/<name>/workflow.py` | Python | How PRDs are implemented |
+| System operations | `.darkfactory/operations/<name>/operation.py` | Python | Project-wide commands |
+| Config cascade | `.darkfactory/config.toml` | TOML only | Models, timeouts, style |
+| Prompt templates | `<workflow_dir>/prompts/*.md` | Markdown only | Agent instructions |

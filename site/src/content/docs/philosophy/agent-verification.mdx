@@ -1,0 +1,95 @@
+---
+title: "Agent Verification Model"
+description: "Why DarkFactory prefers post-agent verification over tightening agent permissions."
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+A core design principle in DarkFactory: **prefer post-agent verification over tightening permissions.** This is a deliberate architectural choice with significant implications for how workflows are structured and how safe autonomous SDLC automation actually works.
+
+## The Problem with Permission Tightening
+
+The intuitive approach to making agents safe is to restrict what they can do. Limit which files they can edit. Block which commands they can run. Whitelist which patterns they can use. The result is predictable: agents produce worse output.
+
+An agent told to "implement retry logic but don't touch config.py" will produce a half-solution that fails to integrate. An agent prevented from modifying test files will produce code that passes tests by coincidence, not correctness. Restrictions create artificial constraints that force agents into suboptimal paths.
+
+## The PRD-549 Failure
+
+This is not theoretical. DarkFactory learned this lesson the hard way with PRD-549.
+
+The setup: a workflow that used alphabetic IDs for tasks, a 600-second timeout, and a strict permission model where every delete operation was blocked. The reasoning was sound -- preventing the agent from deleting files should make it safer.
+
+The result: the agent needed to rename a module (delete old file, create new file). The delete was blocked. The agent worked around it by creating the new file and leaving the old one in place. This produced a codebase with two conflicting modules. The tests passed (they imported the new module) but the application at runtime loaded the old one. The "safety" restriction had created a silent, production-breaking failure.
+
+The fix was counterintuitive: grant the agent permission to delete files, then verify the end result. A simple post-execution check ("are there duplicate module definitions?") would have caught the problem immediately. The permission restriction prevented the agent from doing the right thing while failing to prevent the actual damage.
+
+## The Four Rules
+
+DarkFactory's agent verification model follows four rules:
+
+### 1. Grant Forward Operations
+
+Let the agent create, modify, rename, and delete files in its worktree. These are "forward" operations -- they move the codebase toward the desired state. Restricting them degrades output quality.
+
+```python
+# Good: broad tool access for implementation
+AgentTask(
+    name="implement",
+    allowed_tools=["Read", "Edit", "Write", "Glob", "Grep", "Bash(cargo:*)"],
+)
+```
+
+### 2. Keep Destructive Operations in the Harness
+
+Operations that affect state outside the worktree -- pushing branches, creating PRs, modifying PRD metadata, writing to main -- are exclusively harness operations. The agent cannot perform them regardless of tool allowlist.
+
+```python
+# These are builtins, not agent tasks
+BuiltIn(name="push_branch")   # Harness pushes, not the agent
+BuiltIn(name="create_pr")     # Harness creates PRs, not the agent
+BuiltIn(name="set_status")    # Harness manages status, not the agent
+```
+
+### 3. Verify from Shell Tasks
+
+Post-agent verification runs as ShellTasks -- deterministic, harness-controlled commands that the agent cannot tamper with.
+
+```python
+tasks=[
+    AgentTask(name="implement", prompt_file="implement.md"),
+    ShellTask(name="test", command="pytest tests/ -x", on_failure="fail"),
+    ShellTask(name="lint", command="ruff check .", on_failure="retry_agent"),
+    ShellTask(name="typecheck", command="mypy src/", on_failure="fail"),
+]
+```
+
+The verification commands run in the harness process. The agent never sees them, cannot modify them, and cannot intercept their output.
+
+### 4. Fix via Prompt and Harness, Not Permissions
+
+When an agent produces bad output, the fix is to improve the prompt or add a harness-level check -- not to add another permission restriction.
+
+| Problem | Wrong Fix | Right Fix |
+|---------|-----------|-----------|
+| Agent deletes important file | Block all deletes | Add a scope check: "modified files must be in impacts list" |
+| Agent modifies unrelated code | Restrict file access | Add a diff check: "changes outside impacts trigger warning" |
+| Agent produces invalid syntax | Block certain patterns | Add a lint step with `on_failure="retry_agent"` |
+
+## The Boundary
+
+The architecture draws a clean line:
+
+<CardGrid>
+<Card title="Agent Responsibility">
+Creative and generative work. Reading code, writing implementations, running tests via allowlisted tools. The agent works freely inside its worktree sandbox.
+</Card>
+<Card title="Harness Responsibility">
+Safety and correctness. Worktree creation, status transitions, commits, pushes, PR creation, verification execution, timeout enforcement. The harness controls the lifecycle.
+</Card>
+</CardGrid>
+
+The agent cannot bypass the harness. The harness does not need to anticipate every way the agent might go wrong -- it verifies the end result. If verification passes, the output is promoted. If it fails, the worktree is disposable.
+
+<Aside type="tip">
+When designing a new workflow, start with permissive agent access and strict verification. Then observe failure modes. Add verification checks to catch observed failures. Resist the urge to restrict agent permissions -- add a check instead.
+</Aside>

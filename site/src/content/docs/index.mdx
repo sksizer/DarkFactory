@@ -1,0 +1,124 @@
+---
+title: DarkFactory
+description: PRD-driven SDLC automation. DAG orchestration, declarative workflows, agent invocation, stacked PRs.
+template: splash
+hero:
+  title: |
+    PRD-driven
+    SDLC automation
+  tagline: |
+    Write a PRD. Define a workflow. DarkFactory resolves the dependency graph,
+    creates worktrees, invokes agents, verifies results, and opens pull requests.
+    You review.
+  actions:
+    - text: Get Started
+      link: /getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: GitHub
+      link: https://github.com/sksizer/DarkFactory
+      icon: external
+      variant: minimal
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+<div class="feature-grid">
+  <div class="feature-card">
+    <h3>DAG Execution</h3>
+    <p>PRDs declare dependencies. DarkFactory builds the graph, detects cycles, computes topological order, and executes tasks front-to-back. A failed PRD blocks its dependents — nothing downstream runs on broken foundations.</p>
+  </div>
+
+  <div class="feature-card">
+    <h3>Declarative Workflows</h3>
+    <p>Three task types compose into any SDLC shape. <code>BuiltIn</code> for git operations. <code>AgentTask</code> for Claude Code invocations. <code>ShellTask</code> for verification commands. The workflow is data, not code.</p>
+  </div>
+
+  <div class="feature-card">
+    <h3>Verify, Don't Restrict</h3>
+    <p>Agents generate. The harness verifies. Destructive operations live in trusted Python, never in the agent sandbox. When the agent fails, the harness retries with error context — not tighter permissions.</p>
+  </div>
+
+  <div class="feature-card">
+    <h3>Worktree Isolation</h3>
+    <p>Every PRD executes in its own git worktree. Branches stack on completed dependencies. Advisory file locking prevents concurrent runs on the same PRD. No cross-contamination.</p>
+  </div>
+</div>
+
+<hr class="section-divider" />
+
+## A production run
+
+```bash frame="terminal" title="$ prd run PRD-42 --execute"
+PRD-42 Add user authentication
+  workflow: default (6 tasks)
+
+  [1/6] ensure_worktree ... prd/PRD-42-add-user-authentication
+  [2/6] set_status ....... in-progress
+  [3/6] implement ........ claude (sonnet, timeout=10m)
+        ... 847 tokens in, 12,403 tokens out ...
+  [4/6] verify ........... just test
+        ... 14 passed, 0 failed ...
+  [5/6] commit + push .... prd/PRD-42-add-user-authentication -> origin
+  [6/6] create_pr ........ PR #42 opened
+
+  Done in 4m 38s. Status: review.
+```
+
+One command. Worktree created, code generated, tests passing, PR opened. The PRD moves from `ready` to `review`. You read the diff.
+
+<hr class="section-divider" />
+
+## Running an epic
+
+When the target is an epic, DarkFactory walks the full dependency tree:
+
+```bash frame="terminal" title="$ prd run PRD-200 --execute --max-runs 5"
+PRD-200: Workflow Execution Layer (epic, 11 children)
+
+  PRD-201  Workflow dataclasses ......... done     3m 12s
+  PRD-202  Runner dispatch loop ........ done     8m 44s
+  PRD-203  Built-in task registry ...... done     4m 01s
+  PRD-204  Agent invocation wrapper .... running  --:--
+  PRD-205  ShellTask verification ...... blocked  (depends on PRD-204)
+  PRD-206  Dry-run mode ................ pending
+  ...
+
+  3 of 11 complete. 1 in progress. Max runs reached (5). Stopping.
+```
+
+Each child gets its own worktree and PR. Completed PRDs become base branches for their dependents — automatic stacking. Failures isolate. The graph re-evaluates between runs.
+
+<hr class="section-divider" />
+
+## Three layers
+
+```
+ ┌─────────────────────────────────────────────────────┐
+ │  WORKFLOWS         declarative task lists           │
+ │                    (default, planning, extraction)   │
+ ├─────────────────────────────────────────────────────┤
+ │  BUILT-IN TASKS    deterministic harness primitives │
+ │                    (worktree, commit, push, PR)     │
+ ├─────────────────────────────────────────────────────┤
+ │  SDLC HARNESS      CLI, DAG, runner, config        │
+ │                    (graph, status, validation)      │
+ └─────────────────────────────────────────────────────┘
+```
+
+Workflows compose built-in tasks and agent invocations. The harness executes them against a dependency graph. Each layer has one job. Workflows never touch git. Builtins never invoke agents. The harness never generates code.
+
+<hr class="section-divider" />
+
+<div class="callout-box">
+  <p><strong>Self-hosted.</strong> DarkFactory manages its own development. 500+ PRDs tracked, planned, and executed by the same harness you install. Every feature shipped through a <code>prd run</code>.</p>
+</div>
+
+<hr class="section-divider" />
+
+<CardGrid>
+  <LinkCard title="Install" href="/getting-started/installation/" description="uv tool install darkfactory. Five minutes to first run." />
+  <LinkCard title="Concepts" href="/concepts/prds/" description="PRDs, workflows, DAGs, status lifecycle." />
+  <LinkCard title="CLI Reference" href="/reference/cli/" description="Every command. Every flag. With examples." />
+  <LinkCard title="Architecture" href="/architecture/three-layers/" description="Three layers. Clear contracts. Extension points." />
+</CardGrid>

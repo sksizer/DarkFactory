@@ -1,0 +1,136 @@
+---
+title: Containment
+description: How DarkFactory models parent-child relationships between PRDs using a forest structure, distinct from the dependency DAG.
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+**Containment** is the `parent` field on a [PRD](/concepts/prds). It forms a forest (set of trees) where each PRD has at most one parent. Containment encodes organizational hierarchy -- epic > feature > component > task. It is orthogonal to the [dependency DAG](/concepts/dag).
+
+## Structure
+
+```yaml
+# PRD-100-auth-system.md
+id: PRD-100
+kind: epic
+parent: null
+
+# PRD-101-login-flow.md
+id: PRD-101
+kind: feature
+parent: "[[PRD-100-auth-system]]"
+
+# PRD-102-password-hashing.md
+id: PRD-102
+kind: task
+parent: "[[PRD-101-login-flow]]"
+
+# PRD-103-session-tokens.md
+id: PRD-103
+kind: task
+parent: "[[PRD-101-login-flow]]"
+depends_on:
+  - "[[PRD-102-password-hashing]]"
+```
+
+This produces the tree:
+
+```
+PRD-100 (epic)
+  +-- PRD-101 (feature)
+        +-- PRD-102 (task)
+        +-- PRD-103 (task, depends_on: PRD-102)
+```
+
+Note: PRD-103 depends on PRD-102 (execution ordering via DAG), and both are children of PRD-101 (organizational grouping via containment). Different relationships, different purposes.
+
+## Tree Operations
+
+Functions available on the containment forest:
+
+| Function | Signature | Description |
+|---|---|---|
+| `children()` | `(id) -> set[str]` | Direct children of a PRD |
+| `descendants()` | `(id) -> set[str]` | All descendants via BFS |
+| `ancestors()` | `(id) -> list[str]` | Walk up to root |
+| `roots()` | `() -> set[str]` | PRDs with no parent |
+| `is_leaf()` | `(id) -> bool` | No children |
+| `is_fully_decomposed()` | `(id) -> bool` | Has at least one `task`-kind descendant |
+| `is_runnable()` | `(id) -> bool` | `kind == "task"` OR is a leaf (no children) |
+
+## Runnability
+
+A PRD is **runnable** if it is a `task` or has no children (is a leaf). Epics and features with children are **not runnable** -- they delegate to their descendants.
+
+```python
+def is_runnable(prd, forest) -> bool:
+    return prd.kind == "task" or is_leaf(prd.id, forest)
+```
+
+<Tabs>
+  <TabItem label="Runnable">
+    ```yaml
+    # Runnable: kind is task
+    id: PRD-102
+    kind: task
+    parent: "[[PRD-101-login-flow]]"
+
+    # Runnable: leaf node (no children, even though kind is feature)
+    id: PRD-200
+    kind: feature
+    parent: "[[PRD-199-infra]]"
+    # (no other PRD has parent: PRD-200)
+    ```
+  </TabItem>
+  <TabItem label="Not Runnable">
+    ```yaml
+    # Not runnable: has children
+    id: PRD-101
+    kind: feature
+    parent: "[[PRD-100-auth-system]]"
+    # PRD-102 and PRD-103 have parent: PRD-101
+
+    # Not runnable: epic with children
+    id: PRD-100
+    kind: epic
+    # PRD-101 has parent: PRD-100
+    ```
+
+    These PRDs exist for organizational grouping only. The scheduler skips them and executes their runnable descendants instead.
+  </TabItem>
+</Tabs>
+
+## Containment vs Dependencies
+
+<CardGrid>
+  <Card title="Containment (parent)">
+    - Organizational hierarchy
+    - Epic > feature > component > task
+    - Encoded in `parent` field
+    - Forest structure (each node has 0 or 1 parents)
+    - Does NOT imply execution ordering
+  </Card>
+  <Card title="Dependencies (depends_on)">
+    - Execution ordering
+    - A must complete before B starts
+    - Encoded in `depends_on` / `blocks`
+    - DAG structure (cycles forbidden)
+    - Does NOT imply organizational grouping
+  </Card>
+</CardGrid>
+
+A task can depend on a sibling under a different parent:
+
+```yaml
+# PRD-110: Add rate limiting
+kind: task
+parent: "[[PRD-100-auth-system]]"        # contained in auth epic
+depends_on:
+  - "[[PRD-050-redis-client]]"           # depends on infra epic's task
+```
+
+PRD-110 is organizationally part of the authentication epic but cannot start until a task from the infrastructure epic completes. The [DAG](/concepts/dag) governs when it runs. Containment governs where it appears in the project breakdown.
+
+<Aside type="note">
+`is_fully_decomposed()` checks whether a parent PRD has been broken down into actionable tasks. An epic with only feature children (no tasks) is not fully decomposed -- work cannot be scheduled until tasks exist at the leaves.
+</Aside>

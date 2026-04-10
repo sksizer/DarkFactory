@@ -1,0 +1,249 @@
+---
+title: "Verification"
+description: "How DarkFactory verifies task outcomes using ShellTask on_failure policies and harness-side verification."
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+Automated implementation without automated verification is just generating code and hoping. DarkFactory's verification system ensures that every task produces the expected outcome and defines exactly what happens when it does not.
+
+## The `on_failure` Policy
+
+Every `ShellTask` has an `on_failure` field that determines what the harness does when the command exits non-zero. There are three policies:
+
+### `"fail"` -- Abort the Workflow
+
+The default. Stops execution immediately and preserves the working tree for debugging. The PRD is marked as `blocked`.
+
+```python
+ShellTask(
+    name="test",
+    command="pytest tests/ -x",
+    on_failure="fail",
+)
+```
+
+Use `"fail"` for verification steps where a failure indicates a fundamental problem: tests fail, type checks fail, the build is broken. There is no point continuing if the core invariant is violated.
+
+### `"retry_agent"` -- Self-Healing Loop
+
+The harness captures the failed command's stdout/stderr, re-invokes the most recent `AgentTask` using its `verify_prompts`, and passes the failure output via the `\{{CHECK_OUTPUT}}` placeholder. After the agent applies fixes, the harness re-runs the failed ShellTask exactly once.
+
+```python
+ShellTask(
+    name="lint",
+    command="ruff check . --fix",
+    on_failure="retry_agent",
+)
+```
+
+The retry sequence:
+
+<Steps>
+1. ShellTask `lint` fails (exit code 1)
+2. Harness captures stderr (e.g., "3 fixable lint errors in src/handler.py")
+3. Harness re-invokes the preceding AgentTask with verify prompt + `\{{CHECK_OUTPUT}}`
+4. Agent reads the lint output and fixes the issues
+5. Harness re-runs `ruff check . --fix`
+6. If it passes, execution continues. If it fails again, the workflow aborts.
+</Steps>
+
+<Aside type="tip">
+Use `"retry_agent"` on linting, formatting, and simple compilation errors. Agents are effective at fixing style violations and type errors. Avoid using it for test failures -- agents are unreliable at fixing logic bugs without human guidance.
+</Aside>
+
+### `"ignore"` -- Log and Continue
+
+Logs the failure but does not stop the workflow. The task is recorded as failed in the event log, but subsequent tasks proceed normally.
+
+```python
+ShellTask(
+    name="coverage",
+    command="coverage report --fail-under=80",
+    on_failure="ignore",
+)
+```
+
+Use `"ignore"` for advisory checks: coverage thresholds, documentation generation, optional benchmarks. These provide useful signal but should not block implementation.
+
+## Harness-Side Verification
+
+ShellTask verification runs inside the harness process, not inside the agent sandbox. This is a critical distinction: the agent cannot tamper with verification results.
+
+The verification flow:
+
+```
+Agent writes code in worktree
+    ↓
+Harness runs ShellTask (subprocess.run)
+    ↓
+Shell command has full access to the worktree
+    ↓
+Exit code determines pass/fail
+    ↓
+Harness (trusted Python) decides next action
+```
+
+The agent never sees the verification command, cannot modify it, and cannot intercept its output. The harness is the sole arbiter of pass/fail.
+
+## Verification Patterns
+
+### Pattern 1: Test Suite Gate
+
+The most common pattern. Run the test suite after implementation and fail if any test breaks.
+
+```python
+tasks=[
+    AgentTask(name="implement", prompt_file="implement.md"),
+    ShellTask(name="test", command="pytest tests/ -x", on_failure="fail"),
+]
+```
+
+### Pattern 2: Lint-Fix-Retry
+
+Let the agent fix lint issues automatically before failing.
+
+```python
+tasks=[
+    AgentTask(
+        name="implement",
+        prompt_file="implement.md",
+        verify_prompts=["fix-lint.md"],
+    ),
+    ShellTask(name="lint", command="ruff check .", on_failure="retry_agent"),
+    ShellTask(name="test", command="pytest tests/", on_failure="fail"),
+]
+```
+
+### Pattern 3: Multi-Stage Verification
+
+Run increasingly strict checks, failing fast on the cheapest ones.
+
+```python
+tasks=[
+    AgentTask(name="implement", prompt_file="implement.md"),
+    ShellTask(name="typecheck", command="mypy src/", on_failure="fail"),
+    ShellTask(name="lint", command="ruff check .", on_failure="retry_agent"),
+    ShellTask(name="unit-test", command="pytest tests/unit/", on_failure="fail"),
+    ShellTask(name="integration", command="pytest tests/integration/", on_failure="fail"),
+]
+```
+
+<Aside type="caution">
+Order verification steps from cheapest to most expensive. A `mypy` check that catches a type error in 2 seconds saves you from a 60-second integration test run that would also fail.
+</Aside>
+
+### Pattern 4: Advisory Checks
+
+Collect signal without blocking.
+
+```python
+tasks=[
+    AgentTask(name="implement", prompt_file="implement.md"),
+    ShellTask(name="test", command="pytest tests/", on_failure="fail"),
+    ShellTask(name="coverage", command="coverage report --fail-under=80", on_failure="ignore"),
+    ShellTask(name="benchmark", command="python bench.py --compare main", on_failure="ignore"),
+]
+```
+
+The event log captures output from ignored failures, making them available for post-run analysis without blocking the workflow.
+
+## Walkthrough: Test Failure and Agent Retry
+
+A step-by-step trace of what happens when an agent's implementation fails verification and the harness triggers a retry.
+
+**Setup**: PRD-312 "Add request timeout to HTTP client" uses this workflow:
+
+```python
+tasks=[
+    AgentTask(
+        name="implement",
+        prompt_file="implement.md",
+        verify_prompts=["verify.md"],
+    ),
+    ShellTask(name="test", command="just test", on_failure="retry_agent"),
+]
+```
+
+**Step 1**: The harness invokes the agent. The agent implements the timeout feature and emits the sentinel.
+
+```bash frame="terminal" title="Agent completes implementation"
+[PRD-312] AgentTask 'implement' started
+[PRD-312] Agent writing src/http/client.rs ... done
+[PRD-312] Agent writing tests/http/timeout_test.rs ... done
+[PRD-312] Agent stdout last line: PRD_EXECUTE_OK
+[PRD-312] AgentTask 'implement' completed (87s)
+```
+
+**Step 2**: The harness runs `just test`. It fails.
+
+```bash frame="terminal" title="Verification fails"
+[PRD-312] ShellTask 'test' started: just test
+running 14 tests
+test http::client::test_get_request ... ok
+test http::client::test_post_request ... ok
+test http::client::test_timeout_fires ... FAILED
+test http::client::test_timeout_zero ... FAILED
+
+failures:
+
+---- http::client::test_timeout_fires stdout ----
+thread 'test_timeout_fires' panicked at 'assertion failed: elapsed >= Duration::from_millis(500)',
+  tests/http/timeout_test.rs:42:5
+
+---- http::client::test_timeout_zero stdout ----
+thread 'test_timeout_zero' panicked at 'called `Result::unwrap()` on an `Err` value:
+  InvalidTimeout("timeout must be > 0")', tests/http/timeout_test.rs:58:14
+
+test result: FAILED. 12 passed; 2 failed; 0 ignored
+
+[PRD-312] ShellTask 'test' FAILED (exit code 101)
+[PRD-312] on_failure=retry_agent -- capturing output for retry
+```
+
+**Step 3**: The harness captures the failure output and re-invokes the agent with the verify prompt. The `\{{CHECK_OUTPUT}}` placeholder is replaced with the captured stderr/stdout.
+
+```bash frame="terminal" title="Harness re-invokes agent with failure context"
+[PRD-312] Composing retry prompt from verify.md
+[PRD-312] Binding CHECK_OUTPUT (847 bytes of test output)
+[PRD-312] AgentTask 'implement' retry 1/1 started
+```
+
+The agent receives a prompt like:
+
+```
+The verification step failed. Fix the issues and re-emit PRD_EXECUTE_OK.
+
+Failure output:
+thread 'test_timeout_fires' panicked at 'assertion failed: elapsed >= Duration::from_millis(500)',
+  tests/http/timeout_test.rs:42:5
+thread 'test_timeout_zero' panicked at 'called `Result::unwrap()` on an `Err` value:
+  InvalidTimeout("timeout must be > 0")', tests/http/timeout_test.rs:58:14
+test result: FAILED. 12 passed; 2 failed; 0 ignored
+```
+
+**Step 4**: The agent reads the errors, fixes the implementation, and emits the sentinel again.
+
+```bash frame="terminal" title="Agent fixes the issues"
+[PRD-312] Agent editing src/http/client.rs (fixed timeout comparison, added zero-check)
+[PRD-312] Agent stdout last line: PRD_EXECUTE_OK
+[PRD-312] AgentTask 'implement' retry completed (34s)
+```
+
+**Step 5**: The harness re-runs `just test`. It passes.
+
+```bash frame="terminal" title="Verification passes on retry"
+[PRD-312] ShellTask 'test' started: just test
+running 14 tests
+test http::client::test_get_request ... ok
+test http::client::test_post_request ... ok
+test http::client::test_timeout_fires ... ok
+test http::client::test_timeout_zero ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored
+
+[PRD-312] ShellTask 'test' PASSED
+[PRD-312] Workflow completed successfully (total: 128s)
+```
+
+Total cost: one retry, 34 seconds of additional agent time. The harness handled the entire loop -- the agent never knew it was being retried, it just received a new prompt with error context.

@@ -1,0 +1,98 @@
+---
+title: "Reconciliation"
+description: "How to use prd reconcile to synchronize PRD statuses with merged pull requests."
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+In a busy project, PRs merge faster than PRD statuses get updated. A PRD might still show `review` status even though its implementation PR was merged days ago. The `prd reconcile` command detects these discrepancies and flips stale statuses to `done`.
+
+## How Reconciliation Works
+
+<Steps>
+1. The harness scans all PRDs with `status: review`
+2. For each, it checks whether the associated branch has a merged PR on GitHub
+3. Matched PRDs are proposed for status transition to `done`
+4. In dry-run mode (default), changes are displayed but not applied
+5. With `--execute`, the harness writes updated frontmatter to disk
+</Steps>
+
+```bash frame="terminal" title="Dry-run reconciliation"
+prd reconcile
+```
+
+Output:
+
+```bash frame="terminal" title="Reconciliation report"
+PRD            STATUS    PR      MERGED
+PRD-042        review    #87     2026-04-07
+PRD-045        review    #91     2026-04-08
+PRD-048        review    #93     2026-04-09
+
+3 PRDs would be reconciled to 'done'.
+Run with --execute to apply.
+```
+
+## Applying Changes
+
+```bash frame="terminal" title="Execute reconciliation"
+prd reconcile --execute
+```
+
+This writes updated frontmatter (flipping `status: review` to `status: done`) to each matched PRD file on disk. It does not create a git commit by default.
+
+## Committing to Main
+
+For CI pipelines where reconciliation runs on a schedule, use `--commit-to-main` to have the harness create a commit directly on the main branch:
+
+```bash frame="terminal" title="Reconcile and commit"
+prd reconcile --execute --commit-to-main
+```
+
+The commit message follows a standardized format:
+
+```
+chore(prd): reconcile N merged PRD statuses [skip ci]
+```
+
+The `[skip ci]` suffix prevents reconciliation commits from triggering downstream CI runs, avoiding infinite loops in pipelines that run reconciliation as a scheduled job.
+
+<Aside type="tip">
+Run `prd reconcile` after merging a batch of PRs, or set it up as a scheduled CI job (e.g., every 15 minutes). Stale statuses cause the DAG executor to skip PRDs that are actually unblocked, slowing down your entire pipeline.
+</Aside>
+
+## What Reconciliation Does NOT Do
+
+Reconciliation is deliberately narrow in scope:
+
+- It only looks at PRDs with `status: review`. PRDs in `draft`, `ready`, `in-progress`, or `blocked` are not touched.
+- It only checks for merged PRs. Open or closed-without-merge PRs do not trigger status changes.
+- It does not rebase or update branches. Branch management is handled by the DAG executor.
+- It does not re-run verification. The PR was reviewed and merged by a human; that is sufficient.
+
+## CI Integration
+
+A typical CI reconciliation job:
+
+```yaml
+# .github/workflows/reconcile.yml
+name: Reconcile PRD Statuses
+on:
+  schedule:
+    - cron: '*/15 * * * *'  # Every 15 minutes
+  workflow_dispatch: {}
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+      - run: pip install darkfactory
+      - run: prd reconcile --execute --commit-to-main
+```
+
+<Aside type="caution">
+The `--commit-to-main` flag requires write access to the main branch. If your repository has branch protection rules, use a token with bypass permissions or configure the reconciliation to create a PR instead.
+</Aside>

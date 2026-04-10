@@ -1,0 +1,169 @@
+---
+title: "Configuration Reference"
+description: "Complete reference for .darkfactory/config.toml and environment variable overrides."
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+DarkFactory is configured via `.darkfactory/config.toml`. This file controls model selection, timeout tiers, capability multipliers, and output styling. Every setting can be overridden by environment variables.
+
+## `[model]`
+
+Maps effort levels to LLM model identifiers. The harness selects the model based on the PRD's `effort` field.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `trivial` | `str` | `"haiku"` | Model for trivial-effort PRDs |
+| `simple` | `str` | `"sonnet"` | Model for simple-effort PRDs |
+| `moderate` | `str` | `"sonnet"` | Model for moderate-effort PRDs |
+| `complex` | `str` | `"opus"` | Model for complex-effort PRDs |
+
+```toml
+[model]
+trivial = "haiku"
+simple = "sonnet"
+moderate = "sonnet"
+complex = "opus"
+```
+
+AgentTasks can override the model per-task. The config value is the default when no task-level override is set.
+
+## `[timeouts]`
+
+Timeout tiers in minutes, mapped to PRD effort levels. The harness assigns a timeout tier based on the effort field, then scales it by the capability multiplier.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `xs` | `int` | `5` | Extra-small timeout (minutes) |
+| `s` | `int` | `10` | Small timeout (minutes) |
+| `m` | `int` | `20` | Medium timeout (minutes) |
+| `l` | `int` | `40` | Large timeout (minutes) |
+| `xl` | `int` | `75` | Extra-large timeout (minutes) |
+
+```toml
+[timeouts]
+xs = 5
+s = 10
+m = 20
+l = 40
+xl = 75
+```
+
+Effort-to-tier mapping:
+
+| Effort | Timeout Tier |
+|--------|-------------|
+| `trivial` | `xs` |
+| `simple` | `s` |
+| `moderate` | `m` |
+| `complex` | `l` |
+| `xl` | `xl` |
+
+## `[capability_multipliers]`
+
+Scaling factors applied to timeout calculations per capability domain. A multiplier of `1.5` means tasks in that capability get 50% more time than their base timeout.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `trivial` | `float` | `1.0` | Multiplier for trivial capability |
+| `simple` | `float` | `1.0` | Multiplier for simple capability |
+| `moderate` | `float` | `1.25` | Multiplier for moderate capability |
+| `complex` | `float` | `1.5` | Multiplier for complex capability |
+
+```toml
+[capability_multipliers]
+trivial = 1.0
+simple = 1.0
+moderate = 1.25
+complex = 1.5
+```
+
+Example calculation: A PRD with `effort=moderate` (base timeout 20min) and `capability=complex` (multiplier 1.5) gets an effective timeout of 30 minutes.
+
+## `[style]`
+
+Output formatting preferences for CLI output.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `theme` | `str` | `"auto"` | Color theme: `auto`, `light`, `dark` |
+| `icon_set` | `str` | `"unicode"` | Icon set: `unicode`, `nerd-font`, `ascii` |
+| `no_color` | `bool` | `false` | Disable all color output (respects `NO_COLOR` env var) |
+
+```toml
+[style]
+theme = "dark"
+icon_set = "nerd-font"
+no_color = false
+```
+
+## Environment Variable Overrides
+
+Every config key has a corresponding environment variable. The naming convention:
+
+```
+DARKFACTORY_<SECTION>_<KEY>
+```
+
+All uppercase, underscores as separators.
+
+| Config Key | Environment Variable |
+|-----------|---------------------|
+| `model.trivial` | `DARKFACTORY_MODEL_TRIVIAL` |
+| `model.complex` | `DARKFACTORY_MODEL_COMPLEX` |
+| `timeouts.xl` | `DARKFACTORY_TIMEOUTS_XL` |
+| `style.theme` | `DARKFACTORY_STYLE_THEME` |
+| `style.no_color` | `DARKFACTORY_STYLE_NO_COLOR` |
+| `capability_multipliers.complex` | `DARKFACTORY_CAPABILITY_MULTIPLIERS_COMPLEX` |
+
+Environment variables take precedence over `config.toml` values. This is intentional for CI environments:
+
+```bash frame="terminal" title="Override model in CI"
+export DARKFACTORY_MODEL_COMPLEX=sonnet
+prd execute PRD-042
+```
+
+## Config Cascade
+
+Settings are resolved in priority order (highest wins):
+
+<Steps>
+1. CLI flags (e.g., `--model opus`)
+2. Environment variables (`DARKFACTORY_MODEL_COMPLEX=opus`)
+3. Project config (`.darkfactory/config.toml`)
+4. Built-in defaults
+</Steps>
+
+## Full Example
+
+```toml
+# .darkfactory/config.toml
+
+[model]
+trivial = "haiku"
+simple = "sonnet"
+moderate = "sonnet"
+complex = "opus"
+
+[timeouts]
+xs = 5
+s = 10
+m = 20
+l = 40
+xl = 75
+
+[capability_multipliers]
+trivial = 1.0
+simple = 1.0
+moderate = 1.25
+complex = 1.5
+
+[style]
+theme = "auto"
+icon_set = "unicode"
+no_color = false
+```
+
+<Aside type="tip">
+In CI pipelines, use environment variables to override models (e.g., downgrade to `sonnet` for cost control) without modifying the checked-in config file. The `no_color` setting is automatically inferred from the `NO_COLOR` environment variable if present.
+</Aside>

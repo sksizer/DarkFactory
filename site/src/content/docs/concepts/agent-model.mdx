@@ -1,0 +1,184 @@
+---
+title: Agent Model
+description: How DarkFactory invokes AI coding agents as subprocesses, selects models, verifies output, and handles retries.
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+DarkFactory treats AI agents as **untrusted subprocesses**. The harness composes a prompt, spawns the agent CLI, and evaluates the result via sentinel strings. The agent does generative work. The harness does safety and correctness.
+
+## Invocation
+
+`compose_prompt()` assembles the prompt from workflow prompt files and PRD content. `invoke_claude()` spawns the agent as a subprocess with `--print` mode:
+
+```bash frame="terminal" title="Simplified invocation"
+claude --print \
+  --model sonnet \
+  --allowedTools 'Read,Edit,Write,Glob,Grep,Bash(just:*)' \
+  --max-turns 30 \
+  < composed_prompt.md
+```
+
+The agent receives the full PRD body, role prompts, and task prompts as a single composed input. It operates inside the PRD's [worktree](/concepts/worktrees) and must emit a sentinel string as its final line.
+
+## Sentinel Contract
+
+The agent must emit exactly one of these strings to signal completion:
+
+```
+PRD_EXECUTE_OK        # success -- work is done
+PRD_EXECUTE_FAILED    # failure -- agent could not complete the task
+```
+
+The harness parses the last line of agent stdout to determine success. If neither sentinel is found, the invocation is treated as a failure.
+
+## Model Selection
+
+Model resolution follows a priority chain. The first match wins:
+
+<Steps>
+1. **CLI override** -- `--model opus` on the command line
+2. **Task-level model** -- `model="opus"` set on the `AgentTask`
+3. **Capability mapping** -- derived from the PRD's `capability` field
+4. **Fallback** -- `sonnet`
+</Steps>
+
+The capability-to-model mapping:
+
+| Capability | Model |
+|---|---|
+| `trivial` | haiku |
+| `simple` | sonnet |
+| `moderate` | sonnet |
+| `complex` | opus |
+
+These defaults are configurable via [config cascade](/concepts/config-cascade):
+
+```toml
+# .darkfactory/config.toml
+[model]
+trivial = "haiku"
+simple = "sonnet"
+moderate = "sonnet"
+complex = "opus"
+```
+
+<Aside type="tip">
+Set `capability` on your PRDs to control cost. A `trivial` rename task does not need `opus`. A `complex` architectural refactor benefits from it.
+</Aside>
+
+## Tool Allowlist
+
+Each `AgentTask` declares which tools the agent may use. This list is passed to `--allowedTools`:
+
+```python
+tools=[
+    "Read", "Edit", "Write", "Glob", "Grep",
+    "Bash(cargo:*)", "Bash(pnpm:*)", "Bash(just:*)", "Bash(uv:*)",
+    "Bash(git add:*)", "Bash(git status:*)",
+    "Bash(git diff:*)", "Bash(git log:*)",
+]
+```
+
+The `Bash(prefix:*)` syntax allows shell commands matching a prefix pattern. The agent cannot run arbitrary shell commands -- only those matching a declared pattern.
+
+## Timeout
+
+Agent timeout is resolved from the PRD's `effort` field multiplied by a capability-based multiplier defined in `config.toml`. For example, an `effort: m` (20 minute base) PRD with `capability: complex` might get a 2x multiplier, yielding a 40-minute timeout.
+
+## Retry Behavior
+
+When a `ShellTask` fails with `on_failure="retry_agent"`, the runner:
+
+1. Captures the shell failure output
+2. Re-invokes the last `AgentTask` with `verify_prompts` appended
+3. Binds `{CHECK_OUTPUT}` to the captured failure output
+4. Retries at most once (controlled by `retries` parameter)
+
+```python
+AgentTask(
+    name="implement",
+    retries=1,
+    verify_prompts=["prompts/verify.md"],
+    # On retry, verify.md receives {CHECK_OUTPUT} = "jest: 3 tests failed..."
+)
+```
+
+After exhausting retries, the PRD is marked `blocked` for human intervention.
+
+## Verification Philosophy
+
+Core principle: **prefer post-agent verification from the harness over tightening in-agent permissions.**
+
+The agent does forward/generative work -- writing code, making edits. The harness does safety and correctness -- running tests, checking lints, validating types. This separation exists because:
+
+- Agents are better at creative generation than constraint satisfaction
+- Shell-based checks (test suites, linters, type checkers) are deterministic and fast
+- Restricting agent tools too tightly wastes budget on workarounds
+
+<Aside type="caution">
+Concrete failure case: PRD-549 involved alphabetically-prefixed IDs. The agent spent its entire 600-second budget trying to delete invalid files rather than doing productive work. Post-agent harness checks would have caught this in seconds.
+</Aside>
+
+The default [workflow](/concepts/workflows) implements this pattern: agent writes code, then four sequential ShellTasks verify the output (test, format, lint, typecheck). Failures route back to the agent with the error output for one retry attempt.
+
+## Model Selection in Practice
+
+Walk through the resolution chain for a concrete PRD.
+
+**Given PRD-312**:
+
+```yaml
+id: PRD-312
+title: Add request timeout to HTTP client
+capability: moderate
+# no explicit model field
+```
+
+**Resolution chain** (first match wins):
+
+| Step | Source | Value | Match? |
+|------|--------|-------|--------|
+| 1 | CLI `--model` flag | not provided | no |
+| 2 | AgentTask `model` field | not set | no |
+| 3 | Capability mapping | `moderate` → `sonnet` | **yes** |
+| 4 | Fallback | `sonnet` | skipped |
+
+Result: the agent runs with `sonnet`.
+
+```bash frame="terminal" title="Default resolution"
+prd execute PRD-312
+```
+
+```bash frame="terminal" title="Harness log"
+[PRD-312] Model resolution: capability=moderate → sonnet
+[PRD-312] Invoking: claude --print --model sonnet ...
+```
+
+**Override from the CLI**: force `opus` regardless of capability mapping.
+
+```bash frame="terminal" title="CLI override"
+prd execute PRD-312 --model opus
+```
+
+```bash frame="terminal" title="Harness log with override"
+[PRD-312] Model resolution: CLI override → opus
+[PRD-312] Invoking: claude --print --model opus ...
+```
+
+**Override from the workflow**: set the model directly on the AgentTask. This takes precedence over capability mapping but not the CLI flag.
+
+```python
+AgentTask(
+    name="implement",
+    prompt_file="implement.md",
+    model="opus",  # always use opus for this task
+)
+```
+
+```bash frame="terminal" title="Task-level override"
+[PRD-312] Model resolution: AgentTask.model → opus
+[PRD-312] Invoking: claude --print --model opus ...
+```
+
+The priority order means you can set sensible defaults via `capability` on every PRD, override specific tasks in workflows, and still force a model from the command line during debugging or cost-sensitive runs.

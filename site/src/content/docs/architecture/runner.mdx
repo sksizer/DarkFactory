@@ -1,0 +1,150 @@
+---
+title: "Runner"
+description: "Task dispatch loop, retry semantics, and execution flow in runner.py."
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+The Runner is the execution engine at the heart of DarkFactory. It takes a resolved workflow and an `ExecutionContext`, then dispatches tasks one at a time, handling errors, retries, timeouts, and result collection.
+
+## Dispatch Loop
+
+The runner in `runner.py` walks the workflow's task list sequentially. For each task, it dispatches by type using `isinstance`:
+
+```python
+for task in workflow.tasks:
+    if isinstance(task, BuiltIn):
+        result = _run_builtin(task, ctx)
+    elif isinstance(task, AgentTask):
+        result = _run_agent(task, ctx)
+    elif isinstance(task, ShellTask):
+        result = _run_shell(task, ctx)
+```
+
+There is no parallel execution within a workflow. Tasks run in declared order. Parallelism exists at the DAG level (multiple PRDs), not the task level.
+
+## `_run_builtin`: Built-in Task Dispatch
+
+Built-in tasks are dispatched by looking up the task name in the `BUILTINS` registry -- a dictionary mapping names to callable functions.
+
+<Steps>
+1. Look up `BUILTINS[task.name]`
+2. Format kwargs from the task definition and execution context
+3. Call the built-in function with the formatted kwargs
+4. Return the result (built-ins are synchronous)
+</Steps>
+
+```python
+def _run_builtin(task: BuiltIn, ctx: ExecutionContext) -> StepResult:
+    fn = BUILTINS[task.name]
+    kwargs = _format_kwargs(task, ctx)
+    return fn(**kwargs)
+```
+
+Built-ins receive the full `ExecutionContext` and can perform privileged operations: git commands, status transitions, file writes outside the worktree. They are trusted code.
+
+## `_run_agent`: Agent Task Dispatch
+
+Agent tasks are the most complex dispatch path. The runner composes a prompt, selects a model, invokes the Claude API, and stores the result on the execution context.
+
+<Steps>
+1. **Compose prompt** -- Load the prompt file from `<workflow_dir>/prompts/`, substitute `\{{PLACEHOLDER}}` tokens with values from the PRD and context
+2. **Pick model** -- Use the task-level model override, or fall back to the config model for the PRD's effort level
+3. **Invoke Claude** -- Send the composed prompt with the tool allowlist to the Claude API
+4. **Store result** -- Save the agent's response on `ctx` for use by subsequent tasks (e.g., verify prompts reference prior agent output)
+5. **Check sentinel** -- Scan output for `PRD_EXECUTE_OK` or `PRD_EXECUTE_FAILED`
+</Steps>
+
+The agent runs inside the worktree with access only to the tools specified in `allowed_tools`. The harness enforces this allowlist -- the agent cannot bypass it.
+
+## `_run_shell`: Shell Task Dispatch
+
+Shell tasks run a command in the worktree via `subprocess.run`.
+
+```python
+def _run_shell(task: ShellTask, ctx: ExecutionContext) -> StepResult:
+    cmd = _format_cmd(task.command, ctx)
+    result = subprocess.run(
+        cmd, shell=True, cwd=ctx.worktree_path,
+        capture_output=True, timeout=task.timeout,
+    )
+    if result.returncode != 0:
+        return _handle_shell_failure(task, result, ctx)
+    return StepResult(success=True, output=result.stdout)
+```
+
+The `on_failure` policy on the task determines what happens on non-zero exit:
+
+| Policy | Behavior |
+|--------|----------|
+| `"fail"` | Abort the workflow immediately. Default. |
+| `"retry_agent"` | Re-invoke the last AgentTask with verify prompts + `\{{CHECK_OUTPUT}}`, then retry the shell command once. |
+| `"ignore"` | Log the failure and continue to the next task. |
+
+## The Retry Loop
+
+The `retry_agent` policy triggers a specific sequence:
+
+<Steps>
+1. ShellTask fails (non-zero exit)
+2. Runner captures stdout + stderr as `CHECK_OUTPUT`
+3. Runner locates the most recent `AgentTask` in the already-executed task list
+4. Runner re-invokes that AgentTask using its `verify_prompts` instead of the original `prompt_file`
+5. The verify prompt receives `\{{CHECK_OUTPUT}}` populated with the failure output
+6. Agent applies fixes in the worktree
+7. Runner re-runs the failed ShellTask exactly once
+8. If it passes, execution continues. If it fails again, the workflow aborts.
+</Steps>
+
+```
+implement (AgentTask)  →  lint (ShellTask, on_failure="retry_agent")
+                              ↓ FAIL
+                          implement (re-invoke with verify prompt + CHECK_OUTPUT)
+                              ↓
+                          lint (retry once)
+                              ↓ PASS → continue
+                              ↓ FAIL → abort workflow
+```
+
+<Aside type="caution">
+The retry loop runs exactly once. There is no retry-of-retry. If the agent cannot fix the issue on the first attempt, human intervention is required.
+</Aside>
+
+## RunResult
+
+The runner returns a `RunResult` summarizing the execution:
+
+```python
+@dataclass
+class RunResult:
+    success: bool              # Did all tasks pass?
+    pr_url: str | None         # URL of the created PR (if any)
+    steps: list[StepResult]    # Per-task results in execution order
+    failure_reason: str | None # Description of what went wrong
+```
+
+Each `StepResult` contains the task name, type, success flag, duration, and captured output. This structure is used by the graph executor to decide whether to continue with downstream PRDs or mark them as blocked.
+
+## Dry-Run Mode
+
+When `--execute` is not passed, the runner operates in dry-run mode. It resolves the workflow, computes the task list, and prints each task that would execute -- but performs no side effects.
+
+```bash frame="terminal" title="Dry-run output"
+prd plan PRD-042
+```
+
+```
+Workflow: default (priority 0)
+Tasks:
+  1. [builtin]  ensure_worktree
+  2. [builtin]  set_status → in-progress
+  3. [agent]    implement (model: sonnet, prompt: implement.md)
+  4. [shell]    pytest tests/ -x (on_failure: fail)
+  5. [shell]    ruff check . (on_failure: retry_agent)
+  6. [builtin]  commit
+  7. [builtin]  push_branch
+  8. [builtin]  create_pr
+  9. [builtin]  cleanup_worktree
+```
+
+No branches are created, no agents are invoked, no statuses are changed. This is the default behavior for `prd plan`.

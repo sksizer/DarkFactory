@@ -1,0 +1,118 @@
+---
+title: "Harness as Safety Layer"
+description: "The harness owns correctness and destructive operations; agents own creative generation."
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+DarkFactory draws a sharp line between two kinds of work: work that must be correct (harness) and work that benefits from creativity (agent). This separation is the foundation of safe autonomous SDLC automation.
+
+## What the Harness Owns
+
+The harness is responsible for every operation that could cause irreversible damage or violate project invariants.
+
+### Worktree Creation and Teardown
+
+The harness creates a dedicated git worktree for each PRD execution. The agent works inside this sandbox. If the agent produces garbage, the worktree is disposable -- `cleanup_worktree` removes it without affecting any other branch or worktree.
+
+```
+main (protected)
+ └── worktrees/
+      ├── prd-042/ (agent works here)
+      ├── prd-045/ (agent works here)
+      └── prd-048/ (agent works here)
+```
+
+### Status Transitions
+
+PRD lifecycle transitions follow a strict state machine:
+
+```
+draft → ready → in-progress → review → done
+  ↓       ↓         ↓            ↓
+  └───────┴─────────┴────────────┴──→ blocked
+  └───────┴─────────┴────────────┴──→ cancelled
+```
+
+The harness enforces valid transitions. An agent cannot set a PRD's status directly. The `set_status` built-in validates the transition before applying it. Invalid transitions (e.g., `draft` directly to `done`) are rejected.
+
+### Commits, Pushes, and PRs
+
+All git write operations flow through the harness:
+
+- **Commit**: The `commit` built-in stages changes and creates a commit with a standardized message.
+- **Push**: The `push_branch` built-in pushes to the remote. The agent cannot push.
+- **PR creation**: The `create_pr` built-in creates a GitHub PR with metadata derived from the PRD. The agent cannot create PRs.
+
+This means an agent can write any code it wants, but that code only reaches GitHub when the harness decides it should -- after verification passes.
+
+### Timeout Enforcement
+
+The harness enforces timeouts at multiple levels:
+
+| Timeout | Scope | Default |
+|---------|-------|---------|
+| `xs` | Trivial tasks | 5 minutes |
+| `s` | Simple tasks | 10 minutes |
+| `m` | Moderate tasks | 20 minutes |
+| `l` | Large tasks | 40 minutes |
+| `xl` | Extra-large tasks | 75 minutes |
+
+Timeouts are assigned based on the PRD's `effort` field and scaled by `capability_multipliers` from config. A timed-out agent task is terminated, the worktree is preserved for inspection, and the PRD is marked `blocked`.
+
+### File Locking
+
+During execution, the harness prevents concurrent modifications to the same PRD file. If two processes attempt to execute overlapping PRDs, the second will wait or fail with a lock error.
+
+## What Agents Own
+
+Agents are responsible for creative, generative work inside their worktree sandbox:
+
+### Reading Code
+
+Agents can read any file in the worktree using the `Read`, `Glob`, and `Grep` tools. They analyze the codebase to understand existing patterns, find relevant files, and determine what needs to change.
+
+### Writing Implementations
+
+Agents create, modify, and delete files using `Edit` and `Write` tools. They have full creative freedom within the worktree -- no file is off-limits. This freedom produces better implementations than restricting which files the agent can touch.
+
+### Running Tests
+
+Agents can execute allowlisted commands via `Bash`. Tool allowlists use glob patterns to control what commands are available:
+
+```python
+allowed_tools=["Bash(pytest:*)", "Bash(cargo:*)", "Bash(npm:*)"]
+```
+
+The agent can run tests and build commands to verify its own work before the harness performs its independent verification.
+
+## The Trust Boundary
+
+<CardGrid>
+<Card title="The Harness Can Freely...">
+Delete worktrees. Reject bad output. Revert changes. Block status transitions. Refuse to push. Kill timed-out agents. Skip failed PRDs.
+</Card>
+<Card title="The Agent Cannot...">
+Push to remote. Create PRs. Modify PRD metadata. Change status. Write outside its worktree. Bypass verification. Extend its own timeout.
+</Card>
+</CardGrid>
+
+The critical insight: we never need to trust that an agent will "do the right thing." We only need to trust that the harness can detect when it did not.
+
+The agent's worktree is a sandbox. Everything the agent produces stays in the sandbox until the harness explicitly promotes it (commit, push, PR). If verification fails, the sandbox is discarded. If the agent times out, the sandbox is preserved for inspection but nothing reaches the remote.
+
+<Aside type="tip">
+When debugging a failed execution, look at the worktree first. It contains exactly what the agent produced, unmodified by the harness. The event log tells you what the harness did with it.
+</Aside>
+
+## Why Not Just Restrict the Agent?
+
+See [Agent Verification Model](/philosophy/agent-verification/) for the full argument. The short version: restrictions degrade agent output quality without improving safety. Verification achieves both.
+
+| Approach | Agent Quality | Safety Guarantee |
+|----------|-------------|-----------------|
+| Restrict agent + no verification | Degraded | Weak (restrictions have gaps) |
+| Restrict agent + verification | Degraded | Strong |
+| Free agent + verification | Optimal | Strong |
+
+DarkFactory chooses the third option. Free agent, strong verification, harness-controlled promotion.
