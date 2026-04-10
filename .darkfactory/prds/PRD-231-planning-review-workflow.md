@@ -2,7 +2,7 @@
 id: "PRD-231"
 title: "Planning review workflow: extend partially-decomposed epics"
 kind: task
-status: ready
+status: review
 priority: medium
 effort: s
 capability: complex
@@ -20,7 +20,7 @@ impacts:
 workflow: null
 target_version: null
 created: 2026-04-08
-updated: '2026-04-08'
+updated: '2026-04-09'
 tags:
   - harness
   - workflow

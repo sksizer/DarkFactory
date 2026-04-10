@@ -2,7 +2,7 @@
 id: PRD-560
 title: Transcripts should be jsonl files
 kind: feature
-status: ready
+status: done
 priority: medium
 effort: m
 capability: moderate
@@ -19,7 +19,7 @@ assignee:
 reviewers: []
 target_version:
 created: 2026-04-09
-updated: 2026-04-09
+updated: '2026-04-09'
 tags: []
 ---
 
