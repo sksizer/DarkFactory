@@ -42,6 +42,7 @@ from darkfactory.builtins._shared import (
 from darkfactory.builtins.analyze_transcript import analyze_transcript
 from darkfactory.builtins.cleanup_worktree import cleanup_worktree
 from darkfactory.builtins.commit import commit
+from darkfactory.builtins.rework_guard import check_rework_guard
 from darkfactory.builtins.commit_events import commit_events
 from darkfactory.builtins.commit_transcript import commit_transcript
 from darkfactory.builtins.create_pr import create_pr
@@ -70,4 +71,5 @@ __all__ = [
     "lint_attribution",
     "cleanup_worktree",
     "analyze_transcript",
+    "check_rework_guard",
 ]

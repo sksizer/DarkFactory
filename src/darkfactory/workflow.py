@@ -56,7 +56,14 @@ OnFailure = Literal["fail", "retry_agent", "ignore"]
 
 
 Status = Literal[
-    "draft", "ready", "in-progress", "review", "done", "blocked", "cancelled", "superseded"
+    "draft",
+    "ready",
+    "in-progress",
+    "review",
+    "done",
+    "blocked",
+    "cancelled",
+    "superseded",
 ]
 """All PRD lifecycle statuses. Mirrors the enum in ``docs/prd/_schema.yaml``."""
 
