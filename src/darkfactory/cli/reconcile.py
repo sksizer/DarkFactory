@@ -120,7 +120,7 @@ def _create_reconcile_pr(
     repo_root: Path,
 ) -> None:
     """Create a PR with the reconciled status changes."""
-    branch = "prd/reconcile-status"
+    branch = f"prd/reconcile-status-{date.today().strftime('%Y%m%d')}"
     # Delete stale branch from a previous run, if any.
     subprocess.run(
         ["git", "-C", str(repo_root), "branch", "-D", branch],
