@@ -147,14 +147,33 @@ Otherwise, call `claude --print` (the same plumbing AgentTask uses) with:
 
 ### Outputs
 
-- **Committed analysis file:** `.darkfactory/transcripts/{prd_id}-{ts}.analysis.md`
-  alongside the transcript. Same staging path as `commit_transcript`.
+- **Analysis file:** `.darkfactory/transcripts/{prd_id}-{ts}.analysis.md`
+  alongside the transcript. Written locally but **not committed by default**
+  — transcripts and analysis may contain sensitive information (API keys,
+  internal paths, credentials visible in agent output). Committing is
+  opt-in via `[analysis] commit = true` in `.darkfactory/config.toml`.
+  This matches the principle that private repos can opt in while public
+  repos stay safe by default.
 - **PR body addendum:** appended to `ctx.run_summary` so the existing
   `create_pr` builtin picks it up. The addendum is short — title plus a
   bullet list of finding categories, with a pointer to the analysis file
   for detail. We do not dump the full retro into the PR body.
 - **Stdout:** the existing `summarize_agent_run` already prints to stdout
   via `ctx.run_summary`. Appending here is enough.
+
+### Security considerations
+
+Agent transcripts can contain sensitive information: environment variables,
+file contents, API responses, and credentials that the agent encountered
+during execution. The analysis file may reproduce excerpts of this content.
+
+- **Default: not committed.** Analysis files are written to the gitignored
+  `.darkfactory/transcripts/` directory and are not staged unless
+  `[analysis] commit = true` is set in config.
+- **Future: secrets filtering.** A separate secrets-filtering tool should
+  be developed to scan any output (transcripts, analysis, PR bodies) for
+  credential patterns before commit. This is tracked separately and not
+  part of this PRD's scope.
 
 ### Failure mode
 
@@ -211,8 +230,9 @@ one.
       (default: `sonnet`) when any finding is `error` severity. Verified by
       tests that exercise both tiers.
 - [ ] AC-5: When findings warrant Stage 2, the builtin writes
-      `.darkfactory/transcripts/{prd_id}-{ts}.analysis.md` and stages it
-      with `git add`.
+      `.darkfactory/transcripts/{prd_id}-{ts}.analysis.md`. The file is
+      staged with `git add -f` only when `[analysis] commit = true` is
+      set in `.darkfactory/config.toml` (default: not committed).
 - [ ] AC-6: `ctx.run_summary` is augmented with a short analysis section
       (title + finding-category bullets + pointer to the analysis file)
       so it surfaces in stdout and in the PR body via the existing

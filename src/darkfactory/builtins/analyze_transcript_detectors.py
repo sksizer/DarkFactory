@@ -187,7 +187,7 @@ def detect_retry_count(events: list[dict[str, object]]) -> list[Finding]:
 def detect_repeated_edit(events: list[dict[str, object]]) -> list[Finding]:
     """Flag consecutive Edit/Write calls to the same file path."""
     findings = []
-    prev_key: tuple[str, str] | None = None
+    prev_key: str | None = None
 
     for event in events:
         for tool_use in _tool_use_items(event):
@@ -197,7 +197,7 @@ def detect_repeated_edit(events: list[dict[str, object]]) -> list[Finding]:
                 continue
             inp = tool_use.get("input", {})
             file_path = inp.get("file_path", "") if isinstance(inp, dict) else ""
-            key = (name, str(file_path))
+            key = str(file_path)
             if key == prev_key:
                 findings.append(
                     Finding(

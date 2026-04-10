@@ -289,8 +289,8 @@ def test_error_findings_use_model_severe(tmp_path: Path) -> None:
     assert llm_calls[0][model_idx + 1] == "sonnet"
 
 
-def test_analysis_file_written_and_staged(tmp_path: Path) -> None:
-    """AC-5: analysis.md is written and staged with git add."""
+def test_analysis_file_written_not_staged_by_default(tmp_path: Path) -> None:
+    """AC-5: analysis.md is written but NOT staged by default (security)."""
     _make_transcript_file(tmp_path)
     ctx = _make_ctx(tmp_path)
 
@@ -314,8 +314,37 @@ def test_analysis_file_written_and_staged(tmp_path: Path) -> None:
     analysis_files = list(td.glob("*.analysis.md"))
     assert len(analysis_files) == 1
 
-    # git add should have been called for the analysis file
-    assert any("git" in call and "add" in call for call in staged)
+    # git add should NOT have been called (default: no commit)
+    assert not staged
+
+
+def test_analysis_file_staged_when_config_commit_true(tmp_path: Path) -> None:
+    """AC-5: analysis.md is staged when [analysis] commit = true."""
+    _make_transcript_file(tmp_path)
+    ctx = _make_ctx(tmp_path)
+
+    # Write config enabling commit
+    config_dir = tmp_path / ".darkfactory"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / "config.toml").write_text('[analysis]\ncommit = "true"\n')
+
+    staged: list[list[str]] = []
+
+    def _fake_run(args: list[str], **kwargs: object) -> MagicMock:
+        if args[:2] == ["git", "add"]:
+            staged.append(args)
+        r = MagicMock()
+        r.returncode = 0
+        r.stdout = ""
+        return r
+
+    with patch(
+        "darkfactory.builtins.analyze_transcript.subprocess.run", side_effect=_fake_run
+    ):
+        analyze_transcript(ctx)
+
+    # git add should have been called
+    assert len(staged) >= 1
 
 
 def test_run_summary_augmented(tmp_path: Path) -> None:

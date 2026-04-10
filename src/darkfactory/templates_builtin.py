@@ -68,9 +68,9 @@ EXTRACTION_TEMPLATE = WorkflowTemplate(
         AgentTask: (1, None),
     },
     close=[
-        BuiltIn("commit", kwargs={"message": "chore(prd): {prd_id} ready for review"}),
         BuiltIn("analyze_transcript"),
         BuiltIn("set_status", kwargs={"to": "review"}),
+        BuiltIn("commit", kwargs={"message": "chore(prd): {prd_id} ready for review"}),
         BuiltIn("lint_attribution"),
         BuiltIn("push_branch"),
         BuiltIn("create_pr"),

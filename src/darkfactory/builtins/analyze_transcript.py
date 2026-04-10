@@ -299,9 +299,13 @@ def analyze_transcript(ctx: ExecutionContext) -> None:
     ]
     if narrative:
         body_parts.append(narrative)
+    elif model_used:
+        body_parts.append(
+            "*(LLM call attempted but returned no output — check logs for details)*"
+        )
     else:
         body_parts.append(
-            "*(skipped -- no findings above severity threshold or LLM call skipped)*"
+            "*(skipped — no findings above severity threshold)*"
         )
 
     file_content = "\n".join(body_parts) + "\n"
@@ -313,15 +317,29 @@ def analyze_transcript(ctx: ExecutionContext) -> None:
         analysis_filename = transcript_path.stem + ".analysis.md"
         analysis_path = transcript_dir / analysis_filename
 
-        analysis_path.write_text(file_content)
-        subprocess.run(
-            ["git", "add", str(analysis_path)],
-            cwd=str(ctx.cwd),
-            check=True,
+        analysis_path.write_text(file_content, encoding="utf-8")
+
+        # Only stage for commit if configured — transcripts may contain
+        # sensitive information and should not be committed by default.
+        commit_analysis = analysis_cfg.get("commit", "false").lower() in (
+            "true",
+            "1",
+            "yes",
         )
-        ctx.logger.info(
-            "analyze_transcript: staged %s", analysis_path.relative_to(ctx.cwd)
-        )
+        if commit_analysis:
+            subprocess.run(
+                ["git", "add", "-f", "--", str(analysis_path)],
+                cwd=str(ctx.cwd),
+                check=True,
+            )
+            ctx.logger.info(
+                "analyze_transcript: staged %s", analysis_path.relative_to(ctx.cwd)
+            )
+        else:
+            ctx.logger.info(
+                "analyze_transcript: wrote %s (not staged — set [analysis] commit = true to include in PR)",
+                analysis_path.relative_to(ctx.cwd),
+            )
     except Exception as exc:
         ctx.logger.warning(
             "analyze_transcript: failed to write/stage analysis: %s", exc
