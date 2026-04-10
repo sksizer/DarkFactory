@@ -39,7 +39,11 @@
         "do_not_enforce_on_create": true,
         "required_status_checks": [
           {
-            "context": "test",
+            "context": "CI / test",
+            "integration_id": 15368
+          },
+          {
+            "context": "PRD Validation / validate",
             "integration_id": 15368
           }
         ]
