@@ -317,9 +317,7 @@ def analyze_transcript(ctx: ExecutionContext) -> None:
             "*(LLM call attempted but returned no output — check logs for details)*"
         )
     else:
-        body_parts.append(
-            "*(skipped — no findings above severity threshold)*"
-        )
+        body_parts.append("*(skipped — no findings above severity threshold)*")
 
     file_content = "\n".join(body_parts) + "\n"
 

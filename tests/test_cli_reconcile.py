@@ -357,7 +357,10 @@ def test_reconcile_skips_clobbered_but_flips_valid(
 
     with (
         patch("darkfactory.cli.reconcile._get_merged_prd_prs", return_value=prs),
-        patch("darkfactory.cli.reconcile._merge_commit_is_ancestor", side_effect=fake_ancestor),
+        patch(
+            "darkfactory.cli.reconcile._merge_commit_is_ancestor",
+            side_effect=fake_ancestor,
+        ),
     ):
         rc = main(["--prd-dir", str(prd_dir), "reconcile"])
 
