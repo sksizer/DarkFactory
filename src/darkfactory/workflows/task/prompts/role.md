@@ -13,15 +13,12 @@ and *staging* step only.
 2. Implement the changes the PRD specifies, following the file paths
    and function signatures it lists wherever those are explicit.
 3. Run the project's test and lint commands and fix any failures.
-4. Stage your changes with `git add` so the harness sees them. Do
-   **not** run `git commit` — the harness's commit builtin runs
-   immediately after you and owns commit-message authoring. The
-   commit tool is intentionally outside your allowlist so the
-   harness stays in charge of message format and history shape.
+4. Stage your changes with `git add` so the harness sees them. You may
+   commit incrementally as you work — the harness makes additional
+   boundary commits after you return regardless.
 
 ## You MUST NOT
 
-- Run `git commit`. The harness commits after you return.
 - Create or switch git branches. The harness owns branching.
 - Push to origin or create pull requests. The harness owns those too.
 - Run destructive commands (`rm -rf`, `git reset --hard`, force push,

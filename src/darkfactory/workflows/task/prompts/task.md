@@ -59,13 +59,12 @@ git status
 git diff --cached
 ```
 
-**Do not run `git commit`.** The harness commits immediately after
-you return — it owns commit-message authoring and history shape, and
-`git commit` is intentionally outside your tool allowlist. If you try
-to commit, the run will fail.
+You may commit incrementally as you work using conventional-commits
+messages (e.g. `git commit -m "feat: ..."`). The harness makes
+additional boundary commits after you return regardless, so committing
+is optional but encouraged for logical checkpoints.
 
-You also must not push, branch, or open a PR — the harness handles
-all of those.
+You must not push, branch, or open a PR — the harness handles all of those.
 
 ### 5. Report
 
