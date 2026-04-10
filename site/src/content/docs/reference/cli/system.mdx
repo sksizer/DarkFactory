@@ -1,0 +1,69 @@
+---
+title: "prd system"
+description: "System operations: list, describe, and run built-in operations"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd system list
+prd system describe NAME
+prd system run NAME [flags]
+```
+
+## Description
+
+Command group for managing built-in system operations. These are maintenance and introspection tasks that operate on the DarkFactory installation and PRD graph.
+
+### Subcommands
+
+- **`list`** -- Show all available system operations.
+- **`describe NAME`** -- Show metadata and task list for an operation.
+- **`run NAME`** -- Execute an operation. Dry-run by default.
+
+## Flags (for `run`)
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--execute` | `false` | Actually execute the operation |
+| `--target` | | Target PRD ID for `accepts_target` operations |
+| `--model` | config default | Override model for agent tasks |
+
+## Examples
+
+```bash frame="terminal" title="List available operations"
+$ prd system list
+Available operations:
+  decompose        Break down an epic/feature into tasks
+  review-prd       Review a PRD for completeness
+  doctor           Check environment health
+```
+
+```bash frame="terminal" title="Describe an operation"
+$ prd system describe decompose
+Operation: decompose
+Description: Break down an epic or feature into child task PRDs
+Accepts target: yes
+Tasks:
+  1. analyze-scope       (agent)
+  2. generate-children   (agent)
+  3. write-prds          (builtin)
+```
+
+```bash frame="terminal" title="Run an operation"
+$ prd system run doctor --execute
+Checking git... ok
+Checking Claude CLI... ok
+Checking worktree permissions... ok
+All checks passed.
+```
+
+## Behavior
+
+- `run` is dry-run by default. Pass `--execute` to actually run.
+- Operations that declare `accepts_target` require `--target PRD-ID`.
+
+## Related
+
+- [`prd list-workflows`](/reference/cli/list-workflows/) -- Workflows (per-PRD) vs system operations (project-wide)
+- [`prd run`](/reference/cli/run/) -- Execute workflows on individual PRDs

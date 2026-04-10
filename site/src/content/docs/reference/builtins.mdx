@@ -1,0 +1,159 @@
+---
+title: "Built-in Tasks"
+description: "Registry of all 10 built-in tasks, their parameters, and dry-run behavior."
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+Built-in tasks are the atomic operations that DarkFactory provides in the `builtins/` package. They handle git operations, status management, logging, and cleanup. Workflows compose these builtins alongside agent and shell tasks.
+
+Each builtin is registered in the `BUILTINS` dictionary and dispatched by name from `runner.py`.
+
+## Git Operations
+
+### `ensure_worktree`
+
+Creates a git worktree and branch for the PRD. The branch name is derived from the PRD ID and slug.
+
+| Kwarg | Type | Default | Description |
+|-------|------|---------|-------------|
+| `base_ref` | `str` | Computed | Base branch or commit. Resolved by `resolve_base_ref()`. |
+
+**Behavior**: Creates `worktrees/<prd-id>/` with a new branch `prd/<id>-<slug>` from the base ref. Fails if the worktree already exists or the base ref is dirty.
+
+**Dry-run**: Prints the worktree path and branch name that would be created. No filesystem changes.
+
+### `commit`
+
+Stages all changes in the worktree and creates a commit.
+
+| Kwarg | Type | Default | Description |
+|-------|------|---------|-------------|
+| `message` | `str` | Auto-generated | Commit message. Default: `"feat(<prd-id>): <prd-title>"` |
+
+**Behavior**: Runs `git add -A` in the worktree, then `git commit`. Skips if there are no changes to commit.
+
+**Dry-run**: Prints the diff that would be committed and the commit message. No git operations.
+
+### `push_branch`
+
+Pushes the worktree branch to the remote.
+
+| Kwarg | Type | Default | Description |
+|-------|------|---------|-------------|
+| `force` | `bool` | `false` | Force-push (used during rework to update existing branches). |
+
+**Behavior**: Runs `git push -u origin <branch>`. Sets upstream tracking.
+
+**Dry-run**: Prints the push command that would execute. No network operations.
+
+### `create_pr`
+
+Creates a GitHub pull request from the worktree branch.
+
+| Kwarg | Type | Default | Description |
+|-------|------|---------|-------------|
+| `draft` | `bool` | `false` | Create as draft PR. |
+| `reviewers` | `str[]` | From PRD | GitHub usernames to request review from. Falls back to PRD `reviewers` field. |
+| `base` | `str` | Computed | Target branch for the PR. Usually `main` or the parent PRD's branch. |
+
+**Behavior**: Calls the GitHub API to create a PR. The title is derived from the PRD title, the body from the PRD summary and acceptance criteria. Sets the `pr_url` field on the PRD frontmatter.
+
+**Dry-run**: Prints the PR title, body, base branch, and reviewers. No API calls.
+
+### `cleanup_worktree`
+
+Removes the git worktree after a successful run.
+
+| Kwarg | Type | Default | Description |
+|-------|------|---------|-------------|
+| `force` | `bool` | `false` | Remove even if the worktree has uncommitted changes. |
+
+**Behavior**: Runs `git worktree remove <path>`. Deletes the local branch if the PR has been created.
+
+**Dry-run**: Prints the worktree path that would be removed. No filesystem changes.
+
+## Lifecycle Management
+
+### `set_status`
+
+Updates the PRD frontmatter status field with transition validation.
+
+| Kwarg | Type | Required | Description |
+|-------|------|----------|-------------|
+| `status` | `str` | Yes | Target status: `in-progress`, `review`, `done`, `blocked`, `cancelled`. |
+
+**Behavior**: Validates the transition against the state machine (e.g., `ready` -> `in-progress` is valid; `draft` -> `done` is not). Writes the updated frontmatter to the PRD file. Updates the `updated` date field.
+
+**Dry-run**: Prints the proposed transition. No file modifications.
+
+<Aside type="caution">
+`set_status` enforces the state machine. If you need to force an invalid transition (e.g., resetting a `blocked` PRD to `draft`), edit the PRD file directly. The harness will accept any status on the next read.
+</Aside>
+
+## Quality and Attribution
+
+### `lint_attribution`
+
+Verifies that commits in the worktree have correct attribution.
+
+| Kwarg | Type | Default | Description |
+|-------|------|---------|-------------|
+| None | | | No configurable parameters. |
+
+**Behavior**: Checks that all commits on the branch have valid author information and are signed (if signing is configured). Fails the workflow if attribution is missing or invalid.
+
+**Dry-run**: Prints attribution status for each commit. No modifications.
+
+## Logging and Artifacts
+
+### `commit_transcript`
+
+Commits the agent transcript to the transcripts directory.
+
+| Kwarg | Type | Default | Description |
+|-------|------|---------|-------------|
+| None | | | No configurable parameters. |
+
+**Behavior**: Copies the agent's conversation transcript to `.darkfactory/transcripts/<prd-id>/` and commits it. Transcripts are git-ignored in most setups but can be tracked if configured.
+
+**Dry-run**: Prints the transcript path. No file operations.
+
+### `commit_events`
+
+Commits the JSONL event log for the current execution.
+
+| Kwarg | Type | Default | Description |
+|-------|------|---------|-------------|
+| None | | | No configurable parameters. |
+
+**Behavior**: Ensures the event log file for this PRD is flushed and committed to the events directory.
+
+**Dry-run**: Prints the event file path. No file operations.
+
+### `summarize_agent_run`
+
+Generates a human-readable summary of what the agent did during execution.
+
+| Kwarg | Type | Default | Description |
+|-------|------|---------|-------------|
+| None | | | No configurable parameters. |
+
+**Behavior**: Analyzes the agent transcript and git diff to produce a summary of changes made, files modified, and tests affected. The summary is included in the PR description.
+
+**Dry-run**: Prints that a summary would be generated. No API calls.
+
+## Quick Reference
+
+| Builtin | Category | Modifies Git? | Modifies PRD? | Network? |
+|---------|----------|--------------|--------------|----------|
+| `ensure_worktree` | Git | Yes | No | No |
+| `commit` | Git | Yes | No | No |
+| `push_branch` | Git | No | No | Yes |
+| `create_pr` | Git | No | Yes (`pr_url`) | Yes |
+| `cleanup_worktree` | Git | Yes | No | No |
+| `set_status` | Lifecycle | No | Yes (`status`) | No |
+| `lint_attribution` | Quality | No | No | No |
+| `commit_transcript` | Logging | Yes | No | No |
+| `commit_events` | Logging | Yes | No | No |
+| `summarize_agent_run` | Logging | No | No | No |

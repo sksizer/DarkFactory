@@ -1,0 +1,42 @@
+---
+title: "prd list-workflows"
+description: "Show loaded workflows with priorities and predicates"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd list-workflows
+```
+
+## Description
+
+Displays all workflows available in the current project, including built-in workflows and custom ones from `.darkfactory/workflows/`. Each workflow shows its priority and matching predicates.
+
+Workflows are matched to PRDs by priority -- higher priority workflows take precedence when multiple could match. Use this to understand matching rules and debug unexpected assignments.
+
+## Examples
+
+```bash frame="terminal" title="List all workflows"
+$ prd list-workflows
+Workflows (6 loaded):
+  Priority  Name              Predicate
+  100       fix-bug           kind=bug
+  90        run-spike         kind=spike
+  80        implement-feature kind=feature
+  70        implement-task    kind=task
+  50        decompose-epic    kind=epic
+  10        default           (fallback)
+```
+
+## Behavior
+
+- Workflows from `.darkfactory/workflows/` override built-in workflows of the same name.
+- Priority determines match order when multiple workflows could apply to a PRD.
+- The `default` workflow is the catch-all fallback.
+
+## Related
+
+- [`prd assign`](/reference/cli/assign/) -- See which workflow each PRD resolves to
+- [`prd plan`](/reference/cli/plan/) -- Preview a workflow's execution plan
+- [`prd run`](/reference/cli/run/) -- Execute workflows

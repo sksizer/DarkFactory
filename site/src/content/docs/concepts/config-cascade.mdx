@@ -1,0 +1,185 @@
+---
+title: Configuration Cascade
+description: DarkFactory resolves configuration through five layers, from built-in defaults to CLI flags, with each layer overriding the one below it.
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+DarkFactory resolves configuration through a **five-layer cascade**. Higher layers override lower ones.
+
+## Resolution Order
+
+```
+  CLI flags                --model opus              (highest priority)
+       |
+  Environment variables    DARKFACTORY_MODEL_COMPLEX=opus
+       |
+  Project config           .darkfactory/config.toml
+       |
+  User config              ~/.config/darkfactory/config.toml
+       |
+  Built-in defaults                                  (lowest priority)
+```
+
+## Config Dataclass
+
+Configuration is split into two sections:
+
+```python
+@dataclass
+class ModelConfig:
+    trivial: str = "haiku"
+    simple: str = "sonnet"
+    moderate: str = "sonnet"
+    complex: str = "opus"
+
+@dataclass
+class StyleConfig:
+    theme: str = "dark"
+    icon_set: str = "ascii"
+    no_color: bool = False
+```
+
+## Layer Details
+
+<Tabs>
+  <TabItem label="Built-in Defaults">
+    Ship with DarkFactory. Zero configuration required to get started.
+
+    ```python
+    # Effective defaults
+    model.trivial   = "haiku"
+    model.simple    = "sonnet"
+    model.moderate  = "sonnet"
+    model.complex   = "opus"
+    style.theme     = "dark"
+    style.icon_set  = "ascii"
+    style.no_color  = False
+    ```
+  </TabItem>
+  <TabItem label="User Config">
+    Located at `~/.config/darkfactory/config.toml`. Applies to all projects on your machine. Personal preferences that follow you across repos.
+
+    ```toml
+    # ~/.config/darkfactory/config.toml
+
+    [model]
+    complex = "opus"
+
+    [style]
+    theme = "dark"
+    no_color = false
+    ```
+  </TabItem>
+  <TabItem label="Project Config">
+    Located at `.darkfactory/config.toml`. Committed to version control. Shared by all team members and CI.
+
+    ```toml
+    # .darkfactory/config.toml
+
+    [model]
+    trivial = "haiku"
+    simple = "sonnet"
+    moderate = "sonnet"
+    complex = "opus"
+
+    [style]
+    theme = "dark"
+    icon_set = "ascii"
+    ```
+  </TabItem>
+  <TabItem label="Environment Variables">
+    Pattern: `DARKFACTORY_<SECTION>_<KEY>`. Useful for CI/CD pipelines.
+
+    ```bash frame="terminal" title="Environment variable examples"
+    # Model overrides
+    export DARKFACTORY_MODEL_TRIVIAL=haiku
+    export DARKFACTORY_MODEL_SIMPLE=sonnet
+    export DARKFACTORY_MODEL_MODERATE=sonnet
+    export DARKFACTORY_MODEL_COMPLEX=opus
+
+    # Style overrides
+    export DARKFACTORY_STYLE_THEME=dark
+    export DARKFACTORY_STYLE_NO_COLOR=true
+    export DARKFACTORY_STYLE_ICON_SET=ascii
+    ```
+
+    Boolean fields accept `"1"`, `"true"`, and `"yes"` as truthy values. Everything else is falsy.
+  </TabItem>
+  <TabItem label="CLI Flags">
+    Highest priority. For one-off adjustments.
+
+    ```bash frame="terminal" title="CLI flag examples"
+    # Override model for this run
+    darkfactory execute PRD-042 --model opus
+
+    # Disable color output
+    darkfactory status --no-color
+
+    # Change theme
+    darkfactory status --theme light
+
+    # Change icon set
+    darkfactory status --icon-set unicode
+    ```
+  </TabItem>
+</Tabs>
+
+## Full TOML Example
+
+```toml
+# .darkfactory/config.toml
+# Project-level configuration
+
+[model]
+trivial = "haiku"        # PRDs with capability: trivial
+simple = "sonnet"        # PRDs with capability: simple
+moderate = "sonnet"      # PRDs with capability: moderate
+complex = "opus"         # PRDs with capability: complex
+
+[style]
+theme = "dark"           # "dark" or "light"
+icon_set = "ascii"       # "ascii" or "unicode"
+no_color = false         # disable color output
+```
+
+## Cascade Example
+
+Showing how a single field resolves across layers:
+
+```bash frame="terminal" title="Model resolution for a complex PRD"
+# Built-in default:            model.complex = "opus"
+# User config:                 (not set)
+# Project config:              model.complex = "opus"
+# Environment:                 DARKFACTORY_MODEL_COMPLEX=sonnet
+# CLI:                         (not set)
+#
+# Resolved value: "sonnet" (environment wins over project config)
+```
+
+```bash frame="terminal" title="CLI overrides everything"
+# All layers set model.complex = "sonnet"
+# CLI: --model opus
+#
+# Resolved value: "opus" (CLI always wins)
+```
+
+<Aside type="note">
+The `--model` CLI flag overrides the capability-based model selection entirely. When set, all PRDs in that run use the specified model regardless of their `capability` field. See [agent model](/concepts/agent-model) for the full model selection chain.
+</Aside>
+
+## Environment Variable Naming
+
+The mapping from config keys to env vars is mechanical:
+
+| Config Key | Environment Variable |
+|---|---|
+| `model.trivial` | `DARKFACTORY_MODEL_TRIVIAL` |
+| `model.simple` | `DARKFACTORY_MODEL_SIMPLE` |
+| `model.moderate` | `DARKFACTORY_MODEL_MODERATE` |
+| `model.complex` | `DARKFACTORY_MODEL_COMPLEX` |
+| `style.theme` | `DARKFACTORY_STYLE_THEME` |
+| `style.icon_set` | `DARKFACTORY_STYLE_ICON_SET` |
+| `style.no_color` | `DARKFACTORY_STYLE_NO_COLOR` |
+
+Pattern: `DARKFACTORY_` + section name uppercased + `_` + key name uppercased.

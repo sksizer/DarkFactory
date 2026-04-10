@@ -1,0 +1,88 @@
+---
+title: "prd run"
+description: "Execute a workflow against one or more PRDs"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd run [PRD-ID | --all] [flags]
+```
+
+## Description
+
+Primary execution command. Supports three modes:
+
+1. **Single PRD** -- `prd run PRD-42 --execute`. Runs the assigned workflow for one PRD in an isolated git worktree.
+2. **DAG mode** -- `prd run PRD-200 --execute`. When the target has children or dependencies, walks the graph executing ready PRDs in topological order.
+3. **Queue mode** -- `prd run --all --execute`. Drains all ready PRDs from the queue, ordered by priority then PRD number.
+
+**Default is dry-run.** You must pass `--execute` to actually run.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `PRD-ID` | No | Target PRD. Omit with `--all` for queue mode. |
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--execute` | `false` | Actually execute (default is dry-run) |
+| `--all` | `false` | Queue mode: drain all ready PRDs |
+| `--workflow` | auto | Override workflow assignment |
+| `--base` | `HEAD` | Base ref for new branch |
+| `--model` | config default | Override model for agent tasks |
+| `--timeout` | config default | Per-PRD timeout in minutes |
+| `--max-runs` | | Cap number of PRD runs (queue mode) |
+| `--priority` | | Minimum priority filter: `critical`, `high`, `medium`, `low` (queue mode) |
+| `--tag` | | Filter by tag, repeatable, OR semantics (queue mode) |
+| `--exclude` | | Exclude specific PRD IDs, repeatable (queue mode) |
+
+## Examples
+
+```bash frame="terminal" title="Dry run (default)"
+$ prd run PRD-42
+Workflow: implement-task
+Base: HEAD
+Tasks: create-branch -> analyze-scope -> implement -> run-tests -> create-pr
+DRY RUN -- pass --execute to run
+```
+
+```bash frame="terminal" title="Execute a single PRD"
+$ prd run PRD-42 --execute
+Creating worktree for PRD-42...
+Running: implement-task
+  [1/6] create-branch       done (0.3s)
+  [2/6] analyze-scope       done (12.1s)
+  [3/6] implement           done (45.8s)
+  [4/6] run-tests           done (8.2s)
+  [5/6] create-pr           done (1.1s)
+  [6/6] update-status       done (0.2s)
+PR #142 created: https://github.com/org/repo/pull/142
+```
+
+```bash frame="terminal" title="Queue mode with filters"
+$ prd run --all --execute --max-runs 5 --priority high --tag cli
+Processing ready queue (5 max, priority>=high, tags: cli)
+  PRD-16  Prometheus exporter       done (67s)
+  PRD-22  Fix auth token refresh    done (34s)
+2 PRDs executed, 0 failed
+```
+
+## Behavior
+
+- **Dry-run by default.** Without `--execute`, shows what would happen.
+- **DAG mode** re-loads PRDs between runs to detect mid-run DAG growth (new PRDs added by preceding runs).
+- **Queue mode** uses `topo_sort_with_tiebreak`: priority descending, then PRD number ascending.
+- **Failure isolation:** a failed PRD is marked `blocked`. Transitive dependents are skipped.
+- **Stacked PRs:** when a PRD has a single dependency, its branch is created from the dependency's branch rather than `--base`.
+- **Advisory file locking** prevents concurrent runs on the same PRD.
+
+## Related
+
+- [`prd plan`](/reference/cli/plan/) -- Preview execution plan
+- [`prd next`](/reference/cli/next/) -- See what's actionable
+- [`prd rework`](/reference/cli/rework/) -- Address review feedback after a run
+- [`prd reconcile`](/reference/cli/reconcile/) -- Flip merged PRDs to done

@@ -1,0 +1,103 @@
+---
+title: Worktree Isolation
+description: Each PRD executes in its own git worktree, providing filesystem isolation, safe parallel execution, and clean PR boundaries.
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+Each PRD run creates a **git worktree** -- a separate working directory with its own branch. This provides filesystem isolation between concurrent PRD executions.
+
+## Directory Layout
+
+Worktrees are created at `.darkfactory/worktrees/{id}-{slug}/` with branches named `prd/{id}-{slug}`:
+
+```bash frame="terminal" title="Worktree structure"
+.darkfactory/worktrees/
+  PRD-070-retry-webhook/          # worktree directory
+  PRD-070-retry-webhook.lock      # advisory file lock
+  PRD-071-dead-letter-queue/
+  PRD-071-dead-letter-queue.lock
+```
+
+The `ensure_worktree` builtin handles creation:
+
+```python
+BuiltIn(name="ensure_worktree")
+# Equivalent to:
+# git worktree add .darkfactory/worktrees/PRD-070-retry-webhook \
+#   -b prd/PRD-070-retry-webhook
+```
+
+## Lifecycle
+
+<Steps>
+1. `ensure_worktree` creates the worktree and branch from the base ref
+2. Agent and ShellTasks execute with `cwd` set to the worktree path
+3. Changes are committed and pushed from the worktree
+4. PR is opened from the worktree branch
+5. `cleanup_worktree` removes the worktree after success
+</Steps>
+
+The `cleanup_worktree` builtin runs `git worktree remove` to delete the directory. The branch persists on the remote for the open PR.
+
+## File Locking
+
+Concurrent worktree operations (creation, branch checkout, push) are serialized with **advisory file locks** via the `filelock` library:
+
+```
+.darkfactory/worktrees/PRD-070-retry-webhook.lock
+```
+
+The lock is held only for the duration of the git command, not for the entire agent execution. This minimizes contention -- multiple agents can work in parallel with locks only briefly acquired during git operations.
+
+## Stacked PRs
+
+When a PRD has dependencies completed in the current run, the worktree can branch from a dependency's branch instead of the default base:
+
+<Tabs>
+  <TabItem label="Single Dep (Stacked)">
+    If a PRD has **exactly 1 dependency** completed in the current run, its worktree branches from that dependency's branch:
+
+    ```
+    main
+      +-- prd/PRD-068-http-client        (dep, completed this run)
+            +-- prd/PRD-070-retry-webhook (branches from dep, not main)
+    ```
+
+    This produces a stacked PR -- PRD-070's diff is relative to PRD-068's branch. When PRD-068 merges, PRD-070 rebases onto main.
+  </TabItem>
+  <TabItem label="No Deps / All Merged">
+    If a PRD has no unmerged dependencies from the current run, it branches from the default base (usually `main`):
+
+    ```
+    main
+      +-- prd/PRD-004-standalone-task     (branches from main)
+    ```
+  </TabItem>
+  <TabItem label="Multi-Dep (Unsupported)">
+    If a PRD has **2 or more unmerged dependencies** from the current run, the worktree is skipped:
+
+    ```
+    # PRD-075 depends on both PRD-070 and PRD-071, both unmerged
+    # Result: MultiDepUnsupported -- PRD-075 is skipped
+    ```
+
+    Multi-dependency stacking requires merge conflict resolution and is tracked as a future enhancement (PRD-552).
+  </TabItem>
+</Tabs>
+
+<Aside type="caution">
+Stacked PRs only apply when the dependency was completed in the **current execution run**. If a dependency was completed in a previous run and already merged, the new PRD branches from `main` as usual.
+</Aside>
+
+## Parallel Execution
+
+Because each PRD gets its own worktree directory and branch, multiple PRDs can execute simultaneously without interference:
+
+```
+Agent 1: working in .darkfactory/worktrees/PRD-070-retry-webhook/
+Agent 2: working in .darkfactory/worktrees/PRD-071-dead-letter-queue/
+Agent 3: working in .darkfactory/worktrees/PRD-004-standalone-task/
+```
+
+Each agent sees a clean repository state. File changes in one worktree do not affect another. The only shared resource is the git object store, which is thread-safe in git.

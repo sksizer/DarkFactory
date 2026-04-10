@@ -1,0 +1,95 @@
+---
+title: Your First PRD
+description: Create a Product Requirements Document and understand the frontmatter schema.
+---
+
+import { Steps, Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+A **PRD** (Product Requirements Document) is the atomic unit of work in DarkFactory. It's a Markdown file with YAML frontmatter that declares what to build, how complex it is, and what it depends on.
+
+<Steps>
+
+1. **Create a new PRD**
+
+   ```bash frame="terminal"
+   $ prd new "Add login endpoint" --kind task --effort s --capability simple
+   Created .darkfactory/prds/PRD-1-add-login-endpoint.md
+   ```
+
+2. **Understand the frontmatter**
+
+   Open the generated file. The YAML frontmatter is the machine-readable part that DarkFactory uses for orchestration:
+
+   ```yaml
+   ---
+   id: "PRD-1"
+   title: "Add login endpoint"
+   kind: task                    # epic | feature | task
+   status: draft                 # draft -> ready -> in-progress -> review -> done
+   priority: medium              # critical | high | medium | low
+   effort: s                     # xs (5m) | s (10m) | m (20m) | l (40m) | xl (75m)
+   capability: simple            # trivial | simple | moderate | complex
+   parent: null                  # [[PRD-X]] if this is a child of an epic/feature
+   depends_on: []                # other PRDs that must complete first
+   blocks: []                    # PRDs that are waiting on this one
+   impacts: []                   # file globs this PRD will modify
+   workflow: null                # override automatic workflow assignment
+   created: 2025-01-15
+   updated: 2025-01-15
+   tags: []
+   ---
+   ```
+
+3. **Write the PRD body**
+
+   Below the frontmatter, write what the agent (or human) needs to know to implement this:
+
+   ```markdown
+   ## Summary
+
+   Add a POST /api/login endpoint that accepts email and password,
+   validates credentials against the users table, and returns a JWT.
+
+   ## Requirements
+
+   1. Accept JSON body with `email` and `password` fields
+   2. Return 401 for invalid credentials
+   3. Return 200 with `{ token: "..." }` for valid credentials
+   4. Token expires after 24 hours
+
+   ## Acceptance Criteria
+
+   - AC-1: POST /api/login with valid creds returns 200 + JWT
+   - AC-2: POST /api/login with invalid creds returns 401
+   - AC-3: JWT contains user_id and exp claims
+   ```
+
+   <Aside type="tip">
+     The body is what the agent reads during implementation. Be specific about requirements and acceptance criteria — the agent treats them as its success criteria.
+   </Aside>
+
+4. **Validate your PRD**
+
+   ```bash frame="terminal"
+   $ prd validate
+   All PRDs valid (1 checked, 0 errors)
+   ```
+
+5. **Mark it ready**
+
+   Edit the frontmatter to change `status: draft` to `status: ready`, then check the status:
+
+   ```bash frame="terminal"
+   $ prd status
+   PRDs: 1 total
+     ready: 1
+   
+   Actionable:
+     PRD-1  Add login endpoint  [task, simple, s]
+   ```
+
+</Steps>
+
+## Next step
+
+Your PRD is ready. Now [run your first workflow](/getting-started/first-workflow/) to see DarkFactory execute it.

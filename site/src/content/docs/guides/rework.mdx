@@ -1,0 +1,135 @@
+---
+title: "Rework"
+description: "How to use prd rework to address PR review feedback and iterate on implementations without starting from scratch."
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+No implementation is perfect on the first pass. After a PR is opened, reviewers leave comments, CI surfaces issues, and requirements evolve. The `prd rework` command closes the loop between code review and automated implementation by feeding review feedback back into the agent for targeted fixes.
+
+## How Rework Works
+
+<Steps>
+1. You run `prd rework PRD-150`
+2. The harness fetches the open PR associated with PRD-150
+3. It collects all unresolved review comments from the PR
+4. It composes a rework prompt containing: the original PRD, the current diff, and each review comment with its file location and line number
+5. The agent receives this prompt and applies targeted fixes on the existing branch
+6. The harness commits and pushes, updating the PR
+</Steps>
+
+```bash frame="terminal" title="Basic rework"
+prd rework PRD-150
+```
+
+By default, this is a dry run -- it shows what the agent would receive without invoking it. Add `--execute` to actually run the agent:
+
+```bash frame="terminal" title="Execute rework"
+prd rework PRD-150 --execute
+```
+
+## Filtering Review Feedback
+
+Not all review comments require code changes. Some are questions, acknowledgments, or out-of-scope suggestions. Rework provides flags to control which feedback the agent sees.
+
+### `--reviewer`
+
+Only address comments from a specific reviewer:
+
+```bash frame="terminal" title="Filter by reviewer"
+prd rework PRD-150 --reviewer alice --execute
+```
+
+### `--since`
+
+Only address comments posted after a specific point. Accepts `last-rework` (the timestamp of the most recent rework commit) or an ISO 8601 date:
+
+```bash frame="terminal" title="Only new comments"
+prd rework PRD-150 --since last-rework --execute
+```
+
+This is essential for iterative review cycles. Without `--since`, the agent would re-process old comments and potentially introduce duplicate fixes or undo previous corrections.
+
+### `--all`
+
+Include all comments, including those marked as resolved:
+
+```bash frame="terminal" title="Include resolved comments"
+prd rework PRD-150 --all --execute
+```
+
+### `--from-pr-comment`
+
+Target a single specific comment by URL or ID:
+
+```bash frame="terminal" title="Address a specific comment"
+prd rework PRD-150 --from-pr-comment https://github.com/org/repo/pull/42#discussion_r123456 --execute
+```
+
+### `--reply-to-comments`
+
+After applying fixes, the agent posts replies to each addressed review comment explaining what was changed:
+
+```bash frame="terminal" title="Reply to reviewers"
+prd rework PRD-150 --reply-to-comments --execute
+```
+
+## Combining Flags
+
+Flags compose naturally:
+
+```bash frame="terminal" title="Targeted rework with replies"
+prd rework PRD-150 \
+  --reviewer alice \
+  --since last-rework \
+  --reply-to-comments \
+  --execute
+```
+
+This addresses only Alice's new comments, applies fixes, and replies to each comment with a summary of the change.
+
+<Aside type="caution">
+Rework operates on the existing PR branch. If you have local uncommitted changes on that branch, stash or commit them first to avoid merge conflicts during the rework commit.
+</Aside>
+
+## Rework Prompt Anatomy
+
+The rework prompt the agent receives looks approximately like this:
+
+```markdown
+# Rework: PRD-150 - Add retry logic to task runner
+
+## Original PRD
+[full PRD body]
+
+## Current Diff (vs main)
+[git diff output]
+
+## Review Comments to Address
+
+### Comment 1 (alice, src/runner.py:42)
+> The retry delay should be exponential, not linear.
+
+### Comment 2 (alice, src/runner.py:78)
+> Missing error handling for the case where max_retries is 0.
+
+## Instructions
+Address each review comment above. Make targeted changes -- do not
+refactor unrelated code. When complete, print: PRD_EXECUTE_OK
+```
+
+The agent receives the full diff context so it understands the current state of the implementation, plus precise file:line references for each comment.
+
+## Rework vs. Re-execution
+
+| Aspect | `prd rework` | `prd execute` |
+|--------|-------------|---------------|
+| Starting point | Existing branch with prior work | Fresh worktree |
+| Input | PR review comments | PRD specification |
+| Scope | Targeted fixes to addressed comments | Full implementation |
+| Branch | Reuses existing PR branch | Creates new branch |
+| Use case | Iterating on feedback | Initial implementation |
+
+<Aside type="tip">
+If review comments indicate the implementation approach is fundamentally wrong, consider setting the PRD back to `ready` and re-executing rather than trying to rework a flawed foundation.
+</Aside>

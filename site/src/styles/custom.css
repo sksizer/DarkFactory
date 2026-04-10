@@ -1,0 +1,282 @@
+/*
+ * DarkFactory — Industrial Control Panel
+ *
+ * Gunmetal surfaces. Amber caution lights. Chalk on concrete.
+ * Borders-only depth. No shadows. Factories are precise, not soft.
+ * Terminal-first — monospace is the dominant voice.
+ */
+
+/* ================================================================
+   DARK THEME — primary design target
+   ================================================================ */
+:root[data-theme='dark'] {
+	/* --- Accent: industrial amber (caution lights, hot metal) --- */
+	--sl-color-accent-low: #1c1608;
+	--sl-color-accent: #d4940a;
+	--sl-color-accent-high: #f0d080;
+
+	/* --- Surfaces: gunmetal, ascending warmth --- */
+	--sl-color-black: #08080a;       /* void — deepest background */
+	--sl-color-gray-6: #0e0e10;      /* factory floor — base canvas */
+	--sl-color-gray-5: #16161a;      /* elevated — cards, sidebar */
+	--sl-color-gray-4: #22222a;      /* border-standard */
+	--sl-color-gray-3: #3a3a44;      /* border-emphasis */
+	--sl-color-gray-2: #8a8680;      /* text-tertiary — metadata */
+	--sl-color-gray-1: #b8b4ae;      /* text-secondary — supporting */
+	--sl-color-white: #e8e4de;        /* text-primary — chalk on concrete */
+
+	/* --- Layout surfaces --- */
+	--sl-color-bg: #0a0a0c;
+	--sl-color-bg-sidebar: #0a0a0c;  /* same as canvas — border separates, not color */
+	--sl-color-bg-nav: #0e0e10;
+
+	/* --- Borders: low-opacity for whisper-quiet structure --- */
+	--sl-color-hairline-light: rgba(232, 228, 222, 0.04);
+	--sl-color-hairline: rgba(232, 228, 222, 0.08);
+	--sl-color-hairline-shade: rgba(232, 228, 222, 0.12);
+
+	/* --- Typography: terminal is the native language --- */
+	--sl-font-system-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code',
+		ui-monospace, monospace;
+	--sl-text-h1: var(--sl-text-4xl);
+	--sl-text-h2: var(--sl-text-2xl);
+}
+
+/* ================================================================
+   LIGHT THEME — functional, not primary
+   ================================================================ */
+:root[data-theme='light'] {
+	--sl-color-accent-low: #faf3e0;
+	--sl-color-accent: #9a7008;
+	--sl-color-accent-high: #4a3504;
+	--sl-color-bg: #f8f7f4;
+	--sl-color-bg-sidebar: #f8f7f4;
+	--sl-color-bg-nav: #f0efec;
+	--sl-color-hairline-light: rgba(10, 10, 12, 0.04);
+	--sl-color-hairline: rgba(10, 10, 12, 0.08);
+}
+
+/* ================================================================
+   GLOBAL — borders-only depth, no shadows anywhere
+   ================================================================ */
+
+/* Kill all box-shadows — factories don't float */
+*,
+*::before,
+*::after {
+	--sl-shadow-sm: none;
+	--sl-shadow-md: none;
+	--sl-shadow-lg: none;
+}
+
+/* ================================================================
+   SIDEBAR — same background, border-separated, dense
+   ================================================================ */
+starlight-menu-button + nav,
+.sidebar-content {
+	border-inline-end: 1px solid var(--sl-color-hairline);
+}
+
+.sidebar-content a {
+	font-size: 0.875rem;
+	letter-spacing: 0.01em;
+}
+
+/* ================================================================
+   NAVIGATION — thin bottom border, not floating
+   ================================================================ */
+header.header {
+	border-block-end: 1px solid var(--sl-color-hairline);
+}
+
+/* ================================================================
+   CODE — inset appearance, the dominant voice
+   ================================================================ */
+
+/* Inline code: subtle inset on dark surface */
+:not(pre) > code {
+	font-family: var(--sl-font-system-mono);
+	font-size: 0.875em;
+	background: rgba(232, 228, 222, 0.06);
+	border: 1px solid rgba(232, 228, 222, 0.06);
+	border-radius: 3px;
+	padding: 0.15em 0.35em;
+}
+
+[data-theme='light'] :not(pre) > code {
+	background: rgba(10, 10, 12, 0.05);
+	border-color: rgba(10, 10, 12, 0.06);
+}
+
+/* ================================================================
+   LANDING PAGE — dispatch board, not marketing
+   ================================================================ */
+
+/* Hero: let the words lead, no decorative flair */
+.hero {
+	padding-block: 3rem 2rem;
+}
+
+.hero h1 {
+	font-size: clamp(2.25rem, 5.5vw, 3.5rem);
+	line-height: 1.08;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+}
+
+/* Accent spans inside hero title */
+.accent {
+	color: var(--sl-color-accent);
+}
+
+.hero .tagline {
+	font-size: clamp(1rem, 2.2vw, 1.25rem);
+	color: var(--sl-color-gray-1);
+	max-width: 48ch;
+	line-height: 1.6;
+}
+
+/* Feature grid — like instrument panels in a row */
+.feature-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+	gap: 1px;  /* 1px gap = shared border effect */
+	margin-block: 2.5rem;
+	border: 1px solid var(--sl-color-hairline);
+	border-radius: 4px;
+	overflow: hidden;
+}
+
+.feature-card {
+	background: var(--sl-color-gray-6);
+	border: none;
+	border-radius: 0;
+	padding: 1.25rem 1.5rem;
+	outline: 1px solid var(--sl-color-hairline);
+}
+
+.feature-card h3 {
+	color: var(--sl-color-accent);
+	font-family: var(--sl-font-system-mono);
+	font-size: 0.8125rem;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	margin: 0 0 0.5rem 0;
+}
+
+.feature-card p {
+	color: var(--sl-color-gray-1);
+	margin: 0;
+	font-size: 0.9rem;
+	line-height: 1.55;
+}
+
+/* Section dividers — thin rule, like markings on a factory floor */
+.section-divider {
+	border: none;
+	border-top: 1px solid var(--sl-color-hairline);
+	margin-block: 2.5rem;
+}
+
+/* Self-dogfooding callout — like a stamped placard on a machine */
+.callout-box {
+	background: var(--sl-color-accent-low);
+	border: 1px solid rgba(212, 148, 10, 0.25);
+	border-radius: 4px;
+	padding: 1.25rem 1.5rem;
+	margin-block: 2rem;
+}
+
+.callout-box p {
+	margin: 0;
+	color: var(--sl-color-accent-high);
+	font-size: 0.9rem;
+	line-height: 1.6;
+}
+
+.callout-box strong {
+	color: var(--sl-color-accent);
+}
+
+/* Architecture diagram — monospace block, like a blueprint label */
+.sl-markdown-content pre {
+	border: 1px solid var(--sl-color-hairline);
+	border-radius: 4px;
+}
+
+/* ================================================================
+   STATUS INDICATORS — factory LEDs
+   Used in examples and future interactive components
+   ================================================================ */
+.status-done { color: #4a9; }
+.status-running { color: var(--sl-color-accent); }
+.status-pending { color: var(--sl-color-gray-2); }
+.status-blocked { color: #c44; }
+
+/* ================================================================
+   CONTENT — reading rhythm
+   ================================================================ */
+
+/* Headings: tighter tracking, weight does the work */
+.sl-markdown-content h2 {
+	letter-spacing: -0.01em;
+	margin-block-start: 2.5rem;
+	padding-block-end: 0.5rem;
+	border-block-end: 1px solid var(--sl-color-hairline-light);
+}
+
+.sl-markdown-content h3 {
+	letter-spacing: -0.005em;
+}
+
+/* Tables: spec-sheet density */
+.sl-markdown-content table {
+	font-size: 0.875rem;
+}
+
+.sl-markdown-content th {
+	font-family: var(--sl-font-system-mono);
+	font-size: 0.8125rem;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+	color: var(--sl-color-gray-2);
+}
+
+.sl-markdown-content td {
+	vertical-align: top;
+}
+
+/* Links: amber, not blue */
+.sl-markdown-content a:not([class]) {
+	color: var(--sl-color-accent);
+	text-decoration: underline;
+	text-decoration-color: rgba(212, 148, 10, 0.3);
+	text-underline-offset: 0.15em;
+}
+
+.sl-markdown-content a:not([class]):hover {
+	text-decoration-color: var(--sl-color-accent);
+}
+
+/* ================================================================
+   STARLIGHT COMPONENT OVERRIDES
+   ================================================================ */
+
+/* Cards: borders-only, sharp radius */
+.sl-link-card {
+	border-radius: 4px;
+}
+
+/* Asides: left-border accent, not rounded boxes */
+.starlight-aside {
+	border-radius: 0 4px 4px 0;
+}
+
+/* Tabs: monospace labels */
+[role='tablist'] button {
+	font-family: var(--sl-font-system-mono);
+	font-size: 0.8125rem;
+	letter-spacing: 0.02em;
+}

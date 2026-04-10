@@ -1,0 +1,57 @@
+---
+title: "prd normalize"
+description: "Canonicalize list fields in PRD frontmatter"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd normalize [PRD-ID | --all] [flags]
+```
+
+## Description
+
+Sorts and deduplicates list fields in PRD frontmatter: `depends_on`, `blocks`, `tags`, `impacts`. Ensures consistent ordering across the codebase.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `PRD-ID` | No | Normalize a specific PRD. Use `--all` for all PRDs. |
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--all` | `false` | Normalize every PRD |
+| `--check` | `false` | Exit non-zero if changes needed (no writes) |
+
+## Examples
+
+```bash frame="terminal" title="Check in CI"
+$ prd normalize --all --check
+PRD-22: depends_on is not sorted
+PRD-31: tags contains duplicate "cli"
+2 PRDs need normalization (exit 1)
+```
+
+```bash frame="terminal" title="Fix all PRDs"
+$ prd normalize --all
+Normalized 2 PRDs
+```
+
+```bash frame="terminal" title="Normalize a single PRD"
+$ prd normalize PRD-22
+Normalized PRD-22
+```
+
+## Behavior
+
+- `--check` performs a dry run -- no files are modified, but exit code is `1` if any PRD needs normalization.
+- Without `--check`, files are modified in place.
+- Fields sorted: `depends_on`, `blocks`, `tags`, `impacts`.
+
+## Related
+
+- [`prd validate`](/reference/cli/validate/) -- Structural checks (cycles, missing deps)
+- [`prd new`](/reference/cli/new/) -- New PRDs are created already normalized

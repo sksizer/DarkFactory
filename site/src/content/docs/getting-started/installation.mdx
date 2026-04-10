@@ -1,0 +1,72 @@
+---
+title: Installation
+description: Install DarkFactory and initialize your first project.
+---
+
+import { Tabs, TabItem, Steps, Aside } from '@astrojs/starlight/components';
+
+<Steps>
+
+1. **Install DarkFactory**
+
+   <Tabs syncKey="installer">
+     <TabItem label="uv (recommended)">
+       ```bash frame="terminal"
+       uv tool install darkfactory
+       ```
+     </TabItem>
+     <TabItem label="pipx">
+       ```bash frame="terminal"
+       pipx install darkfactory
+       ```
+     </TabItem>
+     <TabItem label="pip">
+       ```bash frame="terminal"
+       pip install darkfactory
+       ```
+     </TabItem>
+   </Tabs>
+
+   Verify the installation:
+
+   ```bash frame="terminal"
+   $ prd --version
+   darkfactory 0.1.0
+   ```
+
+2. **Initialize your project**
+
+   Navigate to your project root and run:
+
+   ```bash frame="terminal"
+   $ prd init
+   Created .darkfactory/
+   Created .darkfactory/prds/
+   Created .darkfactory/config.toml
+   ```
+
+   This creates the `.darkfactory/` directory where PRDs, workflows, and runtime state live.
+
+3. **Check the project layout**
+
+   ```
+   your-project/
+   ├── .darkfactory/
+   │   ├── prds/           # Your PRD files (tracked in git)
+   │   ├── workflows/      # Custom workflows (optional, tracked)
+   │   ├── config.toml     # Project config (optional, tracked)
+   │   ├── worktrees/      # Runtime state (git-ignored)
+   │   ├── transcripts/    # Agent transcripts (git-ignored)
+   │   └── events/         # Event logs (git-ignored)
+   └── ... your code ...
+   ```
+
+</Steps>
+
+<Aside type="tip">
+  Add `.darkfactory/worktrees/`, `.darkfactory/transcripts/`, and `.darkfactory/events/` to your `.gitignore`. Only `prds/`, `workflows/`, and `config.toml` should be tracked.
+</Aside>
+
+## Next step
+
+Now that DarkFactory is installed, [create your first PRD](/getting-started/first-prd/).

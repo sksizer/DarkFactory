@@ -1,0 +1,42 @@
+---
+title: "prd init"
+description: "Scaffold a .darkfactory/ directory in the current project"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd init
+```
+
+## Description
+
+Scaffolds the `.darkfactory/` directory structure in your project root. Creates the PRD directory, workflows directory, and a default `config.toml`.
+
+Safe to run in an existing project -- adds missing structure without overwriting existing files.
+
+## Examples
+
+```bash frame="terminal" title="Initialize a new project"
+$ prd init
+Created .darkfactory/
+Created .darkfactory/config.toml
+Created .darkfactory/prds/
+Created .darkfactory/workflows/
+```
+
+```bash frame="terminal" title="Re-run in existing project"
+$ prd init
+.darkfactory/ already exists
+Created .darkfactory/workflows/ (missing)
+```
+
+## Behavior
+
+- Creates `prds/`, `workflows/`, and `config.toml` inside `.darkfactory/`.
+- Existing files are never overwritten. Only missing structure is added.
+
+## Related
+
+- [`prd new`](/reference/cli/new/) -- Create a PRD after initializing
+- [`prd list-workflows`](/reference/cli/list-workflows/) -- Inspect loaded workflows

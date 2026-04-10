@@ -1,0 +1,64 @@
+---
+title: "CLI Overview"
+description: "Overview of the prd command-line interface and its subcommands"
+---
+
+The `prd` CLI drives DarkFactory's PRD-driven SDLC automation. It manages the full lifecycle of Product Requirements Documents -- from creation and validation through planning, execution, and reconciliation.
+
+All commands operate relative to a project root containing a `.darkfactory/` directory.
+
+## Synopsis
+
+```bash frame="terminal" title="Top-level usage"
+prd [global-flags] <command> [command-flags]
+```
+
+## Global Flags
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--directory` | `-C` | `.` | Project root containing `.darkfactory/` |
+| `--prd-dir` | | `.darkfactory/prds/` | Path to PRD directory |
+| `--workflows-dir` | | `.darkfactory/workflows/` | Path to workflows directory |
+| `--operations-dir` | | `.darkfactory/operations/` | Path to system operations directory |
+| `--json` | | `false` | Emit JSON output where supported |
+| `--verbose` | `-v` | `false` | Enable debug logging |
+| `--theme` | | `dark` | Color theme: `dark` or `light` |
+| `--no-color` | | `false` | Disable all color output |
+| `--icon-set` | | `nerdfont` | Icon set: `nerdfont`, `ascii`, or `emoji` |
+
+## Subcommands
+
+### Project Setup
+
+- **[`prd init`](/reference/cli/init/)** -- Scaffold a new `.darkfactory/` directory.
+- **[`prd new`](/reference/cli/new/)** -- Create a new PRD from a template.
+
+### Analysis & Validation
+
+- **[`prd status`](/reference/cli/status/)** -- DAG overview with counts by status and actionable PRDs.
+- **[`prd validate`](/reference/cli/validate/)** -- Check for cycles, missing deps, orphan refs, schema errors.
+- **[`prd tree`](/reference/cli/tree/)** -- Display the containment tree (parent-child hierarchy).
+- **[`prd next`](/reference/cli/next/)** -- List actionable PRDs (status=ready, all deps satisfied).
+- **[`prd conflicts`](/reference/cli/conflicts/)** -- Show file-impact overlaps for a PRD.
+- **[`prd orphans`](/reference/cli/orphans/)** -- List top-level PRDs with no parent.
+- **[`prd undecomposed`](/reference/cli/undecomposed/)** -- List epics/features lacking task children.
+- **[`prd children`](/reference/cli/children/)** -- List direct children of a PRD.
+
+### Execution
+
+- **[`prd plan`](/reference/cli/plan/)** -- Show the execution plan for a PRD (dry run).
+- **[`prd run`](/reference/cli/run/)** -- Execute a workflow against one or more PRDs.
+- **[`prd rework`](/reference/cli/rework/)** -- Address PR review feedback.
+
+### Maintenance
+
+- **[`prd reconcile`](/reference/cli/reconcile/)** -- Flip merged-but-not-updated PRDs to done.
+- **[`prd cleanup`](/reference/cli/cleanup/)** -- Remove stale git worktrees.
+- **[`prd assign`](/reference/cli/assign/)** -- Compute and persist workflow assignments.
+- **[`prd normalize`](/reference/cli/normalize/)** -- Canonicalize list fields in PRD frontmatter.
+
+### System
+
+- **[`prd system`](/reference/cli/system/)** -- List, describe, and run built-in system operations.
+- **[`prd list-workflows`](/reference/cli/list-workflows/)** -- Show loaded workflows with priorities and predicates.

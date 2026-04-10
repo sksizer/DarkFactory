@@ -1,0 +1,58 @@
+---
+title: "prd cleanup"
+description: "Remove stale git worktrees"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd cleanup [PRD-ID] [flags]
+```
+
+## Description
+
+Removes git worktrees created by `prd run`. Each PRD execution creates a dedicated worktree that accumulates over time. This command reclaims disk space.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `PRD-ID` | No | Clean up worktree for a specific PRD |
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--merged` | `false` | Remove all worktrees for PRDs whose PRs have been merged |
+| `--all` | `false` | Remove all DarkFactory-managed worktrees (with confirmation) |
+| `--force` | `false` | Remove even worktrees with unpushed commits |
+
+## Examples
+
+```bash frame="terminal" title="Clean merged worktrees"
+$ prd cleanup --merged
+Removed: .worktrees/prd-14-structured-logging
+Removed: .worktrees/prd-15-json-formatter
+Cleaned 2 worktrees
+```
+
+```bash frame="terminal" title="Clean a specific PRD's worktree"
+$ prd cleanup PRD-42
+Removed: .worktrees/prd-42-add-retry-logic
+```
+
+```bash frame="terminal" title="Force remove all"
+$ prd cleanup --all --force
+Remove all 7 DarkFactory worktrees? [y/N] y
+Removed 7 worktrees
+```
+
+## Behavior
+
+- Without `--force`, worktrees with unpushed commits are skipped with a warning.
+- `--all` prompts for confirmation unless combined with `--force`.
+
+## Related
+
+- [`prd reconcile`](/reference/cli/reconcile/) -- Update statuses before cleanup
+- [`prd run`](/reference/cli/run/) -- Creates worktrees during execution

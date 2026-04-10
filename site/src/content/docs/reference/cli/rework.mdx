@@ -1,0 +1,69 @@
+---
+title: "prd rework"
+description: "Address PR review feedback by re-running workflows"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd rework PRD-ID [flags]
+```
+
+## Description
+
+Handles the feedback loop after a pull request receives review comments. Reads PR review comments from GitHub, synthesizes them into actionable instructions, and re-runs workflow tasks to address the feedback.
+
+Default is dry-run. Pass `--execute` to apply changes.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `PRD-ID` | Yes | The PRD whose PR feedback to address |
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--execute` | `false` | Actually perform the rework |
+| `--all` | `false` | Include resolved threads |
+| `--since` | | Only comments after this commit ref |
+| `--reviewer` | | Only from a specific reviewer |
+| `--from-pr-comment` | | Address a single PR comment by ID |
+| `--reply-to-comments` | `false` | Post replies on addressed comments |
+
+## Examples
+
+```bash frame="terminal" title="Preview rework"
+$ prd rework PRD-42
+Found 3 unresolved review comments on PR #142:
+  1. @reviewer: "Add error handling for timeout case" (src/runner.py:45)
+  2. @reviewer: "Missing test for edge case" (tests/test_runner.py:12)
+  3. @reviewer: "Rename this variable" (src/config.py:8)
+DRY RUN -- pass --execute to apply
+```
+
+```bash frame="terminal" title="Execute and reply to comments"
+$ prd rework PRD-42 --execute --reply-to-comments
+Addressing 3 review comments on PR #142...
+  [1/3] Added timeout error handling
+  [2/3] Added edge case test
+  [3/3] Renamed variable
+Pushed 1 commit. Replied to 3 comments.
+```
+
+```bash frame="terminal" title="Filter by reviewer and recency"
+$ prd rework PRD-42 --execute --reviewer octocat --since abc1234
+Addressing 1 comment from octocat after abc1234...
+```
+
+## Behavior
+
+- By default only processes unresolved review threads. Pass `--all` to include resolved.
+- `--since` accepts a commit SHA; only comments posted after that commit are processed.
+- `--from-pr-comment` targets a single comment by its GitHub comment ID.
+
+## Related
+
+- [`prd run`](/reference/cli/run/) -- Initial execution that creates the PR
+- [`prd reconcile`](/reference/cli/reconcile/) -- Flip status after PR merges

@@ -1,0 +1,129 @@
+---
+title: "Writing Effective PRDs"
+description: "Best practices for authoring PRDs that drive reliable, automated implementation workflows in DarkFactory."
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+DarkFactory treats PRDs as the primary unit of work. A PRD is not documentation -- it is an executable specification. The harness parses its frontmatter to build dependency graphs, assign workflows, and verify outcomes. A sloppy PRD means failed runs, wasted agent tokens, and manual cleanup. A precise PRD executes cleanly on the first pass.
+
+## PRD File Naming and ID Format
+
+PRD files live in `.darkfactory/prds/` and follow the naming convention `PRD-NNN-slug.md`. The numeric ID in frontmatter is authoritative; the filename is for human convenience.
+
+```yaml
+---
+id: PRD-227
+title: Add retry logic to task runner
+status: ready
+kind: task
+---
+```
+
+The ID must match the regex `PRD-\d+`. IDs are natural-sorted, so `PRD-9` sorts before `PRD-10`.
+
+## Body Sections
+
+Every PRD body should contain these sections in order:
+
+```markdown
+## Summary
+One to three sentences describing what this PRD delivers and why.
+
+## Requirements
+Numbered list of concrete deliverables. Each requirement maps to one or more acceptance criteria.
+
+## Technical Approach
+Implementation strategy. Reference specific files, modules, or patterns.
+The agent reads this section to guide its work.
+
+## Acceptance Criteria
+Verifiable conditions. See format below.
+
+## Open Questions
+Unresolved decisions. Items here signal the PRD may not be ready for execution.
+```
+
+<Aside type="caution">
+A PRD with non-empty Open Questions should remain in `draft` status. The harness will not execute `draft` PRDs, preventing wasted runs on underspecified work.
+</Aside>
+
+## Acceptance Criteria Format
+
+Each criterion uses the `AC-N` prefix and ties back to a specific requirement. Write them as imperative, independently verifiable statements.
+
+```markdown
+## Acceptance Criteria
+- [ ] AC-1: `prd plan PRD-227` generates a workflow containing a ShellTask for `pytest`
+- [ ] AC-2: `prd execute PRD-227` exits 0 and produces a commit on the working branch
+- [ ] AC-3: The JSONL event log contains `task_finish` events for every task in the plan
+- [ ] AC-4: Retry count in config.toml is respected (default 1, configurable up to 3)
+```
+
+The harness uses acceptance criteria to generate verification prompts during `retry_agent` flows. Reviewers use them as a PR checklist. Vague criteria like "the system should work correctly" produce vague agent output.
+
+<Aside type="tip">
+Each AC should reference observable behavior: a command exits 0, a file exists, a log entry appears, a metric changes. If you cannot describe how to verify it from a shell, it is not specific enough.
+</Aside>
+
+## Impacts Globs
+
+The `impacts` field tells DarkFactory which files a PRD will touch. Use glob patterns relative to the repository root.
+
+```yaml
+impacts:
+  - "src/darkfactory/runner.py"
+  - "src/darkfactory/config.py"
+  - "tests/test_runner_*.py"
+  - "tests/integration/test_retry.py"
+```
+
+Impacts serve three purposes:
+1. **Conflict detection** -- overlapping impacts between concurrent PRDs trigger warnings.
+2. **Scope computation** -- the agent receives these files as primary context.
+3. **Workflow matching** -- custom workflows use `applies_to` predicates that inspect impacts.
+
+Overly broad globs (e.g., `**/*.py`) reduce conflict detection precision. Overly narrow globs cause the agent to miss files it needs to modify.
+
+## Wikilink Dependencies
+
+Use wikilink syntax in the `depends_on` and `blocks` frontmatter fields to declare relationships between PRDs.
+
+```yaml
+depends_on:
+  - "[[PRD-100-base-framework]]"
+  - "[[PRD-101-data-model]]"
+blocks:
+  - "[[PRD-200-api-endpoints]]"
+parent: "[[PRD-010-epic-runner-v2]]"
+```
+
+The harness resolves wikilinks by matching the numeric prefix. The slug portion is optional but improves readability. Dependencies must reference PRDs that exist in the project; dangling references cause `prd plan` to fail.
+
+<Aside type="caution">
+Circular dependencies cause the DAG builder to raise a cycle-detection error. If you need two PRDs to evolve together, make one depend on the other and use rework to iterate.
+</Aside>
+
+## PRD Kinds and Execution
+
+The `kind` field determines whether a PRD is directly executable:
+
+| Kind | Executable | Description |
+|------|-----------|-------------|
+| `epic` | No | Container for child PRDs. Decomposed by planning workflows. |
+| `feature` | No | Mid-level grouping. May contain tasks. |
+| `task` | Yes | Leaf-level work item. The agent implements this directly. |
+| `spike` | Yes | Investigation/research. Agent produces findings, not code. |
+| `bug` | Yes | Defect fix. Agent receives reproduction steps. |
+
+The `is_runnable` predicate returns `True` for `task`, `spike`, and `bug` kinds, or for any PRD that is a leaf node (has no children) regardless of kind.
+
+## Checklist: Before Setting Status to `ready`
+
+<Steps>
+1. All Open Questions are resolved or removed
+2. Acceptance criteria are independently verifiable from a shell
+3. Impacts globs cover every file the implementation will touch
+4. Dependencies reference existing PRDs in `done` or `in-progress` status
+5. The Technical Approach section names concrete files and patterns
+</Steps>

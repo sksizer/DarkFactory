@@ -1,0 +1,205 @@
+---
+title: "DAG Execution"
+description: "How DarkFactory resolves dependency graphs and executes multi-PRD workflows using topological ordering, stacked branches, and failure isolation."
+---
+
+import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+When a project has dozens of interrelated PRDs, executing them one at a time is slow and fragile. DarkFactory builds a directed acyclic graph (DAG) from PRD dependencies and walks it in topological order, handling failures, mid-run growth, and stacked branches.
+
+## Graph Scope
+
+The `graph_scope()` function computes which PRDs participate in a DAG execution. The scope is the union of three sets:
+
+1. **Root** -- the target PRD (or epic) passed to the command
+2. **Containment descendants** -- all PRDs whose `parent` chain leads back to the root
+3. **Transitive unmet dependencies** -- any PRD referenced in `depends_on` that is not yet `done`, recursively
+
+```
+graph_scope(PRD-010) = {PRD-010}
+    ∪ containment_descendants(PRD-010)    # PRD-011, PRD-012, PRD-013
+    ∪ transitive_unmet_deps(PRD-011...)   # PRD-005 (not yet done)
+```
+
+This means executing an epic automatically pulls in its children and any external dependencies they need.
+
+## Actionable Order
+
+Once the scope is computed, `actionable_order()` produces a topologically sorted list of PRDs that are currently runnable. A PRD is runnable when:
+
+- Its `kind` is `task`, `spike`, or `bug` (leaf kinds), OR it is a leaf node (no children)
+- Its status is `ready`
+- All PRDs in its `depends_on` list have status `done`
+
+```bash frame="terminal" title="Preview actionable order"
+prd plan PRD-010
+```
+
+```
+Scope: 5 PRDs
+Actionable order:
+  1. PRD-005  Add config validation       (ready, 0 unmet deps)
+  2. PRD-011  Implement retry logic        (ready, 1 dep: PRD-005)
+  3. PRD-012  Add timeout handling         (ready, 1 dep: PRD-005)
+
+Blocked:
+  PRD-013  Integration tests             (depends on PRD-011, PRD-012)
+```
+
+PRDs at the same depth with no mutual dependencies appear in natural ID order. After each PRD completes, the harness re-evaluates actionable order -- a newly `done` PRD may unblock downstream work.
+
+## Stacked Branches via `resolve_base_ref()`
+
+Each PRD executes in its own git worktree on its own branch. The branch's base is determined by `resolve_base_ref()`:
+
+- **Single dependency**: branch stacks on top of the dependency's branch. This means downstream PRDs build on upstream changes without waiting for upstream PRs to merge.
+- **Multiple dependencies**: the harness raises an error. Multi-parent stacking is not supported; restructure your dependencies so each PRD has at most one direct dependency.
+- **No dependencies**: branch is based on `main`.
+
+```
+main
+ └── prd/005-config-validation
+      ├── prd/011-retry-logic
+      │    └── prd/013-integration-tests
+      └── prd/012-timeout-handling
+```
+
+<Aside type="caution">
+Stacked branches work best when PRD impacts are non-overlapping. Broad impact globs increase rebase conflict risk when upstream branches are updated.
+</Aside>
+
+## Mid-Run DAG Growth
+
+The harness re-loads PRDs from disk between each execution run. This is critical for planning workflows, which create new child PRDs during execution. The sequence:
+
+<Steps>
+1. Execute PRD-010 (a planning workflow that decomposes the epic)
+2. Planning workflow writes PRD-011, PRD-012, PRD-013 to `.darkfactory/prds/`
+3. Harness re-reads all PRDs from disk
+4. New PRDs appear in the graph scope and become actionable
+5. Execution continues with the newly created PRDs
+</Steps>
+
+This enables recursive decomposition: an epic can be broken into features, features into tasks, and tasks executed, all in a single `prd execute` invocation.
+
+## Execution Strategies
+
+DarkFactory supports two DAG walk strategies:
+
+<Tabs>
+<TabItem label="RootedStrategy">
+Used when you target a specific PRD or epic. Computes `graph_scope()` from the root, then walks `actionable_order()`.
+
+```bash frame="terminal" title="Rooted execution"
+prd execute PRD-010 --max-runs 5
+```
+</TabItem>
+<TabItem label="QueueStrategy">
+Used for drain-ready-queue mode. Calls `discover_ready_queue()` to find all `ready` PRDs across the entire project, regardless of parent hierarchy.
+
+```bash frame="terminal" title="Queue execution"
+prd execute --queue --max-runs 10
+```
+</TabItem>
+</Tabs>
+
+## Failure Isolation
+
+When a PRD execution fails, the harness:
+
+1. Marks the PRD as `blocked`
+2. Adds it to the `blocked_ids` set
+3. Computes `_transitive_dependents()` -- all PRDs that directly or transitively depend on the failed PRD
+4. Skips every transitive dependent for the remainder of this run
+
+```
+PRD-011 FAILED (lint errors)
+  → PRD-013 SKIPPED (depends on PRD-011)
+
+PRD-012 CONTINUES (independent of PRD-011)
+```
+
+The `ExecutionReport` returned at the end of a run summarizes the outcome:
+
+```python
+@dataclass
+class ExecutionReport:
+    completed: list[str]   # PRD IDs that finished successfully
+    failed: list[str]      # PRD IDs that failed
+    skipped: list[str]     # PRD IDs skipped due to upstream failure
+```
+
+<Aside type="tip">
+After a failed run, fix the failing PRD and re-execute. The harness will pick up where it left off -- already-completed PRDs remain `done` and are not re-executed.
+</Aside>
+
+## Real-World Example: Running a CLI Refactor Epic
+
+PRD-556 "Split cli.py into package" decomposes a monolithic CLI module into eight tasks. The dependency chain:
+
+```
+PRD-556 (epic)
+ ├── PRD-556.1  Create cli/ package directory          (no deps)
+ ├── PRD-556.2  Extract config subcommand              (depends on 556.1)
+ ├── PRD-556.3  Extract execute subcommand             (depends on 556.1)
+ ├── PRD-556.4  Extract plan subcommand                (depends on 556.1)
+ ├── PRD-556.5  Extract status subcommand              (depends on 556.1)
+ ├── PRD-556.6  Wire up __main__.py entry point        (depends on 556.2, 556.3, 556.4, 556.5)
+ ├── PRD-556.7  Delete old cli.py                      (depends on 556.6)
+ └── PRD-556.8  Update integration tests               (depends on 556.6)
+```
+
+Start execution with a budget of 3 runs:
+
+```bash frame="terminal" title="Launch the epic"
+prd execute PRD-556 --max-runs 3
+```
+
+```bash frame="terminal" title="Run 1 output"
+[run 1/3] Scope: 9 PRDs
+  Actionable: PRD-556.1 (0 unmet deps)
+
+  PRD-556.1  Create cli/ package directory ... OK (47s)
+  PRD-556.2  Extract config subcommand     ... OK (112s)
+  PRD-556.3  Extract execute subcommand    ... FAILED (cargo test exit 1)
+    → PRD-556.6 SKIPPED (transitive dependent)
+    → PRD-556.7 SKIPPED (transitive dependent)
+    → PRD-556.8 SKIPPED (transitive dependent)
+  PRD-556.4  Extract plan subcommand       ... OK (98s)
+  PRD-556.5  Extract status subcommand     ... OK (91s)
+
+  Report: 4 completed, 1 failed, 3 skipped
+  Budget: 1/3 runs consumed
+```
+
+PRD-556.3 failed -- its test suite caught a missing import. PRD-556.6 through 556.8 are transitively blocked. But 556.4 and 556.5 ran because they are independent of 556.3.
+
+At this point, the successful PRDs have open PRs. Merge the ones that are ready:
+
+```bash frame="terminal" title="Merge passing PRs"
+gh pr merge --squash prd/556.1-create-cli-package
+gh pr merge --squash prd/556.2-extract-config
+gh pr merge --squash prd/556.4-extract-plan
+gh pr merge --squash prd/556.5-extract-status
+```
+
+Fix the failing task (edit the PRD or the generated code), reset its status to `ready`, and continue:
+
+```bash frame="terminal" title="Resume execution"
+prd execute PRD-556 --max-runs 3
+```
+
+```bash frame="terminal" title="Run 2 output"
+[run 1/3] Scope: 4 PRDs (5 already done)
+  Actionable: PRD-556.3 (0 unmet deps -- 556.1 is done)
+
+  PRD-556.3  Extract execute subcommand    ... OK (105s)
+  PRD-556.6  Wire up __main__.py           ... OK (134s)
+  PRD-556.7  Delete old cli.py             ... OK (22s)
+  PRD-556.8  Update integration tests      ... OK (89s)
+
+  Report: 4 completed, 0 failed, 0 skipped
+  Budget: 1/3 runs consumed
+```
+
+The harness skipped the 5 already-done PRDs and picked up exactly where execution left off. Total wall time across both invocations: ~12 minutes for 8 tasks.

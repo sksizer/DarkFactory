@@ -1,0 +1,63 @@
+---
+title: "prd new"
+description: "Create a new PRD with optional metadata"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd new TITLE [flags]
+```
+
+## Description
+
+Creates a new PRD file in the project's PRD directory. Generates a Markdown file with pre-populated frontmatter. If no `--id` is supplied, the next available flat numeric ID is assigned automatically.
+
+The filename follows the pattern `PRD-{id}-{slug}.md` where the slug is derived from the title.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `TITLE` | Yes | Title for the new PRD |
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--id` | next flat ID | Explicit PRD ID (e.g. `PRD-42`) |
+| `--kind` | | PRD kind: `epic`, `feature`, `component`, `task` |
+| `--priority` | | Priority: `critical`, `high`, `medium`, `low` |
+| `--effort` | | Estimated effort: `xs`, `s`, `m`, `l`, `xl` |
+| `--capability` | | Implementation complexity: `trivial`, `simple`, `moderate`, `complex` |
+| `--open` | `false` | Open in `$EDITOR` after creation |
+
+## Examples
+
+```bash frame="terminal" title="Create a task with defaults"
+$ prd new "Add retry logic to runner"
+Created .darkfactory/prds/PRD-42-add-retry-logic-to-runner.md
+```
+
+```bash frame="terminal" title="Create a high-priority feature"
+$ prd new "DAG visualization" --kind feature --priority high --capability moderate
+Created .darkfactory/prds/PRD-43-dag-visualization.md
+```
+
+```bash frame="terminal" title="Explicit ID, open in editor"
+$ prd new "Auth refactor" --id PRD-100 --kind epic --open
+Created .darkfactory/prds/PRD-100-auth-refactor.md
+Opening in $EDITOR...
+```
+
+## Behavior
+
+- The PRD starts in `draft` status.
+- ID auto-assignment picks the next unused integer across all existing PRDs.
+- The `--open` flag launches `$EDITOR` (falls back to `vi` if unset).
+
+## Related
+
+- [`prd init`](/reference/cli/init/) -- Set up `.darkfactory/` first
+- [`prd validate`](/reference/cli/validate/) -- Verify the new PRD's frontmatter
+- [`prd assign`](/reference/cli/assign/) -- Compute workflow assignment for the new PRD

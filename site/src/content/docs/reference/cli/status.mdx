@@ -1,0 +1,44 @@
+---
+title: "prd status"
+description: "Show DAG overview and actionable PRDs"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd status [flags]
+```
+
+## Description
+
+Displays a high-level overview of the PRD DAG: counts grouped by status, and a list of actionable PRDs. This is the go-to command for understanding where a project stands at a glance.
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--json` | `false` | Machine-readable JSON output |
+
+## Examples
+
+```bash frame="terminal" title="DAG overview"
+$ prd status
+PRDs: 47 total
+  draft: 12  ready: 8  in-progress: 5  done: 19  blocked: 3
+
+Actionable:
+  PRD-16  Prometheus exporter         (high)
+  PRD-22  Fix auth token refresh      (high)
+  PRD-31  Stale worktree on cleanup   (medium)
+```
+
+```bash frame="terminal" title="JSON output for scripting"
+$ prd status --json
+{"total": 47, "by_status": {"draft": 12, "ready": 8, ...}, "actionable": [...]}
+```
+
+## Related
+
+- [`prd next`](/reference/cli/next/) -- Filtered list of actionable PRDs
+- [`prd validate`](/reference/cli/validate/) -- Structural integrity checks
+- [`prd tree`](/reference/cli/tree/) -- Visualize the containment hierarchy

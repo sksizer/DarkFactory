@@ -1,0 +1,47 @@
+---
+title: "prd assign"
+description: "Compute workflow assignments for PRDs"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd assign [flags]
+```
+
+## Description
+
+Determines which workflow should handle each PRD. Resolution order: explicit frontmatter assignment > predicate match > default workflow. Without `--write`, displays computed assignments only.
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--write` | `false` | Persist assignments to PRD frontmatter |
+
+## Examples
+
+```bash frame="terminal" title="Preview assignments"
+$ prd assign
+PRD-16  implement-task    (predicate: kind=task)
+PRD-22  fix-bug           (predicate: kind=bug)
+PRD-34  run-spike         (predicate: kind=spike)
+PRD-50  implement-task    (explicit: frontmatter)
+```
+
+```bash frame="terminal" title="Write assignments to frontmatter"
+$ prd assign --write
+Wrote workflow to 4 PRDs
+```
+
+## Behavior
+
+- Resolution order: explicit frontmatter `workflow` field > workflow predicate match > default workflow.
+- Shows the resolution source (explicit, predicate, default) for each assignment.
+- `--write` only modifies PRDs that don't already have an explicit assignment.
+
+## Related
+
+- [`prd list-workflows`](/reference/cli/list-workflows/) -- See available workflows and their predicates
+- [`prd plan`](/reference/cli/plan/) -- Preview what a workflow assignment would do
+- [`prd run`](/reference/cli/run/) -- Execute assigned workflows

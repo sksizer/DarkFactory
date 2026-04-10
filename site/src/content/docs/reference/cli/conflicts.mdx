@@ -1,0 +1,51 @@
+---
+title: "prd conflicts"
+description: "Show file-impact overlaps between PRDs"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd conflicts PRD-ID
+```
+
+## Description
+
+Analyzes the `impacts` field of the target PRD and cross-references it against all other in-progress or ready PRDs. Highlights files that multiple PRDs intend to modify, helping anticipate merge conflicts before they happen.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `PRD-ID` | Yes | The PRD to check for conflicts |
+
+## Examples
+
+```bash frame="terminal" title="Check for file overlaps"
+$ prd conflicts PRD-42
+PRD-42 impacts 8 files
+
+Overlaps:
+  src/runner.py        also impacted by PRD-38 (in-progress)
+  src/runner_test.py   also impacted by PRD-38 (in-progress)
+  src/config.py        also impacted by PRD-45 (ready)
+
+3 files overlap with 2 other PRDs
+```
+
+```bash frame="terminal" title="No conflicts"
+$ prd conflicts PRD-16
+PRD-16 impacts 4 files
+
+No overlaps found.
+```
+
+## Behavior
+
+- Only considers PRDs in `ready` or `in-progress` status for overlap detection.
+- Useful before starting `prd run` to decide whether to sequence overlapping PRDs.
+
+## Related
+
+- [`prd run`](/reference/cli/run/) -- Execute PRDs (consider sequencing conflicting ones)
+- [`prd next`](/reference/cli/next/) -- See what's actionable
