@@ -2,7 +2,7 @@
 id: PRD-560
 title: Transcripts should be jsonl files
 kind: feature
-status: review
+status: done
 priority: medium
 effort: m
 capability: moderate
