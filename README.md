@@ -72,6 +72,20 @@ The ruleset definition lives at [`.github/rulesets/main-protection.json`](.githu
 
 When a PR does a structural rewrite (e.g. moving a module into a package, renaming files), rebase onto latest `main` before the final review pass. Structural changes are the most likely to silently drop concurrent work during merge.
 
+## Architectural Principles
+
+### Module-per-concern with peer tests
+
+New functionality should be decomposed into small, focused module files rather than growing existing files. Each module should have a peer test file in the same directory (e.g., `_python.py` / `_python_test.py`). This fights file bloat and keeps context small — for both humans and AI agents working on the codebase. See `src/darkfactory/cli/` and `src/darkfactory/builtins/` for the established patterns.
+
+### Parse errors at the boundary, trust types internally
+
+Validate external input (config files, CLI args, frontmatter) strictly at the point of ingestion — prefer parsing into typed structures that fail fast on bad input. Once data is parsed and typed, trust it throughout the codebase. No defensive shape checks at every call site.
+
+### Hard failures over silent degradation
+
+Start with hard failures and clear error messages when invariants are violated. Relax to graceful degradation only after real usage reveals where strictness hurts more than it helps.
+
 ## Development
 
 ```bash
