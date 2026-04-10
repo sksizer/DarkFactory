@@ -39,6 +39,7 @@ from darkfactory.builtins._shared import (
 )
 
 # Import submodules to trigger @builtin registration.
+from darkfactory.builtins.analyze_transcript import analyze_transcript
 from darkfactory.builtins.cleanup_worktree import cleanup_worktree
 from darkfactory.builtins.commit import commit
 from darkfactory.builtins.commit_events import commit_events
@@ -66,4 +67,5 @@ __all__ = [
     "create_pr",
     "lint_attribution",
     "cleanup_worktree",
+    "analyze_transcript",
 ]
