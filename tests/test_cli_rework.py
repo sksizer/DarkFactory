@@ -53,7 +53,7 @@ def test_rework_errors_if_no_worktree(
     write_prd(prds_dir, "PRD-001", "my-feature", status="review")
 
     # Simulate git worktree list returning no matching worktree
-    with patch("darkfactory.cli.find_worktree", return_value=None):
+    with patch("darkfactory.cli.rework.find_worktree", return_value=None):
         with pytest.raises(SystemExit) as exc_info:
             main([*_base_args(prds_dir), "PRD-001"])
 
@@ -75,8 +75,8 @@ def test_rework_errors_if_no_open_pr(
     fake_worktree.mkdir(parents=True)
 
     with (
-        patch("darkfactory.cli.find_worktree", return_value=fake_worktree),
-        patch("darkfactory.cli.find_open_pr", return_value=None),
+        patch("darkfactory.cli.rework.find_worktree", return_value=fake_worktree),
+        patch("darkfactory.cli.rework.find_open_pr", return_value=None),
     ):
         with pytest.raises(SystemExit) as exc_info:
             main([*_base_args(prds_dir), "PRD-001"])
@@ -99,8 +99,8 @@ def test_rework_dry_run_prints_summary(
     fake_worktree.mkdir(parents=True)
 
     with (
-        patch("darkfactory.cli.find_worktree", return_value=fake_worktree),
-        patch("darkfactory.cli.find_open_pr", return_value=42),
+        patch("darkfactory.cli.rework.find_worktree", return_value=fake_worktree),
+        patch("darkfactory.cli.rework.find_open_pr", return_value=42),
     ):
         result = main([*_base_args(prds_dir), "PRD-001"])
 
@@ -127,8 +127,8 @@ def test_rework_execute_exits_cleanly(
     fake_worktree.mkdir(parents=True)
 
     with (
-        patch("darkfactory.cli.find_worktree", return_value=fake_worktree),
-        patch("darkfactory.cli.find_open_pr", return_value=42),
+        patch("darkfactory.cli.rework.find_worktree", return_value=fake_worktree),
+        patch("darkfactory.cli.rework.find_open_pr", return_value=42),
     ):
         result = main([*_base_args(prds_dir), "PRD-001", "--execute"])
 

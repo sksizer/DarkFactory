@@ -467,7 +467,7 @@ def test_resolve_base_ref_defaults_to_main(tmp_path: Path) -> None:
             )
         return subprocess.CompletedProcess(args=cmd, returncode=1, stdout="", stderr="")
 
-    with patch("darkfactory.cli.subprocess.run", side_effect=mock_run):
+    with patch("darkfactory.cli._shared.subprocess.run", side_effect=mock_run):
         result = _resolve_base_ref(None, tmp_path)
         assert result == "main"
 
@@ -484,7 +484,7 @@ def test_resolve_base_ref_falls_back_to_master(tmp_path: Path) -> None:
             )
         return subprocess.CompletedProcess(args=cmd, returncode=1, stdout="", stderr="")
 
-    with patch("darkfactory.cli.subprocess.run", side_effect=mock_run):
+    with patch("darkfactory.cli._shared.subprocess.run", side_effect=mock_run):
         result = _resolve_base_ref(None, tmp_path)
         assert result == "master"
 
@@ -505,7 +505,7 @@ def test_resolve_base_ref_falls_back_to_origin_head(tmp_path: Path) -> None:
         # All branch checks fail
         return subprocess.CompletedProcess(args=cmd, returncode=1, stdout="", stderr="")
 
-    with patch("darkfactory.cli.subprocess.run", side_effect=mock_run):
+    with patch("darkfactory.cli._shared.subprocess.run", side_effect=mock_run):
         result = _resolve_base_ref(None, tmp_path)
         assert result == "develop"
 
@@ -522,7 +522,7 @@ def test_resolve_base_ref_last_resort_main(tmp_path: Path) -> None:
         # For other calls, return failure status
         return subprocess.CompletedProcess(args=cmd, returncode=1, stdout="", stderr="")
 
-    with patch("darkfactory.cli.subprocess.run", side_effect=mock_run_all_fail):
+    with patch("darkfactory.cli._shared.subprocess.run", side_effect=mock_run_all_fail):
         result = _resolve_base_ref(None, tmp_path)
         assert result == "main"
 

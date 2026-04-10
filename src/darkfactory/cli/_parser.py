@@ -25,11 +25,8 @@ def build_parser() -> argparse.ArgumentParser:
     from darkfactory.cli.undecomposed import cmd_undecomposed
     from darkfactory.cli.validate import cmd_validate
 
-    # Not yet extracted — still in cli/__init__.py
-    from darkfactory.cli import (
-        cmd_init,
-        cmd_rework,
-    )
+    from darkfactory.cli.init_cmd import cmd_init
+    from darkfactory.cli.rework import cmd_rework
     from darkfactory.cli.system import (
         cmd_system_describe,
         cmd_system_list,
