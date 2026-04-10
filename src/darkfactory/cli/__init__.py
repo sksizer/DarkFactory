@@ -50,7 +50,7 @@ from darkfactory.cli._shared import (
     CAPABILITY_ORDER,  # noqa: F401
     _find_repo_root,
     _load_workflows_or_fail,
-    _action_sort_key,
+    _action_sort_key,  # noqa: F401
     _load,
 )
 from darkfactory.cli._parser import build_parser
@@ -58,10 +58,12 @@ from darkfactory.cli.main import main
 from darkfactory.cli.cleanup import cmd_cleanup  # noqa: F401
 from darkfactory.cli.children import cmd_children  # noqa: F401
 from darkfactory.cli.new import cmd_new, _slugify, _next_flat_prd_id  # noqa: F401
+from darkfactory.cli.next_cmd import cmd_next  # noqa: F401
 from darkfactory.cli.status import cmd_status  # noqa: F401
 from darkfactory.cli.validate import cmd_validate  # noqa: F401
 
-__all__ = ["main", "build_parser", "cmd_cleanup", "cmd_children", "cmd_new", "cmd_status", "cmd_validate", "_slugify", "_next_flat_prd_id"]
+
+__all__ = ["main", "build_parser", "cmd_cleanup", "cmd_children", "cmd_new", "cmd_next", "cmd_status", "cmd_validate", "_slugify", "_next_flat_prd_id"]
 
 
 def _read_config_timeouts(repo_root: Path) -> dict[str, object] | None:
@@ -89,44 +91,6 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_next(args: argparse.Namespace) -> int:
-    prds = _load(args.prd_dir)
-    actionable = sorted(
-        (prd for prd in prds.values() if graph.is_actionable(prd, prds)),
-        key=_action_sort_key,
-    )
-    actionable = [prd for prd in actionable if containment.is_runnable(prd, prds)]
-    if args.capability:
-        wanted = {c.strip() for c in args.capability.split(",")}
-        actionable = [prd for prd in actionable if prd.capability in wanted]
-    actionable = actionable[: args.limit]
-
-    if args.json:
-        print(
-            json.dumps(
-                [
-                    {
-                        "id": p.id,
-                        "title": p.title,
-                        "priority": p.priority,
-                        "effort": p.effort,
-                        "capability": p.capability,
-                        "kind": p.kind,
-                    }
-                    for p in actionable
-                ],
-                indent=2,
-            )
-        )
-        return 0
-
-    if not actionable:
-        print("(no actionable PRDs match)")
-        return 0
-    for prd in actionable:
-        print(
-            f"{prd.id:14} [{prd.priority}/{prd.effort}/{prd.capability}]  {prd.title}"
-        )
     return 0
 
 
