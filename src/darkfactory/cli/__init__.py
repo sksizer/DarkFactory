@@ -60,7 +60,7 @@ from darkfactory.cli.children import cmd_children  # noqa: F401
 from darkfactory.cli.new import cmd_new, _slugify, _next_flat_prd_id  # noqa: F401
 from darkfactory.cli.status import cmd_status  # noqa: F401
 
-__all__ = ["main", "build_parser", "cmd_cleanup", "cmd_children", "cmd_new", "cmd_status"]
+__all__ = ["main", "build_parser", "cmd_cleanup", "cmd_children", "cmd_new", "cmd_status", "_slugify", "_next_flat_prd_id"]
 
 
 def _read_config_timeouts(repo_root: Path) -> dict[str, object] | None:
