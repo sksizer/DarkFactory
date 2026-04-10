@@ -86,7 +86,7 @@ def _parse_transcript(path: Path) -> list[dict[str, Any]]:
     """
     events: list[dict[str, Any]] = []
 
-    with open(path) as fh:
+    with open(path, encoding="utf-8") as fh:
         for raw in fh:
             stripped = raw.strip()
             if not stripped or stripped.startswith("#"):
