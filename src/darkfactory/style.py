@@ -214,6 +214,7 @@ NERDFONT_ICONS = IconSet(
         "blocked": "\uf05e ",
         "review": "\uf06e ",
         "cancelled": "\uf00d ",
+        "superseded": "\uf01e ",
         # Priority
         "critical": "\uf071 ",
         "high": "\uf102 ",
@@ -246,6 +247,7 @@ ASCII_ICONS = IconSet(
         "blocked": "[!] ",
         "review": "[?] ",
         "cancelled": "[-] ",
+        "superseded": "[s] ",
         # Priority
         "critical": "!! ",
         "high": "^^ ",
@@ -278,6 +280,7 @@ EMOJI_ICONS = IconSet(
         "blocked": "\U0001f6ab ",
         "review": "\U0001f440 ",
         "cancelled": "\u274c ",
+        "superseded": "\u267b\ufe0f ",
         # Priority
         "critical": "\U0001f525 ",
         "high": "\u2b06\ufe0f ",
