@@ -46,7 +46,11 @@ def fetch_pr_comments(ctx: ExecutionContext) -> None:
 
     threads = _fetch(ctx.pr_number, filters=CommentFilters())
     ctx.review_threads = threads
-    _log.info("fetch_pr_comments: fetched %d thread(s) for PR #%d", len(threads), ctx.pr_number)
+    _log.info(
+        "fetch_pr_comments: fetched %d thread(s) for PR #%d",
+        len(threads),
+        ctx.pr_number,
+    )
 
     if ctx.event_writer:
         ctx.event_writer.emit(
