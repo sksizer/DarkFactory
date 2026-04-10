@@ -266,7 +266,7 @@ def analyze_transcript(ctx: ExecutionContext) -> None:
         model_used = model_severe if max_sev == "error" else model_default
 
         try:
-            template = _PROMPT_PATH.read_text()
+            template = _PROMPT_PATH.read_text(encoding="utf-8")
             excerpt = _build_excerpt(events, findings)
             findings_text = _format_findings(findings)
             prompt = template.replace("{{FINDINGS}}", findings_text).replace(
