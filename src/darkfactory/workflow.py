@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 
     from .event_log import EventWriter
     from .invoke import InvokeResult
+    from .pr_comments import ReviewThread
     from .prd import PRD
 
 
@@ -243,6 +244,13 @@ class ExecutionContext:
         default_factory=lambda: logging.getLogger("darkfactory")
     )
     event_writer: "EventWriter | None" = None
+    # Rework-specific fields — populated by cmd_rework before invoking
+    # the workflow runner. When set, the fetch_pr_comments builtin
+    # treats them as pre-fetched and skips the gh subprocess call.
+    pr_number: int | None = None
+    review_threads: "list[ReviewThread] | None" = None
+    reply_to_comments: bool = False
+
     # Advisory process-level lock held by ensure_worktree for the
     # lifetime of this run. Managed by builtins + runner; tests should
     # not touch it directly.

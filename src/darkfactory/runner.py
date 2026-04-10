@@ -56,6 +56,7 @@ from .workflow import (
 )
 
 if TYPE_CHECKING:
+    from .pr_comments import ReviewThread
     from .prd import PRD
     from .style import Styler
 
@@ -130,6 +131,10 @@ def run_workflow(
     config_timeouts: dict[str, object] | None = None,
     styler: "Styler | None" = None,
     session_id: str | None = None,
+    initial_worktree_path: Path | None = None,
+    initial_pr_number: int | None = None,
+    initial_review_threads: "list[ReviewThread] | None" = None,
+    initial_reply_to_comments: bool = False,
 ) -> RunResult:
     """Execute a workflow against a single PRD and return the result.
 
@@ -160,7 +165,11 @@ def run_workflow(
         workflow=workflow,
         base_ref=base_ref,
         branch_name=branch_name,
-        cwd=repo_root,
+        worktree_path=initial_worktree_path,
+        cwd=initial_worktree_path if initial_worktree_path is not None else repo_root,
+        pr_number=initial_pr_number,
+        review_threads=initial_review_threads,
+        reply_to_comments=initial_reply_to_comments,
         dry_run=dry_run,
         logger=logger,
         event_writer=writer,

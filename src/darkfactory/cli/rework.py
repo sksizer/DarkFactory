@@ -9,11 +9,14 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from darkfactory.runner import _compute_branch_name
+from darkfactory.loader import load_workflows
+from darkfactory.pr_comments import CommentFilters, fetch_pr_comments
+from darkfactory.runner import _compute_branch_name, run_workflow
 
 from darkfactory.cli._shared import (
     _find_repo_root,
     _load,
+    _resolve_base_ref,
 )
 
 
@@ -103,5 +106,34 @@ def cmd_rework(args: argparse.Namespace) -> int:
         print(f"  Branch: {branch_name}")
         return 0
 
-    # Set up execution context for the rework workflow (PRD-225.4)
-    return 0
+    # Build comment filters from CLI args and fetch unresolved threads.
+    filters = CommentFilters(
+        include_resolved=args.all,
+        since_commit=args.since,
+        reviewer=args.reviewer,
+        single_comment_id=args.from_pr_comment,
+    )
+    threads = fetch_pr_comments(pr_number, filters=filters)
+    if not threads:
+        print(f"No unaddressed comments found for {prd_id}")
+        return 0
+
+    # Load the rework workflow from the built-in workflows directory.
+    workflows = load_workflows()
+    rework_wf = workflows.get("rework")
+    if rework_wf is None:
+        raise SystemExit("ERROR: rework workflow not found in built-in workflows")
+
+    base_ref = _resolve_base_ref(None, repo_root)
+    result = run_workflow(
+        prd,
+        rework_wf,
+        repo_root,
+        base_ref,
+        dry_run=False,
+        initial_worktree_path=worktree_path,
+        initial_pr_number=pr_number,
+        initial_review_threads=threads,
+        initial_reply_to_comments=args.reply_to_comments,
+    )
+    return 0 if result.success else 1
