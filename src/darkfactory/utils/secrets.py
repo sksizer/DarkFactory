@@ -33,7 +33,9 @@ def _register(name: str, pattern: str, flags: int = 0) -> None:
 
 # AWS
 _register("aws_access_key", r"(?<![A-Z0-9])(AKIA[0-9A-Z]{16})(?![A-Z0-9])")
-_register("aws_secret_key", r"(?<![A-Za-z0-9/+=])([A-Za-z0-9/+=]{40})(?![A-Za-z0-9/+=])")
+_register(
+    "aws_secret_key", r"(?<![A-Za-z0-9/+=])([A-Za-z0-9/+=]{40})(?![A-Za-z0-9/+=])"
+)
 
 # GitHub
 _register("github_token", r"(ghp_[A-Za-z0-9]{36,})")
@@ -48,7 +50,9 @@ _register(
 )
 
 # Private keys
-_register("private_key", r"(-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----)", re.MULTILINE)
+_register(
+    "private_key", r"(-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----)", re.MULTILINE
+)
 
 # Connection strings
 _register(
@@ -88,6 +92,7 @@ def redact(text: str) -> RedactionResult:
     matched: list[str] = []
 
     for name, pattern in _PATTERNS:
+
         def _replacer(m: re.Match[str], _name: str = name) -> str:
             return f"[REDACTED:{_name}]"
 

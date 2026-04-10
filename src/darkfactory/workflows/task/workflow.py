@@ -56,12 +56,12 @@ workflow = Workflow(
                 "Bash(pnpm:*)",
                 "Bash(just:*)",
                 "Bash(uv:*)",
-                # Git: the agent only stages and inspects. Commit, push, and
-                # PR creation are owned by the harness builtins — see role.md.
-                # Deliberately no Bash(git commit:*) so the agent can't bypass
-                # the harness's commit step.
+                # Git: the agent stages, inspects, and commits incremental work.
+                # Branch creation, pushing, and PR creation are still owned by
+                # the harness builtins.
                 "Bash(git add:*)",
                 "Bash(git rm:*)",
+                "Bash(git commit:*)",
                 "Bash(git status:*)",
                 "Bash(git diff:*)",
                 "Bash(git log:*)",
