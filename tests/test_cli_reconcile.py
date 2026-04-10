@@ -352,7 +352,7 @@ def test_reconcile_skips_clobbered_but_flips_valid(
     ]
 
     def fake_ancestor(pr: dict[str, Any], repo_root: Path) -> bool:
-        sha = pr["mergeCommit"]["oid"]
+        sha: str = pr["mergeCommit"]["oid"]
         return sha == "good111111"
 
     with (
