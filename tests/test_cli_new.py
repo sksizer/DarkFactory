@@ -7,7 +7,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from darkfactory.cli import _slugify, main
+from darkfactory.cli import main
+from darkfactory.cli.new import _slugify
 
 from .conftest import write_prd
 
