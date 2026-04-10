@@ -260,62 +260,6 @@ def cmd_list_workflows(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_assign(args: argparse.Namespace) -> int:
-    """Compute the workflow assignment for every PRD, optionally persist.
-
-    Output is a table of ``PRD-id -> workflow-name``. With ``--write``,
-    the resolved workflow name is persisted into each PRD's frontmatter
-    (only for PRDs that don't already have an explicit workflow field —
-    the command is idempotent on re-run).
-    """
-    prds = _load(args.prd_dir)
-    workflows = _load_workflows_or_fail(args.workflows_dir)
-
-    if not workflows:
-        if args.json:
-            print(json.dumps([], indent=2))
-        else:
-            print(f"{'PRD':14} {'Workflow':20} Source")
-            print("-" * 50)
-        return 0
-
-    try:
-        assignments = assign.assign_all(prds, workflows)
-    except KeyError as exc:
-        raise SystemExit(str(exc))
-
-    if args.json:
-        payload = [
-            {
-                "id": prd_id,
-                "workflow": wf.name,
-                "explicit": prds[prd_id].workflow is not None,
-            }
-            for prd_id, wf in sorted(
-                assignments.items(),
-                key=lambda kv: parse_id_sort_key(kv[0]),
-            )
-        ]
-        print(json.dumps(payload, indent=2))
-        return 0
-
-    # Human-readable table. Mark explicit assignments with a `*`.
-    print(f"{'PRD':14} {'Workflow':20} Source")
-    print("-" * 50)
-    for prd_id in sorted(assignments.keys(), key=parse_id_sort_key):
-        wf = assignments[prd_id]
-        source = "explicit" if prds[prd_id].workflow else "predicate"
-        print(f"{prd_id:14} {wf.name:20} {source}")
-
-    if args.write:
-        written = 0
-        for prd_id, wf in assignments.items():
-            prd = prds[prd_id]
-            if prd.workflow is None:
-                set_workflow(prd, wf.name)
-                written += 1
-        print(f"\nPersisted {written} workflow assignments to frontmatter.")
-    return 0
 
 
 #: List fields that ``prd normalize`` canonicalizes.
