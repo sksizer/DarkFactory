@@ -27,6 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     from darkfactory.cli.init_cmd import cmd_init
     from darkfactory.cli.rework import cmd_rework
+    from darkfactory.cli.rework_watch import cmd_rework_watch
     from darkfactory.cli.system import (
         cmd_system_describe,
         cmd_system_list,
@@ -320,6 +321,53 @@ def build_parser() -> argparse.ArgumentParser:
         help="Post replies on addressed comments",
     )
     p_rework.set_defaults(func=cmd_rework)
+
+    p_rework_watch = sub.add_parser(
+        "rework-watch",
+        help="Polling daemon: auto-trigger rework when new PR comments appear",
+    )
+    _rw_mode = p_rework_watch.add_mutually_exclusive_group()
+    _rw_mode.add_argument(
+        "--daemon",
+        action="store_true",
+        help="Fork and run in background (writes PID file)",
+    )
+    _rw_mode.add_argument(
+        "--status",
+        action="store_true",
+        help="Print daemon status and exit",
+    )
+    _rw_mode.add_argument(
+        "--pause",
+        action="store_true",
+        help="Create pause file (halts polling without stopping)",
+    )
+    _rw_mode.add_argument(
+        "--resume",
+        action="store_true",
+        help="Remove pause file (resume polling)",
+    )
+    _rw_mode.add_argument(
+        "--stop",
+        action="store_true",
+        help="Send SIGTERM to daemon and exit",
+    )
+    p_rework_watch.add_argument(
+        "--interval",
+        type=int,
+        default=60,
+        metavar="SECONDS",
+        help="Poll interval in seconds (default: 60)",
+    )
+    p_rework_watch.add_argument(
+        "--max-reworks",
+        type=int,
+        default=3,
+        dest="max_reworks",
+        metavar="N",
+        help="Max rework cycles per PR per hour (default: 3)",
+    )
+    p_rework_watch.set_defaults(func=cmd_rework_watch)
 
     sub_reconcile = sub.add_parser(
         "reconcile",
