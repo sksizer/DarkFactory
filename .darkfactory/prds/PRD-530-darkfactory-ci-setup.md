@@ -2,7 +2,7 @@
 id: PRD-530
 title: Set up CI for darkfactory
 kind: task
-status: in-progress
+status: superseded
 priority: medium
 effort: s
 capability: simple

@@ -48,6 +48,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         "blocked",
         "draft",
         "cancelled",
+        "superseded",
     ):
         n = counts.get(status, 0)
         if n:

@@ -50,7 +50,7 @@ tags:
 | `slug` | `str` | Extracted from filename: `PRD-070-retry-webhook.md` yields `retry-webhook`. Not in frontmatter. |
 | `title` | `str` | Human-readable name. |
 | `kind` | `str` | One of: `epic`, `feature`, `component`, `task`. Controls [containment](/concepts/containment) and runnability. |
-| `status` | `str` | One of: `draft`, `ready`, `in-progress`, `review`, `done`, `blocked`, `cancelled`. See [status lifecycle](/concepts/status-lifecycle). |
+| `status` | `str` | One of: `draft`, `ready`, `in-progress`, `review`, `done`, `blocked`, `cancelled`, `superseded`. See [status lifecycle](/concepts/status-lifecycle). |
 | `priority` | `str` | One of: `critical`, `high`, `medium`, `low`. Tie-breaker in [topological sort](/concepts/dag). |
 | `effort` | `str` | Sizing: `xs` (5m), `s` (10m), `m` (20m), `l` (40m), `xl` (75m). Drives agent timeout calculation. |
 | `capability` | `str` | Complexity: `trivial`, `simple`, `moderate`, `complex`. Drives [model selection](/concepts/agent-model). |
