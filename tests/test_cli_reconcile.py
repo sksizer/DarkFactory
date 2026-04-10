@@ -46,8 +46,8 @@ def test_reconcile_dryrun_lists_candidates(
     prs = [_fake_pr("prd/PRD-224-reconcile-test", 42)]
 
     with (
-        patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
-        patch("darkfactory.cli._merge_commit_is_ancestor", return_value=True),
+        patch("darkfactory.cli.reconcile._get_merged_prd_prs", return_value=prs),
+        patch("darkfactory.cli.reconcile._merge_commit_is_ancestor", return_value=True),
     ):
         rc = main(["--prd-dir", str(prd_dir), "reconcile"])
 
@@ -73,7 +73,7 @@ def test_reconcile_dryrun_no_candidates(
 
     prs = [_fake_pr("prd/PRD-001-done-already", 10)]
 
-    with patch("darkfactory.cli._get_merged_prd_prs", return_value=prs):
+    with patch("darkfactory.cli.reconcile._get_merged_prd_prs", return_value=prs):
         rc = main(["--prd-dir", str(prd_dir), "reconcile"])
 
     assert rc == 0
@@ -91,7 +91,7 @@ def test_reconcile_dryrun_no_matching_prs(
 
     prs = [_fake_pr("prd/PRD-999-nonexistent", 99)]
 
-    with patch("darkfactory.cli._get_merged_prd_prs", return_value=prs):
+    with patch("darkfactory.cli.reconcile._get_merged_prd_prs", return_value=prs):
         rc = main(["--prd-dir", str(prd_dir), "reconcile"])
 
     assert rc == 0
@@ -115,9 +115,9 @@ def test_reconcile_execute_flips_status(
     prs = [_fake_pr("prd/PRD-010-my-feature", 7)]
 
     with (
-        patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
-        patch("darkfactory.cli._merge_commit_is_ancestor", return_value=True),
-        patch("darkfactory.cli._create_reconcile_pr"),
+        patch("darkfactory.cli.reconcile._get_merged_prd_prs", return_value=prs),
+        patch("darkfactory.cli.reconcile._merge_commit_is_ancestor", return_value=True),
+        patch("darkfactory.cli.reconcile._create_reconcile_pr"),
     ):
         rc = main(["--prd-dir", str(prd_dir), "reconcile", "--execute"])
 
@@ -145,9 +145,9 @@ def test_reconcile_execute_creates_pr(
     mock_create_pr = MagicMock()
 
     with (
-        patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
-        patch("darkfactory.cli._merge_commit_is_ancestor", return_value=True),
-        patch("darkfactory.cli._create_reconcile_pr", mock_create_pr),
+        patch("darkfactory.cli.reconcile._get_merged_prd_prs", return_value=prs),
+        patch("darkfactory.cli.reconcile._merge_commit_is_ancestor", return_value=True),
+        patch("darkfactory.cli.reconcile._create_reconcile_pr", mock_create_pr),
     ):
         rc = main(["--prd-dir", str(prd_dir), "reconcile", "--execute"])
 
@@ -175,10 +175,10 @@ def test_reconcile_execute_commit_to_main(
     mock_create_pr = MagicMock()
 
     with (
-        patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
-        patch("darkfactory.cli._merge_commit_is_ancestor", return_value=True),
-        patch("darkfactory.cli._commit_to_main", mock_commit),
-        patch("darkfactory.cli._create_reconcile_pr", mock_create_pr),
+        patch("darkfactory.cli.reconcile._get_merged_prd_prs", return_value=prs),
+        patch("darkfactory.cli.reconcile._merge_commit_is_ancestor", return_value=True),
+        patch("darkfactory.cli.reconcile._commit_to_main", mock_commit),
+        patch("darkfactory.cli.reconcile._create_reconcile_pr", mock_create_pr),
     ):
         rc = main(
             ["--prd-dir", str(prd_dir), "reconcile", "--execute", "--commit-to-main"]
@@ -210,8 +210,8 @@ def test_reconcile_multiple_candidates_batched(
     ]
 
     with (
-        patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
-        patch("darkfactory.cli._merge_commit_is_ancestor", return_value=True),
+        patch("darkfactory.cli.reconcile._get_merged_prd_prs", return_value=prs),
+        patch("darkfactory.cli.reconcile._merge_commit_is_ancestor", return_value=True),
     ):
         rc = main(["--prd-dir", str(prd_dir), "reconcile"])
 
@@ -241,14 +241,14 @@ def test_reconcile_multiple_execute_batched_commit_msg(
     def fake_commit(
         candidates: list[tuple[Path, dict[str, Any]]], repo_root: Path
     ) -> None:
-        from darkfactory.cli import _build_reconcile_commit_msg
+        from darkfactory.cli.reconcile import _build_reconcile_commit_msg
 
         captured_msg.append(_build_reconcile_commit_msg(candidates))
 
     with (
-        patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
-        patch("darkfactory.cli._merge_commit_is_ancestor", return_value=True),
-        patch("darkfactory.cli._create_reconcile_pr", fake_commit),
+        patch("darkfactory.cli.reconcile._get_merged_prd_prs", return_value=prs),
+        patch("darkfactory.cli.reconcile._merge_commit_is_ancestor", return_value=True),
+        patch("darkfactory.cli.reconcile._create_reconcile_pr", fake_commit),
     ):
         rc = main(["--prd-dir", str(prd_dir), "reconcile", "--execute"])
 
@@ -274,14 +274,14 @@ def test_reconcile_single_commit_msg_format(
     def fake_commit(
         candidates: list[tuple[Path, dict[str, Any]]], repo_root: Path
     ) -> None:
-        from darkfactory.cli import _build_reconcile_commit_msg
+        from darkfactory.cli.reconcile import _build_reconcile_commit_msg
 
         captured_msg.append(_build_reconcile_commit_msg(candidates))
 
     with (
-        patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
-        patch("darkfactory.cli._merge_commit_is_ancestor", return_value=True),
-        patch("darkfactory.cli._create_reconcile_pr", fake_commit),
+        patch("darkfactory.cli.reconcile._get_merged_prd_prs", return_value=prs),
+        patch("darkfactory.cli.reconcile._merge_commit_is_ancestor", return_value=True),
+        patch("darkfactory.cli.reconcile._create_reconcile_pr", fake_commit),
     ):
         rc = main(["--prd-dir", str(prd_dir), "reconcile", "--execute"])
 
@@ -320,9 +320,9 @@ def test_reconcile_warns_on_clobbered_merge_commit(
     prs = [_fake_pr_with_sha("prd/PRD-400-clobbered", 40, "deadbeef1234")]
 
     with (
-        patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
+        patch("darkfactory.cli.reconcile._get_merged_prd_prs", return_value=prs),
         patch(
-            "darkfactory.cli._merge_commit_is_ancestor",
+            "darkfactory.cli.reconcile._merge_commit_is_ancestor",
             return_value=False,
         ),
     ):
@@ -352,12 +352,15 @@ def test_reconcile_skips_clobbered_but_flips_valid(
     ]
 
     def fake_ancestor(pr: dict[str, Any], repo_root: Path) -> bool:
-        sha = pr["mergeCommit"]["oid"]
+        sha: str = pr["mergeCommit"]["oid"]
         return sha == "good111111"
 
     with (
-        patch("darkfactory.cli._get_merged_prd_prs", return_value=prs),
-        patch("darkfactory.cli._merge_commit_is_ancestor", side_effect=fake_ancestor),
+        patch("darkfactory.cli.reconcile._get_merged_prd_prs", return_value=prs),
+        patch(
+            "darkfactory.cli.reconcile._merge_commit_is_ancestor",
+            side_effect=fake_ancestor,
+        ),
     ):
         rc = main(["--prd-dir", str(prd_dir), "reconcile"])
 

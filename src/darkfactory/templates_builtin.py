@@ -37,6 +37,7 @@ PRD_IMPLEMENTATION_TEMPLATE = WorkflowTemplate(
     close=[
         BuiltIn("set_status", kwargs={"to": "review"}),
         BuiltIn("commit_events"),
+        BuiltIn("analyze_transcript"),
         BuiltIn("commit", kwargs={"message": "chore(prd): {prd_id} ready for review"}),
         BuiltIn("summarize_agent_run"),
         BuiltIn("lint_attribution"),
@@ -67,8 +68,9 @@ EXTRACTION_TEMPLATE = WorkflowTemplate(
         AgentTask: (1, None),
     },
     close=[
-        BuiltIn("commit", kwargs={"message": "chore(prd): {prd_id} ready for review"}),
+        BuiltIn("analyze_transcript"),
         BuiltIn("set_status", kwargs={"to": "review"}),
+        BuiltIn("commit", kwargs={"message": "chore(prd): {prd_id} ready for review"}),
         BuiltIn("lint_attribution"),
         BuiltIn("push_branch"),
         BuiltIn("create_pr"),

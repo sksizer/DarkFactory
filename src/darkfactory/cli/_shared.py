@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
 from pathlib import Path
 
+from darkfactory import containment, graph
 from darkfactory.prd import PRD, load_all, parse_id_sort_key
 from darkfactory.workflow import Workflow
 
@@ -75,3 +78,89 @@ def _load(prd_dir: Path) -> dict[str, PRD]:
     if not prd_dir.exists():
         raise SystemExit(f"PRD directory not found: {prd_dir}")
     return load_all(prd_dir)
+
+
+def _resolve_base_ref(explicit: str | None, repo_root: Path) -> str:
+    """Determine the git base ref for a new workflow branch.
+
+    Resolution order:
+
+    1. ``explicit`` from ``--base`` (highest priority)
+    2. ``DARKFACTORY_BASE_REF`` environment variable
+    3. ``main`` if it exists locally
+    4. ``master`` if it exists locally
+    5. The remote's default branch via ``origin/HEAD``
+    6. Last resort: ``main`` (callers will hit a real error later if it's
+       missing too)
+
+    The user's current branch is **not** consulted. PRDs are independent
+    units of work and should base on the project's default branch unless
+    the user says otherwise. Stacking onto a feature branch is the
+    exception, not the rule, and requires an explicit ``--base`` flag.
+    """
+    if explicit:
+        return explicit
+
+    env_override = os.environ.get("DARKFACTORY_BASE_REF")
+    if env_override:
+        return env_override
+
+    for candidate in ("main", "master"):
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repo_root),
+                "rev-parse",
+                "--verify",
+                "--quiet",
+                f"refs/heads/{candidate}",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            return candidate
+
+    # Try remote's default branch (e.g. for fresh clones with no local main)
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "symbolic-ref", "refs/remotes/origin/HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        # Output looks like "refs/remotes/origin/main"
+        return result.stdout.strip().rsplit("/", 1)[-1]
+    except subprocess.CalledProcessError:
+        pass
+
+    return "main"
+
+
+def _check_runnable(prd: PRD, prds: dict[str, PRD]) -> str | None:
+    """Return an error string if the PRD can't be run, else None."""
+    if prd.status == "done":
+        return f"{prd.id} is already done"
+    if prd.status == "cancelled":
+        return f"{prd.id} is cancelled"
+    if not graph.is_actionable(prd, prds):
+        missing = graph.missing_deps(prd, prds)
+        if missing:
+            return f"{prd.id} depends on missing PRDs: {', '.join(missing)}"
+        unfinished = [
+            dep_id
+            for dep_id in prd.depends_on
+            if dep_id in prds and prds[dep_id].status != "done"
+        ]
+        if unfinished:
+            return f"{prd.id} has unfinished dependencies: " + ", ".join(
+                f"{d} ({prds[d].status})" for d in unfinished
+            )
+        return f"{prd.id} status is {prd.status!r}, not 'ready'"
+    if not containment.is_runnable(prd, prds):
+        return (
+            f"{prd.id} is an epic/feature with children; "
+            "use the planning workflow or run its task descendants instead"
+        )
+    return None

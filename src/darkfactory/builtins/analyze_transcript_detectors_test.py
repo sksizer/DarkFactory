@@ -260,6 +260,28 @@ def test_detect_repeated_edit_triple_flagged_twice() -> None:
     assert len(findings) == 2
 
 
+def test_repeated_edit_then_write_same_path_flagged() -> None:
+    events = [
+        _assistant_tool_use("Edit", "config.toml"),
+        _assistant_tool_use("Write", "config.toml"),
+    ]
+    findings = detect_repeated_edit(events)
+    assert len(findings) == 1
+    assert findings[0].category == "repeated_edit"
+    assert "config.toml" in findings[0].message
+
+
+def test_repeated_write_then_edit_same_path_flagged() -> None:
+    events = [
+        _assistant_tool_use("Write", "config.toml"),
+        _assistant_tool_use("Edit", "config.toml"),
+    ]
+    findings = detect_repeated_edit(events)
+    assert len(findings) == 1
+    assert findings[0].category == "repeated_edit"
+    assert "config.toml" in findings[0].message
+
+
 # ---------------------------------------------------------------------------
 # large_thinking_burst
 # ---------------------------------------------------------------------------

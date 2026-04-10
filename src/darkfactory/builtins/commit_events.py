@@ -16,14 +16,12 @@ _log = logging.getLogger(__name__)
 def commit_events(ctx: ExecutionContext) -> None:
     """Copy the event log into the worktree and stage it.
 
-    This builtin is a no-op unless ``[events] commit = true`` is set in
-    ``.darkfactory/config.toml``. When enabled, it copies the current
-    PRD's event log from ``<repo_root>/.darkfactory/events/`` into the
-    worktree at ``.darkfactory/events/`` and stages it for committing.
+    This builtin is a no-op unless event log committing is enabled in
+    ``.darkfactory/config.toml``. Reads from ``[workflow.events] commit``
+    first, falls back to ``[events] commit`` for backwards compatibility.
 
-    Unlike ``commit_transcript`` (which this replaces), the default is
-    to NOT commit event logs — they may contain sensitive data and are
-    primarily diagnostic artifacts.
+    Default is NOT to commit — event logs may contain sensitive data and
+    are primarily diagnostic artifacts.
     """
     # Check config — opt-in only.
     config_path = ctx.repo_root / ".darkfactory" / "config.toml"
@@ -32,9 +30,13 @@ def commit_events(ctx: ExecutionContext) -> None:
 
         with open(config_path, "rb") as f:
             config = tomllib.load(f)
-        events_config = config.get("events", {})
+        # Prefer [workflow.events], fall back to [events]
+        workflow_cfg = config.get("workflow", {})
+        events_config = workflow_cfg.get("events", config.get("events", {}))
         if not events_config.get("commit", False):
-            ctx.logger.info("commit_events: disabled (events.commit != true); skipping")
+            ctx.logger.info(
+                "commit_events: disabled (workflow.events.commit != true); skipping"
+            )
             return
     else:
         ctx.logger.info("commit_events: no config.toml found; skipping (default off)")

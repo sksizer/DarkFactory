@@ -2,7 +2,7 @@
 id: PRD-563
 title: "Drain-ready-queue execution mode: run all ready PRDs without a target"
 kind: feature
-status: ready
+status: in-progress
 priority: high
 effort: m
 capability: moderate
