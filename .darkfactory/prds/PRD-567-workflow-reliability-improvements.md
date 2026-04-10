@@ -130,19 +130,17 @@ When a task fails, include stderr and failure detail in the `task_finish` event.
 
 | Child | Title | Effort | Priority | Depends on |
 |-------|-------|--------|----------|------------|
-| PRD-567.1 | ensure_worktree auto-recovery for merged/closed PRs | s | high | — |
-| PRD-567.2 | Reduce permission denial token waste (disallow + prompt) | xs | high | — |
-| PRD-567.3 | Fix file deletion permissions in task workflow | xs | high | — |
-| PRD-567.4 | Filesystem containment hardening (absolute path blocks) | m | high | — |
-| PRD-567.5 | Pre-run stale cleanup in graph execution | s | medium | 567.1 |
-| PRD-567.6 | Refactor/deletion workflow | s | medium | 567.3 |
-| PRD-567.7 | Planning workflow template alignment | s | medium | — |
-| PRD-567.8 | Structured failure context in event logs | xs | low | — |
+| PRD-567.1 | Worktree lifecycle resilience: auto-recovery and pre-run cleanup | m | high | — |
+| PRD-567.2 | Agent permission hygiene: eliminate denial waste and harden prompts | s | high | — |
+| PRD-567.3 | File operation permissions and workflow specialization | s | high | — |
+| PRD-567.4 | Filesystem containment hardening: block absolute-path escapes | m | high | — |
+| PRD-567.5 | Planning workflow template alignment | s | medium | — |
+| PRD-567.6 | Structured failure context in event logs | xs | low | — |
 
 567.1 through 567.4 are independent and can execute in parallel.
-567.5 depends on 567.1 (reuses the auto-recovery logic).
-567.6 depends on 567.3 (needs validated deletion permissions).
-567.7 and 567.8 are independent of everything else.
+567.5 and 567.6 are independent of everything else.
+
+Note: PRD-567.1–567.4 are further decomposed into sub-tasks (e.g. PRD-567.1.1–567.1.3).
 
 ## Acceptance criteria
 
