@@ -50,6 +50,7 @@ from darkfactory.builtins.ensure_worktree import ensure_worktree
 from darkfactory.builtins.fetch_pr_comments import fetch_pr_comments
 from darkfactory.builtins.lint_attribution import lint_attribution
 from darkfactory.builtins.push_branch import push_branch
+from darkfactory.builtins.reply_pr_comments import reply_pr_comments
 from darkfactory.builtins.set_status import set_status
 from darkfactory.builtins.summarize_agent_run import summarize_agent_run
 
@@ -71,5 +72,6 @@ __all__ = [
     "lint_attribution",
     "cleanup_worktree",
     "analyze_transcript",
+    "reply_pr_comments",
     "check_rework_guard",
 ]

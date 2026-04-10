@@ -103,11 +103,22 @@ def test_rework_workflow_commit_message_format(real_builtin_workflows: None) -> 
     )
 
 
-def test_rework_workflow_ends_with_push(real_builtin_workflows: None) -> None:
-    """The last task in the rework workflow is push_branch."""
+def test_rework_workflow_ends_with_reply(real_builtin_workflows: None) -> None:
+    """The last task in the rework workflow is reply_pr_comments."""
     workflows = load_workflows()
     wf = workflows["rework"]
-    assert wf.tasks[-1].name == "push_branch"
+    assert wf.tasks[-1].name == "reply_pr_comments"
+
+
+def test_rework_workflow_has_push_branch(real_builtin_workflows: None) -> None:
+    """The rework workflow includes push_branch before reply_pr_comments."""
+    workflows = load_workflows()
+    wf = workflows["rework"]
+    names = [t.name for t in wf.tasks]
+    assert "push_branch" in names
+    push_idx = names.index("push_branch")
+    reply_idx = names.index("reply_pr_comments")
+    assert push_idx < reply_idx
 
 
 # ---------- fetch_pr_comments builtin ----------

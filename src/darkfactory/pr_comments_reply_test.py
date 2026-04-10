@@ -1,0 +1,176 @@
+"""Tests for CommentReply, parse_agent_replies, and post_comment_replies."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+from darkfactory.pr_comments import (
+    CommentReply,
+    parse_agent_replies,
+    post_comment_replies,
+)
+
+
+# ---------- parse_agent_replies ----------
+
+
+def test_parse_agent_replies_valid_single() -> None:
+    output = """
+Some agent output here.
+
+```json-reply-notes
+[{"thread_id": "IC_abc123", "note": "Addressed: renamed the method."}]
+```
+
+PRD_EXECUTE_OK: PRD-225.5
+"""
+    replies = parse_agent_replies(output)
+    assert len(replies) == 1
+    assert replies[0].thread_id == "IC_abc123"
+    assert replies[0].body == "Addressed: renamed the method."
+
+
+def test_parse_agent_replies_multiple() -> None:
+    output = (
+        "```json-reply-notes\n"
+        '[{"thread_id": "IC_001", "note": "Fixed."}, '
+        '{"thread_id": "IC_002", "note": "Disagree: not a bug."}]\n'
+        "```"
+    )
+    replies = parse_agent_replies(output)
+    assert len(replies) == 2
+    assert replies[0].thread_id == "IC_001"
+    assert replies[1].thread_id == "IC_002"
+    assert replies[1].body == "Disagree: not a bug."
+
+
+def test_parse_agent_replies_missing_block() -> None:
+    output = "Agent did stuff but emitted no reply notes block."
+    replies = parse_agent_replies(output)
+    assert replies == []
+
+
+def test_parse_agent_replies_invalid_json() -> None:
+    output = "```json-reply-notes\nnot valid json\n```"
+    replies = parse_agent_replies(output)
+    assert replies == []
+
+
+def test_parse_agent_replies_not_a_list() -> None:
+    output = '```json-reply-notes\n{"thread_id": "x", "note": "y"}\n```'
+    replies = parse_agent_replies(output)
+    assert replies == []
+
+
+def test_parse_agent_replies_missing_fields_skipped() -> None:
+    output = (
+        "```json-reply-notes\n"
+        '[{"thread_id": "IC_001"}, {"thread_id": "IC_002", "note": "OK."}]\n'
+        "```"
+    )
+    replies = parse_agent_replies(output)
+    # First item missing "note" is skipped
+    assert len(replies) == 1
+    assert replies[0].thread_id == "IC_002"
+
+
+def test_parse_agent_replies_non_dict_items_skipped() -> None:
+    output = (
+        "```json-reply-notes\n"
+        '["not-a-dict", {"thread_id": "IC_001", "note": "OK."}]\n'
+        "```"
+    )
+    replies = parse_agent_replies(output)
+    assert len(replies) == 1
+    assert replies[0].thread_id == "IC_001"
+
+
+def test_parse_agent_replies_empty_array() -> None:
+    output = "```json-reply-notes\n[]\n```"
+    replies = parse_agent_replies(output)
+    assert replies == []
+
+
+# ---------- post_comment_replies ----------
+
+
+def _make_mock_run(returncode: int = 0, stderr: str = "") -> MagicMock:
+    mock = MagicMock()
+    mock.returncode = returncode
+    mock.stderr = stderr
+    mock.stdout = "{}"
+    return mock
+
+
+def test_post_comment_replies_success(tmp_path: Path) -> None:
+    replies = [CommentReply(thread_id="IC_001", body="Fixed it.")]
+    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+        mock_run.return_value = _make_mock_run(returncode=0)
+        results = post_comment_replies(
+            pr_number=42, replies=replies, commit_sha="abc1234", repo_root=tmp_path
+        )
+
+    assert results == [("IC_001", True)]
+    mock_run.assert_called_once()
+    call_args = mock_run.call_args[0][0]
+    # Verify the body contains the prefix
+    body_arg = next(a for a in call_args if a.startswith("body="))
+    assert body_arg.startswith("body=[harness] addressed in abc1234: Fixed it.")
+
+
+def test_post_comment_replies_prefix_format(tmp_path: Path) -> None:
+    replies = [CommentReply(thread_id="IC_999", body="Renamed the variable.")]
+    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+        mock_run.return_value = _make_mock_run(returncode=0)
+        post_comment_replies(
+            pr_number=7, replies=replies, commit_sha="deadbeef", repo_root=tmp_path
+        )
+
+    call_args = mock_run.call_args[0][0]
+    body_arg = next(a for a in call_args if a.startswith("body="))
+    assert body_arg == "body=[harness] addressed in deadbeef: Renamed the variable."
+
+
+def test_post_comment_replies_failure_returns_false(tmp_path: Path) -> None:
+    replies = [CommentReply(thread_id="IC_bad", body="Something.")]
+    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+        mock_run.return_value = _make_mock_run(returncode=1, stderr="permission denied")
+        results = post_comment_replies(
+            pr_number=1, replies=replies, commit_sha="sha1", repo_root=tmp_path
+        )
+
+    assert results == [("IC_bad", False)]
+
+
+def test_post_comment_replies_exception_returns_false(tmp_path: Path) -> None:
+    replies = [CommentReply(thread_id="IC_exc", body="Something.")]
+    with patch("darkfactory.pr_comments.subprocess.run", side_effect=OSError("no gh")):
+        results = post_comment_replies(
+            pr_number=1, replies=replies, commit_sha="sha1", repo_root=tmp_path
+        )
+
+    assert results == [("IC_exc", False)]
+
+
+def test_post_comment_replies_multiple_mixed(tmp_path: Path) -> None:
+    replies = [
+        CommentReply(thread_id="IC_ok", body="Fixed."),
+        CommentReply(thread_id="IC_fail", body="Done."),
+    ]
+    responses = [_make_mock_run(0), _make_mock_run(1, "rate limit")]
+    with patch("darkfactory.pr_comments.subprocess.run", side_effect=responses):
+        results = post_comment_replies(
+            pr_number=5, replies=replies, commit_sha="abc", repo_root=tmp_path
+        )
+
+    assert results == [("IC_ok", True), ("IC_fail", False)]
+
+
+def test_post_comment_replies_empty(tmp_path: Path) -> None:
+    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+        results = post_comment_replies(
+            pr_number=1, replies=[], commit_sha="sha", repo_root=tmp_path
+        )
+    assert results == []
+    mock_run.assert_not_called()
