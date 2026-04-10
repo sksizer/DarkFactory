@@ -15,7 +15,8 @@ from unittest.mock import patch
 
 import pytest
 
-from darkfactory.cli import _resolve_base_ref, main
+from darkfactory.cli import main
+from darkfactory.cli._shared import _resolve_base_ref
 
 from .conftest import write_prd
 
@@ -417,7 +418,7 @@ workflow = Workflow(
     prd_dir.mkdir()
     write_prd(prd_dir, "PRD-070", "task", status="ready")
 
-    with patch("darkfactory.cli._resolve_base_ref", return_value="main"):
+    with patch("darkfactory.cli.run._resolve_base_ref", return_value="main"):
         exit_code = main(
             [
                 "--prd-dir",

@@ -1,19 +1,28 @@
 views:
   - type: table
-    name: Table
+    name: BACKLOG
     filters:
       and:
         - not:
             - status == "done"
+        - not:
+            - file.ext == "base"
     order:
       - file.name
+      - value
       - status
       - kind
     sort:
+      - property: file.name
+        direction: ASC
+      - property: value
+        direction: ASC
       - property: status
         direction: ASC
     columnSize:
       file.name: 467
+      note.value: 95
+      note.kind: 90
   - type: cards
     name: View
     filters:
