@@ -15,7 +15,8 @@ from unittest.mock import patch
 
 import pytest
 
-from darkfactory.cli import _resolve_base_ref, main
+from darkfactory.cli import main
+from darkfactory.cli.plan import _resolve_base_ref
 
 from .conftest import write_prd
 
