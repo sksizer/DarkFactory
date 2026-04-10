@@ -55,6 +55,8 @@ workflow = Workflow(
         # typecheck is advisory — failures are logged but don't block the commit.
         ShellTask("typecheck", cmd="uv run pyright", on_failure="ignore"),
         ShellTask("test", cmd="uv run pytest", on_failure="fail"),
+        # Detect no-change loops before committing — warn or block.
+        BuiltIn("check_rework_guard"),
         # Commit the agent's changes with the rework message.
         BuiltIn(
             "commit",
