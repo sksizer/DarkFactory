@@ -14,13 +14,13 @@ def build_parser() -> argparse.ArgumentParser:
     from darkfactory.cli.next_cmd import cmd_next
     from darkfactory.cli.status import cmd_status
     from darkfactory.cli.validate import cmd_validate
+    from darkfactory.cli.list_workflows import cmd_list_workflows
 
     # Not yet extracted — still in cli/__init__.py
     from darkfactory.cli import (
         cmd_assign,
         cmd_conflicts,
         cmd_init,
-        cmd_list_workflows,
         cmd_normalize,
         cmd_orphans,
         cmd_plan,
