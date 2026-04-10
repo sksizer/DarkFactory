@@ -2,7 +2,7 @@
 id: PRD-614
 title: Reconcile command errors because of hard coded branch name
 kind: bug
-status: draft
+status: ready 
 priority: critical
 effort: s
 capability: moderate
