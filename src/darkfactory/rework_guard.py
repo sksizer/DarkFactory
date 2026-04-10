@@ -83,7 +83,8 @@ class ReworkGuard:
         """Return the current consecutive no-change count for ``prd_id``."""
         state = self._load()
         entry = state.get(prd_id, {})
-        return int(entry.get("consecutive_no_change", 0))
+        raw = entry.get("consecutive_no_change")
+        return raw if isinstance(raw, int) else 0
 
     def record_outcome(self, prd_id: str, *, had_changes: bool) -> GuardOutcome:
         """Record the outcome of a rework cycle and return the guard result.
@@ -105,7 +106,8 @@ class ReworkGuard:
             return GuardOutcome(blocked=False, consecutive_no_change=0)
 
         # No changes — increment counter.
-        count = int(entry.get("consecutive_no_change", 0)) + 1
+        raw = entry.get("consecutive_no_change")
+        count = (raw if isinstance(raw, int) else 0) + 1
         entry["consecutive_no_change"] = count
 
         blocked = count >= self.max_consecutive
@@ -147,7 +149,9 @@ class ReworkGuard:
             data: dict[str, dict[str, object]] = json.loads(text)
             return data
         except (json.JSONDecodeError, OSError) as exc:
-            _log.warning("failed to read rework guard state from %s: %s", self._state_file, exc)
+            _log.warning(
+                "failed to read rework guard state from %s: %s", self._state_file, exc
+            )
             return {}
 
     def _save(self, state: dict[str, dict[str, object]]) -> None:
