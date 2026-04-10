@@ -2,7 +2,7 @@
 id: "PRD-231"
 title: "Planning review workflow: extend partially-decomposed epics"
 kind: task
-status: review
+status: done
 priority: medium
 effort: s
 capability: complex
