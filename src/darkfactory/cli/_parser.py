@@ -8,27 +8,27 @@ from pathlib import Path
 
 def build_parser() -> argparse.ArgumentParser:
     # Extracted submodules — import directly
+    from darkfactory.cli.assign_cmd import cmd_assign
     from darkfactory.cli.children import cmd_children
     from darkfactory.cli.cleanup import cmd_cleanup
+    from darkfactory.cli.conflicts import cmd_conflicts
+    from darkfactory.cli.list_workflows import cmd_list_workflows
     from darkfactory.cli.new import cmd_new
     from darkfactory.cli.next_cmd import cmd_next
+    from darkfactory.cli.normalize import cmd_normalize
+    from darkfactory.cli.orphans import cmd_orphans
+    from darkfactory.cli.plan import cmd_plan
+    from darkfactory.cli.reconcile import cmd_reconcile
+    from darkfactory.cli.run import cmd_run
     from darkfactory.cli.status import cmd_status
     from darkfactory.cli.tree import cmd_tree
-    from darkfactory.cli.validate import cmd_validate
-    from darkfactory.cli.conflicts import cmd_conflicts
-    from darkfactory.cli.orphans import cmd_orphans
     from darkfactory.cli.undecomposed import cmd_undecomposed
+    from darkfactory.cli.validate import cmd_validate
 
     # Not yet extracted — still in cli/__init__.py
     from darkfactory.cli import (
-        cmd_assign,
         cmd_init,
-        cmd_list_workflows,
-        cmd_normalize,
-        cmd_plan,
-        cmd_reconcile,
         cmd_rework,
-        cmd_run,
     )
     from darkfactory.cli.system import (
         cmd_system_describe,
