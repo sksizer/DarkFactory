@@ -13,6 +13,7 @@ def build_parser() -> argparse.ArgumentParser:
     from darkfactory.cli.new import cmd_new
     from darkfactory.cli.next_cmd import cmd_next
     from darkfactory.cli.status import cmd_status
+    from darkfactory.cli.run import cmd_run
     from darkfactory.cli.validate import cmd_validate
 
     # Not yet extracted — still in cli/__init__.py
@@ -26,7 +27,6 @@ def build_parser() -> argparse.ArgumentParser:
         cmd_plan,
         cmd_reconcile,
         cmd_rework,
-        cmd_run,
         cmd_tree,
         cmd_undecomposed,
     )
