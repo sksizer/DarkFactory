@@ -89,6 +89,7 @@ workflow = Workflow(
         # ----- teardown phase -----
         BuiltIn("set_status", kwargs={"to": "review"}),
         BuiltIn("commit_transcript"),
+        BuiltIn("analyze_transcript"),
         BuiltIn(
             "commit",
             kwargs={"message": "chore(prd): {prd_id} decomposed into tasks"},
