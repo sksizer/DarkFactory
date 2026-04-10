@@ -11,6 +11,7 @@ from typing import Any
 
 from darkfactory.loader import load_workflows
 from darkfactory.pr_comments import CommentFilters, fetch_pr_comments
+from darkfactory.rework_guard import ReworkGuard
 from darkfactory.runner import _compute_branch_name, run_workflow
 
 from darkfactory.cli._shared import (
@@ -105,6 +106,16 @@ def cmd_rework(args: argparse.Namespace) -> int:
         print(f"  PR: #{pr_number}")
         print(f"  Branch: {branch_name}")
         return 0
+
+    # Refuse to run if the guard has blocked this PRD due to loop detection.
+    guard = ReworkGuard(repo_root)
+    if guard.is_blocked(prd_id):
+        raise SystemExit(
+            f"ERROR: {prd_id} is blocked by the rework loop guard after "
+            f"{guard.get_consecutive_no_change(prd_id)} consecutive no-change "
+            f"rework cycle(s). Manual intervention required: remove the entry "
+            f"from {guard.state_file} to unblock."
+        )
 
     # Build comment filters from CLI args and fetch unresolved threads.
     filters = CommentFilters(
