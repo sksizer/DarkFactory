@@ -2,7 +2,7 @@
 id: PRD-622
 title: Data Model Refactor
 kind: task
-status: ready
+status: in-progress
 priority: medium
 effort: xl
 capability: complex
@@ -15,7 +15,7 @@ assignee:
 reviewers: []
 target_version:
 created: 2026-04-11
-updated: 2026-04-11
+updated: '2026-04-11'
 tags: []
 ---
 
