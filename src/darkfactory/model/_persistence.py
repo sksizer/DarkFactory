@@ -511,9 +511,9 @@ def _check_archive_guardrails(
     for pid in sorted(visited):
         if pid == prd.id:
             continue
-        p = all_prds.get(pid)
-        if p is not None and p.status not in TERMINAL_STATUSES:
-            blockers.append((pid, p.status))
+        blocker = all_prds.get(pid)
+        if blocker is not None and blocker.status not in TERMINAL_STATUSES:
+            blockers.append((pid, blocker.status))
     return blockers
 
 
