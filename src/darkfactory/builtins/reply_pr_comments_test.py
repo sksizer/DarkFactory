@@ -45,7 +45,9 @@ def _make_ctx(
     ctx.cwd = cwd or Path("/tmp/worktree")
     ctx.repo_root = repo_root or Path("/tmp/repo")
     ctx.event_writer = None
-    ctx.review_threads = review_threads if review_threads is not None else _default_threads()
+    ctx.review_threads = (
+        review_threads if review_threads is not None else _default_threads()
+    )
     return ctx
 
 

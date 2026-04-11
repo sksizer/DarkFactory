@@ -30,7 +30,7 @@ discuss_operation = SystemOperation(
         BuiltIn(
             "commit_prd_changes",
             kwargs={
-                "message": "chore(prd): {target_prd} discuss session refinements",
+                "message": "docs(prd): {target_prd} discuss session refinements",
             },
         ),
     ],

@@ -2,7 +2,7 @@
 id: PRD-620
 title: prd discuss enhancements
 kind: task
-status: in-progress
+status: review
 priority: low
 effort: s
 capability: simple
