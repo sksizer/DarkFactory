@@ -1,20 +1,20 @@
 ---
-id: "PRD-602"
-title: "Documentation site accuracy overhaul"
+id: PRD-602
+title: Documentation site accuracy overhaul
 kind: task
-status: blocked
+status: ready
 priority: medium
 effort: m
 capability: moderate
-parent: null
+parent:
 depends_on: []
 blocks: []
 impacts:
-  - "site/src/content/docs/"
-workflow: null
-target_version: null
-created: '2026-04-09'
-updated: '2026-04-09'
+  - site/src/content/docs/
+workflow:
+target_version:
+created: 2026-04-09
+updated: 2026-04-09
 tags:
   - docs
   - quality
