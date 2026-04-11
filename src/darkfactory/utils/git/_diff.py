@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ._ops import git_check, git_run
+from ._ops import git_check
 
 
 def diff_quiet(paths: list[str], cwd: Path) -> bool:

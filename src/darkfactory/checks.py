@@ -14,7 +14,10 @@ from pathlib import Path
 from typing import Protocol
 
 from .prd import PRD, compute_branch_name
-from .utils.github.pull_request import fetch_all_pr_states, get_pr_state, list_prs_for_branch
+from .utils.github.pull_request import (
+    fetch_all_pr_states,
+    list_prs_for_branch,
+)
 
 logger = logging.getLogger(__name__)
 

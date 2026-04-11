@@ -8,8 +8,6 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from ._cli import gh_api
-
 logger = logging.getLogger(__name__)
 
 
