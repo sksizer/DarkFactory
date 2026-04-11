@@ -2,7 +2,7 @@
 id: PRD-616
 title: Interactive PRD discussion via phased Claude Code chain
 kind: task
-status: ready
+status: in-progress
 priority: medium
 effort: m
 capability: complex
@@ -29,7 +29,7 @@ impacts:
 workflow:
 target_version:
 created: 2026-04-11
-updated: 2026-04-11
+updated: '2026-04-11'
 tags:
   - harness
   - cli
