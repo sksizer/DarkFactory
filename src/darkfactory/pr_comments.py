@@ -1,9 +1,9 @@
 """Fetch and filter unaddressed PR review comments via the gh CLI.
 
-This module provides ``fetch_pr_comments`` which shells out to ``gh pr view``
-to retrieve review threads, then applies configurable filters before returning
-structured ``ReviewThread`` dataclasses suitable for composing into a feedback
-prompt.
+This module provides ``fetch_pr_comments`` which shells out to
+``gh api graphql`` to retrieve review threads, reviews, and issue comments,
+then applies configurable filters before returning structured
+``ReviewThread`` dataclasses suitable for composing into a feedback prompt.
 
 It also provides ``post_comment_replies`` for posting bot replies back to
 addressed threads, and ``parse_agent_replies`` for extracting structured reply
@@ -58,30 +58,119 @@ def fetch_pr_comments(
 ) -> list[ReviewThread]:
     """Fetch and filter PR review threads from GitHub.
 
-    Shells out to ``gh pr view <pr_number> --json comments,reviews,reviewThreads``
-    and returns a list of ``ReviewThread`` objects matching the given filters.
+    Shells out to ``gh api graphql`` to retrieve ``reviewThreads``,
+    ``reviews``, and issue ``comments`` for the given PR, then returns
+    a list of ``ReviewThread`` objects matching the given filters.
     """
     raw = _gh_fetch(pr_number)
     threads = _parse_threads(raw)
     return _apply_filters(threads, filters or CommentFilters())
 
 
+_GRAPHQL_QUERY = """
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          path
+          line
+          originalLine
+          comments(first: 100) {
+            nodes {
+              id
+              body
+              createdAt
+              author { login }
+            }
+          }
+        }
+      }
+      reviews(first: 100) {
+        nodes {
+          id
+          body
+          submittedAt
+          state
+          author { login }
+        }
+      }
+      comments(first: 100) {
+        nodes {
+          id
+          body
+          createdAt
+          author { login }
+        }
+      }
+    }
+  }
+}
+"""
+
+
 def _gh_fetch(pr_number: int) -> dict[str, Any]:
-    """Run gh pr view and return parsed JSON."""
+    """Fetch PR data via gh GraphQL and reshape into the parser's dict shape.
+
+    ``gh pr view --json`` does not expose ``reviewThreads``, so we use
+    the GraphQL API instead. The response is flattened to match the
+    shape ``_parse_threads`` expects::
+
+        {"reviewThreads": [...], "reviews": [...], "comments": [...]}
+    """
+    owner, name = _gh_repo_nwo()
     result = subprocess.run(
         [
             "gh",
-            "pr",
-            "view",
-            str(pr_number),
-            "--json",
-            "comments,reviews,reviewThreads",
+            "api",
+            "graphql",
+            "-F",
+            f"owner={owner}",
+            "-F",
+            f"name={name}",
+            "-F",
+            f"number={pr_number}",
+            "-f",
+            f"query={_GRAPHQL_QUERY}",
         ],
         capture_output=True,
         text=True,
         check=True,
     )
-    return json.loads(result.stdout)  # type: ignore[no-any-return]
+    payload = json.loads(result.stdout)
+    pr = payload["data"]["repository"]["pullRequest"]
+
+    review_threads: list[dict[str, Any]] = []
+    for rt in pr["reviewThreads"]["nodes"]:
+        review_threads.append(
+            {
+                "isResolved": rt["isResolved"],
+                "path": rt["path"],
+                "line": rt["line"],
+                "originalLine": rt.get("originalLine"),
+                "comments": rt["comments"]["nodes"],
+            }
+        )
+
+    return {
+        "reviewThreads": review_threads,
+        "reviews": pr["reviews"]["nodes"],
+        "comments": pr["comments"]["nodes"],
+    }
+
+
+def _gh_repo_nwo() -> tuple[str, str]:
+    """Return ``(owner, name)`` for the current repo via gh."""
+    result = subprocess.run(
+        ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    nwo = result.stdout.strip()
+    owner, _, name = nwo.partition("/")
+    return owner, name
 
 
 def _parse_threads(raw: dict[str, Any]) -> list[ReviewThread]:

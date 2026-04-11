@@ -24,3 +24,5 @@ build/
 
 .darkfactory/prds/.obsidian
 .vscode
+
+.darkfactory/state
