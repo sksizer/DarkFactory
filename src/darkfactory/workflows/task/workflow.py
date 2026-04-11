@@ -67,6 +67,7 @@ workflow = Workflow(
                 "Bash(git status:*)",
                 "Bash(git diff:*)",
                 "Bash(git log:*)",
+                "Bash(python -m)"
             ],
             model_from_capability=True,
             retries=1,
