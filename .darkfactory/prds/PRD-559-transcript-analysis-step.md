@@ -2,7 +2,7 @@
 id: PRD-559
 title: Add transcript analysis step that surfaces problems and recommendations from agent runs
 kind: feature
-status: blocked
+status: done
 priority: medium
 effort: m
 capability: moderate
