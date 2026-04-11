@@ -11,6 +11,7 @@ from pathlib import Path
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run, _scan_for_forbidden_attribution
 from darkfactory.event_log import emit_builtin_effect
+from darkfactory.utils.github.pull_request import create_pull_request
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -80,23 +81,7 @@ def create_pr(ctx: ExecutionContext) -> None:
         body_path = body_file.name
 
     try:
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "create",
-                "--base",
-                ctx.base_ref,
-                "--title",
-                title,
-                "--body-file",
-                body_path,
-            ],
-            cwd=str(ctx.cwd),
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        result = create_pull_request(ctx.base_ref, title, body_path, ctx.cwd)
     except subprocess.CalledProcessError as exc:
         detail = (
             f"gh pr create failed (exit {exc.returncode}):"

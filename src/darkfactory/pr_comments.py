@@ -15,12 +15,13 @@ from __future__ import annotations
 import json
 import logging
 import re
-import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from darkfactory.utils.git import resolve_commit_timestamp
+from darkfactory.utils.github._cli import gh_graphql, gh_repo_nwo
+from darkfactory.utils.github.comments import post_comment_reply
 
 _log = logging.getLogger(__name__)
 
@@ -127,26 +128,8 @@ def _gh_fetch(pr_number: int) -> dict[str, Any]:
 
         {"reviewThreads": [...], "reviews": [...], "comments": [...]}
     """
-    owner, name = _gh_repo_nwo()
-    result = subprocess.run(
-        [
-            "gh",
-            "api",
-            "graphql",
-            "-F",
-            f"owner={owner}",
-            "-F",
-            f"name={name}",
-            "-F",
-            f"number={pr_number}",
-            "-f",
-            f"query={_GRAPHQL_QUERY}",
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    payload = json.loads(result.stdout)
+    owner, name = gh_repo_nwo()
+    payload = gh_graphql(owner, name, pr_number, _GRAPHQL_QUERY)
     pr = payload["data"]["repository"]["pullRequest"]
 
     review_threads: list[dict[str, Any]] = []
@@ -166,19 +149,6 @@ def _gh_fetch(pr_number: int) -> dict[str, Any]:
         "reviews": pr["reviews"]["nodes"],
         "comments": pr["comments"]["nodes"],
     }
-
-
-def _gh_repo_nwo() -> tuple[str, str]:
-    """Return ``(owner, name)`` for the current repo via gh."""
-    result = subprocess.run(
-        ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    nwo = result.stdout.strip()
-    owner, _, name = nwo.partition("/")
-    return owner, name
 
 
 def _parse_threads(raw: dict[str, Any]) -> list[ReviewThread]:
@@ -407,23 +377,8 @@ def post_comment_replies(
         # gh api POST to create a reply on the specific pull request review comment.
         # GitHub REST endpoint: POST /repos/{owner}/{repo}/pulls/{pull_number}/comments/{comment_id}/replies
         # {comment_id} must be the numeric databaseId, not a GraphQL node id.
-        cmd = [
-            "gh",
-            "api",
-            "--method",
-            "POST",
-            f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/comments/{target_id}/replies",
-            "-f",
-            f"body={body}",
-        ]
-
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                cwd=str(repo_root),
-            )
+            result = post_comment_reply(pr_number, target_id, body, repo_root)
             if result.returncode != 0:
                 _log.warning(
                     "post_comment_replies: gh api failed for thread %s (exit %d): %s",
