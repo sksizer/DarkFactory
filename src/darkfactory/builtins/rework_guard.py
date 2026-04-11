@@ -9,6 +9,7 @@ and either warns (below threshold) or raises :class:`RuntimeError`
 from __future__ import annotations
 
 import logging
+import subprocess
 from pathlib import Path
 
 from darkfactory.builtins._registry import builtin
@@ -22,9 +23,16 @@ _log = logging.getLogger(__name__)
 
 
 def _has_changes(cwd: str) -> bool:
-    """Return True if there are any staged or unstaged changes in the worktree."""
-    result = git_run("status", "--porcelain", cwd=Path(cwd))
-    return bool(result.stdout.strip())
+    """Return True if there are any staged or unstaged changes in the worktree.
+
+    Returns False if the directory is not a git worktree or git errors for any
+    reason, preserving the original non-raising semantics.
+    """
+    try:
+        result = git_run("status", "--porcelain", cwd=Path(cwd))
+        return bool(result.stdout.strip())
+    except subprocess.CalledProcessError:
+        return False
 
 
 @builtin("check_rework_guard")

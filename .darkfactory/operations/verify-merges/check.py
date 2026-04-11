@@ -26,12 +26,19 @@ def _is_ancestor(sha: str, branch: str = "main") -> bool:
 
 def main() -> int:
     # Fetch all merged PRs via gh CLI
-    result = _run([
-        "gh", "pr", "list",
-        "--state", "merged",
-        "--limit", "200",
-        "--json", "number,title,mergeCommit,mergedAt",
-    ])
+    result = _run(
+        [
+            "gh",
+            "pr",
+            "list",
+            "--state",
+            "merged",
+            "--limit",
+            "200",
+            "--json",
+            "number,title,mergeCommit,mergedAt",
+        ]
+    )
     if result.returncode != 0:
         print(f"ERROR: gh pr list failed: {result.stderr}", file=sys.stderr)
         return 1
@@ -49,12 +56,14 @@ def main() -> int:
         if _is_ancestor(sha):
             ok_count += 1
         else:
-            missing.append({
-                "number": pr["number"],
-                "title": pr["title"],
-                "sha": sha[:7],
-                "merged_at": pr.get("mergedAt", "unknown"),
-            })
+            missing.append(
+                {
+                    "number": pr["number"],
+                    "title": pr["title"],
+                    "sha": sha[:7],
+                    "merged_at": pr.get("mergedAt", "unknown"),
+                }
+            )
 
     # Report
     total = ok_count + len(missing)
@@ -68,9 +77,7 @@ def main() -> int:
             print(f"  PR #{m['number']} ({m['sha']}) {m['title']}")
             print(f"    merged: {m['merged_at']}")
         print()
-        print(
-            "These PRs show as merged on GitHub but their code may not be on main."
-        )
+        print("These PRs show as merged on GitHub but their code may not be on main.")
         print(
             "Investigate each one: the merge commit may have been on a branch "
             "that was force-pushed or merged in a way that didn't reach main."

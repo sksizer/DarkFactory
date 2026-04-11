@@ -5,12 +5,12 @@ import sys
 
 # Delete the test file
 try:
-    if os.path.exists('tests/test_builtins.py'):
-        os.remove('tests/test_builtins.py')
-        print(f"Deleted tests/test_builtins.py")
+    if os.path.exists("tests/test_builtins.py"):
+        os.remove("tests/test_builtins.py")
+        print("Deleted tests/test_builtins.py")
 
         # Stage the deletion with git
-        result = subprocess.run(['git', 'add', '-u'], check=True)
+        result = subprocess.run(["git", "add", "-u"], check=True)
         print("Staged deletion with git add -u")
         sys.exit(0)
     else:

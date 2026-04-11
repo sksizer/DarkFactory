@@ -28,7 +28,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/darkfactory"]
-exclude = ["**/*_test.py", "**/conftest.py"]
+exclude = ["**/*_test.py", "**/conftest.py", "**/_test_helpers.py"]
 
 [tool.mypy]
 strict = true

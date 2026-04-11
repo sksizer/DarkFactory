@@ -31,7 +31,7 @@ def cleanup_worktree(ctx: ExecutionContext) -> None:
         )
         return
 
-    if _log_dry_run(ctx, f"git worktree remove {ctx.worktree_path}"):
+    if _log_dry_run(ctx, f"git -C {ctx.repo_root} worktree remove {ctx.worktree_path}"):
         return
 
     git_run("worktree", "remove", str(ctx.worktree_path), cwd=ctx.repo_root)

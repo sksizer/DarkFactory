@@ -42,7 +42,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .builtins import BUILTINS
-from .event_log import EventWriter
+from .event_log import EventWriter, emit_task_event
 from .invoke import InvokeResult, capability_to_model, invoke_claude
 from .prd import compute_branch_name
 from .templates import compose_prompt
@@ -455,23 +455,22 @@ def _run_shell(
     first_result = _run_shell_once(cmd, ctx, task.env)
 
     # Emit shell output events via the event writer.
-    if ctx.event_writer:
-        if first_result.stdout:
-            ctx.event_writer.emit(
-                "task",
-                "shell_output",
-                task=task.name,
-                stream="stdout",
-                text=first_result.stdout[:10000],
-            )
-        if first_result.stderr:
-            ctx.event_writer.emit(
-                "task",
-                "shell_output",
-                task=task.name,
-                stream="stderr",
-                text=first_result.stderr[:10000],
-            )
+    if first_result.stdout:
+        emit_task_event(
+            ctx,
+            "shell_output",
+            task=task.name,
+            stream="stdout",
+            text=first_result.stdout[:10000],
+        )
+    if first_result.stderr:
+        emit_task_event(
+            ctx,
+            "shell_output",
+            task=task.name,
+            stream="stderr",
+            text=first_result.stderr[:10000],
+        )
 
     if first_result.returncode == 0:
         return TaskStep(name=task.name, kind="shell", success=True)
