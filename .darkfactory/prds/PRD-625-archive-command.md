@@ -6,10 +6,8 @@ status: ready
 priority: medium
 effort: s
 capability: simple
-parent: "[[PRD-622-data-model-refactor]]"
+parent:
 depends_on:
-  - "[[PRD-623-model-module-extraction]]"
-  - "[[PRD-624-data-directory-and-migration]]"
 impacts: []
 workflow:
 assignee:
