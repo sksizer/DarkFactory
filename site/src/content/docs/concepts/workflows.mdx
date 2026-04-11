@@ -16,13 +16,13 @@ All tasks inherit from the `Task` base class (a marker for `isinstance` dispatch
     References a harness primitive by name. `kwargs` are format-string'd at runtime using [ExecutionContext](#executioncontext) placeholders.
 
     ```python
-    BuiltIn(name="set_status", kwargs={"status": "in-progress"})
+    BuiltIn(name="set_status", kwargs={"to": "in-progress"})
     BuiltIn(name="ensure_worktree")
-    BuiltIn(name="open_pr", kwargs={"title": "{prd_id}: {prd_title}"})
-    BuiltIn(name="cleanup_worktree")
+    BuiltIn(name="create_pr")
+    BuiltIn(name="commit", kwargs={"message": "chore(prd): {prd_id} start work"})
     ```
 
-    Common builtins: `ensure_worktree`, `cleanup_worktree`, `set_status`, `open_pr`, `ensure_branch`.
+    Common builtins: `ensure_worktree`, `set_status`, `commit`, `push_branch`, `create_pr`.
   </TabItem>
   <TabItem label="AgentTask">
     Invokes an AI coding agent as a subprocess. This is where code gets written.
@@ -54,8 +54,8 @@ All tasks inherit from the `Task` base class (a marker for `isinstance` dispatch
     | `model_from_capability` | `True` | Select model from PRD `capability` field. See [agent model](/concepts/agent-model). |
     | `retries` | `1` | Max retry attempts on failure |
     | `verify_prompts` | `[]` | Prompts used during retry, with `{CHECK_OUTPUT}` bound to failure output |
-    | `sentinel_success` | `"PRD_EXECUTE_OK"` | String agent must emit to signal success |
-    | `sentinel_failure` | `"PRD_EXECUTE_FAILED"` | String agent emits to signal failure |
+    | `sentinel_success` | `"PRD_EXECUTE_OK"` | String agent must emit to signal success (followed by `:` and optional message) |
+    | `sentinel_failure` | `"PRD_EXECUTE_FAILED"` | String agent emits to signal failure (followed by `:` and reason) |
   </TabItem>
   <TabItem label="ShellTask">
     Runs an arbitrary shell command in the PRD's [worktree](/concepts/worktrees).
@@ -118,10 +118,10 @@ sequenceDiagram
     
     R->>B: ensure_worktree
     B-->>R: worktree created
-    R->>B: set_status(in-progress)
-    R->>B: commit
+    R->>B: set_status(to="in-progress")
+    R->>B: commit(start work)
     R->>A: implement (prompts + tools)
-    A-->>R: PRD_EXECUTE_OK
+    A-->>R: PRD_EXECUTE_OK:
     R->>S: just test
     S-->>R: exit 0
     R->>S: just format
@@ -130,7 +130,7 @@ sequenceDiagram
     S-->>R: exit 0
     R->>S: just typecheck
     S-->>R: exit 0
-    R->>B: set_status(review)
+    R->>B: set_status(to="review")
     R->>B: commit + push
     R->>B: create_pr
 ```
@@ -141,15 +141,16 @@ The template prepends and appends builtins, producing this effective sequence:
 
 <Steps>
 1. `BuiltIn("ensure_worktree")` -- create isolated [worktree](/concepts/worktrees) and branch
-2. `BuiltIn("set_status", status="in-progress")` -- transition [status](/concepts/status-lifecycle)
-3. `AgentTask("implement")` -- agent writes code
-4. `ShellTask("test")` -- run test suite; retry agent on failure
-5. `ShellTask("format")` -- run formatter; halt on failure
-6. `ShellTask("lint")` -- run linter; retry agent on failure
-7. `ShellTask("typecheck")` -- run type checker; retry agent on failure
-8. `BuiltIn("set_status", status="review")` -- transition status
-9. `BuiltIn("open_pr")` -- create pull request
-10. `BuiltIn("cleanup_worktree")` -- remove worktree
+2. `BuiltIn("set_status", kwargs={"to": "in-progress"})` -- transition [status](/concepts/status-lifecycle)
+3. `BuiltIn("commit", kwargs={"message": "chore(prd): {prd_id} start work"})` -- checkpoint commit
+4. `AgentTask("implement")` -- agent writes code
+5. `ShellTask("test")` -- run test suite; retry agent on failure
+6. `ShellTask("format")` -- run formatter; halt on failure
+7. `ShellTask("lint")` -- run linter; retry agent on failure
+8. `ShellTask("typecheck")` -- run type checker; retry agent on failure
+9. `BuiltIn("set_status", kwargs={"to": "review"})` -- transition status
+10. `BuiltIn("push_branch")` -- push branch to remote
+11. `BuiltIn("create_pr")` -- create pull request
 </Steps>
 
 ## Workflow Object
@@ -158,11 +159,11 @@ The template prepends and appends builtins, producing this effective sequence:
 Workflow(
     name="default",
     description="Standard implementation workflow",
-    applies_to=["task", "component"],   # PRD kinds this workflow handles
+    applies_to=lambda prd, prds: prd.kind == "task",  # callable predicate
     priority=0,                          # higher = higher priority when multiple match
     tasks=[...],                         # ordered list of Task objects
     workflow_dir=Path(".darkfactory/workflows/default/"),
-    template_name="implement",
+    template_name="prd-implementation",
 )
 ```
 

@@ -47,7 +47,7 @@ DarkFactory supports two execution strategies, selected based on the command inv
 Used when you target a specific PRD or epic. Computes the graph scope from a root node and walks it in topological order.
 
 ```bash frame="terminal" title="Rooted execution"
-prd execute PRD-010 --max-runs 5
+prd run PRD-010 --execute --max-runs 5
 ```
 
 Internally calls `graph_scope()` then `actionable_order()`.
@@ -56,7 +56,7 @@ Internally calls `graph_scope()` then `actionable_order()`.
 Used for drain-ready-queue mode. Discovers all `ready` PRDs across the entire project regardless of parent hierarchy.
 
 ```bash frame="terminal" title="Queue execution"
-prd execute --queue --max-runs 10
+prd run --all --execute --max-runs 10
 ```
 
 Internally calls `discover_ready_queue()`.
@@ -132,7 +132,7 @@ Run 3: Execute PRD-012 (task workflow)
   → ...
 ```
 
-Without re-loading between runs, child PRDs created by planning workflows would not appear in the graph until the next `prd execute` invocation. Re-loading enables single-invocation epic decomposition and execution.
+Without re-loading between runs, child PRDs created by planning workflows would not appear in the graph until the next `prd run --execute` invocation. Re-loading enables single-invocation epic decomposition and execution.
 
 ## Failure Isolation
 
@@ -167,7 +167,7 @@ class ExecutionReport:
 ```
 
 ```bash frame="terminal" title="Execution summary"
-prd execute PRD-010 --max-runs 5
+prd run PRD-010 --execute --max-runs 5
 ```
 
 ```
@@ -192,7 +192,7 @@ Controls how many PRDs the harness will execute in a single invocation. This is 
 - **Testing workflow changes** -- run one PRD to verify a workflow modification before processing the full DAG
 
 ```bash frame="terminal" title="Limit execution count"
-prd execute PRD-010 --max-runs 3
+prd run PRD-010 --execute --max-runs 3
 ```
 
 After `--max-runs` PRDs have been processed (whether completed, failed, or skipped), the harness stops and reports. The remaining actionable PRDs are left in `ready` status for the next invocation.

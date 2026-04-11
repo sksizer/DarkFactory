@@ -78,7 +78,7 @@ Additionally, any status can transition to `blocked` or `cancelled`:
 The harness enforces these transitions. The `set_status` builtin rejects invalid transitions (e.g., `draft` directly to `done`).
 
 <Aside type="caution">
-Manual edits to the `status` field in a PRD file are not validated until the next `prd plan` or `prd execute` invocation. Use `prd status set PRD-NNN <status>` to ensure transition validity.
+Manual edits to the `status` field in a PRD file are not validated until the next `prd plan` or `prd run` invocation. Use `prd status set PRD-NNN <status>` to ensure transition validity.
 </Aside>
 
 ## Kind and Executability

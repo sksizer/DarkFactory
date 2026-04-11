@@ -36,11 +36,11 @@ workflow = Workflow(
         i.endswith(".rs") for i in prd.impacts
     ),
     tasks=PRD_IMPLEMENTATION_TEMPLATE.compose(
-        implement=AgentTask(name="implement", prompt_file="implement.md"),
+        implement=AgentTask(name="implement", prompts=["implement.md"]),
         verify=[
-            ShellTask(name="build", command="cargo build"),
-            ShellTask(name="test", command="cargo test"),
-            ShellTask(name="clippy", command="cargo clippy -- -D warnings",
+            ShellTask(name="build", cmd="cargo build"),
+            ShellTask(name="test", cmd="cargo test"),
+            ShellTask(name="clippy", cmd="cargo clippy -- -D warnings",
                       on_failure="retry_agent"),
         ],
     ),
@@ -75,9 +75,9 @@ operation = Operation(
     name="upgrade-deps",
     description="Update Python dependencies and verify tests pass",
     tasks=[
-        ShellTask(name="compile", command="pip-compile --upgrade requirements.in"),
-        ShellTask(name="install", command="pip install -r requirements.txt"),
-        ShellTask(name="test", command="pytest --tb=short -q", on_failure="fail"),
+        ShellTask(name="compile", cmd="pip-compile --upgrade requirements.in"),
+        ShellTask(name="install", cmd="pip install -r requirements.txt"),
+        ShellTask(name="test", cmd="pytest --tb=short -q", on_failure="fail"),
     ],
 )
 ```
@@ -134,7 +134,7 @@ Each workflow can include a `prompts/` directory containing Markdown files used 
   fix-test.md
 ```
 
-Prompt files are resolved relative to the workflow directory. An AgentTask with `prompt_file="implement.md"` loads from `<workflow_dir>/prompts/implement.md`.
+Prompt files are resolved relative to the workflow directory. An AgentTask with `prompts=["implement.md"]` loads from `<workflow_dir>/prompts/implement.md`.
 
 ### Creating Effective Prompts
 

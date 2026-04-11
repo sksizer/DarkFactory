@@ -15,11 +15,9 @@ Each builtin is registered in the `BUILTINS` dictionary and dispatched by name f
 
 Creates a git worktree and branch for the PRD. The branch name is derived from the PRD ID and slug.
 
-| Kwarg | Type | Default | Description |
-|-------|------|---------|-------------|
-| `base_ref` | `str` | Computed | Base branch or commit. Resolved by `resolve_base_ref()`. |
+No kwargs. Uses `ctx.base_ref` (set from `--base` flag or auto-resolved).
 
-**Behavior**: Creates `worktrees/<prd-id>/` with a new branch `prd/<id>-<slug>` from the base ref. Fails if the worktree already exists or the base ref is dirty.
+**Behavior**: Creates `.worktrees/<prd-id>-<slug>/` with a new branch `prd/<id>-<slug>` from `ctx.base_ref`. Sets `ctx.worktree_path` and `ctx.cwd`. Acquires a per-PRD advisory file lock at `.worktrees/<prd-id>.lock` for the lifetime of the run. Fails if the worktree already exists but is not safe to resume.
 
 **Dry-run**: Prints the worktree path and branch name that would be created. No filesystem changes.
 
@@ -77,18 +75,18 @@ Removes the git worktree after a successful run.
 
 ### `set_status`
 
-Updates the PRD frontmatter status field with transition validation.
+Updates the PRD frontmatter status field.
 
 | Kwarg | Type | Required | Description |
 |-------|------|----------|-------------|
-| `status` | `str` | Yes | Target status: `in-progress`, `review`, `done`, `blocked`, `cancelled`. |
+| `to` | `str` | Yes | Target status: `in-progress`, `review`, `done`, `blocked`, `cancelled`. |
 
-**Behavior**: Validates the transition against the state machine (e.g., `ready` -> `in-progress` is valid; `draft` -> `done` is not). Writes the updated frontmatter to the PRD file. Updates the `updated` date field.
+**Behavior**: Rewrites the `status:` and `updated:` lines in the worktree's copy of the PRD file. Updates `ctx.prd.status` in memory so downstream tasks see the new status without re-loading from disk.
 
 **Dry-run**: Prints the proposed transition. No file modifications.
 
 <Aside type="caution">
-`set_status` enforces the state machine. If you need to force an invalid transition (e.g., resetting a `blocked` PRD to `draft`), edit the PRD file directly. The harness will accept any status on the next read.
+`set_status` targets the worktree's copy of the PRD, not the source repo. Status changes reach the source repo only via PR merge.
 </Aside>
 
 ## Quality and Attribution
@@ -115,7 +113,7 @@ Commits the agent transcript to the transcripts directory.
 |-------|------|---------|-------------|
 | None | | | No configurable parameters. |
 
-**Behavior**: Copies the agent's conversation transcript to `.darkfactory/transcripts/<prd-id>/` and commits it. Transcripts are git-ignored in most setups but can be tracked if configured.
+**Behavior**: Copies the agent's conversation transcript from `.harness-transcripts/<prd-id>.jsonl` to `.darkfactory/transcripts/<prd-id>-<timestamp>.jsonl` in the worktree and commits it.
 
 **Dry-run**: Prints the transcript path. No file operations.
 
@@ -152,7 +150,7 @@ Generates a human-readable summary of what the agent did during execution.
 | `push_branch` | Git | No | No | Yes |
 | `create_pr` | Git | No | Yes (`pr_url`) | Yes |
 | `cleanup_worktree` | Git | Yes | No | No |
-| `set_status` | Lifecycle | No | Yes (`status`) | No |
+| `set_status` | Lifecycle | No | Yes (`status`, `updated`) | No |
 | `lint_attribution` | Quality | No | No | No |
 | `commit_transcript` | Logging | Yes | No | No |
 | `commit_events` | Logging | Yes | No | No |

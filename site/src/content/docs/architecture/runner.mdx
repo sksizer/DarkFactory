@@ -48,14 +48,14 @@ Built-ins receive the full `ExecutionContext` and can perform privileged operati
 Agent tasks are the most complex dispatch path. The runner composes a prompt, selects a model, invokes the Claude API, and stores the result on the execution context.
 
 <Steps>
-1. **Compose prompt** -- Load the prompt file from `<workflow_dir>/prompts/`, substitute `\{{PLACEHOLDER}}` tokens with values from the PRD and context
-2. **Pick model** -- Use the task-level model override, or fall back to the config model for the PRD's effort level
+1. **Compose prompt** -- Load each path from `AgentTask.prompts` relative to `workflow_dir`, substitute `\{{PLACEHOLDER}}` tokens with values from the PRD and context
+2. **Pick model** -- Use the task-level model override, or fall back to the config model for the PRD's capability level
 3. **Invoke Claude** -- Send the composed prompt with the tool allowlist to the Claude API
 4. **Store result** -- Save the agent's response on `ctx` for use by subsequent tasks (e.g., verify prompts reference prior agent output)
-5. **Check sentinel** -- Scan output for `PRD_EXECUTE_OK` or `PRD_EXECUTE_FAILED`
+5. **Check sentinel** -- Scan the last line for `PRD_EXECUTE_OK:` or `PRD_EXECUTE_FAILED:`
 </Steps>
 
-The agent runs inside the worktree with access only to the tools specified in `allowed_tools`. The harness enforces this allowlist -- the agent cannot bypass it.
+The agent runs inside the worktree with access only to the tools specified in `AgentTask.tools`. The harness enforces this allowlist -- the agent cannot bypass it.
 
 ## `_run_shell`: Shell Task Dispatch
 
@@ -63,10 +63,11 @@ Shell tasks run a command in the worktree via `subprocess.run`.
 
 ```python
 def _run_shell(task: ShellTask, ctx: ExecutionContext) -> StepResult:
-    cmd = _format_cmd(task.command, ctx)
+    cmd = ctx.format_string(task.cmd)
     result = subprocess.run(
-        cmd, shell=True, cwd=ctx.worktree_path,
-        capture_output=True, timeout=task.timeout,
+        cmd, shell=True, cwd=ctx.cwd,
+        capture_output=True,
+        env={**os.environ, **task.env},
     )
     if result.returncode != 0:
         return _handle_shell_failure(task, result, ctx)
@@ -89,7 +90,7 @@ The `retry_agent` policy triggers a specific sequence:
 1. ShellTask fails (non-zero exit)
 2. Runner captures stdout + stderr as `CHECK_OUTPUT`
 3. Runner locates the most recent `AgentTask` in the already-executed task list
-4. Runner re-invokes that AgentTask using its `verify_prompts` instead of the original `prompt_file`
+4. Runner re-invokes that AgentTask using its `verify_prompts` prepended to the original `prompts`
 5. The verify prompt receives `\{{CHECK_OUTPUT}}` populated with the failure output
 6. Agent applies fixes in the worktree
 7. Runner re-runs the failed ShellTask exactly once

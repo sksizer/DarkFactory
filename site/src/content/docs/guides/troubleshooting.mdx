@@ -13,7 +13,7 @@ Every issue below has occurred in real DarkFactory runs. Error messages are exac
 
 ```bash frame="terminal" title="prd run PRD-42 --execute"
 branch 'prd/PRD-42-add-login-endpoint' already exists but worktree
-/Users/you/project/.darkfactory/worktrees/PRD-42-add-login-endpoint is gone.
+/Users/you/project/.worktrees/PRD-42-add-login-endpoint is gone.
 Run 'prd cleanup PRD-42' to release it.
 ```
 
@@ -60,7 +60,7 @@ retry agent failed: agent output contained no PRD_EXECUTE_OK
 or PRD_EXECUTE_FAILED sentinel
 ```
 
-**Cause:** The agent ran to completion (or hit its context limit) without printing `PRD_EXECUTE_OK` or `PRD_EXECUTE_FAILED` as a standalone line. Common reasons:
+**Cause:** The agent ran to completion (or hit its context limit) without printing `PRD_EXECUTE_OK: ...` or `PRD_EXECUTE_FAILED: ...` (colon form required) as its final line. Common reasons:
 
 1. **Context window exhaustion** — the agent ran out of tokens before reaching the sentinel instruction
 2. **Agent got stuck** — looped on a problem and never reached the completion phase
@@ -70,7 +70,7 @@ or PRD_EXECUTE_FAILED sentinel
 
 <Steps>
 
-1. Check the agent transcript in `.darkfactory/transcripts/` for the PRD. Search for what the agent was doing when it stopped.
+1. Check the agent transcript in `.harness-transcripts/` for the PRD. Search for what the agent was doing when it stopped.
 
 2. If the agent ran out of context, reduce the PRD scope or increase the timeout:
    ```yaml
@@ -304,7 +304,7 @@ But you know PRs were merged.
 **Symptom:**
 
 ```
-Cannot acquire lock for PRD-42: .darkfactory/worktrees/PRD-42-add-login.lock
+Cannot acquire lock for PRD-42: .worktrees/PRD-42.lock
 Another process may be running this PRD.
 ```
 
@@ -319,7 +319,7 @@ Another process may be running this PRD.
 
 2. **If no process is running**, the lock is stale. Remove it:
    ```bash frame="terminal"
-   $ rm .darkfactory/worktrees/PRD-42-add-login.lock
+   $ rm .worktrees/PRD-42.lock
    ```
 
 <Aside type="note">

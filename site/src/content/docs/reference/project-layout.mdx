@@ -10,58 +10,64 @@ DarkFactory stores all configuration, PRDs, workflows, operations, and runtime a
 ## Directory Structure
 
 ```
-.darkfactory/
-  config.toml                          # Project configuration
-  prds/                                # PRD documents
-    PRD-001-auth-refactor.md
-    PRD-002-add-logging.md
-    PRD-010-epic-runner-v2.md
-  workflows/                           # Custom workflow definitions
-    frontend/
-      workflow.py
-      prompts/
-        implement.md
-        verify.md
-    rust-service/
-      workflow.py
-      prompts/
-        implement.md
-  operations/                          # Custom system operations
-    upgrade-deps/
-      operation.py
-    rotate-secrets/
-      operation.py
-  worktrees/                           # Runtime: git worktrees
-    prd-042/
-    prd-045/
-  transcripts/                         # Runtime: agent conversation logs
-    PRD-042/
-      session-abc123.md
-    PRD-045/
-      session-abc123.md
-  events/                              # Runtime: JSONL event logs
-    PRD-042_session-abc123.jsonl
-    PRD-045_session-abc123.jsonl
+<repo-root>/
+  .worktrees/                          # Runtime: git worktrees (repo root, not .darkfactory/)
+    PRD-042-add-retry-logic/
+    PRD-045-dead-letter-queue/
+    PRD-042.lock                       # Advisory per-PRD file locks
+  .harness-transcripts/                # Runtime: raw agent transcripts (JSONL)
+    PRD-042.jsonl
+    PRD-045.jsonl
+  .darkfactory/
+    config.toml                        # Project configuration
+    prds/                              # PRD documents
+      PRD-001-auth-refactor.md
+      PRD-002-add-logging.md
+      PRD-010-epic-runner-v2.md
+    workflows/                         # Custom workflow definitions
+      frontend/
+        workflow.py
+        prompts/
+          implement.md
+          verify.md
+      rust-service/
+        workflow.py
+        prompts/
+          implement.md
+    operations/                        # Custom system operations
+      upgrade-deps/
+        operation.py
+      rotate-secrets/
+        operation.py
+    transcripts/                       # Runtime: committed transcript copies
+      PRD-042-20260101T120000.jsonl
+      PRD-045-20260101T130000.jsonl
+    events/                            # Runtime: JSONL event logs
+      PRD-042_session-abc123.jsonl
+      PRD-045_session-abc123.jsonl
 ```
 
 ## Git Tracking Status
 
 | Path | Tracked | Notes |
 |------|---------|-------|
-| `config.toml` | Yes (optional) | Project configuration. Committed to share settings across team. |
-| `prds/` | Yes | PRD documents. These are the source of truth for all work items. |
-| `workflows/` | Yes (optional) | Custom workflow definitions. Committed to share workflow logic. |
-| `operations/` | Yes (optional) | Custom system operations. Committed to share operational scripts. |
-| `worktrees/` | No (git-ignored) | Runtime artifact. Created by `ensure_worktree`, removed by `cleanup_worktree`. |
-| `transcripts/` | No (git-ignored) | Runtime artifact. Agent conversation logs for debugging. |
-| `events/` | No (git-ignored) | Runtime artifact. JSONL event logs for post-mortem analysis. |
+| `.darkfactory/config.toml` | Yes (optional) | Project configuration. Committed to share settings across team. |
+| `.darkfactory/prds/` | Yes | PRD documents. These are the source of truth for all work items. |
+| `.darkfactory/workflows/` | Yes (optional) | Custom workflow definitions. Committed to share workflow logic. |
+| `.darkfactory/operations/` | Yes (optional) | Custom system operations. Committed to share operational scripts. |
+| `.darkfactory/transcripts/` | Yes (optional) | Committed transcript copies produced by `commit_transcript`. |
+| `.darkfactory/events/` | No (git-ignored) | Runtime artifact. JSONL event logs for post-mortem analysis. |
+| `.worktrees/` | No (git-ignored) | Runtime artifact at repo root. Created by `ensure_worktree`. |
+| `.harness-transcripts/` | No (git-ignored) | Runtime artifact at repo root. Raw agent transcripts written by `claude --print`. |
 
 The `.gitignore` entries for runtime directories:
 
 ```gitignore
+# .gitignore (repo root)
+.worktrees/
+.harness-transcripts/
+
 # .darkfactory/.gitignore
-worktrees/
-transcripts/
 events/
 ```
 
@@ -112,25 +118,29 @@ operations/
 
 Operations are discovered by scanning `operations/*/operation.py` at startup. See [System Operations](/guides/system-operations/) for authoring details.
 
-## `worktrees/`
+## `.worktrees/` (repo root)
 
-Git worktrees created during PRD execution. Each PRD gets its own worktree directory. Created by the `ensure_worktree` builtin, removed by `cleanup_worktree`.
+Git worktrees created during PRD execution. Each PRD gets its own worktree directory. Created by the `ensure_worktree` builtin, optionally removed by `cleanup_worktree` (opt-in, not the default).
 
-This directory is git-ignored and can grow large during DAG execution with many PRDs. Worktrees are cleaned up automatically on successful runs. Failed runs leave worktrees intact for debugging -- clean them up manually with:
+This directory is git-ignored and can grow large during DAG execution with many PRDs. Clean up stale worktrees manually with:
 
 ```bash frame="terminal" title="Clean up stale worktrees"
 git worktree prune
-rm -rf .darkfactory/worktrees/*
+prd cleanup --all
 ```
 
-## `transcripts/`
+## `.harness-transcripts/` (repo root)
 
-Agent conversation transcripts. Each PRD execution creates a transcript file containing the full agent conversation: system prompt, user messages, agent responses, and tool calls.
+Raw agent conversation transcripts in JSONL format. Written directly by `claude --print` during agent invocations. One file per PRD ID.
 
-Transcripts are invaluable for debugging failed agent tasks. They show exactly what the agent saw and what it decided to do.
+These are the source files that `commit_transcript` copies into `.darkfactory/transcripts/`. They are git-ignored and can be deleted after the committed copy exists.
+
+## `.darkfactory/transcripts/`
+
+Committed copies of agent transcripts produced by the `commit_transcript` builtin. Each file is timestamped: `<prd-id>-<timestamp>.jsonl`.
 
 ```bash frame="terminal" title="View a transcript"
-cat .darkfactory/transcripts/PRD-042/session-abc123.md
+cat .darkfactory/transcripts/PRD-042-20260101T120000.jsonl
 ```
 
 ## `events/`

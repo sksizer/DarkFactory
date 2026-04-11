@@ -55,7 +55,7 @@ Each criterion uses the `AC-N` prefix and ties back to a specific requirement. W
 ```markdown
 ## Acceptance Criteria
 - [ ] AC-1: `prd plan PRD-227` generates a workflow containing a ShellTask for `pytest`
-- [ ] AC-2: `prd execute PRD-227` exits 0 and produces a commit on the working branch
+- [ ] AC-2: `prd run PRD-227 --execute` exits 0 and produces a commit on the working branch
 - [ ] AC-3: The JSONL event log contains `task_finish` events for every task in the plan
 - [ ] AC-4: Retry count in config.toml is respected (default 1, configurable up to 3)
 ```

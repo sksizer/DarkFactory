@@ -81,7 +81,7 @@ Failed tasks include failure details:
 
 ## Session IDs
 
-A session ID is generated at the start of each `prd execute` invocation. All events within that run -- across multiple PRDs in a DAG execution -- share the same session ID. This makes it straightforward to correlate events across PRDs that were processed in the same batch.
+A session ID is generated at the start of each `prd run --execute` invocation. All events within that run -- across multiple PRDs in a DAG execution -- share the same session ID. This makes it straightforward to correlate events across PRDs that were processed in the same batch.
 
 ```bash frame="terminal" title="Find all events for a session"
 cat .darkfactory/events/*.jsonl | jq 'select(.session_id == "abc123")'

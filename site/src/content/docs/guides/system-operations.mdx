@@ -61,15 +61,15 @@ operation = Operation(
     tasks=[
         AgentTask(
             name="analyze",
-            prompt_file="find-v1-calls.md",
+            prompts=["find-v1-calls.md"],
         ),
         AgentTask(
             name="migrate",
-            prompt_file="apply-migration.md",
+            prompts=["apply-migration.md"],
         ),
         ShellTask(
             name="verify",
-            command="pytest tests/ && mypy src/",
+            cmd="pytest tests/ && mypy src/",
             on_failure="fail",
         ),
     ],

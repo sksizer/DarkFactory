@@ -9,14 +9,14 @@ DarkFactory is configured via `.darkfactory/config.toml`. This file controls mod
 
 ## `[model]`
 
-Maps effort levels to LLM model identifiers. The harness selects the model based on the PRD's `effort` field.
+Maps capability levels to LLM model identifiers. The harness selects the model based on the PRD's `capability` field (not `effort`).
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `trivial` | `str` | `"haiku"` | Model for trivial-effort PRDs |
-| `simple` | `str` | `"sonnet"` | Model for simple-effort PRDs |
-| `moderate` | `str` | `"sonnet"` | Model for moderate-effort PRDs |
-| `complex` | `str` | `"opus"` | Model for complex-effort PRDs |
+| `trivial` | `str` | `"haiku"` | Model for trivial-capability PRDs |
+| `simple` | `str` | `"sonnet"` | Model for simple-capability PRDs |
+| `moderate` | `str` | `"sonnet"` | Model for moderate-capability PRDs |
+| `complex` | `str` | `"opus"` | Model for complex-capability PRDs |
 
 ```toml
 [model]
@@ -26,7 +26,7 @@ moderate = "sonnet"
 complex = "opus"
 ```
 
-AgentTasks can override the model per-task. The config value is the default when no task-level override is set.
+AgentTasks can override the model per-task with `model="opus"`. The config value is the default when neither a task-level override nor a CLI `--model` flag is set.
 
 ## `[timeouts]`
 
@@ -120,7 +120,7 @@ Environment variables take precedence over `config.toml` values. This is intenti
 
 ```bash frame="terminal" title="Override model in CI"
 export DARKFACTORY_MODEL_COMPLEX=sonnet
-prd execute PRD-042
+prd run PRD-042 --execute
 ```
 
 ## Config Cascade

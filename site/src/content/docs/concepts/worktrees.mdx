@@ -9,14 +9,14 @@ Each PRD run creates a **git worktree** -- a separate working directory with its
 
 ## Directory Layout
 
-Worktrees are created at `.darkfactory/worktrees/{id}-{slug}/` with branches named `prd/{id}-{slug}`:
+Worktrees are created at `.worktrees/{id}-{slug}/` with branches named `prd/{id}-{slug}`:
 
 ```bash frame="terminal" title="Worktree structure"
-.darkfactory/worktrees/
+.worktrees/
   PRD-070-retry-webhook/          # worktree directory
-  PRD-070-retry-webhook.lock      # advisory file lock
+  PRD-070.lock                    # advisory file lock (per PRD ID)
   PRD-071-dead-letter-queue/
-  PRD-071-dead-letter-queue.lock
+  PRD-071.lock
 ```
 
 The `ensure_worktree` builtin handles creation:
@@ -24,8 +24,8 @@ The `ensure_worktree` builtin handles creation:
 ```python
 BuiltIn(name="ensure_worktree")
 # Equivalent to:
-# git worktree add .darkfactory/worktrees/PRD-070-retry-webhook \
-#   -b prd/PRD-070-retry-webhook
+# git worktree add -b prd/PRD-070-retry-webhook \
+#   .worktrees/PRD-070-retry-webhook main
 ```
 
 ## Lifecycle
@@ -42,13 +42,13 @@ The `cleanup_worktree` builtin runs `git worktree remove` to delete the director
 
 ## File Locking
 
-Concurrent worktree operations (creation, branch checkout, push) are serialized with **advisory file locks** via the `filelock` library:
+Each PRD run acquires an **advisory file lock** via the `filelock` library before creating or resuming its worktree:
 
 ```
-.darkfactory/worktrees/PRD-070-retry-webhook.lock
+.worktrees/PRD-070.lock
 ```
 
-The lock is held only for the duration of the git command, not for the entire agent execution. This minimizes contention -- multiple agents can work in parallel with locks only briefly acquired during git operations.
+The lock is held for the **entire run** (from `ensure_worktree` through the final task) and released when the process exits. This prevents two concurrent `prd run` invocations for the same PRD from racing. Multiple PRDs run in parallel with no contention because each holds its own per-PRD lock.
 
 ## Stacked PRs
 
@@ -95,9 +95,9 @@ Stacked PRs only apply when the dependency was completed in the **current execut
 Because each PRD gets its own worktree directory and branch, multiple PRDs can execute simultaneously without interference:
 
 ```
-Agent 1: working in .darkfactory/worktrees/PRD-070-retry-webhook/
-Agent 2: working in .darkfactory/worktrees/PRD-071-dead-letter-queue/
-Agent 3: working in .darkfactory/worktrees/PRD-004-standalone-task/
+Agent 1: working in .worktrees/PRD-070-retry-webhook/
+Agent 2: working in .worktrees/PRD-071-dead-letter-queue/
+Agent 3: working in .worktrees/PRD-004-standalone-task/
 ```
 
 Each agent sees a clean repository state. File changes in one worktree do not affect another. The only shared resource is the git object store, which is thread-safe in git.
