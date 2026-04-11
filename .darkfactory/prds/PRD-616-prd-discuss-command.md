@@ -2,30 +2,20 @@
 id: PRD-616
 title: Interactive PRD discussion via phased Claude Code chain
 kind: feature
-status: in-progress
+status: review
 priority: medium
 effort: m
 capability: complex
 parent:
 depends_on: []
-blocks: []
-impacts:
-  - src/darkfactory/cli/discuss.py
-  - src/darkfactory/cli/new.py
-  - src/darkfactory/cli/_parser.py
-  - src/darkfactory/cli/main.py
-  - src/darkfactory/commands/__init__.py
-  - src/darkfactory/commands/discuss/__init__.py
-  - src/darkfactory/commands/discuss/operation.py
-  - src/darkfactory/commands/discuss/prompts/discuss.md
-  - src/darkfactory/commands/discuss/prompts/critique.md
-  - src/darkfactory/builtins/discuss_prd.py
-  - src/darkfactory/builtins/gather_prd_context.py
-  - src/darkfactory/builtins/commit_prd_changes.py
-  - src/darkfactory/builtins/system_builtins.py
-  - src/darkfactory/system_runner.py
-  - tests/test_cli_discuss.py
-  - tests/test_commands_discuss.py
+blocks:
+  - "[[PRD-616.1-commands-discuss-module]]"
+  - "[[PRD-616.2-gather-prd-context-builtin]]"
+  - "[[PRD-616.3-discuss-prd-builtin]]"
+  - "[[PRD-616.4-commit-prd-changes-builtin]]"
+  - "[[PRD-616.5-cli-discuss-command]]"
+  - "[[PRD-616.6-new-discuss-flag]]"
+impacts: []
 workflow:
 target_version:
 created: 2026-04-11
