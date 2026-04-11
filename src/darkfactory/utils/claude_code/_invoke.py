@@ -42,8 +42,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from .event_log import EventWriter
-    from .style import Element, Styler
+    from darkfactory.event_log import EventWriter
+    from darkfactory.style import Element, Styler
 
 
 # ---------- capability -> model mapping ----------
@@ -230,7 +230,7 @@ def _summarize_stream_event(
 
     Anything not in this list is skipped (element=None).
     """
-    from .style import Element
+    from darkfactory.style import Element
 
     etype = event.get("type")
 
@@ -536,7 +536,7 @@ def invoke_claude(
                 # Not JSON — preserve old behavior. Useful for tests that
                 # stub the subprocess with plain text and for diagnostics.
                 if styler is not None:
-                    from .style import Element
+                    from darkfactory.style import Element
                     import sys
 
                     print(
@@ -570,12 +570,11 @@ def invoke_claude(
                         tool_counts[name] = tool_counts.get(name, 0) + 1
             if element is not None and display_text:
                 if styler is not None:
-                    from .style import Element
+                    from darkfactory.style import Element
+                    import sys
 
                     # Print with styling to stderr so it doesn't mix with
                     # any stdout output the caller may be collecting.
-                    import sys
-
                     print(styler.render(element, display_text), file=sys.stderr)
                 else:
                     log.info("agent: %s", display_text)

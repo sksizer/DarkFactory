@@ -14,7 +14,7 @@ from darkfactory.cli._shared import (
     _resolve_base_ref,
     _resolve_prd_or_exit,
 )
-from darkfactory.invoke import capability_to_model
+from darkfactory.utils.claude_code import capability_to_model
 from darkfactory.prd import PRD
 from darkfactory.runner import _compute_branch_name, _pick_model
 from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Task

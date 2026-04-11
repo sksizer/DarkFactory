@@ -43,7 +43,7 @@ from typing import TYPE_CHECKING
 
 from .builtins import BUILTINS
 from .event_log import EventWriter, emit_task_event
-from .invoke import InvokeResult, capability_to_model, invoke_claude
+from .utils.claude_code import InvokeResult, capability_to_model, invoke_claude
 from .prd import compute_branch_name
 from .templates import compose_prompt
 from .timeouts import resolve_timeout

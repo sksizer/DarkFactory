@@ -23,7 +23,7 @@ import os
 import subprocess
 from typing import Callable
 
-from .invoke import invoke_claude
+from .utils.claude_code import invoke_claude
 from .runner import RunResult, TaskStep, _task_kind, _task_name
 from .system import SystemContext, SystemOperation
 from .templates import load_prompt_files, substitute_placeholders

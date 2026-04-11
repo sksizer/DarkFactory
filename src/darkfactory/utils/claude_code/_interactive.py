@@ -1,4 +1,4 @@
-"""Claude Code subprocess helpers."""
+"""Claude Code interactive session helper."""
 
 from __future__ import annotations
 
