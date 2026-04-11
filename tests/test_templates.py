@@ -119,20 +119,20 @@ def test_substitute_nested_braces_in_code_blocks() -> None:
 
 
 def _make_ctx(
-    tmp_prd_dir: Path, workflow_dir: Path
+    tmp_data_dir: Path, workflow_dir: Path
 ) -> tuple[Workflow, ExecutionContext]:
     """Build a workflow (with workflow_dir set) and a context for testing compose."""
-    (tmp_prd_dir / "prds").mkdir(exist_ok=True)
-    write_prd(tmp_prd_dir / "prds", "PRD-070", "test-task")
-    prds = load_all(tmp_prd_dir)
+    (tmp_data_dir / "prds").mkdir(exist_ok=True)
+    write_prd(tmp_data_dir / "prds", "PRD-070", "test-task")
+    prds = load_all(tmp_data_dir)
     wf = Workflow(name="default", workflow_dir=workflow_dir)
     ctx = ExecutionContext(
         prd=prds["PRD-070"],
-        repo_root=tmp_prd_dir,
+        repo_root=tmp_data_dir,
         workflow=wf,
         base_ref="main",
         branch_name="prd/PRD-070-test-task",
-        worktree_path=tmp_prd_dir / ".worktrees" / "PRD-070-test-task",
+        worktree_path=tmp_data_dir / ".worktrees" / "PRD-070-test-task",
     )
     return wf, ctx
 

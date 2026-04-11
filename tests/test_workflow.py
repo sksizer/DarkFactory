@@ -138,9 +138,9 @@ def test_workflow_with_tasks() -> None:
     assert isinstance(wf.tasks[2], ShellTask)
 
 
-def test_workflow_custom_applies_to(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir / "prds", "PRD-070", "ui-task")
-    prds = load_all(tmp_prd_dir)
+def test_workflow_custom_applies_to(tmp_data_dir: Path) -> None:
+    write_prd(tmp_data_dir / "prds", "PRD-070", "ui-task")
+    prds = load_all(tmp_data_dir)
 
     def predicate(prd, prds):  # type: ignore[no-untyped-def]
         return prd.id == "PRD-070"
@@ -149,30 +149,30 @@ def test_workflow_custom_applies_to(tmp_prd_dir: Path) -> None:
     assert wf.applies_to(prds["PRD-070"], prds) is True
 
 
-def test_default_applies_to_returns_false(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir / "prds", "PRD-070", "task")
-    prds = load_all(tmp_prd_dir)
+def test_default_applies_to_returns_false(tmp_data_dir: Path) -> None:
+    write_prd(tmp_data_dir / "prds", "PRD-070", "task")
+    prds = load_all(tmp_data_dir)
     assert _default_applies_to(prds["PRD-070"], prds) is False
 
 
 # ---------- ExecutionContext ----------
 
 
-def _make_ctx(tmp_prd_dir: Path) -> ExecutionContext:
-    write_prd(tmp_prd_dir / "prds", "PRD-070", "tera-filter-obsidian-link")
-    prds = load_all(tmp_prd_dir)
+def _make_ctx(tmp_data_dir: Path) -> ExecutionContext:
+    write_prd(tmp_data_dir / "prds", "PRD-070", "tera-filter-obsidian-link")
+    prds = load_all(tmp_data_dir)
     return ExecutionContext(
         prd=prds["PRD-070"],
-        repo_root=tmp_prd_dir,
+        repo_root=tmp_data_dir,
         workflow=Workflow(name="default"),
         base_ref="main",
         branch_name="prd/PRD-070-tera-filter-obsidian-link",
-        worktree_path=tmp_prd_dir / ".worktrees" / "PRD-070-tera-filter-obsidian-link",
+        worktree_path=tmp_data_dir / ".worktrees" / "PRD-070-tera-filter-obsidian-link",
     )
 
 
-def test_execution_context_defaults(tmp_prd_dir: Path) -> None:
-    ctx = _make_ctx(tmp_prd_dir)
+def test_execution_context_defaults(tmp_data_dir: Path) -> None:
+    ctx = _make_ctx(tmp_data_dir)
     assert ctx.base_ref == "main"
     assert ctx.agent_output is None
     assert ctx.agent_success is False
@@ -181,40 +181,40 @@ def test_execution_context_defaults(tmp_prd_dir: Path) -> None:
     assert isinstance(ctx.logger, logging.Logger)
 
 
-def test_format_string_expands_prd_fields(tmp_prd_dir: Path) -> None:
-    ctx = _make_ctx(tmp_prd_dir)
+def test_format_string_expands_prd_fields(tmp_data_dir: Path) -> None:
+    ctx = _make_ctx(tmp_data_dir)
     assert ctx.format_string("hello {prd_id}") == "hello PRD-070"
     assert ctx.format_string("{prd_title}") == "Test PRD"
     assert ctx.format_string("{prd_slug}") == "tera-filter-obsidian-link"
 
 
-def test_format_string_expands_branch_refs(tmp_prd_dir: Path) -> None:
-    ctx = _make_ctx(tmp_prd_dir)
+def test_format_string_expands_branch_refs(tmp_data_dir: Path) -> None:
+    ctx = _make_ctx(tmp_data_dir)
     assert ctx.format_string("{branch} from {base_ref}") == (
         "prd/PRD-070-tera-filter-obsidian-link from main"
     )
 
 
-def test_format_string_expands_worktree(tmp_prd_dir: Path) -> None:
-    ctx = _make_ctx(tmp_prd_dir)
+def test_format_string_expands_worktree(tmp_data_dir: Path) -> None:
+    ctx = _make_ctx(tmp_data_dir)
     worktree_str = str(ctx.worktree_path)
     assert worktree_str in ctx.format_string("cd {worktree}")
 
 
-def test_format_string_empty_worktree_when_unset(tmp_prd_dir: Path) -> None:
-    ctx = _make_ctx(tmp_prd_dir)
+def test_format_string_empty_worktree_when_unset(tmp_data_dir: Path) -> None:
+    ctx = _make_ctx(tmp_data_dir)
     ctx.worktree_path = None
     assert ctx.format_string("{worktree}") == ""
 
 
-def test_format_string_unknown_placeholder_raises(tmp_prd_dir: Path) -> None:
-    ctx = _make_ctx(tmp_prd_dir)
+def test_format_string_unknown_placeholder_raises(tmp_data_dir: Path) -> None:
+    ctx = _make_ctx(tmp_data_dir)
     with pytest.raises(KeyError):
         ctx.format_string("{nonexistent}")
 
 
-def test_format_string_composite_commit_message(tmp_prd_dir: Path) -> None:
+def test_format_string_composite_commit_message(tmp_data_dir: Path) -> None:
     """The common case: a commit message template with multiple fields."""
-    ctx = _make_ctx(tmp_prd_dir)
+    ctx = _make_ctx(tmp_data_dir)
     msg = ctx.format_string("chore(prd): {prd_id} start work on '{prd_title}'")
     assert msg == "chore(prd): PRD-070 start work on 'Test PRD'"

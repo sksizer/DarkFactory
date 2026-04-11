@@ -29,14 +29,6 @@ def init_git_repo(path: Path) -> None:
 
 
 @pytest.fixture
-def tmp_prd_dir(tmp_path: Path) -> Path:
-    """Legacy fixture — returns tmp_path with prds/ and archive/ subdirs."""
-    (tmp_path / "prds").mkdir()
-    (tmp_path / "archive").mkdir()
-    return tmp_path
-
-
-@pytest.fixture
 def tmp_data_dir(tmp_path: Path) -> Path:
     """A temporary data directory with prds/ and archive/ subdirectories."""
     (tmp_path / "prds").mkdir()

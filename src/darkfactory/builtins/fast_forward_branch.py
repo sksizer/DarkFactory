@@ -124,7 +124,9 @@ def fast_forward_branch(
     branch = ctx.branch_name
     cwd = ctx.cwd
 
-    if _log_dry_run(ctx, f"git fetch origin {branch} && git merge --ff-only origin/{branch}"):
+    if _log_dry_run(
+        ctx, f"git fetch origin {branch} && git merge --ff-only origin/{branch}"
+    ):
         emit_builtin_effect(ctx, "fast_forward_branch", "sync", result="up_to_date")
         return
 

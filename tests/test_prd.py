@@ -96,8 +96,8 @@ def test_parse_wikilinks_handles_none() -> None:
 # ---------- file parsing ----------
 
 
-def test_parse_prd_minimal(tmp_prd_dir: Path) -> None:
-    path = write_prd(tmp_prd_dir / "prds", "PRD-070", "minimal-task")
+def test_parse_prd_minimal(tmp_data_dir: Path) -> None:
+    path = write_prd(tmp_data_dir / "prds", "PRD-070", "minimal-task")
     prd = parse_prd(path)
     assert prd.id == "PRD-070"
     assert prd.slug == "minimal-task"
@@ -110,10 +110,10 @@ def test_parse_prd_minimal(tmp_prd_dir: Path) -> None:
     assert prd.workflow is None
 
 
-def test_parse_prd_with_relations(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir / "prds", "PRD-001", "epic", kind="epic")
+def test_parse_prd_with_relations(tmp_data_dir: Path) -> None:
+    write_prd(tmp_data_dir / "prds", "PRD-001", "epic", kind="epic")
     path = write_prd(
-        tmp_prd_dir / "prds",
+        tmp_data_dir / "prds",
         "PRD-070",
         "child",
         parent="PRD-001",
@@ -130,28 +130,28 @@ def test_parse_prd_with_relations(tmp_prd_dir: Path) -> None:
     assert prd.workflow == "ui-component"
 
 
-def test_load_all_skips_underscore_files(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir / "prds", "PRD-001", "first")
-    (tmp_prd_dir / "prds" / "_template.md").write_text(
+def test_load_all_skips_underscore_files(tmp_data_dir: Path) -> None:
+    write_prd(tmp_data_dir / "prds", "PRD-001", "first")
+    (tmp_data_dir / "prds" / "_template.md").write_text(
         "---\nid: bogus\n---\n", encoding="utf-8"
     )
-    prds = load_all(tmp_prd_dir)
+    prds = load_all(tmp_data_dir)
     assert set(prds.keys()) == {"PRD-001"}
 
 
-def test_load_all_rejects_duplicate_ids(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir / "prds", "PRD-001", "a")
-    write_prd(tmp_prd_dir / "prds", "PRD-001", "b")
+def test_load_all_rejects_duplicate_ids(tmp_data_dir: Path) -> None:
+    write_prd(tmp_data_dir / "prds", "PRD-001", "a")
+    write_prd(tmp_data_dir / "prds", "PRD-001", "b")
     with pytest.raises(ValueError, match="duplicate"):
-        load_all(tmp_prd_dir)
+        load_all(tmp_data_dir)
 
 
 # ---------- frontmatter round-trip ----------
 
 
-def test_set_status_preserves_body(tmp_prd_dir: Path) -> None:
+def test_set_status_preserves_body(tmp_data_dir: Path) -> None:
     path = write_prd(
-        tmp_prd_dir / "prds", "PRD-070", "task", body="# Title\n\nLine 1\nLine 2\n"
+        tmp_data_dir / "prds", "PRD-070", "task", body="# Title\n\nLine 1\nLine 2\n"
     )
     prd = parse_prd(path)
     set_status(prd, "in-progress")
@@ -161,10 +161,10 @@ def test_set_status_preserves_body(tmp_prd_dir: Path) -> None:
     assert "Line 2" in reread.body
 
 
-def test_set_status_bumps_updated(tmp_prd_dir: Path) -> None:
+def test_set_status_bumps_updated(tmp_data_dir: Path) -> None:
     from datetime import date
 
-    path = write_prd(tmp_prd_dir / "prds", "PRD-070", "task")
+    path = write_prd(tmp_data_dir / "prds", "PRD-070", "task")
     prd = parse_prd(path)
     set_status(prd, "review")
     reread = parse_prd(path)
@@ -177,7 +177,7 @@ def test_set_status_bumps_updated(tmp_prd_dir: Path) -> None:
 
 
 def test_update_frontmatter_field_at_preserves_other_fields_byte_for_byte(
-    tmp_prd_dir: Path,
+    tmp_data_dir: Path,
 ) -> None:
     """Single-field updates must not touch any other byte in the file —
     not other frontmatter fields, not their quoting style, not the body.
@@ -206,7 +206,7 @@ def test_update_frontmatter_field_at_preserves_other_fields_byte_for_byte(
         "\n"
         "Some text with `backticks` and [[wikilinks]].\n"
     )
-    path = tmp_prd_dir / "PRD-070-example.md"
+    path = tmp_data_dir / "PRD-070-example.md"
     path.write_text(raw, encoding="utf-8")
 
     update_frontmatter_field_at(path, {"status": "in-progress"})
@@ -216,9 +216,9 @@ def test_update_frontmatter_field_at_preserves_other_fields_byte_for_byte(
     assert after == expected, "only the status line should change"
 
 
-def test_update_frontmatter_field_at_multiple_fields(tmp_prd_dir: Path) -> None:
+def test_update_frontmatter_field_at_multiple_fields(tmp_data_dir: Path) -> None:
     raw = "---\nstatus: ready\nupdated: 2026-04-01\nid: PRD-070\n---\nbody\n"
-    path = tmp_prd_dir / "PRD-070-x.md"
+    path = tmp_data_dir / "PRD-070-x.md"
     path.write_text(raw, encoding="utf-8")
     update_frontmatter_field_at(path, {"status": "review", "updated": "'2026-04-08'"})
     after = path.read_text(encoding="utf-8")
@@ -229,19 +229,19 @@ def test_update_frontmatter_field_at_multiple_fields(tmp_prd_dir: Path) -> None:
 
 
 def test_update_frontmatter_field_at_missing_field_raises(
-    tmp_prd_dir: Path,
+    tmp_data_dir: Path,
 ) -> None:
     raw = "---\nstatus: ready\n---\nbody\n"
-    path = tmp_prd_dir / "PRD-070-x.md"
+    path = tmp_data_dir / "PRD-070-x.md"
     path.write_text(raw, encoding="utf-8")
     with pytest.raises(ValueError, match="missing frontmatter field"):
         update_frontmatter_field_at(path, {"nonexistent": "value"})
 
 
 def test_update_frontmatter_field_at_no_frontmatter_raises(
-    tmp_prd_dir: Path,
+    tmp_data_dir: Path,
 ) -> None:
-    path = tmp_prd_dir / "PRD-070-x.md"
+    path = tmp_data_dir / "PRD-070-x.md"
     path.write_text("just body, no frontmatter\n", encoding="utf-8")
     with pytest.raises(ValueError, match="no leading frontmatter"):
         update_frontmatter_field_at(path, {"status": "review"})
@@ -250,10 +250,10 @@ def test_update_frontmatter_field_at_no_frontmatter_raises(
 # ---------- normalize_list_field_at ----------
 
 
-def test_normalize_list_field_at_tags_sorted_alphabetically(tmp_prd_dir: Path) -> None:
+def test_normalize_list_field_at_tags_sorted_alphabetically(tmp_data_dir: Path) -> None:
     """AC-1: tags are sorted case-insensitively."""
     raw = '---\nid: "PRD-070"\ntags:\n  - zebra\n  - Apple\n  - mango\n---\n# Body\n'
-    path = tmp_prd_dir / "PRD-070-test.md"
+    path = tmp_data_dir / "PRD-070-test.md"
     path.write_text(raw, encoding="utf-8")
     changed = normalize_list_field_at(path, "tags", ["zebra", "Apple", "mango"])
     assert changed
@@ -266,7 +266,7 @@ def test_normalize_list_field_at_tags_sorted_alphabetically(tmp_prd_dir: Path) -
 
 
 def test_normalize_list_field_at_tags_only_writes_that_field(
-    tmp_prd_dir: Path,
+    tmp_data_dir: Path,
 ) -> None:
     """AC-1: only the tags lines change; everything else is byte-identical."""
     raw = (
@@ -280,7 +280,7 @@ def test_normalize_list_field_at_tags_only_writes_that_field(
         "---\n"
         "# Body content\n"
     )
-    path = tmp_prd_dir / "PRD-070-test.md"
+    path = tmp_data_dir / "PRD-070-test.md"
     path.write_text(raw, encoding="utf-8")
     normalize_list_field_at(path, "tags", ["zebra", "Apple", "mango"])
     after = path.read_text(encoding="utf-8")
@@ -292,7 +292,7 @@ def test_normalize_list_field_at_tags_only_writes_that_field(
     assert after == expected
 
 
-def test_normalize_list_field_at_blocks_natural_sort(tmp_prd_dir: Path) -> None:
+def test_normalize_list_field_at_blocks_natural_sort(tmp_data_dir: Path) -> None:
     """AC-2: blocks are sorted by natural PRD ID (PRD-1.2 before PRD-1.10)."""
     raw = (
         "---\n"
@@ -304,7 +304,7 @@ def test_normalize_list_field_at_blocks_natural_sort(tmp_prd_dir: Path) -> None:
         "---\n"
         "# Body\n"
     )
-    path = tmp_prd_dir / "PRD-070-test.md"
+    path = tmp_data_dir / "PRD-070-test.md"
     path.write_text(raw, encoding="utf-8")
     changed = normalize_list_field_at(
         path,
@@ -319,7 +319,7 @@ def test_normalize_list_field_at_blocks_natural_sort(tmp_prd_dir: Path) -> None:
 
 
 def test_normalize_list_field_at_preserves_other_fields_byte_for_byte(
-    tmp_prd_dir: Path,
+    tmp_data_dir: Path,
 ) -> None:
     """AC-3: normalizing tags leaves every other byte unchanged."""
     raw = (
@@ -333,7 +333,7 @@ def test_normalize_list_field_at_preserves_other_fields_byte_for_byte(
         "---\n"
         "# Body content\n"
     )
-    path = tmp_prd_dir / "PRD-070-test.md"
+    path = tmp_data_dir / "PRD-070-test.md"
     path.write_text(raw, encoding="utf-8")
     normalize_list_field_at(path, "tags", ["zebra", "Apple", "mango"])
     after = path.read_text(encoding="utf-8")
@@ -345,10 +345,10 @@ def test_normalize_list_field_at_preserves_other_fields_byte_for_byte(
     assert after == expected, "only the tags block should change"
 
 
-def test_normalize_list_field_at_no_change_when_canonical(tmp_prd_dir: Path) -> None:
+def test_normalize_list_field_at_no_change_when_canonical(tmp_data_dir: Path) -> None:
     """AC-4: returns False when the field is already in canonical order."""
     raw = '---\nid: "PRD-070"\ntags:\n  - alpha\n  - beta\n  - gamma\n---\nbody\n'
-    path = tmp_prd_dir / "PRD-070-x.md"
+    path = tmp_data_dir / "PRD-070-x.md"
     path.write_text(raw, encoding="utf-8")
     changed = normalize_list_field_at(path, "tags", ["alpha", "beta", "gamma"])
     assert not changed
@@ -356,22 +356,22 @@ def test_normalize_list_field_at_no_change_when_canonical(tmp_prd_dir: Path) -> 
 
 
 def test_normalize_list_field_at_rejects_nonempty_flow_style(
-    tmp_prd_dir: Path,
+    tmp_data_dir: Path,
 ) -> None:
     """AC-6: flow-style non-empty list raises a clear ValueError."""
     raw = '---\nid: "PRD-070"\ntags: [foo, bar]\n---\nbody\n'
-    path = tmp_prd_dir / "PRD-070-x.md"
+    path = tmp_data_dir / "PRD-070-x.md"
     path.write_text(raw, encoding="utf-8")
     with pytest.raises(ValueError, match="flow-style"):
         normalize_list_field_at(path, "tags", ["foo", "bar"])
 
 
 def test_normalize_list_field_at_empty_list_writes_flow_empty(
-    tmp_prd_dir: Path,
+    tmp_data_dir: Path,
 ) -> None:
     """Normalizing a non-empty field to an empty list writes ``field: []``."""
     raw = '---\nid: "PRD-070"\ntags:\n  - foo\n---\nbody\n'
-    path = tmp_prd_dir / "PRD-070-x.md"
+    path = tmp_data_dir / "PRD-070-x.md"
     path.write_text(raw, encoding="utf-8")
     changed = normalize_list_field_at(path, "tags", [])
     assert changed
@@ -380,11 +380,11 @@ def test_normalize_list_field_at_empty_list_writes_flow_empty(
 
 
 def test_normalize_list_field_at_write_false_does_not_modify(
-    tmp_prd_dir: Path,
+    tmp_data_dir: Path,
 ) -> None:
     """``write=False`` returns True when changes would occur but does not write."""
     raw = '---\nid: "PRD-070"\ntags:\n  - zebra\n  - Apple\n---\n# Body\n'
-    path = tmp_prd_dir / "PRD-070-test.md"
+    path = tmp_data_dir / "PRD-070-test.md"
     path.write_text(raw, encoding="utf-8")
     would_change = normalize_list_field_at(
         path, "tags", ["zebra", "Apple"], write=False
