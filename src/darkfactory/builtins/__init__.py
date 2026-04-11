@@ -47,9 +47,11 @@ from darkfactory.builtins.commit_events import commit_events
 from darkfactory.builtins.commit_transcript import commit_transcript
 from darkfactory.builtins.create_pr import create_pr
 from darkfactory.builtins.ensure_worktree import ensure_worktree
+from darkfactory.builtins.fast_forward_branch import fast_forward_branch
 from darkfactory.builtins.fetch_pr_comments import fetch_pr_comments
 from darkfactory.builtins.lint_attribution import lint_attribution
 from darkfactory.builtins.push_branch import push_branch
+from darkfactory.builtins.rebase_onto_main import rebase_onto_main
 from darkfactory.builtins.reply_pr_comments import reply_pr_comments
 from darkfactory.builtins.set_status import set_status
 from darkfactory.builtins.summarize_agent_run import summarize_agent_run
@@ -74,4 +76,6 @@ __all__ = [
     "analyze_transcript",
     "reply_pr_comments",
     "check_rework_guard",
+    "fast_forward_branch",
+    "rebase_onto_main",
 ]
