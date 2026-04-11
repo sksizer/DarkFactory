@@ -35,6 +35,8 @@ workflow = Workflow(
     tasks=[
         # ----- setup phase -----
         BuiltIn("ensure_worktree"),
+        BuiltIn("fast_forward_branch"),
+        BuiltIn("rebase_onto_main"),
         BuiltIn("set_status", kwargs={"to": "in-progress"}),
         BuiltIn(
             "commit",
