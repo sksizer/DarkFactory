@@ -12,6 +12,7 @@ import subprocess
 from pathlib import Path
 
 from darkfactory.builtins._registry import builtin
+from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
 from darkfactory.git_ops import git_check
 from darkfactory.workflow import ExecutionContext
@@ -92,6 +93,10 @@ def rebase_onto_main(
     Raises :class:`RuntimeError` on fetch failure, timeout, or rebase conflict.
     """
     cwd = ctx.cwd
+
+    if _log_dry_run(ctx, "git fetch origin main && git rebase origin/main"):
+        emit_builtin_effect(ctx, "rebase_onto_main", "rebase", result="up_to_date")
+        return
 
     _fetch_origin_main(cwd, fetch_timeout)
 

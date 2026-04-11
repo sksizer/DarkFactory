@@ -12,6 +12,7 @@ import subprocess
 from pathlib import Path
 
 from darkfactory.builtins._registry import builtin
+from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
 from darkfactory.git_ops import git_run
 from darkfactory.workflow import ExecutionContext
@@ -122,6 +123,10 @@ def fast_forward_branch(
     """
     branch = ctx.branch_name
     cwd = ctx.cwd
+
+    if _log_dry_run(ctx, f"git fetch origin {branch} && git merge --ff-only origin/{branch}"):
+        emit_builtin_effect(ctx, "fast_forward_branch", "sync", result="up_to_date")
+        return
 
     remote_found = _fetch_origin_branch(cwd, branch, fetch_timeout)
 
