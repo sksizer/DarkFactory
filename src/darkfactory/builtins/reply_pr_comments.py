@@ -12,8 +12,12 @@ from __future__ import annotations
 
 import logging
 import subprocess
+from pathlib import Path
 
 from darkfactory.builtins._registry import builtin
+from darkfactory.builtins._shared import _log_dry_run
+from darkfactory.event_log import emit_builtin_effect
+from darkfactory.git_ops import git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -22,13 +26,7 @@ _log = logging.getLogger(__name__)
 def _get_head_sha(cwd: str) -> str | None:
     """Return the short SHA of HEAD, or None on failure."""
     try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True,
-            text=True,
-            cwd=cwd,
-            check=True,
-        )
+        result = git_run("rev-parse", "--short", "HEAD", cwd=Path(cwd))
         return result.stdout.strip()
     except subprocess.CalledProcessError as exc:
         _log.warning("reply_pr_comments: could not resolve HEAD SHA: %s", exc)
@@ -73,12 +71,9 @@ def reply_pr_comments(ctx: ExecutionContext) -> None:
         _log.info("reply_pr_comments: no reply notes found in agent output")
         return
 
-    if ctx.dry_run:
-        ctx.logger.info(
-            "[dry-run] would post %d reply/replies to PR #%d",
-            len(replies),
-            ctx.pr_number,
-        )
+    if _log_dry_run(
+        ctx, f"would post {len(replies)} reply/replies to PR #{ctx.pr_number}"
+    ):
         for reply in replies:
             ctx.logger.info(
                 "[dry-run]   thread=%s note=%r", reply.thread_id, reply.body
@@ -110,16 +105,14 @@ def reply_pr_comments(ctx: ExecutionContext) -> None:
             fail_count,
         )
 
-    if ctx.event_writer:
-        ctx.event_writer.emit(
-            "task",
-            "builtin_effect",
-            task="reply_pr_comments",
-            effect="reply",
-            detail={
-                "pr_number": ctx.pr_number,
-                "total": len(results),
-                "success": success_count,
-                "failed": fail_count,
-            },
-        )
+    emit_builtin_effect(
+        ctx,
+        "reply_pr_comments",
+        "reply",
+        detail={
+            "pr_number": ctx.pr_number,
+            "total": len(results),
+            "success": success_count,
+            "failed": fail_count,
+        },
+    )

@@ -1,5 +1,12 @@
 """Unified structured event log for harness execution.
 
+Public helpers:
+
+- :func:`emit_builtin_effect` — emit a ``task/builtin_effect`` event from a
+  builtin, replacing the repeated ``if ctx.event_writer: ctx.event_writer.emit(...)``
+  pattern across builtin entry points.
+
+
 Provides :class:`EventWriter`, a per-PRD JSONL writer that emits
 structured events with flat correlation fields (``session_id``,
 ``prd_id``, ``scope``, ``type``). One file per PRD execution attempt,
@@ -19,6 +26,12 @@ import json
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+from darkfactory.timestamps import now_iso_utc
+
+if TYPE_CHECKING:
+    from darkfactory.workflow import ExecutionContext
 
 
 def generate_session_id() -> str:
@@ -32,9 +45,7 @@ def generate_session_id() -> str:
     return f"s-{now.strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(2)}"
 
 
-def _now_iso() -> str:
-    """ISO-8601 timestamp with millisecond precision."""
-    return datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+_now_iso = now_iso_utc
 
 
 class EventWriter:
@@ -92,3 +103,55 @@ class EventWriter:
 
     def __exit__(self, *args: object) -> None:
         self.close()
+
+
+def emit_task_event(
+    ctx: "ExecutionContext",
+    event_type: str,
+    **fields: Any,
+) -> None:
+    """Emit a ``task/<event_type>`` event, or no-op when no event writer.
+
+    General-purpose sibling of :func:`emit_builtin_effect` for task-scope
+    events that do not follow the ``builtin_effect`` schema (e.g. the
+    ``rework_guard`` event, which carries ``had_changes``, ``blocked``, etc.).
+    """
+    if ctx.event_writer is None:
+        return
+    ctx.event_writer.emit("task", event_type, **fields)
+
+
+def emit_builtin_effect(
+    ctx: "ExecutionContext",
+    task: str,
+    effect: str,
+    **detail: Any,
+) -> None:
+    """Emit a ``task/builtin_effect`` event from a builtin entry point.
+
+    No-op when ``ctx.event_writer`` is None (dry-run, or event logging
+    disabled). Replaces the repeated ``if ctx.event_writer:`` guard across
+    all builtins that emit side-effect events.
+
+    Event schema::
+
+        {
+            "scope": "task",
+            "type": "builtin_effect",
+            "task": "<builtin name>",
+            "effect": "<action performed>",
+            "<extra keys>": <values>
+        }
+
+    ``effect`` is a short verb like ``"commit"``, ``"push"``, ``"set_status"``.
+    Extra kwargs go directly into the event as top-level fields.
+    """
+    if ctx.event_writer is None:
+        return
+    ctx.event_writer.emit(
+        "task",
+        "builtin_effect",
+        task=task,
+        effect=effect,
+        **detail,
+    )

@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import argparse
-import json
 from collections import Counter
 
 from darkfactory import containment, graph
 from darkfactory.checks import find_stale_worktrees
-from darkfactory.cli._shared import _action_sort_key, _find_repo_root, _load
+from darkfactory.cli._shared import (
+    _action_sort_key,
+    _emit_json,
+    _find_repo_root,
+    _format_prd_line,
+    _load,
+    _prd_to_dict,
+)
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -21,23 +27,18 @@ def cmd_status(args: argparse.Namespace) -> int:
     runnable = [prd for prd in actionable if containment.is_runnable(prd, prds)]
 
     if args.json:
-        out = {
-            "total": len(prds),
-            "by_status": dict(counts),
-            "actionable": len(actionable),
-            "runnable": len(runnable),
-            "next": [
-                {
-                    "id": p.id,
-                    "title": p.title,
-                    "priority": p.priority,
-                    "effort": p.effort,
-                }
-                for p in runnable[:5]
-            ],
-        }
-        print(json.dumps(out, indent=2))
-        return 0
+        return _emit_json(
+            {
+                "total": len(prds),
+                "by_status": dict(counts),
+                "actionable": len(actionable),
+                "runnable": len(runnable),
+                "next": [
+                    _prd_to_dict(p, ("id", "title", "priority", "effort"))
+                    for p in runnable[:5]
+                ],
+            }
+        )
 
     print(f"PRDs — {len(prds)} total")
     for status in (
@@ -57,9 +58,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     if runnable:
         print("\nNext runnable (top 5):")
         for prd in runnable[:5]:
-            print(
-                f"  {prd.id:14} [{prd.kind}/{prd.effort}/{prd.capability}]  {prd.title}"
-            )
+            print("  " + _format_prd_line(prd, ("kind", "effort", "capability")))
 
     try:
         repo_root = _find_repo_root(args.prd_dir)

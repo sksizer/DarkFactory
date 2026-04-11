@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import date as _date
-
 from darkfactory import prd as prd_module
 from darkfactory.builtins._registry import builtin
+from darkfactory.builtins._shared import _log_dry_run
+from darkfactory.event_log import emit_builtin_effect
+from darkfactory.timestamps import today_iso
 from darkfactory.workflow import ExecutionContext, Status
 
 
@@ -22,14 +23,10 @@ def set_status(ctx: ExecutionContext, *, to: Status) -> None:
     only the ``status:`` and ``updated:`` lines so the resulting commit
     diff is two lines, not the whole frontmatter block.
     """
-    if ctx.dry_run:
-        ctx.logger.info(
-            "[dry-run] set status of %s: %s -> %s (worktree=%s)",
-            ctx.prd.id,
-            ctx.prd.status,
-            to,
-            ctx.worktree_path,
-        )
+    if _log_dry_run(
+        ctx,
+        f"set status of {ctx.prd.id}: {ctx.prd.status} -> {to} (worktree={ctx.worktree_path})",
+    ):
         return
 
     if ctx.worktree_path is None:
@@ -44,13 +41,8 @@ def set_status(ctx: ExecutionContext, *, to: Status) -> None:
     # Mirror the field updates onto the in-memory PRD so subsequent
     # builtins see the new status without re-loading from disk.
     ctx.prd.status = to
-    ctx.prd.updated = _date.today().isoformat()
+    ctx.prd.updated = today_iso()
 
-    if ctx.event_writer:
-        ctx.event_writer.emit(
-            "task",
-            "builtin_effect",
-            task="set_status",
-            effect="set_status",
-            detail={"from": old_status, "to": to},
-        )
+    emit_builtin_effect(
+        ctx, "set_status", "set_status", detail={"from": old_status, "to": to}
+    )

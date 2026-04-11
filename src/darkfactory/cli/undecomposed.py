@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 
 from darkfactory import containment
-from darkfactory.cli._shared import _load
+from darkfactory.cli._shared import _format_prd_line, _load
 from darkfactory.prd import parse_id_sort_key
 
 
@@ -23,5 +23,5 @@ def cmd_undecomposed(args: argparse.Namespace) -> int:
         print("(no undecomposed epics/features)")
         return 0
     for prd in candidates:
-        print(f"{prd.id:14} [{prd.kind}]  {prd.title}")
+        print(_format_prd_line(prd, ("kind",)))
     return 0

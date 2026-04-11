@@ -10,55 +10,38 @@ from pathlib import Path
 from darkfactory import checks
 from darkfactory.checks import StaleWorktree, find_stale_worktrees, is_safe_to_remove
 from darkfactory.cli._shared import _find_repo_root
+from darkfactory.git_ops import git_check, git_run
+from darkfactory.worktree_utils import find_worktree_for_prd
 
 
 def _remove_worktree(worktree: StaleWorktree, repo_root: Path) -> None:
     """Remove a worktree directory and delete the local branch."""
-    subprocess.run(
-        ["git", "worktree", "remove", "--force", str(worktree.worktree_path)],
-        cwd=repo_root,
-        check=True,
-    )
-    subprocess.run(
-        ["git", "branch", "-D", worktree.branch.removeprefix("prd/")],
-        cwd=repo_root,
-        capture_output=True,
-    )
+    git_run("worktree", "remove", "--force", str(worktree.worktree_path), cwd=repo_root)
+    git_check("branch", "-D", worktree.branch.removeprefix("prd/"), cwd=repo_root)
 
 
 def _find_worktree_for_prd(prd_id: str, repo_root: Path) -> StaleWorktree | None:
-    """Find the worktree entry for the given PRD id, regardless of PR state."""
-    worktrees_dir = repo_root / ".worktrees"
-    if not worktrees_dir.exists():
+    """Find the worktree entry for the given PRD id, regardless of PR state.
+
+    Delegates path discovery to :func:`~darkfactory.worktree_utils.find_worktree_for_prd`,
+    then wraps the result in a :class:`StaleWorktree` with PR state for cleanup operations.
+    """
+    entry = find_worktree_for_prd(prd_id, repo_root)
+    if entry is None:
         return None
-    for entry in sorted(worktrees_dir.iterdir()):
-        if not entry.is_dir():
-            continue
-        name = entry.name
-        m = re.match(r"^(PRD-[\d.]+)", name)
-        if not m:
-            continue
-        if m.group(1) != prd_id:
-            continue
-        branch = f"prd/{name}"
-        pr_state = checks._get_pr_state(branch, repo_root)
-        return StaleWorktree(
-            prd_id=prd_id,
-            branch=branch,
-            worktree_path=entry,
-            pr_state=pr_state,
-        )
-    return None
+    branch = f"prd/{entry.name}"
+    pr_state = checks._get_pr_state(branch, repo_root)
+    return StaleWorktree(
+        prd_id=prd_id,
+        branch=branch,
+        worktree_path=entry,
+        pr_state=pr_state,
+    )
 
 
 def _find_orphaned_branch(prd_id: str, repo_root: Path) -> str | None:
     """Find a local branch for *prd_id* when the worktree dir is gone."""
-    result = subprocess.run(
-        ["git", "branch", "--list", f"prd/{prd_id}-*"],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-    )
+    result = git_run("branch", "--list", f"prd/{prd_id}-*", cwd=repo_root)
     for line in result.stdout.splitlines():
         branch = line.strip().lstrip("* ")
         if branch:
@@ -70,15 +53,11 @@ def _orphaned_branch_commit_count(
     branch: str, repo_root: Path, base: str = "main"
 ) -> int:
     """Count commits on *branch* ahead of *base*."""
-    result = subprocess.run(
-        ["git", "rev-list", "--count", f"{base}..{branch}"],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode == 0:
+    try:
+        result = git_run("rev-list", "--count", f"{base}..{branch}", cwd=repo_root)
         return int(result.stdout.strip() or "0")
-    return 0
+    except subprocess.CalledProcessError:
+        return 0
 
 
 def _cleanup_single(prd_id: str, force: bool, repo_root: Path) -> int:
@@ -97,18 +76,8 @@ def _cleanup_single(prd_id: str, force: bool, repo_root: Path) -> int:
             )
             return 1
         # Prune any stale git worktree bookkeeping for the missing directory.
-        subprocess.run(
-            ["git", "worktree", "prune"],
-            cwd=repo_root,
-            capture_output=True,
-        )
-        subprocess.run(
-            ["git", "branch", "-D", orphaned],
-            cwd=repo_root,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        git_check("worktree", "prune", cwd=repo_root)
+        git_run("branch", "-D", orphaned, cwd=repo_root)
         label = f"orphaned branch '{orphaned}'"
         if ahead > 0:
             label += f" ({ahead} commit(s) ahead of main)"

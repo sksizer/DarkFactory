@@ -5,11 +5,11 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-import tomllib
 from collections.abc import Mapping
 from pathlib import Path
 
 from darkfactory import assign, containment
+from darkfactory.config import load_section
 from darkfactory.event_log import generate_session_id
 from darkfactory.graph_execution import (
     QueueFilters,
@@ -30,6 +30,7 @@ from darkfactory.cli._shared import (
     _load,
     _load_workflows_or_fail,
     _resolve_base_ref,
+    _resolve_prd_or_exit,
 )
 
 
@@ -39,10 +40,8 @@ def _read_config_timeouts(repo_root: Path) -> dict[str, object] | None:
     if not config_path.exists():
         return None
     try:
-        with open(config_path, "rb") as fh:
-            data = tomllib.load(fh)
-        section = data.get("timeouts")
-        return section if isinstance(section, dict) else None
+        result = load_section(config_path, "timeouts")
+        return result if result else None
     except Exception:  # noqa: BLE001
         return None
 
@@ -113,9 +112,8 @@ def cmd_run(args: argparse.Namespace) -> int:
             styler=styler,
         )
 
-    if prd_id not in prds:
-        raise SystemExit(f"unknown PRD id: {prd_id}")
-    prd = prds[prd_id]
+    assert prd_id is not None  # guarded by the not-prd_id check above
+    prd = _resolve_prd_or_exit(prd_id, prds)
 
     if _is_graph_target(prd, prds):
         return _cmd_run_graph(

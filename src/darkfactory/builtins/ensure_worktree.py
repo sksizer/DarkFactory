@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import logging
-import subprocess
 from pathlib import Path
 
 from filelock import FileLock, Timeout
 
 from darkfactory.builtins._registry import builtin
+from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.checks import is_resume_safe
+from darkfactory.git_ops import git_check, git_probe, git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -26,20 +27,13 @@ def _worktree_target(ctx: ExecutionContext) -> Path:
 
 def _branch_exists_local(repo_root: Path, branch: str) -> bool:
     """Return True if ``branch`` exists in the local repo's refs."""
-    result = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(repo_root),
-            "rev-parse",
-            "--verify",
-            "--quiet",
-            f"refs/heads/{branch}",
-        ],
-        capture_output=True,
-        text=True,
+    return git_check(
+        "rev-parse",
+        "--verify",
+        "--quiet",
+        f"refs/heads/{branch}",
+        cwd=repo_root,
     )
-    return result.returncode == 0
 
 
 def _branch_exists_remote(repo_root: Path, branch: str) -> bool:
@@ -48,35 +42,13 @@ def _branch_exists_remote(repo_root: Path, branch: str) -> bool:
     Best-effort: returns False (and logs a warning) on timeout or any
     subprocess error so the caller can fall back to the local check.
     """
-    try:
-        result = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(repo_root),
-                "ls-remote",
-                "--exit-code",
-                "origin",
-                f"refs/heads/{branch}",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-    except subprocess.TimeoutExpired:
-        _log.warning(
-            "git ls-remote timed out checking remote branch %r — skipping remote check",
-            branch,
-        )
-        return False
-    except Exception as exc:
-        _log.warning(
-            "git ls-remote failed checking remote branch %r (%s) — skipping remote check",
-            branch,
-            exc,
-        )
-        return False
-    return result.returncode == 0
+    return git_probe(
+        "ls-remote",
+        "--exit-code",
+        "origin",
+        f"refs/heads/{branch}",
+        cwd=repo_root,
+    )
 
 
 @builtin("ensure_worktree")
@@ -98,14 +70,10 @@ def ensure_worktree(ctx: ExecutionContext) -> None:
     worktree_path = _worktree_target(ctx)
     branch = ctx.branch_name
 
-    if ctx.dry_run:
+    if _log_dry_run(
+        ctx, f"git worktree add -b {branch} {worktree_path} {ctx.base_ref}"
+    ):
         # Dry-run produces no side effects, so no lock needed.
-        ctx.logger.info(
-            "[dry-run] git worktree add -b %s %s %s",
-            branch,
-            worktree_path,
-            ctx.base_ref,
-        )
         ctx.worktree_path = worktree_path
         ctx.cwd = worktree_path
         return
@@ -153,21 +121,14 @@ def ensure_worktree(ctx: ExecutionContext) -> None:
 
     # git worktree add -b <branch> <path> <base>
     # Run from the repo root, not from ctx.cwd (which may not be a git dir yet).
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(ctx.repo_root),
-            "worktree",
-            "add",
-            "-b",
-            branch,
-            str(worktree_path),
-            ctx.base_ref,
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
+    git_run(
+        "worktree",
+        "add",
+        "-b",
+        branch,
+        str(worktree_path),
+        ctx.base_ref,
+        cwd=ctx.repo_root,
     )
 
     ctx.worktree_path = worktree_path

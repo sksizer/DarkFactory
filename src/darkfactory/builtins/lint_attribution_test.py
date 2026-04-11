@@ -7,10 +7,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from darkfactory.builtins._test_helpers import make_builtin_ctx
 from darkfactory.builtins.lint_attribution import lint_attribution
 
 
-def _make_ctx(
+def _make_lint_ctx(
     tmp_path: Path,
     *,
     dry_run: bool = False,
@@ -19,13 +20,10 @@ def _make_ctx(
     base_ref: str = "main",
 ) -> MagicMock:
     """Build a minimal ExecutionContext mock for lint_attribution tests."""
-    ctx = MagicMock()
-    ctx.dry_run = dry_run
-    ctx.cwd = tmp_path
+    ctx = make_builtin_ctx(tmp_path, dry_run=dry_run)
     ctx.run_summary = run_summary
     ctx.branch_name = branch_name
     ctx.base_ref = base_ref
-    ctx.prd.id = "PRD-001"
     return ctx
 
 
@@ -33,8 +31,8 @@ def _make_ctx(
 
 
 def test_dry_run_logs_and_returns(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path, dry_run=True)
-    with patch("darkfactory.builtins.lint_attribution.subprocess.run") as mock_run:
+    ctx = _make_lint_ctx(tmp_path, dry_run=True)
+    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
         lint_attribution(ctx)
     ctx.logger.info.assert_called()
     call_args = ctx.logger.info.call_args[0]
@@ -46,9 +44,9 @@ def test_dry_run_logs_and_returns(tmp_path: Path) -> None:
 
 
 def test_clean_commits_pass(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path, dry_run=False, run_summary="All good")
+    ctx = _make_lint_ctx(tmp_path, dry_run=False, run_summary="All good")
     clean_git_output = "abc123\x00Fix a bug\x1e"
-    with patch("darkfactory.builtins.lint_attribution.subprocess.run") as mock_run:
+    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(stdout=clean_git_output)
         lint_attribution(ctx)
 
@@ -58,8 +56,8 @@ def test_clean_commits_pass(tmp_path: Path) -> None:
 
 
 def test_clean_no_commits(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path, dry_run=False, run_summary=None)
-    with patch("darkfactory.builtins.lint_attribution.subprocess.run") as mock_run:
+    ctx = _make_lint_ctx(tmp_path, dry_run=False, run_summary=None)
+    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(stdout="")
         lint_attribution(ctx)
 
@@ -70,20 +68,20 @@ def test_clean_no_commits(tmp_path: Path) -> None:
 
 
 def test_commit_message_violation_raises(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path, dry_run=False, run_summary=None)
+    ctx = _make_lint_ctx(tmp_path, dry_run=False, run_summary=None)
     bad_commit_output = (
         "deadbeef1234\x00Fix thing\n\nCo-Authored-By: Claude <claude@anthropic.com>\x1e"
     )
-    with patch("darkfactory.builtins.lint_attribution.subprocess.run") as mock_run:
+    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(stdout=bad_commit_output)
         with pytest.raises(RuntimeError, match="forbidden attribution"):
             lint_attribution(ctx)
 
 
 def test_generated_with_claude_code_raises(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path, dry_run=False, run_summary=None)
+    ctx = _make_lint_ctx(tmp_path, dry_run=False, run_summary=None)
     bad_commit_output = "deadbeef1234\x00Fix thing\n\n🤖 Generated with Claude Code\x1e"
-    with patch("darkfactory.builtins.lint_attribution.subprocess.run") as mock_run:
+    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(stdout=bad_commit_output)
         with pytest.raises(RuntimeError, match="forbidden attribution"):
             lint_attribution(ctx)
@@ -93,12 +91,12 @@ def test_generated_with_claude_code_raises(tmp_path: Path) -> None:
 
 
 def test_run_summary_violation_raises(tmp_path: Path) -> None:
-    ctx = _make_ctx(
+    ctx = _make_lint_ctx(
         tmp_path,
         dry_run=False,
         run_summary="Generated with Claude Code",
     )
-    with patch("darkfactory.builtins.lint_attribution.subprocess.run") as mock_run:
+    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(stdout="")
         with pytest.raises(RuntimeError, match="forbidden attribution"):
             lint_attribution(ctx)

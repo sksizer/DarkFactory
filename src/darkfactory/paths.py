@@ -3,6 +3,14 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+# Relative subdirectory names used by the harness.  Combine with a repo root or
+# project root via ``repo_root / WORKTREES_SUBDIR`` etc.
+WORKTREES_SUBDIR: str = ".worktrees"
+DARKFACTORY_SUBDIR: str = ".darkfactory"
+STATE_SUBDIR: str = ".darkfactory/state"
+EVENTS_SUBDIR: str = ".darkfactory/events"
+TRANSCRIPTS_SUBDIR: str = ".darkfactory/transcripts"
+
 
 def user_config_dir() -> Path:
     """Return the user-level darkfactory config directory."""

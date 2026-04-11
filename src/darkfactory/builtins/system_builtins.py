@@ -8,10 +8,12 @@ parallel registry that the system runner dispatches against.
 
 from __future__ import annotations
 
-import subprocess
+from pathlib import Path
 from typing import Callable
 
 from darkfactory import containment, prd as prd_module
+from darkfactory.git_ops import git_run
+from darkfactory.prd import compute_branch_name
 from darkfactory.system import SystemContext
 
 SYSTEM_BUILTINS: dict[str, Callable[..., None]] = {}
@@ -92,30 +94,21 @@ def system_load_prds_by_status(ctx: SystemContext, *, status: str) -> None:
     )
 
 
-def _branch_name(prd: prd_module.PRD) -> str:
-    """Return the expected branch name for a PRD: ``prd/{id}-{slug}``."""
-    return f"prd/{prd.id}-{prd.slug}"
+_branch_name = compute_branch_name
 
 
 def _is_merged_standard(repo_root: str, branch: str) -> bool:
     """Return True if ``branch`` (local or remote) is listed in ``git branch --merged main``."""
+    cwd = Path(repo_root)
     # Check local branch merged into main
-    result = subprocess.run(
-        ["git", "branch", "--merged", "main", "--list", branch],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode == 0 and result.stdout.strip():
+    result = git_run("branch", "--merged", "main", "--list", branch, cwd=cwd)
+    if result.stdout.strip():
         return True
     # Check remote branch
-    result = subprocess.run(
-        ["git", "branch", "-r", "--merged", "main", "--list", f"origin/{branch}"],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
+    result = git_run(
+        "branch", "-r", "--merged", "main", "--list", f"origin/{branch}", cwd=cwd
     )
-    return result.returncode == 0 and bool(result.stdout.strip())
+    return bool(result.stdout.strip())
 
 
 def _is_merged_squash(repo_root: str, branch: str) -> bool:
@@ -126,13 +119,10 @@ def _is_merged_squash(repo_root: str, branch: str) -> bool:
     A more reliable signal is the ``prd/PRD-X-slug`` pattern that GitHub
     appends to squash-merge commit messages when auto-generated.
     """
-    result = subprocess.run(
-        ["git", "log", "main", "--oneline", f"--grep={branch}"],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
+    result = git_run(
+        "log", "main", "--oneline", f"--grep={branch}", cwd=Path(repo_root)
     )
-    return result.returncode == 0 and bool(result.stdout.strip())
+    return bool(result.stdout.strip())
 
 
 @_register("system_check_merged")

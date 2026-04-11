@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
-import subprocess
 
 from darkfactory.builtins._registry import builtin
+from darkfactory.builtins._shared import _log_dry_run
+from darkfactory.git_ops import git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -30,17 +31,7 @@ def cleanup_worktree(ctx: ExecutionContext) -> None:
         )
         return
 
-    cmd = [
-        "git",
-        "-C",
-        str(ctx.repo_root),
-        "worktree",
-        "remove",
-        str(ctx.worktree_path),
-    ]
-
-    if ctx.dry_run:
-        ctx.logger.info("[dry-run] %s", " ".join(cmd))
+    if _log_dry_run(ctx, f"git worktree remove {ctx.worktree_path}"):
         return
 
-    subprocess.run(cmd, check=True, capture_output=True, text=True)
+    git_run("worktree", "remove", str(ctx.worktree_path), cwd=ctx.repo_root)

@@ -3,25 +3,20 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
+from darkfactory.builtins._test_helpers import make_builtin_ctx
 from darkfactory.builtins.push_branch import push_branch
 
-
-def _make_ctx(tmp_path: Path, *, dry_run: bool = False) -> MagicMock:
-    """Build a minimal ExecutionContext mock for push_branch tests."""
-    ctx = MagicMock()
-    ctx.dry_run = dry_run
-    ctx.cwd = tmp_path
-    ctx.branch_name = "prd/PRD-001-test-thing"
-    return ctx
+_BRANCH = "prd/PRD-001-test-thing"
 
 
 # ---------- dry-run path ----------
 
 
 def test_dry_run_logs_command(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path, dry_run=True)
+    ctx = make_builtin_ctx(tmp_path, dry_run=True)
+    ctx.branch_name = _BRANCH
     push_branch(ctx)
     ctx.logger.info.assert_called()
     call_args = ctx.logger.info.call_args[0]
@@ -31,8 +26,9 @@ def test_dry_run_logs_command(tmp_path: Path) -> None:
 
 
 def test_dry_run_no_subprocess_calls(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path, dry_run=True)
-    with patch("darkfactory.builtins.push_branch.subprocess.run") as mock_run:
+    ctx = make_builtin_ctx(tmp_path, dry_run=True)
+    ctx.branch_name = _BRANCH
+    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
         push_branch(ctx)
     mock_run.assert_not_called()
 
@@ -41,18 +37,20 @@ def test_dry_run_no_subprocess_calls(tmp_path: Path) -> None:
 
 
 def test_successful_push_calls_git_push(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path, dry_run=False)
-    with patch("darkfactory.builtins.push_branch.subprocess.run") as mock_run:
+    ctx = make_builtin_ctx(tmp_path, dry_run=False)
+    ctx.branch_name = _BRANCH
+    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
         push_branch(ctx)
 
     mock_run.assert_called_once()
     call_args = mock_run.call_args[0][0]
-    assert call_args == ["git", "push", "-u", "origin", "prd/PRD-001-test-thing"]
+    assert call_args == ["git", "push", "-u", "origin", _BRANCH]
 
 
 def test_successful_push_with_correct_cwd(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path, dry_run=False)
-    with patch("darkfactory.builtins.push_branch.subprocess.run") as mock_run:
+    ctx = make_builtin_ctx(tmp_path, dry_run=False)
+    ctx.branch_name = _BRANCH
+    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
         push_branch(ctx)
 
     # Verify cwd is passed correctly

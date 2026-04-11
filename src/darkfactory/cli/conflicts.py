@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import argparse
-import json
 
 from darkfactory import containment, impacts
-from darkfactory.cli._shared import _find_repo_root, _load
+from darkfactory.cli._shared import (
+    _emit_json,
+    _find_repo_root,
+    _load,
+    _resolve_prd_or_exit,
+)
 
 
 def cmd_conflicts(args: argparse.Namespace) -> int:
     prds = _load(args.prd_dir)
-    if args.prd_id not in prds:
-        raise SystemExit(f"unknown PRD id: {args.prd_id}")
-    prd = prds[args.prd_id]
+    prd = _resolve_prd_or_exit(args.prd_id, prds)
     repo_root = _find_repo_root(args.prd_dir)
     conflicts = impacts.find_conflicts(prd, prds, repo_root)
 
@@ -25,20 +27,16 @@ def cmd_conflicts(args: argparse.Namespace) -> int:
         raise SystemExit(str(exc))
 
     if args.json:
-        print(
-            json.dumps(
-                {
-                    "id": prd.id,
-                    "effective_impacts": effective,
-                    "conflicts": [
-                        {"id": other_id, "files": sorted(files)}
-                        for other_id, files in conflicts
-                    ],
-                },
-                indent=2,
-            )
+        return _emit_json(
+            {
+                "id": prd.id,
+                "effective_impacts": effective,
+                "conflicts": [
+                    {"id": other_id, "files": sorted(files)}
+                    for other_id, files in conflicts
+                ],
+            }
         )
-        return 0
 
     if not effective:
         kids = containment.children(prd.id, prds)

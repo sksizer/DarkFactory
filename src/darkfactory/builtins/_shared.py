@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from darkfactory.workflow import ExecutionContext
 
 # ----- attribution lint -----
 #
@@ -16,6 +20,27 @@ _FORBIDDEN_ATTRIBUTION_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"Generated with .{0,20}Claude Code", re.IGNORECASE),
     re.compile(r"🤖 Generated with", re.IGNORECASE),
 )
+
+
+def _log_dry_run(ctx: "ExecutionContext", message: str) -> bool:
+    """Return True (and log) if ``ctx`` is in dry-run mode.
+
+    Eliminates the repeated ``if ctx.dry_run: ctx.logger.info(...); return``
+    boilerplate from builtin entry points.  Usage::
+
+        if _log_dry_run(ctx, "git add -A && git commit"):
+            return
+
+    The caller may perform additional dry-run-only mutations after the check::
+
+        if _log_dry_run(ctx, "gh pr create ..."):
+            ctx.pr_url = "https://example.test/dry-run/pr/0"
+            return
+    """
+    if not ctx.dry_run:
+        return False
+    ctx.logger.info("[dry-run] %s", message)
+    return True
 
 
 def _scan_for_forbidden_attribution(text: str, *, source: str) -> None:

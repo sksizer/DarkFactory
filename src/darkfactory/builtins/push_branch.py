@@ -6,6 +6,9 @@ import logging
 import subprocess
 
 from darkfactory.builtins._registry import builtin
+from darkfactory.builtins._shared import _log_dry_run
+from darkfactory.event_log import emit_builtin_effect
+from darkfactory.git_ops import git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -19,20 +22,11 @@ def push_branch(ctx: ExecutionContext) -> None:
     before :func:`create_pr` because ``gh pr create --base`` needs the
     remote to exist.
     """
-    cmd = ["git", "push", "-u", "origin", ctx.branch_name]
-
-    if ctx.dry_run:
-        ctx.logger.info("[dry-run] %s", " ".join(cmd))
+    if _log_dry_run(ctx, " ".join(["git", "push", "-u", "origin", ctx.branch_name])):
         return
 
     try:
-        subprocess.run(
-            cmd,
-            cwd=str(ctx.cwd),
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        git_run("push", "-u", "origin", ctx.branch_name, cwd=ctx.cwd)
     except subprocess.CalledProcessError as exc:
         detail = (
             f"git push failed (exit {exc.returncode}):"
@@ -42,11 +36,4 @@ def push_branch(ctx: ExecutionContext) -> None:
         _log.error(detail)
         raise RuntimeError(detail) from exc
 
-    if ctx.event_writer:
-        ctx.event_writer.emit(
-            "task",
-            "builtin_effect",
-            task="push_branch",
-            effect="push",
-            detail={"branch": ctx.branch_name},
-        )
+    emit_builtin_effect(ctx, "push_branch", "push", detail={"branch": ctx.branch_name})

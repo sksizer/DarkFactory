@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import argparse
-import json
 
 from darkfactory import containment, graph
-from darkfactory.cli._shared import _action_sort_key, _load
+from darkfactory.cli._shared import (
+    _action_sort_key,
+    _emit_json,
+    _format_prd_line,
+    _load,
+    _prd_to_dict,
+)
 
 
 def cmd_next(args: argparse.Namespace) -> int:
@@ -22,29 +27,18 @@ def cmd_next(args: argparse.Namespace) -> int:
     actionable = actionable[: args.limit]
 
     if args.json:
-        print(
-            json.dumps(
-                [
-                    {
-                        "id": p.id,
-                        "title": p.title,
-                        "priority": p.priority,
-                        "effort": p.effort,
-                        "capability": p.capability,
-                        "kind": p.kind,
-                    }
-                    for p in actionable
-                ],
-                indent=2,
-            )
+        return _emit_json(
+            [
+                _prd_to_dict(
+                    p, ("id", "title", "priority", "effort", "capability", "kind")
+                )
+                for p in actionable
+            ]
         )
-        return 0
 
     if not actionable:
         print("(no actionable PRDs match)")
         return 0
     for prd in actionable:
-        print(
-            f"{prd.id:14} [{prd.priority}/{prd.effort}/{prd.capability}]  {prd.title}"
-        )
+        print(_format_prd_line(prd, ("priority", "effort", "capability")))
     return 0

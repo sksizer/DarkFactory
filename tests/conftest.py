@@ -3,8 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import NamedTuple
+from unittest.mock import MagicMock
 
 import pytest
+
+from conftest import write_prd as write_prd  # noqa: F401
+from darkfactory.prd import PRD, load_all
+from darkfactory.workflow import Workflow
 
 
 @pytest.fixture(autouse=True)
@@ -34,73 +40,163 @@ def real_builtin_workflows() -> None:
     return None
 
 
-def write_prd(
-    dir_path: Path,
-    prd_id: str,
-    slug: str,
-    *,
-    title: str = "Test PRD",
-    kind: str = "task",
-    status: str = "ready",
-    priority: str = "medium",
-    effort: str = "s",
-    capability: str = "simple",
-    parent: str | None = None,
-    depends_on: list[str] | None = None,
-    blocks: list[str] | None = None,
-    impacts: list[str] | None = None,
-    workflow: str | None = None,
-    body: str = "# Test\n\nBody content.\n",
-) -> Path:
-    """Write a minimal valid PRD file to ``dir_path`` and return its path."""
-    fm_lines = [
-        "---",
-        f'id: "{prd_id}"',
-        f'title: "{title}"',
-        f"kind: {kind}",
-        f"status: {status}",
-        f"priority: {priority}",
-        f"effort: {effort}",
-        f"capability: {capability}",
-    ]
-    if parent:
-        fm_lines.append(f'parent: "[[{parent}-stub]]"')
-    else:
-        fm_lines.append("parent: null")
+@pytest.fixture
+def git_repo(tmp_path: Path) -> Path:
+    """Return ``tmp_path`` after creating a minimal ``.git/`` directory.
 
-    if depends_on:
-        fm_lines.append("depends_on:")
-        for dep in depends_on:
-            fm_lines.append(f'  - "[[{dep}-stub]]"')
-    else:
-        fm_lines.append("depends_on: []")
+    Allows ``_find_repo_root`` and similar git-root discovery helpers to
+    resolve successfully without a real git repository.
+    """
+    (tmp_path / ".git").mkdir(exist_ok=True)
+    return tmp_path
 
-    if blocks:
-        fm_lines.append("blocks:")
-        for blk in blocks:
-            fm_lines.append(f'  - "[[{blk}-stub]]"')
-    else:
-        fm_lines.append("blocks: []")
 
-    if impacts:
-        fm_lines.append("impacts:")
-        for imp in impacts:
-            fm_lines.append(f"  - {imp}")
-    else:
-        fm_lines.append("impacts: []")
+class CliProject(NamedTuple):
+    """Paths for a minimal project layout used in CLI integration tests."""
 
-    if workflow:
-        fm_lines.append(f"workflow: {workflow}")
-    else:
-        fm_lines.append("workflow: null")
+    repo_root: Path
+    prd_dir: Path
+    workflows_dir: Path
 
-    fm_lines.append("created: 2026-04-06")
-    fm_lines.append("updated: 2026-04-06")
-    fm_lines.append("tags: []")
-    fm_lines.append("---")
-    fm_lines.append("")
-    fm_lines.append(body)
 
-    path = dir_path / f"{prd_id}-{slug}.md"
-    path.write_text("\n".join(fm_lines), encoding="utf-8")
-    return path
+@pytest.fixture
+def cli_project(tmp_path: Path) -> CliProject:
+    """Create a minimal project directory structure and return its paths.
+
+    - ``repo_root`` — ``tmp_path`` with ``.git/`` created
+    - ``prd_dir`` — ``tmp_path / "prds"`` (created)
+    - ``workflows_dir`` — ``tmp_path / "workflows"`` (created)
+    """
+    (tmp_path / ".git").mkdir(exist_ok=True)
+    prd_dir = tmp_path / "prds"
+    prd_dir.mkdir()
+    workflows_dir = tmp_path / "workflows"
+    workflows_dir.mkdir()
+    return CliProject(
+        repo_root=tmp_path,
+        prd_dir=prd_dir,
+        workflows_dir=workflows_dir,
+    )
+
+
+@pytest.fixture
+def make_prd(tmp_path: Path) -> object:
+    """Return a factory that writes and loads a single PRD.
+
+    The factory signature::
+
+        make_prd(
+            prd_id: str,
+            slug: str,
+            *,
+            capability: str = "simple",
+            kind: str = "task",
+            status: str = "ready",
+            priority: str = "medium",
+            effort: str = "s",
+            parent: str | None = None,
+            depends_on: list[str] | None = None,
+        ) -> PRD
+    """
+    prd_dir = tmp_path / "prds"
+    prd_dir.mkdir(exist_ok=True)
+
+    def _factory(
+        prd_id: str,
+        slug: str,
+        *,
+        capability: str = "simple",
+        kind: str = "task",
+        status: str = "ready",
+        priority: str = "medium",
+        effort: str = "s",
+        parent: str | None = None,
+        depends_on: list[str] | None = None,
+    ) -> PRD:
+        write_prd(
+            prd_dir,
+            prd_id,
+            slug,
+            capability=capability,
+            kind=kind,
+            status=status,
+            priority=priority,
+            effort=effort,
+            parent=parent,
+            depends_on=depends_on,
+        )
+        prds = load_all(prd_dir)
+        return prds[prd_id]
+
+    return _factory
+
+
+@pytest.fixture
+def make_workflow(tmp_path: Path) -> object:
+    """Return a factory that creates a ``Workflow`` instance in a temp dir.
+
+    The factory signature::
+
+        make_workflow(name: str = "test", *, with_prompts: bool = True) -> Workflow
+    """
+
+    def _factory(name: str = "test", *, with_prompts: bool = True) -> Workflow:
+        wf_dir = tmp_path / "wf" / name
+        wf_dir.mkdir(parents=True, exist_ok=True)
+        if with_prompts:
+            prompts_dir = wf_dir / "prompts"
+            prompts_dir.mkdir()
+            (prompts_dir / "role.md").write_text("# Role\n")
+            (prompts_dir / "task.md").write_text("# Task\n{{PRD_ID}}\n")
+            (prompts_dir / "verify.md").write_text("# Verify\nFix:\n{{CHECK_OUTPUT}}\n")
+        return Workflow(
+            name=name,
+            applies_to=lambda prd, prds: True,
+            tasks=[],
+            workflow_dir=wf_dir if with_prompts else None,
+        )
+
+    return _factory
+
+
+@pytest.fixture
+def make_execution_context() -> object:
+    """Return a factory that creates a mock ``ExecutionContext``.
+
+    The returned factory creates a ``MagicMock`` pre-populated with the
+    fields most commonly accessed in workflow and builtin tests::
+
+        make_execution_context(
+            *,
+            prd_id: str = "PRD-001",
+            dry_run: bool = False,
+            branch_name: str = "prd/PRD-001-stub",
+            base_ref: str = "main",
+            cwd: Path | None = None,
+            repo_root: Path | None = None,
+            worktree_path: Path | None = None,
+        ) -> MagicMock
+    """
+
+    def _factory(
+        *,
+        prd_id: str = "PRD-001",
+        dry_run: bool = False,
+        branch_name: str = "prd/PRD-001-stub",
+        base_ref: str = "main",
+        cwd: Path | None = None,
+        repo_root: Path | None = None,
+        worktree_path: Path | None = None,
+    ) -> MagicMock:
+        ctx = MagicMock()
+        ctx.dry_run = dry_run
+        ctx.prd.id = prd_id
+        ctx.branch_name = branch_name
+        ctx.base_ref = base_ref
+        ctx.cwd = cwd
+        ctx.repo_root = repo_root
+        ctx.worktree_path = worktree_path
+        ctx.format_string.side_effect = lambda s: s
+        return ctx
+
+    return _factory

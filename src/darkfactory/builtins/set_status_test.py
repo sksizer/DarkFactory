@@ -7,22 +7,28 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from darkfactory.builtins._test_helpers import make_builtin_ctx
 from darkfactory.builtins.set_status import set_status
 
 
-def _make_ctx(*, dry_run: bool = False, worktree_path: Path | None = None) -> MagicMock:
-    ctx = MagicMock()
-    ctx.dry_run = dry_run
-    ctx.worktree_path = worktree_path
-    ctx.prd.id = "PRD-999"
+def _make_set_status_ctx(
+    *, dry_run: bool = False, worktree_path: Path | None = None
+) -> MagicMock:
+    """Thin wrapper that adds set_status-specific fields on top of the shared factory."""
+    ctx = make_builtin_ctx(
+        Path("/repo"),
+        dry_run=dry_run,
+        prd_id="PRD-999",
+        worktree_path=worktree_path,
+        repo_root=Path("/repo"),
+    )
     ctx.prd.status = "ready"
     ctx.prd.path = Path("/repo/.darkfactory/prds/PRD-999-test.md")
-    ctx.repo_root = Path("/repo")
     return ctx
 
 
 def test_dry_run_logs_and_does_not_call_set_status_at() -> None:
-    ctx = _make_ctx(dry_run=True, worktree_path=Path("/worktrees/PRD-999"))
+    ctx = _make_set_status_ctx(dry_run=True, worktree_path=Path("/worktrees/PRD-999"))
 
     with patch("darkfactory.builtins.set_status.prd_module") as mock_prd:
         set_status(ctx, to="in-progress")
@@ -34,7 +40,7 @@ def test_dry_run_logs_and_does_not_call_set_status_at() -> None:
 
 
 def test_missing_worktree_raises_runtime_error() -> None:
-    ctx = _make_ctx(dry_run=False, worktree_path=None)
+    ctx = _make_set_status_ctx(dry_run=False, worktree_path=None)
 
     with pytest.raises(RuntimeError, match="set_status requires a worktree"):
         set_status(ctx, to="in-progress")
@@ -42,7 +48,7 @@ def test_missing_worktree_raises_runtime_error() -> None:
 
 def test_successful_update_calls_set_status_at_and_updates_ctx() -> None:
     worktree = Path("/worktrees/PRD-999")
-    ctx = _make_ctx(dry_run=False, worktree_path=worktree)
+    ctx = _make_set_status_ctx(dry_run=False, worktree_path=worktree)
     ctx.prd.path = Path("/repo/.darkfactory/prds/PRD-999-test.md")
     ctx.repo_root = Path("/repo")
 

@@ -44,6 +44,7 @@ from typing import TYPE_CHECKING
 from .builtins import BUILTINS
 from .event_log import EventWriter
 from .invoke import InvokeResult, capability_to_model, invoke_claude
+from .prd import compute_branch_name
 from .templates import compose_prompt
 from .timeouts import resolve_timeout
 from .workflow import (
@@ -95,14 +96,9 @@ class RunResult:
     failure_reason: str | None = None
 
 
-def _compute_branch_name(prd: "PRD") -> str:
-    """Derive the branch name a workflow should use for this PRD.
-
-    Matches the convention in ``ensure_worktree``:
-    ``prd/<id>-<slug>``. Surfaced as a helper so callers can compute
-    it before creating the ExecutionContext.
-    """
-    return f"prd/{prd.id}-{prd.slug}"
+# Backward-compatible alias so graph_execution.py and CLI modules that
+# import _compute_branch_name from runner keep working.
+_compute_branch_name = compute_branch_name
 
 
 def _pick_model(task: AgentTask, prd: "PRD", override: str | None = None) -> str:

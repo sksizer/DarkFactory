@@ -23,6 +23,8 @@ from typing import Any, Callable
 
 import yaml
 
+from darkfactory.timestamps import today_iso
+
 # Regex for matching either flat (PRD-070) or hierarchical (PRD-4.1.1) IDs.
 PRD_ID_RE = re.compile(r"^PRD-\d+(?:\.\d+)*$")
 
@@ -62,6 +64,11 @@ class PRD:
     tags: list[str]
     raw_frontmatter: dict[str, Any]
     body: str
+
+
+def compute_branch_name(prd: "PRD") -> str:
+    """Return the git branch name for a PRD: ``prd/{id}-{slug}``."""
+    return f"prd/{prd.id}-{prd.slug}"
 
 
 def parse_id_sort_key(prd_id: str) -> tuple[int, ...]:
@@ -298,7 +305,7 @@ def set_status(prd: PRD, new_status: str) -> None:
     set_status_at(prd.path, new_status)
     prd.raw_frontmatter = dict(prd.raw_frontmatter)
     prd.raw_frontmatter["status"] = new_status
-    prd.raw_frontmatter["updated"] = date.today().isoformat()
+    prd.raw_frontmatter["updated"] = today_iso()
     prd.status = new_status
     prd.updated = prd.raw_frontmatter["updated"]
 
@@ -313,7 +320,7 @@ def set_status_at(path: Path, new_status: str) -> None:
     """
     # Quote the date so PyYAML round-trips it as a string instead of
     # auto-coercing to a ``datetime.date`` object on the next parse.
-    today = date.today().isoformat()
+    today = today_iso()
     update_frontmatter_field_at(
         path,
         {"status": new_status, "updated": f"'{today}'"},
@@ -483,7 +490,7 @@ def set_workflow(prd: PRD, workflow_name: str | None) -> None:
     """
     fm = dict(prd.raw_frontmatter)
     fm["workflow"] = workflow_name
-    fm["updated"] = date.today().isoformat()
+    fm["updated"] = today_iso()
     write_frontmatter(prd, fm)
     prd.workflow = workflow_name
     prd.updated = fm["updated"]

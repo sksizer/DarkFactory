@@ -6,7 +6,7 @@ import argparse
 from collections.abc import Mapping
 
 from darkfactory import containment
-from darkfactory.cli._shared import _load
+from darkfactory.cli._shared import _load, _resolve_prd_or_exit
 from darkfactory.prd import PRD
 from darkfactory.style import Element, Styler
 
@@ -49,9 +49,7 @@ def cmd_tree(args: argparse.Namespace) -> int:
     prds = _load(args.prd_dir)
     styler: Styler = args.styler
     if args.prd_id:
-        prd = prds.get(args.prd_id)
-        if prd is None:
-            raise SystemExit(f"unknown PRD id: {args.prd_id}")
+        prd = _resolve_prd_or_exit(args.prd_id, prds)
         print(_format_tree_node(prd, styler))
         kids = containment.children(prd.id, prds)
         for i, kid in enumerate(kids):
