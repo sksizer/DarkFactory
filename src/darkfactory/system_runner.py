@@ -19,11 +19,10 @@ Key differences from the workflow runner:
 from __future__ import annotations
 
 import logging
-import os
-import subprocess
 from typing import Callable
 
 from .utils.claude_code import invoke_claude
+from .utils.shell import run_shell_once
 from .runner import RunResult, TaskStep, _task_kind, _task_name
 from .system import SystemContext, SystemOperation
 from .templates import load_prompt_files, substitute_placeholders
@@ -275,7 +274,7 @@ def _run_system_shell(
         ctx.logger.info("[dry-run] %s", cmd)
         return TaskStep(name=task.name, kind="shell", success=True, detail="dry-run")
 
-    first_result = _run_shell_once(cmd, ctx, task.env)
+    first_result = run_shell_once(cmd, ctx.cwd, task.env)
 
     if first_result.returncode == 0:
         return TaskStep(name=task.name, kind="shell", success=True)
@@ -333,7 +332,7 @@ def _run_system_shell(
             detail=f"retry agent failed: {agent_step.detail}",
         )
 
-    second_result = _run_shell_once(cmd, ctx, task.env)
+    second_result = run_shell_once(cmd, ctx.cwd, task.env)
     if second_result.returncode == 0:
         return TaskStep(
             name=task.name,
@@ -353,21 +352,3 @@ def _run_system_shell(
     )
 
 
-def _run_shell_once(
-    cmd: str,
-    ctx: SystemContext,
-    env: dict[str, str],
-) -> subprocess.CompletedProcess[str]:
-    """Run a shell command once and return the completed-process result."""
-    full_env = dict(os.environ)
-    full_env.update(env)
-
-    return subprocess.run(
-        cmd,
-        shell=True,
-        cwd=str(ctx.cwd),
-        capture_output=True,
-        text=True,
-        env=full_env,
-        check=False,
-    )

@@ -35,7 +35,6 @@ synthetic success result via :func:`~darkfactory.invoke.invoke_claude`'s
 from __future__ import annotations
 
 import logging
-import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -44,6 +43,7 @@ from typing import TYPE_CHECKING
 from .builtins import BUILTINS
 from .event_log import EventWriter, emit_task_event
 from .utils.claude_code import InvokeResult, capability_to_model, invoke_claude
+from .utils.shell import run_shell_once
 from .prd import compute_branch_name
 from .templates import compose_prompt
 from .timeouts import resolve_timeout
@@ -452,7 +452,7 @@ def _run_shell(
         ctx.logger.info("[dry-run] %s", cmd)
         return TaskStep(name=task.name, kind="shell", success=True, detail="dry-run")
 
-    first_result = _run_shell_once(cmd, ctx, task.env)
+    first_result = run_shell_once(cmd, ctx.cwd, task.env)
 
     # Emit shell output events via the event writer.
     if first_result.stdout:
@@ -534,7 +534,7 @@ def _run_shell(
         )
 
     # Re-run the shell task once more after the agent fix
-    second_result = _run_shell_once(cmd, ctx, task.env)
+    second_result = run_shell_once(cmd, ctx.cwd, task.env)
     if second_result.returncode == 0:
         return TaskStep(
             name=task.name,
@@ -554,23 +554,3 @@ def _run_shell(
     )
 
 
-def _run_shell_once(
-    cmd: str,
-    ctx: ExecutionContext,
-    env: dict[str, str],
-) -> subprocess.CompletedProcess[str]:
-    """Run a shell command once and return the completed-process result."""
-    import os
-
-    full_env = dict(os.environ)
-    full_env.update(env)
-
-    return subprocess.run(
-        cmd,
-        shell=True,
-        cwd=str(ctx.cwd),
-        capture_output=True,
-        text=True,
-        env=full_env,
-        check=False,
-    )
