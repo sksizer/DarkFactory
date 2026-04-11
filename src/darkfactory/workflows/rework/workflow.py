@@ -57,6 +57,13 @@ workflow = Workflow(
             ],
             model_from_capability=True,
             retries=1,
+            # Rework responds to review feedback — the agent needs to
+            # hold the original intent AND the reviewer's objections in
+            # mind simultaneously, so we request Claude Code's highest
+            # adaptive-reasoning budget. Note: ``max`` is Opus 4.6 only,
+            # so rework PRDs should be tagged ``capability: complex`` to
+            # route to opus.
+            effort_level="max",
         ),
         # Verification steps — run after the agent finishes.
         ShellTask("format", cmd="uv run ruff format .", on_failure="fail"),

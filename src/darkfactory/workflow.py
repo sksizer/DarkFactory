@@ -31,6 +31,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
+from .utils.claude_code import EffortLevel
+
 if TYPE_CHECKING:
     from filelock import FileLock
 
@@ -151,6 +153,7 @@ class AgentTask(Task):
     verify_prompts: list[str] = field(default_factory=list)
     sentinel_success: str = "PRD_EXECUTE_OK"
     sentinel_failure: str = "PRD_EXECUTE_FAILED"
+    effort_level: EffortLevel | None = None
 
 
 @dataclass

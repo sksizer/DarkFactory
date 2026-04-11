@@ -213,6 +213,43 @@ def test_invoke_claude_success_sentinel(tmp_path: Path) -> None:
     assert "PRD_EXECUTE_OK" in result.stdout
 
 
+def test_invoke_claude_effort_max_appends_cli_flag(tmp_path: Path) -> None:
+    """effort_level='max' should append ``--effort max`` to the subprocess argv.
+
+    The prompt is piped over stdin unchanged — effort is a CLI flag, not
+    a prompt-keyword, so the agent sees the exact composed prompt.
+    """
+    mock_proc = _make_mock_popen(stdout="PRD_EXECUTE_OK: X\n")
+    with patch("subprocess.Popen", return_value=mock_proc) as mock_popen:
+        invoke_claude(
+            prompt="original prompt",
+            tools=["Read"],
+            model="opus",
+            cwd=tmp_path,
+            effort_level="max",
+        )
+    cmd = mock_popen.call_args[0][0]
+    assert "--effort" in cmd
+    assert cmd[cmd.index("--effort") + 1] == "max"
+    # Prompt untouched — no keyword prepended
+    mock_proc.stdin.write.assert_called_once_with("original prompt")
+
+
+def test_invoke_claude_no_effort_level_omits_flag(tmp_path: Path) -> None:
+    """When ``effort_level`` is unset, no ``--effort`` flag is passed."""
+    mock_proc = _make_mock_popen(stdout="PRD_EXECUTE_OK: X\n")
+    with patch("subprocess.Popen", return_value=mock_proc) as mock_popen:
+        invoke_claude(
+            prompt="plain prompt",
+            tools=["Read"],
+            model="sonnet",
+            cwd=tmp_path,
+        )
+    cmd = mock_popen.call_args[0][0]
+    assert "--effort" not in cmd
+    mock_proc.stdin.write.assert_called_once_with("plain prompt")
+
+
 def test_invoke_claude_builds_expected_command(tmp_path: Path) -> None:
     """The subprocess call should use `pnpm dlx` with the right flags."""
     mock_proc = _make_mock_popen(stdout="PRD_EXECUTE_OK: X\n")

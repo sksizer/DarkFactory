@@ -77,6 +77,15 @@ def test_rework_workflow_has_expected_task_names(real_builtin_workflows: None) -
     assert "push_branch" in task_names
 
 
+def test_rework_workflow_agent_uses_max_effort(real_builtin_workflows: None) -> None:
+    """The rework AgentTask must request Claude Code's max effort level."""
+    workflows = load_workflows()
+    wf = workflows["rework"]
+    agent_tasks = [t for t in wf.tasks if isinstance(t, AgentTask)]
+    assert len(agent_tasks) == 1
+    assert agent_tasks[0].effort_level == "max"
+
+
 def test_rework_workflow_skips_sdlc_steps(real_builtin_workflows: None) -> None:
     """The rework workflow must NOT include ensure_worktree, set_status, create_pr."""
     workflows = load_workflows()

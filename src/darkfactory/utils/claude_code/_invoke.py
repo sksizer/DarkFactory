@@ -41,6 +41,8 @@ from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from .utils.claude_code import EffortLevel
+
 if TYPE_CHECKING:
     from darkfactory.event_log import EventWriter
     from darkfactory.style import Element, Styler
@@ -377,6 +379,7 @@ def invoke_claude(
     timeout_seconds: int = 600,
     executable: str = "pnpm",
     dry_run: bool = False,
+    effort_level: EffortLevel | None = None,
     logger: logging.Logger | None = None,
     styler: "Styler | None" = None,
     _argv_override: list[str] | None = None,
@@ -416,7 +419,8 @@ def invoke_claude(
     if dry_run:
         return InvokeResult(
             stdout=f"[dry-run] would invoke claude with model={model}, "
-            f"{len(tools)} tools, prompt={len(prompt)} chars",
+            f"{len(tools)} tools, prompt={len(prompt)} chars"
+            + (f", effort={effort_level}" if effort_level else ""),
             stderr="",
             exit_code=0,
             success=True,
@@ -461,6 +465,12 @@ def invoke_claude(
             "--disallowed-tools",
             "Read(../)",
         ]
+        if effort_level is not None:
+            # Session-scoped adaptive-reasoning budget. ``max`` is Opus 4.6
+            # only and will fail loud at the CLI if the selected model
+            # doesn't support it — matching this project's "hard failures
+            # over silent degradation" principle.
+            cmd.extend(["--effort", effort_level])
 
     try:
         proc = subprocess.Popen(
