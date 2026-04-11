@@ -11,10 +11,11 @@ Invocation (from _invoke):
 - :func:`capability_to_model` — map PRD capability tier to model name
 """
 
-from ._interactive import spawn_claude
+from ._interactive import EffortLevel, spawn_claude
 from ._invoke import InvokeResult, capability_to_model, invoke_claude
 
 __all__ = [
+    "EffortLevel",
     "InvokeResult",
     "capability_to_model",
     "invoke_claude",

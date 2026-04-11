@@ -26,6 +26,7 @@ import sys
 import time
 
 from darkfactory.utils.git import git_run
+from darkfactory.utils.github.pull_request import gh_pr_view_json, list_prs
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -145,28 +146,15 @@ def fetch_open_prd_prs(repo_root: Path) -> list[dict[str, Any]]:
     Returns an empty list if ``gh`` is unavailable or fails.
     """
     try:
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "list",
-                "--state",
-                "open",
-                "--json",
-                "number,headRefName",
-            ],
-            capture_output=True,
-            text=True,
-            cwd=repo_root,
-        )
-        if result.returncode != 0:
-            _log.warning("gh pr list failed: %s", result.stderr.strip())
-            return []
-        prs: list[dict[str, Any]] = json.loads(result.stdout)
-        return [p for p in prs if re.match(r"^prd/PRD-", p.get("headRefName", ""))]
-    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        prs = list_prs("open", "number,headRefName", repo_root=repo_root)
+    except (
+        FileNotFoundError,
+        subprocess.CalledProcessError,
+        json.JSONDecodeError,
+    ) as exc:
         _log.warning("Could not fetch open PRs: %s", exc)
         return []
+    return [p for p in prs if re.match(r"^prd/PRD-", p.get("headRefName", ""))]
 
 
 def _worktree_exists(prd_id: str, repo_root: Path) -> bool:
@@ -201,22 +189,8 @@ def check_missing_worktrees(prs: list[dict[str, Any]], repo_root: Path) -> list[
 
 def _fetch_comment_ids(pr_number: int) -> set[str]:
     """Return the set of all comment/thread IDs for ``pr_number``."""
-    try:
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "view",
-                str(pr_number),
-                "--json",
-                "comments,reviews,reviewThreads",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        raw: dict[str, Any] = json.loads(result.stdout)
-    except (FileNotFoundError, subprocess.CalledProcessError, json.JSONDecodeError):
+    raw = gh_pr_view_json(pr_number, "comments,reviews,reviewThreads")
+    if raw is None:
         return set()
 
     ids: set[str] = set()

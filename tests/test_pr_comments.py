@@ -323,7 +323,7 @@ def test_fetch_pr_comments_calls_gh_and_returns_threads() -> None:
     ) as mock_fetch:
         result = fetch_pr_comments(42)
 
-    mock_fetch.assert_called_once_with(42)
+    mock_fetch.assert_called_once_with(42, None)
     assert isinstance(result, list)
     assert all(isinstance(t, ReviewThread) for t in result)
     # Resolved thread excluded by default

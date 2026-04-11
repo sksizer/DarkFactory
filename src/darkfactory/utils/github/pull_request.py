@@ -157,3 +157,94 @@ def create_pull_request(
         capture_output=True,
         text=True,
     )
+
+
+def create_pull_request_inline(
+    title: str,
+    body: str,
+    base_ref: str | None = None,
+    cwd: Path | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run ``gh pr create`` with an inline body string.
+
+    Unlike :func:`create_pull_request`, this passes ``--body`` directly rather
+    than writing a temp file.  Use for short, generated bodies where a temp file
+    is unnecessary.
+
+    Raises :class:`subprocess.CalledProcessError` on non-zero exit.
+    """
+    cmd = ["gh", "pr", "create", "--title", title, "--body", body]
+    if base_ref is not None:
+        cmd.extend(["--base", base_ref])
+    return subprocess.run(
+        cmd,
+        cwd=str(cwd) if cwd is not None else None,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+def list_prs(
+    state: str,
+    fields: str,
+    limit: int = 100,
+    repo_root: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Return a list of PR dicts from ``gh pr list``.
+
+    ``state`` is one of ``"open"``, ``"closed"``, or ``"merged"``.
+    ``fields`` is a comma-separated list of JSON field names.
+
+    Raises :class:`subprocess.CalledProcessError` on non-zero exit,
+    :class:`FileNotFoundError` if ``gh`` is not installed, or
+    :class:`json.JSONDecodeError` on unparseable output.
+    """
+    result = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "list",
+            "--state",
+            state,
+            "--json",
+            fields,
+            "--limit",
+            str(limit),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=str(repo_root) if repo_root is not None else None,
+    )
+    return list(json.loads(result.stdout))
+
+
+def gh_pr_view_json(
+    pr_number: int,
+    fields: str,
+    repo_root: Path | None = None,
+) -> dict[str, Any] | None:
+    """Run ``gh pr view {pr_number} --json {fields}`` and return parsed JSON.
+
+    Returns ``None`` on any error (gh not installed, non-zero exit, parse
+    failure) so callers can treat missing data as an empty result.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "gh",
+                "pr",
+                "view",
+                str(pr_number),
+                "--json",
+                fields,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=str(repo_root) if repo_root is not None else None,
+        )
+        return dict(json.loads(result.stdout))
+    except (FileNotFoundError, subprocess.CalledProcessError, json.JSONDecodeError):
+        return None

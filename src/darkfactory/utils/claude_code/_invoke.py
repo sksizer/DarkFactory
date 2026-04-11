@@ -41,7 +41,7 @@ from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .utils.claude_code import EffortLevel
+from ._interactive import EffortLevel
 
 if TYPE_CHECKING:
     from darkfactory.event_log import EventWriter

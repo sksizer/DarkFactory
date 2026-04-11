@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import subprocess
 from datetime import date
@@ -12,29 +11,21 @@ from typing import Any
 
 from darkfactory.cli._shared import _find_repo_root
 from darkfactory.utils.git import git_check, git_run
+from darkfactory.utils.github.pull_request import create_pull_request_inline, list_prs
 from darkfactory.prd import update_frontmatter_field_at
 
 
-def _get_merged_prd_prs() -> list[dict[str, Any]]:
+def _get_merged_prd_prs(repo_root: Path | None = None) -> list[dict[str, Any]]:
     """Return merged PRs whose head branch matches ``prd/PRD-*``."""
-    result = subprocess.run(
-        [
-            "gh",
-            "pr",
-            "list",
-            "--state",
+    try:
+        prs = list_prs(
             "merged",
-            "--json",
             "headRefName,mergedAt,mergeCommit,number",
-            "--limit",
-            "200",
-        ],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        raise SystemExit(f"gh pr list failed: {result.stderr.strip()}")
-    prs: list[dict[str, Any]] = json.loads(result.stdout)
+            limit=200,
+            repo_root=repo_root,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit(f"gh pr list failed: {exc.stderr.strip()}")
     return [pr for pr in prs if re.match(r"^prd/PRD-", pr["headRefName"])]
 
 
@@ -123,26 +114,20 @@ def _create_reconcile_pr(
     msg = _build_reconcile_commit_msg(candidates)
     git_run("commit", "-m", msg, cwd=repo_root)
     git_run("push", "-u", "origin", branch, cwd=repo_root)
-    subprocess.run(
-        [
-            "gh",
-            "pr",
-            "create",
-            "--title",
-            msg,
-            "--body",
-            "Auto-reconciled by `prd reconcile`",
-        ],
-        check=True,
+    create_pull_request_inline(
+        title=msg,
+        body="Auto-reconciled by `prd reconcile`",
+        cwd=repo_root,
     )
 
 
 def cmd_reconcile(args: argparse.Namespace) -> int:
     """Find merged-but-not-flipped PRDs and reconcile their status."""
     prd_dir = args.prd_dir
+    repo_root = _find_repo_root(prd_dir)
 
     # 1. Get merged PRs with prd/* branches.
-    merged_prs = _get_merged_prd_prs()
+    merged_prs = _get_merged_prd_prs(repo_root)
 
     # 2. Find corresponding PRD files still in 'review'.
     candidates: list[tuple[Path, dict[str, Any]]] = []
@@ -158,7 +143,6 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
         return 0
 
     # 2b. Verify merge commits are reachable from HEAD.
-    repo_root = _find_repo_root(prd_dir)
     verified: list[tuple[Path, dict[str, Any]]] = []
     clobbered: list[tuple[Path, dict[str, Any]]] = []
     for prd_file, pr in candidates:
