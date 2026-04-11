@@ -81,7 +81,7 @@ Agents create, modify, and delete files using `Edit` and `Write` tools. They hav
 Agents can execute allowlisted commands via `Bash`. Tool allowlists use glob patterns to control what commands are available:
 
 ```python
-allowed_tools=["Bash(pytest:*)", "Bash(cargo:*)", "Bash(npm:*)"]
+tools=["Bash(pytest:*)", "Bash(cargo:*)", "Bash(npm:*)"]
 ```
 
 The agent can run tests and build commands to verify its own work before the harness performs its independent verification.

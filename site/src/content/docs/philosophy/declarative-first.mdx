@@ -25,11 +25,11 @@ workflow = Workflow(
     tasks=PRD_IMPLEMENTATION_TEMPLATE.compose(
         implement=AgentTask(
             name="implement",
-            prompt_file="implement.md",
+            prompts=["implement.md"],
         ),
         verify=[
-            ShellTask(name="test", command="pytest tests/ -x", on_failure="fail"),
-            ShellTask(name="lint", command="ruff check .", on_failure="retry_agent"),
+            ShellTask(name="test", cmd="pytest tests/ -x", on_failure="fail"),
+            ShellTask(name="lint", cmd="ruff check .", on_failure="retry_agent"),
         ],
     ),
 )
@@ -99,7 +99,7 @@ Workflows are dataclasses. You can assert on their structure in unit tests witho
 ```python
 def test_workflow_has_test_step():
     assert any(
-        isinstance(t, ShellTask) and "pytest" in t.command
+        isinstance(t, ShellTask) and "pytest" in t.cmd
         for t in workflow.tasks
     )
 

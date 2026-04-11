@@ -2,7 +2,7 @@
 id: PRD-602
 title: Documentation site accuracy overhaul
 kind: task
-status: in-progress
+status: review
 priority: medium
 effort: m
 capability: moderate

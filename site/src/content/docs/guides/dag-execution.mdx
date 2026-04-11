@@ -80,7 +80,7 @@ The harness re-loads PRDs from disk between each execution run. This is critical
 5. Execution continues with the newly created PRDs
 </Steps>
 
-This enables recursive decomposition: an epic can be broken into features, features into tasks, and tasks executed, all in a single `prd execute` invocation.
+This enables recursive decomposition: an epic can be broken into features, features into tasks, and tasks executed, all in a single `prd run --execute` invocation.
 
 ## Execution Strategies
 
@@ -91,14 +91,14 @@ DarkFactory supports two DAG walk strategies:
 Used when you target a specific PRD or epic. Computes `graph_scope()` from the root, then walks `actionable_order()`.
 
 ```bash frame="terminal" title="Rooted execution"
-prd execute PRD-010 --max-runs 5
+prd run PRD-010 --execute --max-runs 5
 ```
 </TabItem>
 <TabItem label="QueueStrategy">
 Used for drain-ready-queue mode. Calls `discover_ready_queue()` to find all `ready` PRDs across the entire project, regardless of parent hierarchy.
 
 ```bash frame="terminal" title="Queue execution"
-prd execute --queue --max-runs 10
+prd run --all --execute --max-runs 10
 ```
 </TabItem>
 </Tabs>
@@ -152,7 +152,7 @@ PRD-556 (epic)
 Start execution with a budget of 3 runs:
 
 ```bash frame="terminal" title="Launch the epic"
-prd execute PRD-556 --max-runs 3
+prd run PRD-556 --execute --max-runs 3
 ```
 
 ```bash frame="terminal" title="Run 1 output"
@@ -186,7 +186,7 @@ gh pr merge --squash prd/556.5-extract-status
 Fix the failing task (edit the PRD or the generated code), reset its status to `ready`, and continue:
 
 ```bash frame="terminal" title="Resume execution"
-prd execute PRD-556 --max-runs 3
+prd run PRD-556 --execute --max-runs 3
 ```
 
 ```bash frame="terminal" title="Run 2 output"

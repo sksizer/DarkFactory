@@ -35,7 +35,7 @@ Let the agent create, modify, rename, and delete files in its worktree. These ar
 # Good: broad tool access for implementation
 AgentTask(
     name="implement",
-    allowed_tools=["Read", "Edit", "Write", "Glob", "Grep", "Bash(cargo:*)"],
+    tools=["Read", "Edit", "Write", "Glob", "Grep", "Bash(cargo:*)"],
 )
 ```
 
@@ -56,10 +56,10 @@ Post-agent verification runs as ShellTasks -- deterministic, harness-controlled 
 
 ```python
 tasks=[
-    AgentTask(name="implement", prompt_file="implement.md"),
-    ShellTask(name="test", command="pytest tests/ -x", on_failure="fail"),
-    ShellTask(name="lint", command="ruff check .", on_failure="retry_agent"),
-    ShellTask(name="typecheck", command="mypy src/", on_failure="fail"),
+    AgentTask(name="implement", prompts=["implement.md"]),
+    ShellTask(name="test", cmd="pytest tests/ -x", on_failure="fail"),
+    ShellTask(name="lint", cmd="ruff check .", on_failure="retry_agent"),
+    ShellTask(name="typecheck", cmd="mypy src/", on_failure="fail"),
 ]
 ```
 

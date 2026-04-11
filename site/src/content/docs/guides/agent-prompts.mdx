@@ -20,7 +20,7 @@ Prompt files are relative to the workflow directory's `prompts/` subdirectory:
       verify.md         ← referenced as "verify.md"
 ```
 
-When an `AgentTask` specifies `prompt_file="implement.md"`, the harness resolves it to `<workflow_dir>/prompts/implement.md`.
+When an `AgentTask` specifies `prompts=["implement.md"]`, the harness resolves it to `<workflow_dir>/prompts/implement.md`.
 
 ## Placeholder Substitution
 
@@ -52,8 +52,8 @@ You are implementing \{{PRD_ID}}. The full specification is below.
 - Follow the project's existing code style and naming conventions
 
 ## When Complete
-Print the sentinel: PRD_EXECUTE_OK
-If you cannot complete the work, print: PRD_EXECUTE_FAILED
+Print the sentinel: `PRD_EXECUTE_OK: <summary>`
+If you cannot complete the work, print: `PRD_EXECUTE_FAILED: <reason>`
 ```
 
 ## Tool Allowlists
@@ -63,8 +63,8 @@ Each `AgentTask` can restrict which tools the agent may use. The allowlist is a 
 ```python
 AgentTask(
     name="implement",
-    prompt_file="implement.md",
-    allowed_tools=[
+    prompts=["implement.md"],
+    tools=[
         "Read",
         "Edit",
         "Write",
@@ -85,7 +85,7 @@ The tool allowlist is enforced by the harness, not by the agent itself. An agent
 <Tabs>
 <TabItem label="Python Project">
 ```python
-allowed_tools=[
+tools=[
     "Read", "Edit", "Write", "Glob", "Grep",
     "Bash(python:*)",
     "Bash(pytest:*)",
@@ -97,7 +97,7 @@ allowed_tools=[
 </TabItem>
 <TabItem label="Rust Project">
 ```python
-allowed_tools=[
+tools=[
     "Read", "Edit", "Write", "Glob", "Grep",
     "Bash(cargo:*)",
     "Bash(rustfmt:*)",
@@ -106,7 +106,7 @@ allowed_tools=[
 </TabItem>
 <TabItem label="Node.js Project">
 ```python
-allowed_tools=[
+tools=[
     "Read", "Edit", "Write", "Glob", "Grep",
     "Bash(npm:*)",
     "Bash(npx:*)",
@@ -118,21 +118,20 @@ allowed_tools=[
 
 ## Sentinel Contract
 
-The harness determines whether an agent task succeeded by scanning the agent's output for sentinel strings:
+The harness determines whether an agent task succeeded by scanning the agent's **final line** for sentinel strings:
 
 | Sentinel | Meaning |
 |----------|---------|
-| `PRD_EXECUTE_OK` | Agent completed the task successfully |
-| `PRD_EXECUTE_FAILED` | Agent could not complete the task |
+| `PRD_EXECUTE_OK: <summary>` | Agent completed the task successfully |
+| `PRD_EXECUTE_FAILED: <reason>` | Agent could not complete the task |
 
-The sentinel must appear as a standalone line in the agent's output. If neither sentinel is found, the harness treats the task as failed.
+The colon is required. If neither sentinel is found on the final line, the harness treats the task as failed.
 
 ```markdown
 ## When You Are Done
 After making all changes and verifying they work:
-- If everything is complete, print exactly: PRD_EXECUTE_OK
-- If you hit a blocker you cannot resolve, print: PRD_EXECUTE_FAILED
-  followed by a description of the blocker on the next line.
+- If everything is complete, emit as your final line: PRD_EXECUTE_OK: <short summary>
+- If you hit a blocker you cannot resolve, emit as your final line: PRD_EXECUTE_FAILED: <reason>
 ```
 
 <Aside type="tip">
@@ -155,7 +154,7 @@ The previous implementation attempt for \{{PRD_ID}} failed verification.
 Analyze the failure output above and fix the issues.
 Do not start from scratch -- modify the existing implementation.
 
-When fixed, print: PRD_EXECUTE_OK
+When fixed, emit as your final line: `PRD_EXECUTE_OK: <summary>`
 ```
 
 Place verify prompts alongside implementation prompts in your `prompts/` directory and reference them in the AgentTask:
@@ -163,7 +162,7 @@ Place verify prompts alongside implementation prompts in your `prompts/` directo
 ```python
 AgentTask(
     name="implement",
-    prompt_file="implement.md",
+    prompts=["implement.md"],
     verify_prompts=["fix-verification.md"],
 )
 ```

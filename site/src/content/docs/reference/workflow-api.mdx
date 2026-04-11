@@ -15,19 +15,23 @@ The top-level container. Exported as the `workflow` attribute from a workflow mo
 @dataclass
 class Workflow:
     name: str
-    description: str
-    priority: int
-    applies_to: Callable[[PRD, list[PRD]], bool]
-    tasks: list[Task]
+    description: str = ""
+    applies_to: AppliesToPredicate = _default_applies_to
+    priority: int = 0
+    tasks: list[Task] = field(default_factory=list)
+    workflow_dir: Path | None = None
+    template_name: str | None = None
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `name` | `str` | Required | Unique workflow identifier. Used in CLI output and event logs. |
-| `description` | `str` | Required | Human-readable description. Shown by `prd plan`. |
-| `priority` | `int` | Required | Matching priority. Higher values take precedence. Built-ins use 0-5. |
-| `applies_to` | `Callable[[PRD, list[PRD]], bool]` | Required | Predicate function. Receives the candidate PRD and all PRDs in the project. |
-| `tasks` | `list[Task]` | Required | Ordered task sequence. Executed sequentially by the runner. |
+| `description` | `str` | `""` | Human-readable description. Shown by `prd plan`. |
+| `applies_to` | `Callable[[PRD, dict[str, PRD]], bool]` | matches nothing | Predicate function. Receives the candidate PRD and all PRDs as a dict. |
+| `priority` | `int` | `0` | Matching priority. Higher values take precedence. Built-ins use 0-5. |
+| `tasks` | `list[Task]` | `[]` | Ordered task sequence. Executed sequentially by the runner. |
+| `workflow_dir` | `Path \| None` | `None` | Set by the loader to the workflow's directory. AgentTask prompt paths resolve relative to this. |
+| `template_name` | `str \| None` | `None` | Template name if this workflow was composed from a `WorkflowTemplate`. |
 
 ## Task Types
 
@@ -51,30 +55,36 @@ class BuiltIn(Task):
 
 ### `AgentTask`
 
-Invokes an LLM agent with a prompt file and scoped tool access.
+Invokes an LLM agent with composed prompts and a scoped tool allowlist.
 
 ```python
 @dataclass
 class AgentTask(Task):
-    name: str
-    prompt_file: str
-    allowed_tools: list[str] = field(default_factory=list)
-    verify_prompts: list[str] = field(default_factory=list)
+    name: str = "implement"
+    prompts: list[str] = field(default_factory=list)
+    tools: list[str] = field(default_factory=list)
     model: str | None = None
-    max_tokens: int = 16384
+    model_from_capability: bool = True
+    retries: int = 1
+    verify_prompts: list[str] = field(default_factory=list)
+    sentinel_success: str = "PRD_EXECUTE_OK"
+    sentinel_failure: str = "PRD_EXECUTE_FAILED"
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `name` | `str` | Required | Task identifier. Used in event logs and CLI output. |
-| `prompt_file` | `str` | Required | Path to prompt template, relative to `<workflow_dir>/prompts/`. |
-| `allowed_tools` | `list[str]` | `[]` | Tool allowlist. Supports glob patterns for Bash subcommands (e.g., `"Bash(cargo:*)"`). Empty list means all tools allowed. |
-| `verify_prompts` | `list[str]` | `[]` | Prompt files used during `retry_agent` re-invocation. Receive `\{{CHECK_OUTPUT}}` placeholder. |
-| `model` | `str \| None` | `None` | Model override. If `None`, uses the config model for the PRD's effort level. |
-| `max_tokens` | `int` | `16384` | Maximum output tokens for the agent response. |
+| `name` | `str` | `"implement"` | Task identifier. Used in event logs and CLI output. |
+| `prompts` | `list[str]` | `[]` | Paths to prompt template files, relative to `workflow_dir`. Concatenated in order. |
+| `tools` | `list[str]` | `[]` | Tool allowlist passed to `--allowed-tools`. Supports glob patterns (e.g., `"Bash(cargo:*)"`). Empty list means all tools allowed. |
+| `model` | `str \| None` | `None` | Explicit model override. Takes precedence over capability mapping. |
+| `model_from_capability` | `bool` | `True` | When `True` and `model` is `None`, selects model from the PRD's `capability` field. |
+| `retries` | `int` | `1` | Maximum retry attempts when a `ShellTask` triggers `retry_agent`. |
+| `verify_prompts` | `list[str]` | `[]` | Prompt files used during `retry_agent` re-invocation. Receive `{CHECK_OUTPUT}` bound to failure output. |
+| `sentinel_success` | `str` | `"PRD_EXECUTE_OK"` | String the agent must emit to signal success. |
+| `sentinel_failure` | `str` | `"PRD_EXECUTE_FAILED"` | String the agent emits to signal failure. |
 
 <Aside type="caution">
-An empty `allowed_tools` list means ALL tools are available, not zero tools. To restrict tool access, explicitly list the permitted tools.
+An empty `tools` list means ALL tools are available, not zero tools. To restrict tool access, explicitly list the permitted tools.
 </Aside>
 
 ### `ShellTask`
@@ -85,53 +95,61 @@ Runs a shell command in the worktree.
 @dataclass
 class ShellTask(Task):
     name: str
-    command: str
-    on_failure: str = "fail"
-    timeout: int | None = None
+    cmd: str
+    on_failure: OnFailure = "fail"
+    env: dict[str, str] = field(default_factory=dict)
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `name` | `str` | Required | Task identifier. Used in event logs and CLI output. |
-| `command` | `str` | Required | Shell command to execute. Supports `\{{PLACEHOLDER}}` substitution. Runs via `subprocess.run(shell=True)`. |
+| `cmd` | `str` | Required | Shell command to execute. Supports `{placeholder}` substitution from `ExecutionContext`. |
 | `on_failure` | `str` | `"fail"` | Failure policy: `"fail"` (abort), `"retry_agent"` (re-invoke last AgentTask with verify prompts), `"ignore"` (log and continue). |
-| `timeout` | `int \| None` | `None` | Command timeout in seconds. If `None`, uses the PRD's effort-based timeout. |
+| `env` | `dict[str, str]` | `{}` | Environment variable overrides merged into the subprocess environment. |
 
 ## `ExecutionContext`
 
-Passed to every task at runtime. Provides access to PRD metadata, project configuration, and the worktree environment.
+Passed to every task at runtime. State is mutated in place as the workflow progresses.
 
 ```python
 @dataclass
 class ExecutionContext:
     prd: PRD
-    project_root: Path
-    worktree_path: Path
-    branch: str
-    base_branch: str
-    config: Config
-    dry_run: bool
-    session_id: str
-    event_writer: EventWriter
-    agent_response: str | None = None
+    repo_root: Path
+    workflow: Workflow
+    base_ref: str
+    branch_name: str
+    worktree_path: Path | None = None
+    cwd: Path = field(default_factory=Path.cwd)
+    agent_output: str | None = None
+    agent_success: bool = False
+    pr_url: str | None = None
+    model: str | None = None
+    invoke_count: int = 0
+    dry_run: bool = True
+    event_writer: EventWriter | None = None
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `prd` | `PRD` | The parsed PRD with frontmatter and body. |
-| `project_root` | `Path` | Absolute path to the repository root. |
-| `worktree_path` | `Path` | Absolute path to the PRD's worktree directory. |
-| `branch` | `str` | Git branch name for this PRD (e.g., `prd/042-add-retry-logic`). |
-| `base_branch` | `str` | Base branch the worktree was created from. |
-| `config` | `Config` | Parsed `.darkfactory/config.toml` with defaults applied. |
-| `dry_run` | `bool` | `True` if `--execute` was not passed. Tasks should print but not act. |
-| `session_id` | `str` | Unique session identifier. Shared across all PRDs in a DAG run. |
-| `event_writer` | `EventWriter` | Handle for emitting JSONL events. |
-| `agent_response` | `str \| None` | The most recent agent's output. Populated after each AgentTask completes. |
+| `repo_root` | `Path` | Absolute path to the repository root. |
+| `workflow` | `Workflow` | The executing workflow object. |
+| `base_ref` | `str` | Base branch the worktree was created from (e.g., `main`). |
+| `branch_name` | `str` | Git branch name for this PRD (e.g., `prd/PRD-042-add-retry-logic`). |
+| `worktree_path` | `Path \| None` | Absolute path to the PRD's worktree. Set by `ensure_worktree`. |
+| `cwd` | `Path` | Current working directory for shell tasks. Set to `worktree_path` by `ensure_worktree`. |
+| `agent_output` | `str \| None` | Captured stdout from the last agent invocation. |
+| `agent_success` | `bool` | Whether the last agent emitted the success sentinel. |
+| `pr_url` | `str \| None` | URL of the opened PR. Set by `create_pr`. |
+| `model` | `str \| None` | Resolved model name. |
+| `invoke_count` | `int` | Number of agent invocations so far. |
+| `dry_run` | `bool` | `True` if `--execute` was not passed. Tasks print but do not act. |
+| `event_writer` | `EventWriter \| None` | Handle for emitting JSONL events. |
 
 ## `PRD_IMPLEMENTATION_TEMPLATE`
 
-A helper that wraps custom tasks in the standard open/close envelope.
+A `WorkflowTemplate` that wraps custom tasks in the standard open/close envelope.
 
 ```python
 PRD_IMPLEMENTATION_TEMPLATE.compose(
@@ -140,18 +158,26 @@ PRD_IMPLEMENTATION_TEMPLATE.compose(
 ) -> list[Task]
 ```
 
-Returns the full task list:
+Returns the full task list (open + your middle tasks + close):
 
 ```python
 [
-    BuiltIn(name="ensure_worktree"),
-    BuiltIn(name="set_status", kwargs={"status": "in-progress"}),
-    implement,                    # Your AgentTask
-    *verify,                      # Your ShellTasks
-    BuiltIn(name="commit"),
-    BuiltIn(name="push_branch"),
-    BuiltIn(name="create_pr"),
-    BuiltIn(name="cleanup_worktree"),
+    # open
+    BuiltIn("ensure_worktree"),
+    BuiltIn("set_status", kwargs={"to": "in-progress"}),
+    BuiltIn("commit", kwargs={"message": "chore(prd): {prd_id} start work"}),
+    # middle (your tasks)
+    implement,
+    *verify,
+    # close
+    BuiltIn("set_status", kwargs={"to": "review"}),
+    BuiltIn("commit_events"),
+    BuiltIn("analyze_transcript"),
+    BuiltIn("commit", kwargs={"message": "chore(prd): {prd_id} ready for review"}),
+    BuiltIn("summarize_agent_run"),
+    BuiltIn("lint_attribution"),
+    BuiltIn("push_branch"),
+    BuiltIn("create_pr"),
 ]
 ```
 
@@ -160,8 +186,8 @@ Returns the full task list:
 ```python
 from darkfactory.workflow import (
     Workflow, AgentTask, ShellTask, BuiltIn,
-    PRD_IMPLEMENTATION_TEMPLATE,
 )
+from darkfactory.templates_builtin import PRD_IMPLEMENTATION_TEMPLATE
 
 workflow = Workflow(
     name="python-library",
@@ -174,17 +200,17 @@ workflow = Workflow(
     tasks=PRD_IMPLEMENTATION_TEMPLATE.compose(
         implement=AgentTask(
             name="implement",
-            prompt_file="implement.md",
-            allowed_tools=[
+            prompts=["implement.md"],
+            tools=[
                 "Read", "Edit", "Write", "Glob", "Grep",
                 "Bash(python:*)", "Bash(pytest:*)", "Bash(mypy:*)",
             ],
             verify_prompts=["fix-errors.md"],
         ),
         verify=[
-            ShellTask(name="typecheck", command="mypy src/", on_failure="retry_agent"),
-            ShellTask(name="lint", command="ruff check . --fix", on_failure="retry_agent"),
-            ShellTask(name="test", command="pytest tests/ -x", on_failure="fail"),
+            ShellTask(name="typecheck", cmd="mypy src/", on_failure="retry_agent"),
+            ShellTask(name="lint", cmd="ruff check . --fix", on_failure="retry_agent"),
+            ShellTask(name="test", cmd="pytest tests/ -x", on_failure="fail"),
         ],
     ),
 )

@@ -23,14 +23,14 @@ The agent receives the full PRD body, role prompts, and task prompts as a single
 
 ## Sentinel Contract
 
-The agent must emit exactly one of these strings to signal completion:
+The agent must emit exactly one of these strings as its **final line** to signal completion:
 
 ```
-PRD_EXECUTE_OK        # success -- work is done
-PRD_EXECUTE_FAILED    # failure -- agent could not complete the task
+PRD_EXECUTE_OK: <short summary>        # success -- work is done
+PRD_EXECUTE_FAILED: <reason>           # failure -- agent could not complete the task
 ```
 
-The harness parses the last line of agent stdout to determine success. If neither sentinel is found, the invocation is treated as a failure.
+The colon suffix is required. The harness scans the last line of agent stdout for the sentinel prefix. If neither sentinel is found, the invocation is treated as a failure.
 
 ## Model Selection
 
@@ -147,7 +147,7 @@ capability: moderate
 Result: the agent runs with `sonnet`.
 
 ```bash frame="terminal" title="Default resolution"
-prd execute PRD-312
+prd run PRD-312 --execute
 ```
 
 ```bash frame="terminal" title="Harness log"
@@ -158,7 +158,7 @@ prd execute PRD-312
 **Override from the CLI**: force `opus` regardless of capability mapping.
 
 ```bash frame="terminal" title="CLI override"
-prd execute PRD-312 --model opus
+prd run PRD-312 --execute --model opus
 ```
 
 ```bash frame="terminal" title="Harness log with override"
@@ -171,7 +171,7 @@ prd execute PRD-312 --model opus
 ```python
 AgentTask(
     name="implement",
-    prompt_file="implement.md",
+    prompts=["implement.md"],
     model="opus",  # always use opus for this task
 )
 ```

@@ -47,14 +47,14 @@ The happy path flows left to right: **draft** to **ready** to **in-progress** to
     Set by `set_status` builtin at workflow start. Occurs when the scheduler dispatches a PRD for execution.
 
     ```python
-    BuiltIn(name="set_status", kwargs={"status": "in-progress"})
+    BuiltIn(name="set_status", kwargs={"to": "in-progress"})
     ```
 
     **in-progress -> review**
     Set by `set_status` builtin after the agent finishes and the PR is opened.
 
     ```python
-    BuiltIn(name="set_status", kwargs={"status": "review"})
+    BuiltIn(name="set_status", kwargs={"to": "review"})
     ```
 
     **review -> done**

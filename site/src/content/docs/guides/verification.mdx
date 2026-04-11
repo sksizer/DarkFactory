@@ -94,8 +94,8 @@ The most common pattern. Run the test suite after implementation and fail if any
 
 ```python
 tasks=[
-    AgentTask(name="implement", prompt_file="implement.md"),
-    ShellTask(name="test", command="pytest tests/ -x", on_failure="fail"),
+    AgentTask(name="implement", prompts=["implement.md"]),
+    ShellTask(name="test", cmd="pytest tests/ -x", on_failure="fail"),
 ]
 ```
 
@@ -107,11 +107,11 @@ Let the agent fix lint issues automatically before failing.
 tasks=[
     AgentTask(
         name="implement",
-        prompt_file="implement.md",
+        prompts=["implement.md"],
         verify_prompts=["fix-lint.md"],
     ),
-    ShellTask(name="lint", command="ruff check .", on_failure="retry_agent"),
-    ShellTask(name="test", command="pytest tests/", on_failure="fail"),
+    ShellTask(name="lint", cmd="ruff check .", on_failure="retry_agent"),
+    ShellTask(name="test", cmd="pytest tests/", on_failure="fail"),
 ]
 ```
 
@@ -121,11 +121,11 @@ Run increasingly strict checks, failing fast on the cheapest ones.
 
 ```python
 tasks=[
-    AgentTask(name="implement", prompt_file="implement.md"),
-    ShellTask(name="typecheck", command="mypy src/", on_failure="fail"),
-    ShellTask(name="lint", command="ruff check .", on_failure="retry_agent"),
-    ShellTask(name="unit-test", command="pytest tests/unit/", on_failure="fail"),
-    ShellTask(name="integration", command="pytest tests/integration/", on_failure="fail"),
+    AgentTask(name="implement", prompts=["implement.md"]),
+    ShellTask(name="typecheck", cmd="mypy src/", on_failure="fail"),
+    ShellTask(name="lint", cmd="ruff check .", on_failure="retry_agent"),
+    ShellTask(name="unit-test", cmd="pytest tests/unit/", on_failure="fail"),
+    ShellTask(name="integration", cmd="pytest tests/integration/", on_failure="fail"),
 ]
 ```
 
@@ -139,10 +139,10 @@ Collect signal without blocking.
 
 ```python
 tasks=[
-    AgentTask(name="implement", prompt_file="implement.md"),
-    ShellTask(name="test", command="pytest tests/", on_failure="fail"),
-    ShellTask(name="coverage", command="coverage report --fail-under=80", on_failure="ignore"),
-    ShellTask(name="benchmark", command="python bench.py --compare main", on_failure="ignore"),
+    AgentTask(name="implement", prompts=["implement.md"]),
+    ShellTask(name="test", cmd="pytest tests/", on_failure="fail"),
+    ShellTask(name="coverage", cmd="coverage report --fail-under=80", on_failure="ignore"),
+    ShellTask(name="benchmark", cmd="python bench.py --compare main", on_failure="ignore"),
 ]
 ```
 
@@ -158,10 +158,10 @@ A step-by-step trace of what happens when an agent's implementation fails verifi
 tasks=[
     AgentTask(
         name="implement",
-        prompt_file="implement.md",
+        prompts=["implement.md"],
         verify_prompts=["verify.md"],
     ),
-    ShellTask(name="test", command="just test", on_failure="retry_agent"),
+    ShellTask(name="test", cmd="just test", on_failure="retry_agent"),
 ]
 ```
 
@@ -171,7 +171,7 @@ tasks=[
 [PRD-312] AgentTask 'implement' started
 [PRD-312] Agent writing src/http/client.rs ... done
 [PRD-312] Agent writing tests/http/timeout_test.rs ... done
-[PRD-312] Agent stdout last line: PRD_EXECUTE_OK
+[PRD-312] Agent stdout last line: PRD_EXECUTE_OK: implemented request timeout
 [PRD-312] AgentTask 'implement' completed (87s)
 ```
 
@@ -212,7 +212,7 @@ test result: FAILED. 12 passed; 2 failed; 0 ignored
 The agent receives a prompt like:
 
 ```
-The verification step failed. Fix the issues and re-emit PRD_EXECUTE_OK.
+The verification step failed. Fix the issues and re-emit `PRD_EXECUTE_OK: <summary>` as your final line.
 
 Failure output:
 thread 'test_timeout_fires' panicked at 'assertion failed: elapsed >= Duration::from_millis(500)',
@@ -226,7 +226,7 @@ test result: FAILED. 12 passed; 2 failed; 0 ignored
 
 ```bash frame="terminal" title="Agent fixes the issues"
 [PRD-312] Agent editing src/http/client.rs (fixed timeout comparison, added zero-check)
-[PRD-312] Agent stdout last line: PRD_EXECUTE_OK
+[PRD-312] Agent stdout last line: PRD_EXECUTE_OK: implemented request timeout
 [PRD-312] AgentTask 'implement' retry completed (34s)
 ```
 
