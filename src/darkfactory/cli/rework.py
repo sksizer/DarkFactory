@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 import argparse
-import json
-import subprocess
-from pathlib import Path
-from typing import Any
 
 from darkfactory.event_log import generate_session_id
 from darkfactory.loader import load_workflows
-from darkfactory.pr_comments import CommentFilters, fetch_pr_comments
-from darkfactory.rework_guard import ReworkGuard
-from darkfactory.runner import _compute_branch_name, run_workflow
-from darkfactory.worktree_utils import find_worktree_for_prd
+from darkfactory.pr_comments import CommentFilters
+from darkfactory.rework_context import (
+    ReworkContext,
+    ReworkError,
+    discover_rework_context,
+)
+from darkfactory.runner import run_workflow
 
 from darkfactory.cli._shared import (
     _find_repo_root,
@@ -23,96 +22,55 @@ from darkfactory.cli._shared import (
 )
 
 
-def find_worktree(prd_id: str, repo_root: Path) -> Path | None:
-    """Find the worktree path for the given PRD id.
-
-    Delegates to :func:`~darkfactory.worktree_utils.find_worktree_for_prd`.
-    Kept for backward compatibility with any callers outside this module.
-    """
-    return find_worktree_for_prd(prd_id, repo_root)
-
-
-def find_open_pr(branch_name: str, repo_root: Path) -> int | None:
-    """Find the PR number for an open PR on the given branch."""
-    try:
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "list",
-                "--head",
-                branch_name,
-                "--state",
-                "open",
-                "--json",
-                "number",
-            ],
-            capture_output=True,
-            text=True,
-            cwd=repo_root,
-        )
-        if result.returncode != 0:
-            return None
-        prs: list[dict[str, Any]] = json.loads(result.stdout)
-        if prs:
-            return int(prs[0]["number"])
-    except (FileNotFoundError, json.JSONDecodeError, ValueError):
-        pass
-    return None
-
-
 def cmd_rework(args: argparse.Namespace) -> int:
-    """Rework a PRD by addressing PR review feedback."""
+    """Rework a PRD by addressing PR review feedback.
+
+    Resolves the PRD, checks it's in ``review``, then delegates all
+    worktree/PR/guard/comment discovery to
+    :func:`~darkfactory.rework_context.discover_rework_context`. That
+    same discovery module is what the ``resolve_rework_context``
+    builtin calls when the workflow runs outside the CLI, so the two
+    paths cannot drift apart.
+
+    Without ``--execute``, prints a dry-run summary and exits.
+    With ``--execute`` and any unresolved threads, invokes the rework
+    workflow, seeding the ExecutionContext with the already-discovered
+    state via ``context_overrides`` so the builtin at position 0 is a
+    no-op and the workflow proceeds directly to fast-forward/rebase.
+    """
     prds = _load(args.prd_dir)
-    prd_id = args.prd_id
-    prd = _resolve_prd_or_exit(prd_id, prds)
+    prd = _resolve_prd_or_exit(args.prd_id, prds)
 
     if prd.status != "review":
-        raise SystemExit(f"ERROR: {prd_id} is in '{prd.status}', not 'review'")
+        raise SystemExit(f"ERROR: {prd.id} is in '{prd.status}', not 'review'")
 
     repo_root = _find_repo_root(args.prd_dir)
 
-    worktree_path = find_worktree(prd_id, repo_root)
-    if worktree_path is None:
-        raise SystemExit(
-            f"ERROR: No worktree found for {prd_id}. Run 'prd run {prd_id}' first."
-        )
-
-    branch_name = _compute_branch_name(prd)
-    pr_number = find_open_pr(branch_name, repo_root)
-    if pr_number is None:
-        raise SystemExit(f"ERROR: No open PR found for {prd_id}")
-
-    if not args.execute:
-        print(f"Would rework {prd_id}")
-        print(f"  Worktree: {worktree_path}")
-        print(f"  PR: #{pr_number}")
-        print(f"  Branch: {branch_name}")
-        return 0
-
-    # Refuse to run if the guard has blocked this PRD due to loop detection.
-    guard = ReworkGuard(repo_root)
-    if guard.is_blocked(prd_id):
-        raise SystemExit(
-            f"ERROR: {prd_id} is blocked by the rework loop guard after "
-            f"{guard.get_consecutive_no_change(prd_id)} consecutive no-change "
-            f"rework cycle(s). Manual intervention required: remove the entry "
-            f"from {guard.state_file} to unblock."
-        )
-
-    # Build comment filters from CLI args and fetch unresolved threads.
     filters = CommentFilters(
         include_resolved=args.all,
         since_commit=args.since,
         reviewer=args.reviewer,
         single_comment_id=args.from_pr_comment,
     )
-    threads = fetch_pr_comments(pr_number, filters=filters)
-    if not threads:
-        print(f"No unaddressed comments found for {prd_id}")
+
+    try:
+        discovered = discover_rework_context(
+            prd,
+            repo_root,
+            comment_filters=filters,
+            reply_to_comments=args.reply_to_comments,
+        )
+    except ReworkError as exc:
+        raise SystemExit(f"ERROR: {exc}") from exc
+
+    if not args.execute:
+        _print_dry_run_summary(prd.id, discovered)
         return 0
 
-    # Load the rework workflow from the built-in workflows directory.
+    if not discovered.review_threads:
+        print(f"No unaddressed comments found for {prd.id}")
+        return 0
+
     workflows = load_workflows()
     rework_wf = workflows.get("rework")
     if rework_wf is None:
@@ -127,9 +85,22 @@ def cmd_rework(args: argparse.Namespace) -> int:
         base_ref,
         dry_run=False,
         session_id=session,
-        initial_worktree_path=worktree_path,
-        initial_pr_number=pr_number,
-        initial_review_threads=threads,
-        initial_reply_to_comments=args.reply_to_comments,
+        context_overrides={
+            "worktree_path": discovered.worktree_path,
+            "cwd": discovered.worktree_path,
+            "pr_number": discovered.pr_number,
+            "review_threads": discovered.review_threads,
+            "comment_filters": discovered.comment_filters,
+            "reply_to_comments": discovered.reply_to_comments,
+        },
     )
     return 0 if result.success else 1
+
+
+def _print_dry_run_summary(prd_id: str, discovered: ReworkContext) -> None:
+    """Print the human-readable dry-run summary for ``prd rework PRD-X``."""
+    print(f"Would rework {prd_id}")
+    print(f"  Worktree: {discovered.worktree_path}")
+    print(f"  PR: #{discovered.pr_number}")
+    print(f"  Branch: {discovered.branch_name}")
+    print(f"  Comments: {len(discovered.review_threads)}")
