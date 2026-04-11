@@ -2,7 +2,7 @@
 id: PRD-615
 title: Codebase duplication cleanup sweep
 kind: feature
-status: ready
+status: in-progress
 priority: medium
 effort: m
 capability: moderate
@@ -54,7 +54,7 @@ impacts:
 workflow: task
 target_version:
 created: 2026-04-11
-updated: 2026-04-11
+updated: '2026-04-11'
 tags:
   - harness
   - quality
