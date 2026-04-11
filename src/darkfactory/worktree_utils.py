@@ -9,7 +9,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from darkfactory.git_ops import git_run
+from darkfactory.utils.git import git_run
 
 
 def find_worktree_for_prd(prd_id: str, repo_root: Path) -> Path | None:

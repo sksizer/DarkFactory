@@ -55,7 +55,7 @@ def test_find_worktree_for_prd_returns_none_when_not_found(tmp_path: Path) -> No
     worktrees_dir = tmp_path / ".worktrees"
     worktrees_dir.mkdir()
     (worktrees_dir / "PRD-2-other").mkdir()
-    with patch("darkfactory.checks._get_pr_state", return_value="MERGED"):
+    with patch("darkfactory.cli.cleanup.get_pr_state", return_value="MERGED"):
         result = _find_worktree_for_prd("PRD-1", tmp_path)
     assert result is None
 
@@ -65,7 +65,7 @@ def test_find_worktree_for_prd_finds_matching_entry(tmp_path: Path) -> None:
     worktrees_dir.mkdir()
     prd_dir = worktrees_dir / "PRD-1-my-feature"
     prd_dir.mkdir()
-    with patch("darkfactory.checks._get_pr_state", return_value="MERGED"):
+    with patch("darkfactory.cli.cleanup.get_pr_state", return_value="MERGED"):
         result = _find_worktree_for_prd("PRD-1", tmp_path)
     assert result is not None
     assert result.prd_id == "PRD-1"
@@ -243,7 +243,7 @@ def test_cleanup_all_aborts_on_no_confirm(tmp_path: Path) -> None:
     worktrees_dir.mkdir()
     (worktrees_dir / "PRD-1-feat").mkdir()
     with (
-        patch("darkfactory.checks._get_pr_state", return_value="MERGED"),
+        patch("darkfactory.cli.cleanup.get_pr_state", return_value="MERGED"),
         patch("builtins.input", return_value="n"),
     ):
         result = _cleanup_all(False, tmp_path)
@@ -256,7 +256,7 @@ def test_cleanup_all_removes_on_confirm(tmp_path: Path) -> None:
     (worktrees_dir / "PRD-1-feat").mkdir()
     safe_status = MagicMock(safe=True)
     with (
-        patch("darkfactory.checks._get_pr_state", return_value="MERGED"),
+        patch("darkfactory.cli.cleanup.get_pr_state", return_value="MERGED"),
         patch("builtins.input", return_value="y"),
         patch("darkfactory.cli.cleanup.is_safe_to_remove", return_value=safe_status),
         patch("darkfactory.cli.cleanup._remove_worktree") as mock_remove,

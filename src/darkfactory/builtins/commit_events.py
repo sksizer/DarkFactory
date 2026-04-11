@@ -8,7 +8,7 @@ import shutil
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.config import load_section
-from darkfactory.git_ops import git_run
+from darkfactory.utils.git import git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Callable
 
 from darkfactory import containment, prd as prd_module
-from darkfactory.git_ops import git_run
+from darkfactory.utils.git import git_run
 from darkfactory.prd import compute_branch_name
 from darkfactory.system import SystemContext
 

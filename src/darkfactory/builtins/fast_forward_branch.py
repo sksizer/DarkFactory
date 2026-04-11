@@ -13,7 +13,7 @@ from pathlib import Path
 
 from darkfactory.builtins._registry import builtin
 from darkfactory.event_log import emit_builtin_effect
-from darkfactory.git_ops import git_run
+from darkfactory.utils.git import git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)

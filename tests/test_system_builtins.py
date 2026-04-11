@@ -246,7 +246,7 @@ def test_system_check_merged_standard_merge(tmp_path: Path) -> None:
             return _make_completed(stdout="  prd/PRD-60-pi\n")
         return _make_completed(stdout="")
 
-    with patch("darkfactory.git_ops.subprocess.run", side_effect=fake_run):
+    with patch("darkfactory.utils.git._ops.subprocess.run", side_effect=fake_run):
         system_check_merged(ctx)
 
     assert "PRD-60" in ctx.targets
@@ -267,7 +267,7 @@ def test_system_check_merged_remote_standard_merge(tmp_path: Path) -> None:
             return _make_completed(stdout="  origin/prd/PRD-61-rho\n")
         return _make_completed(stdout="")
 
-    with patch("darkfactory.git_ops.subprocess.run", side_effect=fake_run):
+    with patch("darkfactory.utils.git._ops.subprocess.run", side_effect=fake_run):
         system_check_merged(ctx)
 
     assert "PRD-61" in ctx.targets
@@ -293,7 +293,7 @@ def test_system_check_merged_squash_merge(tmp_path: Path) -> None:
             return _make_completed(stdout="abc1234 Squash merge prd/PRD-70-sigma\n")
         return _make_completed(stdout="")
 
-    with patch("darkfactory.git_ops.subprocess.run", side_effect=fake_run):
+    with patch("darkfactory.utils.git._ops.subprocess.run", side_effect=fake_run):
         system_check_merged(ctx)
 
     assert "PRD-70" in ctx.targets
@@ -312,7 +312,7 @@ def test_system_check_merged_not_merged(tmp_path: Path) -> None:
     )
 
     with patch(
-        "darkfactory.git_ops.subprocess.run",
+        "darkfactory.utils.git._ops.subprocess.run",
         return_value=_make_completed(stdout=""),
     ):
         system_check_merged(ctx)
@@ -337,7 +337,7 @@ def test_system_check_merged_populates_targets_only_with_merged(tmp_path: Path) 
             return _make_completed(stdout="  prd/PRD-81-upsilon\n")
         return _make_completed(stdout="")
 
-    with patch("darkfactory.git_ops.subprocess.run", side_effect=fake_run):
+    with patch("darkfactory.utils.git._ops.subprocess.run", side_effect=fake_run):
         system_check_merged(ctx)
 
     assert ctx.targets == ["PRD-81"]
@@ -355,7 +355,7 @@ def test_system_check_merged_dry_run_no_subprocess(tmp_path: Path) -> None:
         shared_state={"candidates": ["PRD-90"]},
     )
 
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._ops.subprocess.run") as mock_run:
         system_check_merged(ctx)
 
     mock_run.assert_not_called()
@@ -384,7 +384,7 @@ def test_system_check_merged_dry_run_logs(
 def test_system_check_merged_missing_prd_skips(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, {}, shared_state={"candidates": ["PRD-999"]})
 
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._ops.subprocess.run") as mock_run:
         system_check_merged(ctx)
 
     mock_run.assert_not_called()

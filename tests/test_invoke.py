@@ -17,12 +17,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
-from darkfactory.invoke import (
+from darkfactory.utils.claude_code import (
+    capability_to_model,
+    invoke_claude,
+)
+from darkfactory.utils.claude_code._invoke import (
     CAPABILITY_MODELS,
     _find_terminal_result,
     _parse_sentinels,
-    capability_to_model,
-    invoke_claude,
 )
 
 

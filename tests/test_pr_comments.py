@@ -287,7 +287,7 @@ def test_filter_since_commit_excludes_older_comments() -> None:
     ]
     # Commit timestamp: 2026-04-07 — only the new thread should survive
     with patch(
-        "darkfactory.pr_comments._resolve_commit_timestamp",
+        "darkfactory.pr_comments.resolve_commit_timestamp",
         return_value="2026-04-07T00:00:00Z",
     ):
         result = _apply_filters(threads, CommentFilters(since_commit="abc123"))

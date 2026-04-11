@@ -49,7 +49,7 @@ def test_find_stale_worktrees_returns_merged(tmp_path: Path) -> None:
         "prd/PRD-002-another": "OPEN",
     }
 
-    with patch("darkfactory.checks._fetch_all_pr_states", return_value=fake_states):
+    with patch("darkfactory.checks.fetch_all_pr_states", return_value=fake_states):
         result = find_stale_worktrees(tmp_path)
 
     assert len(result) == 1
@@ -63,7 +63,7 @@ def test_find_stale_worktrees_returns_closed(tmp_path: Path) -> None:
     _make_worktree_dir(tmp_path, "PRD-003-closed-one")
 
     with patch(
-        "darkfactory.checks._fetch_all_pr_states",
+        "darkfactory.checks.fetch_all_pr_states",
         return_value={"prd/PRD-003-closed-one": "CLOSED"},
     ):
         result = find_stale_worktrees(tmp_path)
@@ -78,7 +78,7 @@ def test_find_stale_worktrees_skips_open(tmp_path: Path) -> None:
 
     fake_states = {"prd/PRD-005-open-one": "OPEN"}
 
-    with patch("darkfactory.checks._fetch_all_pr_states", return_value=fake_states):
+    with patch("darkfactory.checks.fetch_all_pr_states", return_value=fake_states):
         result = find_stale_worktrees(tmp_path)
 
     assert result == []
@@ -259,7 +259,7 @@ def test_cleanup_orphaned_branch_no_commits_force(
             return_value="prd/PRD-001-my-feature",
         ),
         patch("darkfactory.cli.cleanup._orphaned_branch_commit_count", return_value=0),
-        patch("darkfactory.git_ops.subprocess.run") as mock_run,
+        patch("darkfactory.utils.git._ops.subprocess.run") as mock_run,
     ):
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = ""
@@ -305,7 +305,7 @@ def test_cleanup_orphaned_branch_with_commits_force_succeeds(
             return_value="prd/PRD-001-my-feature",
         ),
         patch("darkfactory.cli.cleanup._orphaned_branch_commit_count", return_value=5),
-        patch("darkfactory.git_ops.subprocess.run") as mock_run,
+        patch("darkfactory.utils.git._ops.subprocess.run") as mock_run,
     ):
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = ""
@@ -346,7 +346,7 @@ def test_cleanup_orphaned_branch_no_commits_without_force(
             return_value="prd/PRD-001-my-feature",
         ),
         patch("darkfactory.cli.cleanup._orphaned_branch_commit_count", return_value=0),
-        patch("darkfactory.git_ops.subprocess.run") as mock_run,
+        patch("darkfactory.utils.git._ops.subprocess.run") as mock_run,
     ):
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = ""

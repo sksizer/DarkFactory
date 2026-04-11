@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from darkfactory.cli._shared import _find_repo_root
-from darkfactory.git_ops import git_check, git_run
+from darkfactory.utils.git import git_check, git_run
 from darkfactory.prd import update_frontmatter_field_at
 
 

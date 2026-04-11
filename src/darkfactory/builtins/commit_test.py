@@ -16,7 +16,7 @@ from darkfactory.builtins.commit import commit
 
 def test_dry_run_logs_and_returns_without_subprocess(tmp_path: Path) -> None:
     ctx = make_builtin_ctx(tmp_path, dry_run=True)
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._ops.subprocess.run") as mock_run:
         commit(ctx, message="chore: test commit")
     mock_run.assert_not_called()
     ctx.logger.info.assert_called()
@@ -44,7 +44,7 @@ def test_empty_diff_skips_commit(tmp_path: Path) -> None:
             result.returncode = 0
         return result
 
-    with patch("darkfactory.git_ops.subprocess.run", side_effect=fake_run):
+    with patch("darkfactory.utils.git._ops.subprocess.run", side_effect=fake_run):
         commit(ctx, message="chore: test")
 
     ctx.logger.info.assert_called_with("commit skipped: no changes to commit")
@@ -60,7 +60,7 @@ def test_empty_diff_does_not_call_git_commit(tmp_path: Path) -> None:
         result.returncode = 0
         return result
 
-    with patch("darkfactory.git_ops.subprocess.run", side_effect=fake_run):
+    with patch("darkfactory.utils.git._ops.subprocess.run", side_effect=fake_run):
         commit(ctx, message="chore: test")
 
     assert not any("commit" in c and "-m" in c for c in calls)
@@ -80,7 +80,7 @@ def test_successful_commit_calls_git_add_then_commit(tmp_path: Path) -> None:
         result.returncode = 1 if cmd[:3] == ["git", "diff", "--cached"] else 0
         return result
 
-    with patch("darkfactory.git_ops.subprocess.run", side_effect=fake_run):
+    with patch("darkfactory.utils.git._ops.subprocess.run", side_effect=fake_run):
         commit(ctx, message="chore: my commit")
 
     assert calls[0] == ["git", "add", "-A"]
@@ -100,7 +100,7 @@ def test_successful_commit_uses_formatted_message(tmp_path: Path) -> None:
             committed_messages.append(cmd[idx + 1])
         return result
 
-    with patch("darkfactory.git_ops.subprocess.run", side_effect=fake_run):
+    with patch("darkfactory.utils.git._ops.subprocess.run", side_effect=fake_run):
         commit(ctx, message="chore(prd): {prd_id} start work")
 
     assert committed_messages == ["chore(prd): PRD-042 start work"]
@@ -113,7 +113,7 @@ def test_forbidden_attribution_raises_before_subprocess(tmp_path: Path) -> None:
     ctx = make_builtin_ctx(tmp_path)
     ctx.format_string.side_effect = lambda s: s
 
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._ops.subprocess.run") as mock_run:
         with pytest.raises(RuntimeError, match="forbidden attribution"):
             commit(
                 ctx,

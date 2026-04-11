@@ -277,7 +277,7 @@ def _make_rework_workflow(tmp_path: Path) -> Workflow:
 
 def test_run_workflow_passes_review_threads_to_context(tmp_path: Path) -> None:
     """review_threads passed to run_workflow appear on ExecutionContext."""
-    from darkfactory.invoke import InvokeResult
+    from darkfactory.utils.claude_code import InvokeResult
 
     prd = _make_prd(tmp_path)
     worktree = tmp_path / "worktree"
@@ -340,7 +340,7 @@ def test_run_workflow_commit_message_uses_prd_id(tmp_path: Path) -> None:
     def _fake_commit(ctx: ExecutionContext, *, message: str) -> None:
         commit_messages.append(ctx.format_string(message))
 
-    from darkfactory.invoke import InvokeResult
+    from darkfactory.utils.claude_code import InvokeResult
 
     fake_invoke = InvokeResult(
         stdout="PRD_EXECUTE_OK: PRD-007\n",

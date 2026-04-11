@@ -20,7 +20,9 @@ def list_prs_for_branch(
 ) -> list[dict[str, Any]]:
     """Return list of PR dicts for a branch (all states).
 
-    Best-effort: returns empty list if ``gh`` is absent or the call fails.
+    Raises :class:`FileNotFoundError` if ``gh`` is not installed — callers
+    that want graceful degradation must catch it themselves. Returns an empty
+    list on other errors (e.g. non-zero exit, JSON decode failures).
     """
     try:
         result = subprocess.run(
@@ -41,7 +43,7 @@ def list_prs_for_branch(
         )
         if result.returncode == 0:
             return list(json.loads(result.stdout))
-    except (FileNotFoundError, json.JSONDecodeError, ValueError):
+    except (json.JSONDecodeError, ValueError):
         pass
     return []
 

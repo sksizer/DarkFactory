@@ -123,7 +123,7 @@ def _make_mock_run(returncode: int = 0, stderr: str = "") -> MagicMock:
 def test_post_comment_replies_success(tmp_path: Path) -> None:
     replies = [CommentReply(thread_id="IC_001", body="Fixed it.")]
     threads = [_make_thread("IC_001", reply_target_id="555001")]
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.github._cli.subprocess.run") as mock_run:
         mock_run.return_value = _make_mock_run(returncode=0)
         results = post_comment_replies(
             pr_number=42,
@@ -147,7 +147,7 @@ def test_post_comment_replies_success(tmp_path: Path) -> None:
 def test_post_comment_replies_prefix_format(tmp_path: Path) -> None:
     replies = [CommentReply(thread_id="IC_999", body="Renamed the variable.")]
     threads = [_make_thread("IC_999", reply_target_id="555999")]
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.github._cli.subprocess.run") as mock_run:
         mock_run.return_value = _make_mock_run(returncode=0)
         post_comment_replies(
             pr_number=7,
@@ -165,7 +165,7 @@ def test_post_comment_replies_prefix_format(tmp_path: Path) -> None:
 def test_post_comment_replies_failure_returns_false(tmp_path: Path) -> None:
     replies = [CommentReply(thread_id="IC_bad", body="Something.")]
     threads = [_make_thread("IC_bad", reply_target_id="555bad")]
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.github._cli.subprocess.run") as mock_run:
         mock_run.return_value = _make_mock_run(returncode=1, stderr="permission denied")
         results = post_comment_replies(
             pr_number=1,
@@ -181,7 +181,7 @@ def test_post_comment_replies_failure_returns_false(tmp_path: Path) -> None:
 def test_post_comment_replies_exception_returns_false(tmp_path: Path) -> None:
     replies = [CommentReply(thread_id="IC_exc", body="Something.")]
     threads = [_make_thread("IC_exc", reply_target_id="555exc")]
-    with patch("darkfactory.pr_comments.subprocess.run", side_effect=OSError("no gh")):
+    with patch("darkfactory.utils.github._cli.subprocess.run", side_effect=OSError("no gh")):
         results = post_comment_replies(
             pr_number=1,
             replies=replies,
@@ -203,7 +203,7 @@ def test_post_comment_replies_multiple_mixed(tmp_path: Path) -> None:
         _make_thread("IC_fail", reply_target_id="5551"),
     ]
     responses = [_make_mock_run(0), _make_mock_run(1, "rate limit")]
-    with patch("darkfactory.pr_comments.subprocess.run", side_effect=responses):
+    with patch("darkfactory.utils.github._cli.subprocess.run", side_effect=responses):
         results = post_comment_replies(
             pr_number=5,
             replies=replies,
@@ -216,7 +216,7 @@ def test_post_comment_replies_multiple_mixed(tmp_path: Path) -> None:
 
 
 def test_post_comment_replies_empty(tmp_path: Path) -> None:
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.github._cli.subprocess.run") as mock_run:
         results = post_comment_replies(
             pr_number=1,
             replies=[],
@@ -232,7 +232,7 @@ def test_post_comment_replies_unknown_thread_id_skipped(tmp_path: Path) -> None:
     """An agent-supplied thread_id not in the fetched threads is logged and skipped."""
     replies = [CommentReply(thread_id="IC_ghost", body="Done.")]
     threads = [_make_thread("IC_real", reply_target_id="5555")]
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.github._cli.subprocess.run") as mock_run:
         results = post_comment_replies(
             pr_number=1,
             replies=replies,
@@ -248,7 +248,7 @@ def test_post_comment_replies_no_reply_target_skipped(tmp_path: Path) -> None:
     """A thread with no reply_target_id (review summary / issue comment) is skipped."""
     replies = [CommentReply(thread_id="review-1", body="Thanks.")]
     threads = [_make_thread("review-1", reply_target_id=None)]
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.github._cli.subprocess.run") as mock_run:
         results = post_comment_replies(
             pr_number=1,
             replies=replies,

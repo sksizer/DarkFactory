@@ -25,7 +25,7 @@ import subprocess
 import sys
 import time
 
-from darkfactory.git_ops import git_run
+from darkfactory.utils.git import git_run
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any

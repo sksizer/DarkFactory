@@ -65,14 +65,14 @@ _VALID_OUTPUT = (
 
 def test_skips_when_reply_to_comments_false() -> None:
     ctx = _make_ctx(reply_to_comments=False, agent_output=_VALID_OUTPUT)
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.github._cli.subprocess.run") as mock_run:
         reply_pr_comments(ctx)
     mock_run.assert_not_called()
 
 
 def test_skips_when_no_pr_number() -> None:
     ctx = _make_ctx(pr_number=None, agent_output=_VALID_OUTPUT)
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.github._cli.subprocess.run") as mock_run:
         reply_pr_comments(ctx)
     mock_run.assert_not_called()
     ctx.logger.warning.assert_called()
@@ -80,14 +80,14 @@ def test_skips_when_no_pr_number() -> None:
 
 def test_skips_when_no_agent_output() -> None:
     ctx = _make_ctx(agent_output=None)
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.github._cli.subprocess.run") as mock_run:
         reply_pr_comments(ctx)
     mock_run.assert_not_called()
 
 
 def test_skips_when_agent_output_empty_string() -> None:
     ctx = _make_ctx(agent_output="")
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.github._cli.subprocess.run") as mock_run:
         reply_pr_comments(ctx)
     mock_run.assert_not_called()
 
@@ -97,7 +97,7 @@ def test_skips_when_agent_output_empty_string() -> None:
 
 def test_dry_run_logs_without_posting() -> None:
     ctx = _make_ctx(dry_run=True, agent_output=_VALID_OUTPUT)
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.github._cli.subprocess.run") as mock_run:
         reply_pr_comments(ctx)
     mock_run.assert_not_called()
     ctx.logger.info.assert_called()
@@ -123,11 +123,11 @@ def test_posts_replies_on_success(tmp_path: Path) -> None:
 
     with (
         patch(
-            "darkfactory.git_ops.subprocess.run",
+            "darkfactory.utils.git._ops.subprocess.run",
             return_value=sha_result,
         ),
         patch(
-            "darkfactory.pr_comments.subprocess.run",
+            "darkfactory.utils.github._cli.subprocess.run",
             return_value=post_result,
         ),
     ):
@@ -149,11 +149,11 @@ def test_failure_does_not_raise(tmp_path: Path) -> None:
 
     with (
         patch(
-            "darkfactory.git_ops.subprocess.run",
+            "darkfactory.utils.git._ops.subprocess.run",
             return_value=sha_result,
         ),
         patch(
-            "darkfactory.pr_comments.subprocess.run",
+            "darkfactory.utils.github._cli.subprocess.run",
             return_value=fail_result,
         ),
     ):
@@ -169,6 +169,6 @@ def test_no_replies_in_output_is_silent(tmp_path: Path) -> None:
         repo_root=tmp_path,
         cwd=tmp_path,
     )
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.github._cli.subprocess.run") as mock_run:
         reply_pr_comments(ctx)
     mock_run.assert_not_called()

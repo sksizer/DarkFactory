@@ -23,7 +23,7 @@ def test_no_transcript_skips_and_logs(tmp_path: Path) -> None:
 
 def test_no_transcript_no_subprocess(tmp_path: Path) -> None:
     ctx = make_builtin_ctx(tmp_path, prd_id="PRD-549.8")
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._ops.subprocess.run") as mock_run:
         commit_transcript(ctx)
     mock_run.assert_not_called()
 
@@ -50,7 +50,7 @@ def test_dry_run_no_subprocess(tmp_path: Path) -> None:
     transcript_dir.mkdir()
     (transcript_dir / "PRD-549.8.jsonl").write_text("transcript content")
 
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._ops.subprocess.run") as mock_run:
         commit_transcript(ctx)
     mock_run.assert_not_called()
 
@@ -77,7 +77,7 @@ def test_successful_run_creates_dest_and_stages(tmp_path: Path) -> None:
     src = transcript_dir / "PRD-549.8.jsonl"
     src.write_text("transcript content")
 
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._ops.subprocess.run") as mock_run:
         commit_transcript(ctx)
 
     # Destination directory should be created
@@ -102,7 +102,7 @@ def test_successful_run_logs_staged(tmp_path: Path) -> None:
     transcript_dir.mkdir()
     (transcript_dir / "PRD-549.8.jsonl").write_text("data")
 
-    with patch("darkfactory.git_ops.subprocess.run"):
+    with patch("darkfactory.utils.git._ops.subprocess.run"):
         commit_transcript(ctx)
 
     ctx.logger.info.assert_called()

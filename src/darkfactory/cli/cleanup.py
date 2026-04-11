@@ -7,10 +7,10 @@ import re
 import subprocess
 from pathlib import Path
 
-from darkfactory import checks
 from darkfactory.checks import StaleWorktree, find_stale_worktrees, is_safe_to_remove
 from darkfactory.cli._shared import _find_repo_root
-from darkfactory.git_ops import git_check, git_run
+from darkfactory.utils.git import git_check, git_run
+from darkfactory.utils.github.pull_request import get_pr_state
 from darkfactory.worktree_utils import find_worktree_for_prd
 
 
@@ -30,7 +30,7 @@ def _find_worktree_for_prd(prd_id: str, repo_root: Path) -> StaleWorktree | None
     if entry is None:
         return None
     branch = f"prd/{entry.name}"
-    pr_state = checks._get_pr_state(branch, repo_root)
+    pr_state = get_pr_state(branch, repo_root)
     return StaleWorktree(
         prd_id=prd_id,
         branch=branch,
@@ -128,7 +128,7 @@ def _cleanup_all(force: bool, repo_root: Path) -> int:
             continue
         prd_id = m.group(1)
         branch = f"prd/{name}"
-        pr_state = checks._get_pr_state(branch, repo_root)
+        pr_state = get_pr_state(branch, repo_root)
         all_worktrees.append(
             StaleWorktree(
                 prd_id=prd_id,

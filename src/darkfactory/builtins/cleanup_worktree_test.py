@@ -23,7 +23,7 @@ def test_no_worktree_path_logs_and_returns(tmp_path: Path) -> None:
 def test_no_worktree_path_no_subprocess(tmp_path: Path) -> None:
     ctx = make_builtin_ctx(tmp_path)
     ctx.worktree_path = None
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._ops.subprocess.run") as mock_run:
         cleanup_worktree(ctx)
     mock_run.assert_not_called()
 
@@ -42,7 +42,7 @@ def test_worktree_already_gone_logs_and_returns(tmp_path: Path) -> None:
 def test_worktree_already_gone_no_subprocess(tmp_path: Path) -> None:
     ctx = make_builtin_ctx(tmp_path)
     ctx.worktree_path = tmp_path / "nonexistent-worktree"
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._ops.subprocess.run") as mock_run:
         cleanup_worktree(ctx)
     mock_run.assert_not_called()
 
@@ -64,7 +64,7 @@ def test_dry_run_no_subprocess(tmp_path: Path) -> None:
     ctx = make_builtin_ctx(tmp_path, dry_run=True)
     ctx.worktree_path = tmp_path / "my-worktree"
     ctx.worktree_path.mkdir()
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._ops.subprocess.run") as mock_run:
         cleanup_worktree(ctx)
     mock_run.assert_not_called()
 
@@ -77,7 +77,7 @@ def test_successful_removal_calls_git_worktree_remove(tmp_path: Path) -> None:
     ctx.worktree_path = tmp_path / "my-worktree"
     ctx.worktree_path.mkdir()
 
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._ops.subprocess.run") as mock_run:
         cleanup_worktree(ctx)
 
     mock_run.assert_called_once()
@@ -93,7 +93,7 @@ def test_successful_removal_passes_repo_root(tmp_path: Path) -> None:
     ctx.worktree_path = tmp_path / "my-worktree"
     ctx.worktree_path.mkdir()
 
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._ops.subprocess.run") as mock_run:
         cleanup_worktree(ctx)
 
     call_kwargs = mock_run.call_args[1]

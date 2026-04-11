@@ -5,7 +5,7 @@ from __future__ import annotations
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run, _scan_for_forbidden_attribution
 from darkfactory.event_log import emit_builtin_effect
-from darkfactory.git_ops import git_check, git_run
+from darkfactory.utils.git import git_check, git_run
 from darkfactory.workflow import ExecutionContext
 
 

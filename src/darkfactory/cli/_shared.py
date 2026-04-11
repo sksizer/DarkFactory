@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from darkfactory import containment, graph
-from darkfactory.git_ops import git_check, git_run
+from darkfactory.utils.git import git_check, git_run
 from darkfactory.prd import PRD, load_all, parse_id_sort_key
 from darkfactory.workflow import Workflow
 

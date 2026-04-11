@@ -32,7 +32,7 @@ def _make_lint_ctx(
 
 def test_dry_run_logs_and_returns(tmp_path: Path) -> None:
     ctx = _make_lint_ctx(tmp_path, dry_run=True)
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._ops.subprocess.run") as mock_run:
         lint_attribution(ctx)
     ctx.logger.info.assert_called()
     call_args = ctx.logger.info.call_args[0]
@@ -46,7 +46,7 @@ def test_dry_run_logs_and_returns(tmp_path: Path) -> None:
 def test_clean_commits_pass(tmp_path: Path) -> None:
     ctx = _make_lint_ctx(tmp_path, dry_run=False, run_summary="All good")
     clean_git_output = "abc123\x00Fix a bug\x1e"
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._ops.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(stdout=clean_git_output)
         lint_attribution(ctx)
 
@@ -57,7 +57,7 @@ def test_clean_commits_pass(tmp_path: Path) -> None:
 
 def test_clean_no_commits(tmp_path: Path) -> None:
     ctx = _make_lint_ctx(tmp_path, dry_run=False, run_summary=None)
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._ops.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(stdout="")
         lint_attribution(ctx)
 
@@ -72,7 +72,7 @@ def test_commit_message_violation_raises(tmp_path: Path) -> None:
     bad_commit_output = (
         "deadbeef1234\x00Fix thing\n\nCo-Authored-By: Claude <claude@anthropic.com>\x1e"
     )
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._ops.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(stdout=bad_commit_output)
         with pytest.raises(RuntimeError, match="forbidden attribution"):
             lint_attribution(ctx)
@@ -81,7 +81,7 @@ def test_commit_message_violation_raises(tmp_path: Path) -> None:
 def test_generated_with_claude_code_raises(tmp_path: Path) -> None:
     ctx = _make_lint_ctx(tmp_path, dry_run=False, run_summary=None)
     bad_commit_output = "deadbeef1234\x00Fix thing\n\n🤖 Generated with Claude Code\x1e"
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._ops.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(stdout=bad_commit_output)
         with pytest.raises(RuntimeError, match="forbidden attribution"):
             lint_attribution(ctx)
@@ -96,7 +96,7 @@ def test_run_summary_violation_raises(tmp_path: Path) -> None:
         dry_run=False,
         run_summary="Generated with Claude Code",
     )
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._ops.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(stdout="")
         with pytest.raises(RuntimeError, match="forbidden attribution"):
             lint_attribution(ctx)

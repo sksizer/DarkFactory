@@ -123,13 +123,16 @@ def test_is_resume_safe_open_pr_returns_safe(tmp_path: Path) -> None:
     """An open PR should not block resuming."""
     open_pr = [{"state": "OPEN", "mergedAt": None}]
 
-    def fake_run(cmd: list[str], **kwargs: object) -> MagicMock:
-        if cmd[0] == "gh":
-            return _make_gh_run(open_pr)
-        # git rev-parse for divergence check: no remote ref
-        return _make_git_rev_parse_not_found()
-
-    with patch("darkfactory.checks.subprocess.run", side_effect=fake_run):
+    with (
+        patch(
+            "darkfactory.utils.github.pull_request.subprocess.run",
+            return_value=_make_gh_run(open_pr),
+        ),
+        patch(
+            "darkfactory.checks.subprocess.run",
+            return_value=_make_git_rev_parse_not_found(),
+        ),
+    ):
         status = is_resume_safe("prd/PRD-001-my-feat", tmp_path)
 
     assert status.safe is True
@@ -140,12 +143,10 @@ def test_is_resume_safe_merged_pr_returns_not_safe(tmp_path: Path) -> None:
     """A merged PR must block resuming."""
     merged_pr = [{"state": "MERGED", "mergedAt": "2026-01-01T00:00:00Z"}]
 
-    def fake_run(cmd: list[str], **kwargs: object) -> MagicMock:
-        if cmd[0] == "gh":
-            return _make_gh_run(merged_pr)
-        return _make_git_rev_parse_not_found()
-
-    with patch("darkfactory.checks.subprocess.run", side_effect=fake_run):
+    with patch(
+        "darkfactory.utils.github.pull_request.subprocess.run",
+        return_value=_make_gh_run(merged_pr),
+    ):
         status = is_resume_safe("prd/PRD-001-my-feat", tmp_path)
 
     assert status.safe is False
@@ -157,12 +158,10 @@ def test_is_resume_safe_closed_pr_returns_not_safe(tmp_path: Path) -> None:
     """A closed (not merged) PR must block resuming."""
     closed_pr = [{"state": "CLOSED", "mergedAt": None}]
 
-    def fake_run(cmd: list[str], **kwargs: object) -> MagicMock:
-        if cmd[0] == "gh":
-            return _make_gh_run(closed_pr)
-        return _make_git_rev_parse_not_found()
-
-    with patch("darkfactory.checks.subprocess.run", side_effect=fake_run):
+    with patch(
+        "darkfactory.utils.github.pull_request.subprocess.run",
+        return_value=_make_gh_run(closed_pr),
+    ):
         status = is_resume_safe("prd/PRD-001-my-feat", tmp_path)
 
     assert status.safe is False
@@ -172,13 +171,16 @@ def test_is_resume_safe_closed_pr_returns_not_safe(tmp_path: Path) -> None:
 
 def test_is_resume_safe_no_prs_returns_safe(tmp_path: Path) -> None:
     """No PRs at all means we can safely resume."""
-
-    def fake_run(cmd: list[str], **kwargs: object) -> MagicMock:
-        if cmd[0] == "gh":
-            return _make_gh_run([])
-        return _make_git_rev_parse_not_found()
-
-    with patch("darkfactory.checks.subprocess.run", side_effect=fake_run):
+    with (
+        patch(
+            "darkfactory.utils.github.pull_request.subprocess.run",
+            return_value=_make_gh_run([]),
+        ),
+        patch(
+            "darkfactory.checks.subprocess.run",
+            return_value=_make_git_rev_parse_not_found(),
+        ),
+    ):
         status = is_resume_safe("prd/PRD-001-my-feat", tmp_path)
 
     assert status.safe is True
@@ -188,14 +190,17 @@ def test_is_resume_safe_no_gh_degrades_gracefully(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     """Missing gh binary should warn and proceed with local-only checks."""
-
-    def fake_run(cmd: list[str], **kwargs: object) -> MagicMock:
-        if cmd[0] == "gh":
-            raise FileNotFoundError("gh not found")
-        return _make_git_rev_parse_not_found()
-
     with caplog.at_level(logging.WARNING, logger="darkfactory.checks"):
-        with patch("darkfactory.checks.subprocess.run", side_effect=fake_run):
+        with (
+            patch(
+                "darkfactory.checks.list_prs_for_branch",
+                side_effect=FileNotFoundError("gh not found"),
+            ),
+            patch(
+                "darkfactory.checks.subprocess.run",
+                return_value=_make_git_rev_parse_not_found(),
+            ),
+        ):
             status = is_resume_safe("prd/PRD-001-my-feat", tmp_path)
 
     assert status.safe is True
@@ -206,13 +211,8 @@ def test_is_resume_safe_diverged_warns_but_allows(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     """Branch behind origin should warn but not block resume."""
-    call_count = 0
 
-    def fake_run(cmd: list[str], **kwargs: object) -> MagicMock:
-        nonlocal call_count
-        call_count += 1
-        if cmd[0] == "gh":
-            return _make_gh_run([])  # no PRs
+    def fake_git_run(cmd: list[str], **kwargs: object) -> MagicMock:
         # git rev-parse for local ref
         if "refs/heads/" in " ".join(cmd):
             m = MagicMock()
@@ -234,7 +234,13 @@ def test_is_resume_safe_diverged_warns_but_allows(
         return _make_git_rev_parse_not_found()
 
     with caplog.at_level(logging.WARNING, logger="darkfactory.checks"):
-        with patch("darkfactory.checks.subprocess.run", side_effect=fake_run):
+        with (
+            patch(
+                "darkfactory.utils.github.pull_request.subprocess.run",
+                return_value=_make_gh_run([]),
+            ),
+            patch("darkfactory.checks.subprocess.run", side_effect=fake_git_run),
+        ):
             status = is_resume_safe("prd/PRD-001-my-feat", tmp_path)
 
     assert status.safe is True

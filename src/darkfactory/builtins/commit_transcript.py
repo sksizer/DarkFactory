@@ -7,7 +7,7 @@ import shutil
 
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run
-from darkfactory.git_ops import git_run
+from darkfactory.utils.git import git_run
 from darkfactory.timestamps import now_filename_safe
 from darkfactory.workflow import ExecutionContext
 
