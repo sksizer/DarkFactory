@@ -24,6 +24,13 @@ workflow = Workflow(
     name="rework",
     description="Address PR review feedback for an existing PRD",
     tasks=[
+        # Sync the worktree branch with origin before any mutation.
+        # Fast-forwards local to match origin/<branch> so push_branch won't
+        # be rejected; then rebases onto origin/main so the agent works
+        # against current mainline code.  Both steps fail early (before the
+        # expensive agent invocation) if the branch is diverged or conflicted.
+        BuiltIn("fast_forward_branch"),
+        BuiltIn("rebase_onto_main"),
         # Fetch unresolved review threads and store on ctx.review_threads.
         # When cmd_rework --execute pre-fetches them, this is a no-op.
         BuiltIn("fetch_pr_comments"),
@@ -46,7 +53,7 @@ workflow = Workflow(
                 "Bash(git diff:*)",
                 "Bash(git log:*)",
                 "Bash(git rm:*)",
-                "Bash(git mv:*)"
+                "Bash(git mv:*)",
             ],
             model_from_capability=True,
             retries=1,

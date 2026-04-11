@@ -137,9 +137,7 @@ def test_post_comment_replies_success(tmp_path: Path) -> None:
     mock_run.assert_called_once()
     call_args = mock_run.call_args[0][0]
     # Verify the URL uses the numeric reply_target_id, not the thread_id
-    url_arg = next(
-        a for a in call_args if a.startswith("repos/") and "/replies" in a
-    )
+    url_arg = next(a for a in call_args if a.startswith("repos/") and "/replies" in a)
     assert "/comments/555001/replies" in url_arg
     assert "IC_001" not in url_arg
     body_arg = next(a for a in call_args if a.startswith("body="))
