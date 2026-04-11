@@ -55,7 +55,9 @@ def test_discuss_prd_composes_prompt(tmp_path: Path) -> None:
         captured_prompts.append(prompt)
         return 0
 
-    with patch("darkfactory.builtins.discuss_prd._spawn_claude", side_effect=mock_spawn):
+    with patch(
+        "darkfactory.builtins.discuss_prd._spawn_claude", side_effect=mock_spawn
+    ):
         with patch("darkfactory.builtins.discuss_prd.time.sleep"):
             discuss_prd(ctx, phase="discuss", prompt_file="prompts/discuss.md")
 
@@ -64,7 +66,9 @@ def test_discuss_prd_composes_prompt(tmp_path: Path) -> None:
     assert "Phase: discuss" in captured_prompts[0]
 
 
-def test_discuss_prd_prints_banner(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_discuss_prd_prints_banner(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     op_dir = _setup_prompt(tmp_path)
     ctx = _make_ctx(tmp_path, operation_dir=op_dir)
 

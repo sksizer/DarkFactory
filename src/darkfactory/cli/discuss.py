@@ -16,14 +16,18 @@ from darkfactory.system_runner import run_system_operation
 def _check_prerequisites(cwd: Path) -> None:
     """Fail fast if claude or git are missing, or cwd is not a git repo."""
     if shutil.which("claude") is None:
-        raise SystemExit("error: 'claude' is not on PATH. Install Claude Code to use 'prd discuss'.")
+        raise SystemExit(
+            "error: 'claude' is not on PATH. Install Claude Code to use 'prd discuss'."
+        )
     if shutil.which("git") is None:
         raise SystemExit("error: 'git' is not on PATH.")
     if not (cwd / ".git").exists():
         try:
             _find_repo_root(cwd)
         except SystemExit:
-            raise SystemExit("error: current directory is not inside a git working tree.")
+            raise SystemExit(
+                "error: current directory is not inside a git working tree."
+            )
 
 
 def launch_discuss_for_prd(prd_id: str, args: argparse.Namespace) -> int:

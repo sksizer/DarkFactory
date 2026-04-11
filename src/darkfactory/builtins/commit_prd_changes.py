@@ -114,7 +114,10 @@ def commit_prd_changes(
     other_dirty = _git_status_other_dirty(paths, ctx.cwd)
     if other_dirty:
         n = len(other_dirty)
-        print(f"\nNote: {n} other file(s) have unstaged changes that will NOT be included.", file=sys.stderr)
+        print(
+            f"\nNote: {n} other file(s) have unstaged changes that will NOT be included.",
+            file=sys.stderr,
+        )
         if n <= 5:
             for f in other_dirty:
                 print(f"  {f}", file=sys.stderr)
@@ -133,6 +136,9 @@ def commit_prd_changes(
             _run_git_commit(new_message, ctx.cwd)
             ctx.logger.info("commit_prd_changes: committed with custom message")
         else:
-            print("Empty message — skipped commit. Changes left in working tree.", file=sys.stderr)
+            print(
+                "Empty message — skipped commit. Changes left in working tree.",
+                file=sys.stderr,
+            )
     else:
         print("Skipped commit. Changes left in working tree.", file=sys.stderr)
