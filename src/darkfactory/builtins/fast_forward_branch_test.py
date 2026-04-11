@@ -301,6 +301,31 @@ def test_fetch_timeout_propagates_runtime_error(tmp_path: Path) -> None:
             fast_forward_branch(ctx)
 
 
+# ---------- dry-run ----------
+
+
+def test_dry_run_skips_subprocess_and_emits_up_to_date(tmp_path: Path) -> None:
+    writer = MagicMock()
+    ctx = make_builtin_ctx(tmp_path, dry_run=True, event_writer=writer)
+    ctx.branch_name = _BRANCH
+
+    with (
+        patch(
+            "darkfactory.builtins.fast_forward_branch._fetch_origin_branch"
+        ) as mock_fetch,
+        patch(
+            "darkfactory.builtins.fast_forward_branch._check_divergence"
+        ) as mock_check,
+    ):
+        fast_forward_branch(ctx)
+
+    mock_fetch.assert_not_called()
+    mock_check.assert_not_called()
+    writer.emit.assert_called_once()
+    _, kwargs = writer.emit.call_args
+    assert kwargs.get("result") == "up_to_date"
+
+
 # ---------- event writer is None ----------
 
 
