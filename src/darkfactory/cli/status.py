@@ -18,7 +18,7 @@ from darkfactory.cli._shared import (
 
 
 def cmd_status(args: argparse.Namespace) -> int:
-    prds = _load(args.prd_dir)
+    prds = _load(args.data_dir)
     counts = Counter(prd.status for prd in prds.values())
     actionable = sorted(
         (prd for prd in prds.values() if graph.is_actionable(prd, prds)),
@@ -61,7 +61,7 @@ def cmd_status(args: argparse.Namespace) -> int:
             print("  " + _format_prd_line(prd, ("kind", "effort", "capability")))
 
     try:
-        repo_root = _find_repo_root(args.prd_dir)
+        repo_root = _find_repo_root(args.data_dir)
         stale = find_stale_worktrees(repo_root)
         if stale:
             print(

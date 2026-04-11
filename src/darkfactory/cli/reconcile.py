@@ -12,7 +12,7 @@ from typing import Any
 
 from darkfactory.cli._shared import _find_repo_root
 from darkfactory.git_ops import git_check, git_run
-from darkfactory.prd import update_frontmatter_field_at
+from darkfactory.model import update_frontmatter_field_at
 
 
 def _get_merged_prd_prs() -> list[dict[str, Any]]:
@@ -139,7 +139,7 @@ def _create_reconcile_pr(
 
 def cmd_reconcile(args: argparse.Namespace) -> int:
     """Find merged-but-not-flipped PRDs and reconcile their status."""
-    prd_dir = args.prd_dir
+    prds_dir = args.data_dir / "prds"
 
     # 1. Get merged PRs with prd/* branches.
     merged_prs = _get_merged_prd_prs()
@@ -147,7 +147,7 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
     # 2. Find corresponding PRD files still in 'review'.
     candidates: list[tuple[Path, dict[str, Any]]] = []
     for pr in merged_prs:
-        prd_file = _find_prd_file_for_branch(pr["headRefName"], prd_dir)
+        prd_file = _find_prd_file_for_branch(pr["headRefName"], prds_dir)
         if prd_file is None:
             continue
         if _get_prd_status(prd_file) == "review":
@@ -158,7 +158,7 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
         return 0
 
     # 2b. Verify merge commits are reachable from HEAD.
-    repo_root = _find_repo_root(prd_dir)
+    repo_root = _find_repo_root(args.data_dir)
     verified: list[tuple[Path, dict[str, Any]]] = []
     clobbered: list[tuple[Path, dict[str, Any]]] = []
     for prd_file, pr in candidates:

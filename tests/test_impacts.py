@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from darkfactory import impacts
-from darkfactory.prd import load_all
+from darkfactory.model import load_all
 
 from .conftest import write_prd
 
@@ -73,7 +73,7 @@ def test_expand_impacts_mixed_glob_and_literal() -> None:
 
 def test_effective_impacts_leaf_returns_declared(tmp_prd_dir: Path) -> None:
     """A leaf PRD (no children) returns its own declared impacts."""
-    write_prd(tmp_prd_dir, "PRD-001", "a", impacts=["src/foo.rs", "src/bar.rs"])
+    write_prd(tmp_prd_dir / "prds","PRD-001", "a", impacts=["src/foo.rs", "src/bar.rs"])
     prds = load_all(tmp_prd_dir)
     result = impacts.effective_impacts(prds["PRD-001"], prds)
     assert result == ["src/foo.rs", "src/bar.rs"]
@@ -81,14 +81,14 @@ def test_effective_impacts_leaf_returns_declared(tmp_prd_dir: Path) -> None:
 
 def test_effective_impacts_leaf_empty_returns_empty(tmp_prd_dir: Path) -> None:
     """A leaf with no declared impacts returns an empty list."""
-    write_prd(tmp_prd_dir, "PRD-001", "a")
+    write_prd(tmp_prd_dir / "prds","PRD-001", "a")
     prds = load_all(tmp_prd_dir)
     assert impacts.effective_impacts(prds["PRD-001"], prds) == []
 
 
 def test_effective_impacts_container_aggregates_children(tmp_prd_dir: Path) -> None:
     """A container returns the sorted union of leaf descendants' impacts."""
-    write_prd(tmp_prd_dir, "PRD-001", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds","PRD-001", "epic", kind="epic")
     write_prd(
         tmp_prd_dir,
         "PRD-002",
@@ -117,7 +117,7 @@ def test_effective_impacts_container_with_declared_raises(tmp_prd_dir: Path) -> 
         kind="epic",
         impacts=["something.rs"],  # should be empty
     )
-    write_prd(tmp_prd_dir, "PRD-002", "child", parent="PRD-001", impacts=["src/foo.rs"])
+    write_prd(tmp_prd_dir / "prds","PRD-002", "child", parent="PRD-001", impacts=["src/foo.rs"])
     prds = load_all(tmp_prd_dir)
     with pytest.raises(ValueError, match="container"):
         impacts.effective_impacts(prds["PRD-001"], prds)
@@ -125,8 +125,8 @@ def test_effective_impacts_container_with_declared_raises(tmp_prd_dir: Path) -> 
 
 def test_effective_impacts_nested_containers_aggregate(tmp_prd_dir: Path) -> None:
     """Intermediate containers contribute via their descendants' leaves."""
-    write_prd(tmp_prd_dir, "PRD-001", "epic", kind="epic")
-    write_prd(tmp_prd_dir, "PRD-002", "feature", kind="feature", parent="PRD-001")
+    write_prd(tmp_prd_dir / "prds","PRD-001", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds","PRD-002", "feature", kind="feature", parent="PRD-001")
     write_prd(
         tmp_prd_dir,
         "PRD-003",
@@ -158,16 +158,16 @@ def test_effective_impacts_container_with_no_children_yet(tmp_prd_dir: Path) -> 
     """A PRD with no children is treated as a leaf (returns declared)."""
     # kind is "epic" but no children exist yet — it's "pre-planning".
     # We treat it as a leaf (its declared impacts, which are empty).
-    write_prd(tmp_prd_dir, "PRD-001", "unplanned-epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds","PRD-001", "unplanned-epic", kind="epic")
     prds = load_all(tmp_prd_dir)
     assert impacts.effective_impacts(prds["PRD-001"], prds) == []
 
 
 def test_effective_impacts_container_ignores_empty_leaves(tmp_prd_dir: Path) -> None:
     """Leaves that don't declare impacts contribute nothing to the aggregate."""
-    write_prd(tmp_prd_dir, "PRD-001", "epic", kind="epic")
-    write_prd(tmp_prd_dir, "PRD-002", "declared", parent="PRD-001", impacts=["x.rs"])
-    write_prd(tmp_prd_dir, "PRD-003", "undeclared", parent="PRD-001")  # empty
+    write_prd(tmp_prd_dir / "prds","PRD-001", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds","PRD-002", "declared", parent="PRD-001", impacts=["x.rs"])
+    write_prd(tmp_prd_dir / "prds","PRD-003", "undeclared", parent="PRD-001")  # empty
     prds = load_all(tmp_prd_dir)
     assert impacts.effective_impacts(prds["PRD-001"], prds) == ["x.rs"]
 
@@ -176,8 +176,8 @@ def test_effective_impacts_container_ignores_empty_leaves(tmp_prd_dir: Path) -> 
 
 
 def test_impacts_overlap_disjoint(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "a", impacts=["src/foo.rs"])
-    write_prd(tmp_prd_dir, "PRD-002", "b", impacts=["src/bar.rs"])
+    write_prd(tmp_prd_dir / "prds","PRD-001", "a", impacts=["src/foo.rs"])
+    write_prd(tmp_prd_dir / "prds","PRD-002", "b", impacts=["src/bar.rs"])
     prds = load_all(tmp_prd_dir)
     files = ["src/foo.rs", "src/bar.rs"]
     overlap = impacts.impacts_overlap(prds["PRD-001"], prds["PRD-002"], files, prds)
@@ -185,8 +185,8 @@ def test_impacts_overlap_disjoint(tmp_prd_dir: Path) -> None:
 
 
 def test_impacts_overlap_intersecting(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "a", impacts=["src/foo.rs", "src/bar.rs"])
-    write_prd(tmp_prd_dir, "PRD-002", "b", impacts=["src/bar.rs", "src/baz.rs"])
+    write_prd(tmp_prd_dir / "prds","PRD-001", "a", impacts=["src/foo.rs", "src/bar.rs"])
+    write_prd(tmp_prd_dir / "prds","PRD-002", "b", impacts=["src/bar.rs", "src/baz.rs"])
     prds = load_all(tmp_prd_dir)
     files = ["src/foo.rs", "src/bar.rs", "src/baz.rs"]
     overlap = impacts.impacts_overlap(prds["PRD-001"], prds["PRD-002"], files, prds)
@@ -194,8 +194,8 @@ def test_impacts_overlap_intersecting(tmp_prd_dir: Path) -> None:
 
 
 def test_impacts_overlap_glob_intersection(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "a", impacts=["src/*.rs"])
-    write_prd(tmp_prd_dir, "PRD-002", "b", impacts=["src/foo.rs"])
+    write_prd(tmp_prd_dir / "prds","PRD-001", "a", impacts=["src/*.rs"])
+    write_prd(tmp_prd_dir / "prds","PRD-002", "b", impacts=["src/foo.rs"])
     prds = load_all(tmp_prd_dir)
     files = ["src/foo.rs", "src/bar.rs"]
     overlap = impacts.impacts_overlap(prds["PRD-001"], prds["PRD-002"], files, prds)
@@ -203,8 +203,8 @@ def test_impacts_overlap_glob_intersection(tmp_prd_dir: Path) -> None:
 
 
 def test_impacts_overlap_undeclared_returns_empty(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "a", impacts=["src/foo.rs"])
-    write_prd(tmp_prd_dir, "PRD-002", "b")  # no impacts declared
+    write_prd(tmp_prd_dir / "prds","PRD-001", "a", impacts=["src/foo.rs"])
+    write_prd(tmp_prd_dir / "prds","PRD-002", "b")  # no impacts declared
     prds = load_all(tmp_prd_dir)
     files = ["src/foo.rs"]
     overlap = impacts.impacts_overlap(prds["PRD-001"], prds["PRD-002"], files, prds)
@@ -217,7 +217,7 @@ def test_impacts_overlap_undeclared_returns_empty(tmp_prd_dir: Path) -> None:
 def test_impacts_overlap_parent_child_exempt(tmp_prd_dir: Path) -> None:
     """A container's effective impacts include its children, so the
     overlap between them is definitional — not a conflict."""
-    write_prd(tmp_prd_dir, "PRD-001", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds","PRD-001", "epic", kind="epic")
     write_prd(
         tmp_prd_dir,
         "PRD-002",
@@ -237,8 +237,8 @@ def test_impacts_overlap_parent_child_exempt(tmp_prd_dir: Path) -> None:
 
 def test_impacts_overlap_transitive_ancestor_exempt(tmp_prd_dir: Path) -> None:
     """A grandparent -> grandchild overlap is also exempt."""
-    write_prd(tmp_prd_dir, "PRD-001", "epic", kind="epic")
-    write_prd(tmp_prd_dir, "PRD-002", "feature", kind="feature", parent="PRD-001")
+    write_prd(tmp_prd_dir / "prds","PRD-001", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds","PRD-002", "feature", kind="feature", parent="PRD-001")
     write_prd(
         tmp_prd_dir,
         "PRD-003",
@@ -259,7 +259,7 @@ def test_impacts_overlap_siblings_still_warn(tmp_prd_dir: Path) -> None:
     the same file need an explicit depends_on, and the validator must
     still surface this.
     """
-    write_prd(tmp_prd_dir, "PRD-001", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds","PRD-001", "epic", kind="epic")
     write_prd(
         tmp_prd_dir,
         "PRD-002",
@@ -282,8 +282,8 @@ def test_impacts_overlap_siblings_still_warn(tmp_prd_dir: Path) -> None:
 
 def test_impacts_overlap_cross_tree_still_warns(tmp_prd_dir: Path) -> None:
     """Unrelated PRDs touching the same file still overlap (no exemption)."""
-    write_prd(tmp_prd_dir, "PRD-001", "one", impacts=["src/foo.rs"])
-    write_prd(tmp_prd_dir, "PRD-002", "two", impacts=["src/foo.rs"])
+    write_prd(tmp_prd_dir / "prds","PRD-001", "one", impacts=["src/foo.rs"])
+    write_prd(tmp_prd_dir / "prds","PRD-002", "two", impacts=["src/foo.rs"])
     prds = load_all(tmp_prd_dir)
     files = ["src/foo.rs"]
     overlap = impacts.impacts_overlap(prds["PRD-001"], prds["PRD-002"], files, prds)
@@ -292,7 +292,7 @@ def test_impacts_overlap_cross_tree_still_warns(tmp_prd_dir: Path) -> None:
 
 def test_impacts_overlap_epic_vs_unrelated_uses_aggregate(tmp_prd_dir: Path) -> None:
     """An epic's overlap with an unrelated PRD is computed from the aggregate."""
-    write_prd(tmp_prd_dir, "PRD-001", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds","PRD-001", "epic", kind="epic")
     write_prd(
         tmp_prd_dir,
         "PRD-002",
@@ -319,7 +319,7 @@ def test_impacts_overlap_epic_vs_unrelated_uses_aggregate(tmp_prd_dir: Path) -> 
 
 def test_find_conflicts_excludes_parent(tmp_prd_dir: Path) -> None:
     """find_conflicts should not report a parent as conflicting with its child."""
-    write_prd(tmp_prd_dir, "PRD-001", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds","PRD-001", "epic", kind="epic")
     write_prd(
         tmp_prd_dir,
         "PRD-002",

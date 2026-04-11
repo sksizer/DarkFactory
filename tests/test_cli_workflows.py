@@ -15,9 +15,21 @@ from pathlib import Path
 import pytest
 
 from darkfactory.cli import main
-from darkfactory.prd import load_all
+from darkfactory.model import load_all
 
 from .conftest import write_prd
+
+
+def _setup_project(tmp_path: Path) -> tuple[Path, Path]:
+    """Create .darkfactory/ layout and return (prds_dir, workflows_dir)."""
+    df = tmp_path / ".darkfactory"
+    df.mkdir()
+    prds = df / "data" / "prds"
+    prds.mkdir(parents=True)
+    (df / "data" / "archive").mkdir()
+    workflows = df / "workflows"
+    workflows.mkdir()
+    return prds, workflows
 
 
 def _write_default_workflow(dir_path: Path) -> None:
@@ -70,19 +82,14 @@ def test_list_workflows_shows_loaded(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """list-workflows dumps each loaded workflow with priority and description."""
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_default_workflow(workflows_dir)
-
-    # Need a PRD dir too so --prd-dir has something valid (not used by this cmd
-    # but required by the global flag default).
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-001", "placeholder")
 
     exit_code = main(
         [
-            "--prd-dir",
-            str(prd_dir),
+            "--directory",
+            str(tmp_path),
             "--workflows-dir",
             str(workflows_dir),
             "list-workflows",
@@ -99,18 +106,15 @@ def test_list_workflows_orders_by_priority_desc(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Higher-priority workflows appear first in the output."""
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_default_workflow(workflows_dir)
     _write_ui_workflow(workflows_dir)
-
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-001", "placeholder")
 
     main(
         [
-            "--prd-dir",
-            str(prd_dir),
+            "--directory",
+            str(tmp_path),
             "--workflows-dir",
             str(workflows_dir),
             "list-workflows",
@@ -126,17 +130,14 @@ def test_list_workflows_json_output(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """--json produces a valid JSON array."""
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_default_workflow(workflows_dir)
-
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-001", "placeholder")
 
     main(
         [
-            "--prd-dir",
-            str(prd_dir),
+            "--directory",
+            str(tmp_path),
             "--workflows-dir",
             str(workflows_dir),
             "--json",
@@ -155,17 +156,13 @@ def test_list_workflows_empty(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """list-workflows with an empty workflows dir prints a friendly message."""
-    workflows_dir = tmp_path / "workflows"
-    workflows_dir.mkdir()
-
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     write_prd(prd_dir, "PRD-001", "placeholder")
 
     main(
         [
-            "--prd-dir",
-            str(prd_dir),
+            "--directory",
+            str(tmp_path),
             "--workflows-dir",
             str(workflows_dir),
             "list-workflows",
@@ -181,21 +178,15 @@ def test_assign_predicate_routing(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Each PRD is routed by the assignment logic and the source is shown."""
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_default_workflow(workflows_dir)
     _write_ui_workflow(workflows_dir)
-
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-001", "backend-task")
-    # The fixture write_prd doesn't currently support a tags kwarg, so
-    # we verify the routing path via the default predicate only. The
-    # explicit-workflow test below covers the non-default case.
 
     main(
         [
-            "--prd-dir",
-            str(prd_dir),
+            "--directory",
+            str(tmp_path),
             "--workflows-dir",
             str(workflows_dir),
             "assign",
@@ -211,18 +202,15 @@ def test_assign_explicit_source(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """PRDs with an explicit workflow field show 'explicit' in the Source column."""
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_default_workflow(workflows_dir)
     _write_ui_workflow(workflows_dir)
-
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-001", "explicit-task", workflow="ui")
 
     main(
         [
-            "--prd-dir",
-            str(prd_dir),
+            "--directory",
+            str(tmp_path),
             "--workflows-dir",
             str(workflows_dir),
             "assign",
@@ -237,18 +225,15 @@ def test_assign_explicit_source(
 
 def test_assign_json_output(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """--json produces a list of {id, workflow, explicit} records."""
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_default_workflow(workflows_dir)
-
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-001", "first")
     write_prd(prd_dir, "PRD-002", "second", workflow="default")
 
     main(
         [
-            "--prd-dir",
-            str(prd_dir),
+            "--directory",
+            str(tmp_path),
             "--workflows-dir",
             str(workflows_dir),
             "--json",
@@ -268,22 +253,21 @@ def test_assign_json_output(tmp_path: Path, capsys: pytest.CaptureFixture[str]) 
 
 def test_assign_write_persists_to_frontmatter(tmp_path: Path) -> None:
     """--write persists the resolved workflow into each PRD's frontmatter."""
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_default_workflow(workflows_dir)
-
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-001", "first")
     write_prd(prd_dir, "PRD-002", "second")
 
+    data_dir = tmp_path / ".darkfactory" / "data"
+
     # Before: no workflow field set
-    before = load_all(prd_dir)
+    before = load_all(data_dir)
     assert before["PRD-001"].workflow is None
 
     exit_code = main(
         [
-            "--prd-dir",
-            str(prd_dir),
+            "--directory",
+            str(tmp_path),
             "--workflows-dir",
             str(workflows_dir),
             "assign",
@@ -293,27 +277,26 @@ def test_assign_write_persists_to_frontmatter(tmp_path: Path) -> None:
     assert exit_code == 0
 
     # After: workflow field should be 'default' for both PRDs
-    after = load_all(prd_dir)
+    after = load_all(data_dir)
     assert after["PRD-001"].workflow == "default"
     assert after["PRD-002"].workflow == "default"
 
 
 def test_assign_write_is_idempotent(tmp_path: Path) -> None:
     """--write doesn't overwrite existing explicit workflow assignments."""
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_default_workflow(workflows_dir)
     _write_ui_workflow(workflows_dir)
-
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     # PRD-001 has explicit "ui" workflow pinned
     write_prd(prd_dir, "PRD-001", "first", workflow="ui")
     write_prd(prd_dir, "PRD-002", "second")
 
+    data_dir = tmp_path / ".darkfactory" / "data"
+
     main(
         [
-            "--prd-dir",
-            str(prd_dir),
+            "--directory",
+            str(tmp_path),
             "--workflows-dir",
             str(workflows_dir),
             "assign",
@@ -321,7 +304,7 @@ def test_assign_write_is_idempotent(tmp_path: Path) -> None:
         ]
     )
 
-    after = load_all(prd_dir)
+    after = load_all(data_dir)
     # Explicit assignment preserved
     assert after["PRD-001"].workflow == "ui"
     # Second got the default
@@ -338,14 +321,13 @@ def test_assign_missing_project_workflows_dir_is_ok(
     with the isolation fixture stubbing built-ins to an empty dir, so
     no workflows load at all — but the command still exits cleanly.
     """
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    prd_dir, _ = _setup_project(tmp_path)
     write_prd(prd_dir, "PRD-001", "first")
 
     exit_code = main(
         [
-            "--prd-dir",
-            str(prd_dir),
+            "--directory",
+            str(tmp_path),
             "--workflows-dir",
             str(tmp_path / "does-not-exist"),
             "list-workflows",

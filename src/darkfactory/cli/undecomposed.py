@@ -6,11 +6,11 @@ import argparse
 
 from darkfactory import containment
 from darkfactory.cli._shared import _format_prd_line, _load
-from darkfactory.prd import parse_id_sort_key
+from darkfactory.model import parse_id_sort_key
 
 
 def cmd_undecomposed(args: argparse.Namespace) -> int:
-    prds = _load(args.prd_dir)
+    prds = _load(args.data_dir)
     candidates = [
         prd
         for prd in prds.values()

@@ -23,7 +23,7 @@ from darkfactory.graph_execution import (
     execute_graph,
     matches_filters,
 )
-from darkfactory.prd import PRD, load_all, set_status_at
+from darkfactory.model import PRD, load_all, set_status_at
 from darkfactory.runner import RunResult
 from darkfactory.workflow import Workflow
 
@@ -319,6 +319,18 @@ class TestQueueExecution:
 class TestCLIValidation:
     """Test CLI argument validation for `prd run` in queue mode."""
 
+    @staticmethod
+    def _setup_project(tmp_path: Path) -> Path:
+        """Create .darkfactory/ layout with .git and return the prds dir."""
+        (tmp_path / ".git").mkdir(exist_ok=True)
+        df = tmp_path / ".darkfactory"
+        df.mkdir()
+        prds = df / "data" / "prds"
+        prds.mkdir(parents=True)
+        (df / "data" / "archive").mkdir()
+        (df / "workflows").mkdir()
+        return prds
+
     def _run_main(self, argv: list[str]) -> tuple[int, str]:
         """Invoke the CLI main() and capture stderr output."""
         import io
@@ -337,19 +349,13 @@ class TestCLIValidation:
         return exit_code, captured_stderr.getvalue()
 
     def test_all_and_prd_id_error(self, tmp_path: Path) -> None:
-        prd_dir = tmp_path / "prds"
-        prd_dir.mkdir()
+        prd_dir = self._setup_project(tmp_path)
         write_prd(prd_dir, "PRD-001", "task")
-        (tmp_path / ".git").mkdir()
-        workflows_dir = tmp_path / "workflows"
-        workflows_dir.mkdir()
 
         exit_code, stderr = self._run_main(
             [
-                "--prd-dir",
-                str(prd_dir),
-                "--workflows-dir",
-                str(workflows_dir),
+                "--directory",
+                str(tmp_path),
                 "run",
                 "--all",
                 "PRD-001",
@@ -359,18 +365,12 @@ class TestCLIValidation:
         assert "mutually exclusive" in stderr or "--all" in stderr
 
     def test_neither_error(self, tmp_path: Path) -> None:
-        prd_dir = tmp_path / "prds"
-        prd_dir.mkdir()
-        (tmp_path / ".git").mkdir()
-        workflows_dir = tmp_path / "workflows"
-        workflows_dir.mkdir()
+        self._setup_project(tmp_path)
 
         exit_code, stderr = self._run_main(
             [
-                "--prd-dir",
-                str(prd_dir),
-                "--workflows-dir",
-                str(workflows_dir),
+                "--directory",
+                str(tmp_path),
                 "run",
             ]
         )
@@ -386,7 +386,7 @@ class TestCLIValidation:
         parser = build_parser()
         args = parser.parse_args(
             [
-                "--prd-dir",
+                "--directory",
                 str(tmp_path),
                 "run",
                 "--all",

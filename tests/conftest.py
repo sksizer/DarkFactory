@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from conftest import write_prd as write_prd  # noqa: F401
-from darkfactory.prd import PRD, load_all
+from darkfactory.model import PRD, load_all
 from darkfactory.workflow import Workflow
 
 
@@ -55,7 +55,7 @@ class CliProject(NamedTuple):
     """Paths for a minimal project layout used in CLI integration tests."""
 
     repo_root: Path
-    prd_dir: Path
+    data_dir: Path
     workflows_dir: Path
 
 
@@ -64,17 +64,19 @@ def cli_project(tmp_path: Path) -> CliProject:
     """Create a minimal project directory structure and return its paths.
 
     - ``repo_root`` — ``tmp_path`` with ``.git/`` created
-    - ``prd_dir`` — ``tmp_path / "prds"`` (created)
+    - ``data_dir`` — ``tmp_path / "data"`` with ``prds/`` and ``archive/``
     - ``workflows_dir`` — ``tmp_path / "workflows"`` (created)
     """
     (tmp_path / ".git").mkdir(exist_ok=True)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "prds").mkdir()
+    (data_dir / "archive").mkdir()
     workflows_dir = tmp_path / "workflows"
     workflows_dir.mkdir()
     return CliProject(
         repo_root=tmp_path,
-        prd_dir=prd_dir,
+        data_dir=data_dir,
         workflows_dir=workflows_dir,
     )
 
@@ -98,8 +100,11 @@ def make_prd(tmp_path: Path) -> Callable[..., PRD]:
             depends_on: list[str] | None = None,
         ) -> PRD
     """
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir(exist_ok=True)
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(exist_ok=True)
+    prds_dir = data_dir / "prds"
+    prds_dir.mkdir(exist_ok=True)
+    (data_dir / "archive").mkdir(exist_ok=True)
 
     def _factory(
         prd_id: str,
@@ -114,7 +119,7 @@ def make_prd(tmp_path: Path) -> Callable[..., PRD]:
         depends_on: list[str] | None = None,
     ) -> PRD:
         write_prd(
-            prd_dir,
+            prds_dir,
             prd_id,
             slug,
             capability=capability,
@@ -125,7 +130,7 @@ def make_prd(tmp_path: Path) -> Callable[..., PRD]:
             parent=parent,
             depends_on=depends_on,
         )
-        prds = load_all(prd_dir)
+        prds = load_all(data_dir)
         return prds[prd_id]
 
     return _factory

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from darkfactory import graph
-from darkfactory.prd import load_all
+from darkfactory.model import load_all
 
 from .conftest import write_prd
 

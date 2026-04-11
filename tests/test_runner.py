@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 
 from darkfactory.invoke import InvokeResult
-from darkfactory.prd import PRD, load_all
+from darkfactory.model import PRD, load_all
 from darkfactory.runner import (
     _compute_branch_name,
     _pick_model,

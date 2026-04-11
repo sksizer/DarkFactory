@@ -12,12 +12,14 @@ from darkfactory.cli._parser import build_parser
 
 
 def _setup_project(tmp_path: Path) -> Path:
-    """Create a minimal project with a PRD and return prd_dir."""
+    """Create a minimal project with a PRD and return data_dir."""
     (tmp_path / ".git").mkdir()
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
-    write_prd(prd_dir, "PRD-070", "test-prd", title="Test PRD")
-    return prd_dir
+    data_dir = tmp_path / ".darkfactory" / "data"
+    prds_dir = data_dir / "prds"
+    prds_dir.mkdir(parents=True)
+    (data_dir / "archive").mkdir()
+    write_prd(prds_dir, "PRD-070", "test-prd", title="Test PRD")
+    return data_dir
 
 
 def test_discuss_registered_in_parser() -> None:
@@ -30,11 +32,11 @@ def test_discuss_registered_in_parser() -> None:
 
 def test_discuss_unknown_prd_exits(tmp_path: Path) -> None:
     """AC-1: Running on an unknown PRD exits cleanly."""
-    prd_dir = _setup_project(tmp_path)
+    data_dir = _setup_project(tmp_path)
 
     parser = build_parser()
     args = parser.parse_args(["discuss", "PRD-999"])
-    args.prd_dir = prd_dir
+    args.data_dir = data_dir
     args.operations_dir = tmp_path / "operations"
 
     with patch("darkfactory.utils.system.shutil") as mock_shutil:
@@ -45,11 +47,11 @@ def test_discuss_unknown_prd_exits(tmp_path: Path) -> None:
 
 def test_discuss_missing_claude_exits(tmp_path: Path) -> None:
     """AC-7: Missing ``claude`` binary exits before the chain runs."""
-    prd_dir = _setup_project(tmp_path)
+    data_dir = _setup_project(tmp_path)
 
     parser = build_parser()
     args = parser.parse_args(["discuss", "PRD-070"])
-    args.prd_dir = prd_dir
+    args.data_dir = data_dir
     args.operations_dir = tmp_path / "operations"
 
     with patch("darkfactory.utils.system.shutil") as mock_shutil:
@@ -62,11 +64,11 @@ def test_discuss_missing_claude_exits(tmp_path: Path) -> None:
 
 def test_discuss_launches_chain(tmp_path: Path) -> None:
     """AC-6: The discuss chain dispatches through the system runner."""
-    prd_dir = _setup_project(tmp_path)
+    data_dir = _setup_project(tmp_path)
 
     parser = build_parser()
     args = parser.parse_args(["discuss", "PRD-070"])
-    args.prd_dir = prd_dir
+    args.data_dir = data_dir
     args.operations_dir = tmp_path / "operations"
 
     with patch("darkfactory.utils.system.shutil") as mock_shutil:

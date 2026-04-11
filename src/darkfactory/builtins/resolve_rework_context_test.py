@@ -9,7 +9,7 @@ import pytest
 
 from darkfactory.builtins.resolve_rework_context import resolve_rework_context
 from darkfactory.pr_comments import CommentFilters, ReviewThread
-from darkfactory.prd import PRD
+from darkfactory.model import PRD
 from darkfactory.rework_context import ReworkContext, ReworkError
 from darkfactory.workflow import ExecutionContext, Workflow
 

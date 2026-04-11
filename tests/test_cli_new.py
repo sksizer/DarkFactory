@@ -48,10 +48,20 @@ def test_slugify_with_dashes() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _setup_project(tmp_path: Path) -> Path:
+    """Create .darkfactory/ and return the prds dir."""
+    df = tmp_path / ".darkfactory"
+    df.mkdir()
+    prds = df / "data" / "prds"
+    prds.mkdir(parents=True)
+    (df / "data" / "archive").mkdir()
+    return prds
+
+
 def test_new_basic_creates_file(tmp_path: Path) -> None:
     """Basic usage creates PRD-001-my-feature.md in an empty dir."""
-    prd_dir = tmp_path / "prds"
-    rc = main(["--prd-dir", str(prd_dir), "new", "My feature"])
+    prd_dir = _setup_project(tmp_path)
+    rc = main(["--directory", str(tmp_path), "new", "My feature"])
     assert rc == 0
     created = prd_dir / "PRD-001-my-feature.md"
     assert created.exists()
@@ -59,32 +69,30 @@ def test_new_basic_creates_file(tmp_path: Path) -> None:
 
 def test_new_auto_id_increments(tmp_path: Path) -> None:
     """Auto-id picks the number above the current max."""
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    prd_dir = _setup_project(tmp_path)
     write_prd(prd_dir, "PRD-005", "five", title="Existing five")
     write_prd(prd_dir, "PRD-010", "ten", title="Existing ten")
 
-    rc = main(["--prd-dir", str(prd_dir), "new", "Next thing"])
+    rc = main(["--directory", str(tmp_path), "new", "Next thing"])
     assert rc == 0
     assert (prd_dir / "PRD-011-next-thing.md").exists()
 
 
 def test_new_explicit_id(tmp_path: Path) -> None:
     """--id pins the PRD id."""
-    prd_dir = tmp_path / "prds"
-    rc = main(["--prd-dir", str(prd_dir), "new", "Pinned", "--id", "PRD-500"])
+    prd_dir = _setup_project(tmp_path)
+    rc = main(["--directory", str(tmp_path), "new", "Pinned", "--id", "PRD-500"])
     assert rc == 0
     assert (prd_dir / "PRD-500-pinned.md").exists()
 
 
 def test_new_explicit_id_refused_if_exists(tmp_path: Path) -> None:
     """--id refuses if the id already exists."""
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    prd_dir = _setup_project(tmp_path)
     write_prd(prd_dir, "PRD-042", "fortytwo", title="Existing")
 
     with pytest.raises(SystemExit):
-        main(["--prd-dir", str(prd_dir), "new", "Duplicate", "--id", "PRD-042"])
+        main(["--directory", str(tmp_path), "new", "Duplicate", "--id", "PRD-042"])
 
 
 def test_new_refuses_overwrite(tmp_path: Path) -> None:
@@ -93,20 +101,19 @@ def test_new_refuses_overwrite(tmp_path: Path) -> None:
     Uses --id to pin the id so we know the exact filename that will be
     attempted, then pre-creates that file as a different PRD.
     """
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    prd_dir = _setup_project(tmp_path)
     # Pre-create the exact output path as a valid PRD with a different id
     # so load_all succeeds but the file-exists guard fires.
     write_prd(prd_dir, "PRD-099", "my-title", title="Already here")
 
     with pytest.raises(SystemExit):
-        main(["--prd-dir", str(prd_dir), "new", "My title", "--id", "PRD-099"])
+        main(["--directory", str(tmp_path), "new", "My title", "--id", "PRD-099"])
 
 
 def test_new_frontmatter_is_valid(tmp_path: Path) -> None:
     """Generated frontmatter has expected fields and passes basic checks."""
-    prd_dir = tmp_path / "prds"
-    rc = main(["--prd-dir", str(prd_dir), "new", "Check Fields"])
+    prd_dir = _setup_project(tmp_path)
+    rc = main(["--directory", str(tmp_path), "new", "Check Fields"])
     assert rc == 0
 
     path = prd_dir / "PRD-001-check-fields.md"
@@ -131,8 +138,8 @@ def test_new_frontmatter_is_valid(tmp_path: Path) -> None:
 
 def test_new_frontmatter_kind_default(tmp_path: Path) -> None:
     """Default kind is 'task'."""
-    prd_dir = tmp_path / "prds"
-    main(["--prd-dir", str(prd_dir), "new", "Kind Test"])
+    prd_dir = _setup_project(tmp_path)
+    main(["--directory", str(tmp_path), "new", "Kind Test"])
     path = prd_dir / "PRD-001-kind-test.md"
     fm = yaml.safe_load(path.read_text(encoding="utf-8").split("---\n", 2)[1])
     assert fm["kind"] == "task"
@@ -140,11 +147,11 @@ def test_new_frontmatter_kind_default(tmp_path: Path) -> None:
 
 def test_new_frontmatter_custom_flags(tmp_path: Path) -> None:
     """Custom --kind, --priority, --effort, --capability are respected."""
-    prd_dir = tmp_path / "prds"
+    prd_dir = _setup_project(tmp_path)
     rc = main(
         [
-            "--prd-dir",
-            str(prd_dir),
+            "--directory",
+            str(tmp_path),
             "new",
             "Custom Flags",
             "--kind",
@@ -168,8 +175,9 @@ def test_new_frontmatter_custom_flags(tmp_path: Path) -> None:
 
 def test_new_body_has_standard_sections(tmp_path: Path) -> None:
     """Generated body contains all standard sections."""
-    prd_dir = tmp_path / "prds"
-    main(["--prd-dir", str(prd_dir), "new", "Section Check"])
+    _setup_project(tmp_path)
+    prd_dir = tmp_path / ".darkfactory" / "data" / "prds"
+    main(["--directory", str(tmp_path), "new", "Section Check"])
     path = prd_dir / "PRD-001-section-check.md"
     body = path.read_text(encoding="utf-8")
 
@@ -187,22 +195,22 @@ def test_new_body_has_standard_sections(tmp_path: Path) -> None:
 
 def test_new_invalid_kind_rejected(tmp_path: Path) -> None:
     """Invalid --kind value is rejected by argparse."""
-    prd_dir = tmp_path / "prds"
+    _setup_project(tmp_path)
     with pytest.raises(SystemExit):
-        main(["--prd-dir", str(prd_dir), "new", "Bad Kind", "--kind", "bogus"])
+        main(["--directory", str(tmp_path), "new", "Bad Kind", "--kind", "bogus"])
 
 
 def test_new_invalid_priority_rejected(tmp_path: Path) -> None:
     """Invalid --priority value is rejected by argparse."""
-    prd_dir = tmp_path / "prds"
+    _setup_project(tmp_path)
     with pytest.raises(SystemExit):
-        main(["--prd-dir", str(prd_dir), "new", "Bad Priority", "--priority", "urgent"])
+        main(["--directory", str(tmp_path), "new", "Bad Priority", "--priority", "urgent"])
 
 
 def test_new_no_existing_prds_starts_at_001(tmp_path: Path) -> None:
     """With zero existing PRDs, the first id is PRD-001."""
-    prd_dir = tmp_path / "prds"
-    rc = main(["--prd-dir", str(prd_dir), "new", "First Ever"])
+    prd_dir = _setup_project(tmp_path)
+    rc = main(["--directory", str(tmp_path), "new", "First Ever"])
     assert rc == 0
     assert (prd_dir / "PRD-001-first-ever.md").exists()
 
@@ -213,8 +221,8 @@ def test_new_validate_passes(
     """Generated PRD passes `prd validate`."""
     # validate calls _find_repo_root which needs a .git directory
     (tmp_path / ".git").mkdir()
-    prd_dir = tmp_path / "prds"
-    main(["--prd-dir", str(prd_dir), "new", "Validate Me"])
+    _setup_project(tmp_path)
+    main(["--directory", str(tmp_path), "new", "Validate Me"])
 
-    rc = main(["--prd-dir", str(prd_dir), "validate"])
+    rc = main(["--directory", str(tmp_path), "validate"])
     assert rc == 0

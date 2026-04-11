@@ -124,7 +124,7 @@ def cmd_system_run(args: argparse.Namespace) -> int:
             f"operation {args.name!r} requires --target (accepts_target=True)"
         )
 
-    repo_root = _find_repo_root(args.prd_dir)
+    repo_root = _find_repo_root(args.data_dir)
     dry_run = not getattr(args, "execute", False)
     model_override: str | None = getattr(args, "model", None)
     styler: Styler = args.styler
@@ -146,7 +146,7 @@ def cmd_system_run(args: argparse.Namespace) -> int:
                 f"{repo_root / '.harness-system.lock'} if the previous run is dead."
             ) from None
 
-    prds = _load(args.prd_dir) if args.prd_dir.exists() else {}
+    prds = _load(args.data_dir) if (args.data_dir / "prds").exists() else {}
 
     ctx = SystemContext(
         repo_root=repo_root,

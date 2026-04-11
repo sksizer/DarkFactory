@@ -8,7 +8,7 @@ from unittest.mock import patch
 from conftest import write_prd
 from darkfactory.commands.discuss import discuss_operation
 from darkfactory.commands.discuss.operation import discuss_operation as op_from_module
-from darkfactory.prd import load_all
+from darkfactory.model import load_all
 from darkfactory.system import SystemContext, SystemOperation
 from darkfactory.workflow import BuiltIn
 

@@ -10,7 +10,7 @@ import pytest
 
 from conftest import init_git_repo, make_system_ctx, setup_repo_with_prd, write_prd
 from darkfactory.builtins.commit_prd_changes import commit_prd_changes
-from darkfactory.prd import load_all
+from darkfactory.model import load_all
 
 
 def test_no_changes_returns_cleanly(

@@ -2,7 +2,7 @@
 
 After the rework CLI/workflow consolidation (see ``rework_context.py``
 and ``builtins/resolve_rework_context.py``), the CLI no longer
-duplicates worktree/PR/comment discovery — it delegates everything to
+duplicates worktree/PR/comment discovery -- it delegates everything to
 :func:`~darkfactory.rework_context.discover_rework_context`. These
 tests patch that single entry point rather than the former private
 helpers (``find_worktree``, ``find_open_pr``, ``fetch_pr_comments``)
@@ -23,13 +23,20 @@ from darkfactory.rework_context import ReworkContext, ReworkError
 from .conftest import write_prd
 
 
-def _init_git_repo(path: Path) -> None:
-    """Minimal git init so ``_find_repo_root`` can locate the tmp dir."""
-    (path / ".git").mkdir(exist_ok=True)
+def _setup_project(tmp_path: Path) -> Path:
+    """Create .darkfactory/ layout with .git and return the prds dir."""
+    (tmp_path / ".git").mkdir(exist_ok=True)
+    df = tmp_path / ".darkfactory"
+    df.mkdir()
+    prds = df / "data" / "prds"
+    prds.mkdir(parents=True)
+    (df / "data" / "archive").mkdir()
+    (df / "workflows").mkdir()
+    return prds
 
 
-def _base_args(prds_dir: Path) -> list[str]:
-    return ["--prd-dir", str(prds_dir), "rework"]
+def _base_args(tmp_path: Path) -> list[str]:
+    return ["--directory", str(tmp_path), "rework"]
 
 
 def _make_discovered(
@@ -71,13 +78,11 @@ def _thread() -> ReviewThread:
 def test_rework_errors_if_prd_not_in_review(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _init_git_repo(tmp_path)
-    prds_dir = tmp_path / "prds"
-    prds_dir.mkdir()
+    prds_dir = _setup_project(tmp_path)
     write_prd(prds_dir, "PRD-001", "my-feature", status="ready")
 
     with pytest.raises(SystemExit) as exc_info:
-        main([*_base_args(prds_dir), "PRD-001"])
+        main([*_base_args(tmp_path), "PRD-001"])
 
     assert exc_info.value.code != 0 or isinstance(exc_info.value.code, str)
     assert "ready" in str(exc_info.value.code)
@@ -90,9 +95,7 @@ def test_rework_errors_if_prd_not_in_review(
 def test_rework_errors_when_discovery_reports_missing_worktree(
     tmp_path: Path,
 ) -> None:
-    _init_git_repo(tmp_path)
-    prds_dir = tmp_path / "prds"
-    prds_dir.mkdir()
+    prds_dir = _setup_project(tmp_path)
     write_prd(prds_dir, "PRD-001", "my-feature", status="review")
 
     with patch(
@@ -100,15 +103,13 @@ def test_rework_errors_when_discovery_reports_missing_worktree(
         side_effect=ReworkError("No worktree found for PRD-001. Run ..."),
     ):
         with pytest.raises(SystemExit) as exc_info:
-            main([*_base_args(prds_dir), "PRD-001"])
+            main([*_base_args(tmp_path), "PRD-001"])
 
     assert "No worktree found" in str(exc_info.value.code)
 
 
 def test_rework_errors_when_discovery_reports_no_open_pr(tmp_path: Path) -> None:
-    _init_git_repo(tmp_path)
-    prds_dir = tmp_path / "prds"
-    prds_dir.mkdir()
+    prds_dir = _setup_project(tmp_path)
     write_prd(prds_dir, "PRD-001", "my-feature", status="review")
 
     with patch(
@@ -116,15 +117,13 @@ def test_rework_errors_when_discovery_reports_no_open_pr(tmp_path: Path) -> None
         side_effect=ReworkError("No open PR found for PRD-001"),
     ):
         with pytest.raises(SystemExit) as exc_info:
-            main([*_base_args(prds_dir), "PRD-001"])
+            main([*_base_args(tmp_path), "PRD-001"])
 
     assert "No open PR found" in str(exc_info.value.code)
 
 
 def test_rework_errors_when_discovery_reports_guard_blocked(tmp_path: Path) -> None:
-    _init_git_repo(tmp_path)
-    prds_dir = tmp_path / "prds"
-    prds_dir.mkdir()
+    prds_dir = _setup_project(tmp_path)
     write_prd(prds_dir, "PRD-001", "my-feature", status="review")
 
     with patch(
@@ -134,7 +133,7 @@ def test_rework_errors_when_discovery_reports_guard_blocked(tmp_path: Path) -> N
         ),
     ):
         with pytest.raises(SystemExit) as exc_info:
-            main([*_base_args(prds_dir), "PRD-001", "--execute"])
+            main([*_base_args(tmp_path), "PRD-001", "--execute"])
 
     assert "blocked by the rework loop guard" in str(exc_info.value.code)
 
@@ -145,9 +144,7 @@ def test_rework_errors_when_discovery_reports_guard_blocked(tmp_path: Path) -> N
 def test_rework_dry_run_prints_summary(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _init_git_repo(tmp_path)
-    prds_dir = tmp_path / "prds"
-    prds_dir.mkdir()
+    prds_dir = _setup_project(tmp_path)
     write_prd(prds_dir, "PRD-001", "my-feature", status="review")
 
     discovered = _make_discovered(tmp_path, threads=[_thread()])
@@ -155,7 +152,7 @@ def test_rework_dry_run_prints_summary(
     with patch(
         "darkfactory.cli.rework.discover_rework_context", return_value=discovered
     ):
-        result = main([*_base_args(prds_dir), "PRD-001"])
+        result = main([*_base_args(tmp_path), "PRD-001"])
 
     assert result == 0
     out = capsys.readouterr().out
@@ -170,9 +167,7 @@ def test_rework_dry_run_passes_filter_flags_to_discovery(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Filter CLI args reach discover_rework_context in the CommentFilters."""
-    _init_git_repo(tmp_path)
-    prds_dir = tmp_path / "prds"
-    prds_dir.mkdir()
+    prds_dir = _setup_project(tmp_path)
     write_prd(prds_dir, "PRD-001", "my-feature", status="review")
 
     discovered = _make_discovered(tmp_path)
@@ -182,7 +177,7 @@ def test_rework_dry_run_passes_filter_flags_to_discovery(
     ) as mock_discover:
         main(
             [
-                *_base_args(prds_dir),
+                *_base_args(tmp_path),
                 "PRD-001",
                 "--all",
                 "--reviewer",
@@ -206,9 +201,7 @@ def test_rework_execute_no_comments_exits_cleanly(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """When discovery reports no unaddressed comments, exit 0 without running."""
-    _init_git_repo(tmp_path)
-    prds_dir = tmp_path / "prds"
-    prds_dir.mkdir()
+    prds_dir = _setup_project(tmp_path)
     write_prd(prds_dir, "PRD-001", "my-feature", status="review")
 
     discovered = _make_discovered(tmp_path, threads=[])
@@ -219,7 +212,7 @@ def test_rework_execute_no_comments_exits_cleanly(
         ),
         patch("darkfactory.cli.rework.run_workflow") as mock_run,
     ):
-        result = main([*_base_args(prds_dir), "PRD-001", "--execute"])
+        result = main([*_base_args(tmp_path), "PRD-001", "--execute"])
 
     assert result == 0
     out = capsys.readouterr().out
@@ -235,9 +228,7 @@ def test_rework_execute_with_comments_invokes_workflow(
     from darkfactory.runner import RunResult
     from darkfactory.workflow import Workflow
 
-    _init_git_repo(tmp_path)
-    prds_dir = tmp_path / "prds"
-    prds_dir.mkdir()
+    prds_dir = _setup_project(tmp_path)
     write_prd(prds_dir, "PRD-001", "my-feature", status="review")
 
     thread = _thread()
@@ -259,7 +250,7 @@ def test_rework_execute_with_comments_invokes_workflow(
         ) as mock_run,
     ):
         result = main(
-            [*_base_args(prds_dir), "PRD-001", "--execute", "--reply-to-comments"]
+            [*_base_args(tmp_path), "PRD-001", "--execute", "--reply-to-comments"]
         )
 
     assert result == 0

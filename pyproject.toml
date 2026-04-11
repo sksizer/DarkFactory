@@ -1,6 +1,6 @@
 [project]
 name = "darkfactory"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Standalone PRD harness: DAG orchestration, declarative workflows, agent invocation, stacked PRs."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -25,6 +25,9 @@ dev = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/darkfactory/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/darkfactory"]

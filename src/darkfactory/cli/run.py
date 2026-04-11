@@ -19,7 +19,7 @@ from darkfactory.graph_execution import (
     execute_graph,
     plan_execution,
 )
-from darkfactory.prd import PRD
+from darkfactory.model import PRD
 from darkfactory.runner import run_workflow
 from darkfactory.style import Element, Styler
 from darkfactory.workflow import Workflow
@@ -87,9 +87,9 @@ def cmd_run(args: argparse.Namespace) -> int:
         print("error: provide either a PRD ID or --all", file=sys.stderr)
         return 1
 
-    prds = _load(args.prd_dir)
+    prds = _load(args.data_dir)
     workflows = _load_workflows_or_fail(args.workflows_dir)
-    repo_root = _find_repo_root(args.prd_dir)
+    repo_root = _find_repo_root(args.data_dir)
     base_ref = _resolve_base_ref(args.base, repo_root)
     dry_run = not args.execute
     styler: Styler = args.styler
@@ -287,7 +287,7 @@ def _cmd_run_queue(
     session = generate_session_id()
 
     report = execute_graph(
-        prd_dir=args.prd_dir,
+        data_dir=args.data_dir,
         repo_root=repo_root,
         workflows=workflows,
         strategy=strategy,
@@ -407,7 +407,7 @@ def _cmd_run_graph(
 
     report = execute_graph(
         root_id=prd.id,
-        prd_dir=args.prd_dir,
+        data_dir=args.data_dir,
         repo_root=repo_root,
         workflows=workflows,
         default_base=default_base,

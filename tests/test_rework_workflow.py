@@ -152,7 +152,7 @@ def test_rework_workflow_has_no_legacy_fetch_pr_comments(
 
 
 def _make_prd(tmp_path: Path, prd_id: str = "PRD-001") -> object:
-    from darkfactory.prd import load_all
+    from darkfactory.model import load_all
 
     prds_dir = tmp_path / "prds"
     prds_dir.mkdir(exist_ok=True)

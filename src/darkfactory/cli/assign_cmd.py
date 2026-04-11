@@ -6,7 +6,7 @@ import argparse
 
 from darkfactory import assign
 from darkfactory.cli._shared import _emit_json, _load, _load_workflows_or_fail
-from darkfactory.prd import parse_id_sort_key, set_workflow
+from darkfactory.model import parse_id_sort_key, set_workflow
 
 
 def cmd_assign(args: argparse.Namespace) -> int:
@@ -17,7 +17,7 @@ def cmd_assign(args: argparse.Namespace) -> int:
     (only for PRDs that don't already have an explicit workflow field —
     the command is idempotent on re-run).
     """
-    prds = _load(args.prd_dir)
+    prds = _load(args.data_dir)
     workflows = _load_workflows_or_fail(args.workflows_dir)
 
     if not workflows:

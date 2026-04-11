@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 from .workflow import Task
 
 if TYPE_CHECKING:
-    from .prd import PRD
+    from .model import PRD
 
 
 @dataclass

@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 
 from darkfactory.assign import assign_all, assign_workflow
-from darkfactory.prd import load_all
+from darkfactory.model import load_all
 from darkfactory.workflow import BuiltIn, Workflow
 
 from .conftest import write_prd
@@ -38,7 +38,7 @@ def _make_workflow(
 
 def test_explicit_workflow_field_wins(tmp_prd_dir: Path) -> None:
     """If prd.workflow is set, it overrides predicate matching."""
-    write_prd(tmp_prd_dir, "PRD-070", "task", workflow="specific")
+    write_prd(tmp_prd_dir / "prds","PRD-070", "task", workflow="specific")
     prds = load_all(tmp_prd_dir)
 
     default = _make_workflow("default", priority=0)
@@ -51,7 +51,7 @@ def test_explicit_workflow_field_wins(tmp_prd_dir: Path) -> None:
 
 def test_explicit_field_ignored_if_workflow_not_loaded(tmp_prd_dir: Path) -> None:
     """If prd.workflow names a workflow that isn't registered, fall through to predicates."""
-    write_prd(tmp_prd_dir, "PRD-070", "task", workflow="nonexistent")
+    write_prd(tmp_prd_dir / "prds","PRD-070", "task", workflow="nonexistent")
     prds = load_all(tmp_prd_dir)
 
     default = _make_workflow(
@@ -69,7 +69,7 @@ def test_explicit_field_ignored_if_workflow_not_loaded(tmp_prd_dir: Path) -> Non
 
 def test_highest_priority_predicate_wins(tmp_prd_dir: Path) -> None:
     """Among matching predicates, the highest-priority workflow is chosen."""
-    write_prd(tmp_prd_dir, "PRD-070", "task")
+    write_prd(tmp_prd_dir / "prds","PRD-070", "task")
     prds = load_all(tmp_prd_dir)
 
     low = _make_workflow(
@@ -90,7 +90,7 @@ def test_highest_priority_predicate_wins(tmp_prd_dir: Path) -> None:
 
 def test_alphabetical_tiebreak_on_equal_priority(tmp_prd_dir: Path) -> None:
     """Equal priority -> alphabetical by name for determinism."""
-    write_prd(tmp_prd_dir, "PRD-070", "task")
+    write_prd(tmp_prd_dir / "prds","PRD-070", "task")
     prds = load_all(tmp_prd_dir)
 
     bravo = _make_workflow(
@@ -111,7 +111,7 @@ def test_alphabetical_tiebreak_on_equal_priority(tmp_prd_dir: Path) -> None:
 
 def test_only_matching_predicates_considered(tmp_prd_dir: Path) -> None:
     """Workflows whose predicate returns False are ignored even at high priority."""
-    write_prd(tmp_prd_dir, "PRD-070", "task", kind="task")
+    write_prd(tmp_prd_dir / "prds","PRD-070", "task", kind="task")
     prds = load_all(tmp_prd_dir)
 
     # High priority but doesn't match
@@ -136,7 +136,7 @@ def test_only_matching_predicates_considered(tmp_prd_dir: Path) -> None:
 
 
 def test_default_fallback_when_no_predicate_matches(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-070", "task")
+    write_prd(tmp_prd_dir / "prds","PRD-070", "task")
     prds = load_all(tmp_prd_dir)
 
     default = _make_workflow("default")  # default predicate returns False
@@ -151,7 +151,7 @@ def test_default_fallback_when_no_predicate_matches(tmp_prd_dir: Path) -> None:
 
 
 def test_raises_key_error_when_no_match_and_no_default(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-070", "task")
+    write_prd(tmp_prd_dir / "prds","PRD-070", "task")
     prds = load_all(tmp_prd_dir)
 
     other = _make_workflow(
@@ -168,7 +168,7 @@ def test_raises_key_error_when_no_match_and_no_default(tmp_prd_dir: Path) -> Non
 
 
 def test_accepts_two_arg_predicate(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-070", "task")
+    write_prd(tmp_prd_dir / "prds","PRD-070", "task")
     prds = load_all(tmp_prd_dir)
 
     wf = _make_workflow(
@@ -182,7 +182,7 @@ def test_accepts_two_arg_predicate(tmp_prd_dir: Path) -> None:
 
 def test_accepts_one_arg_legacy_predicate(tmp_prd_dir: Path) -> None:
     """A legacy ``lambda prd: ...`` still works via TypeError fallback."""
-    write_prd(tmp_prd_dir, "PRD-070", "task")
+    write_prd(tmp_prd_dir / "prds","PRD-070", "task")
     prds = load_all(tmp_prd_dir)
 
     wf = _make_workflow(
@@ -198,9 +198,9 @@ def test_accepts_one_arg_legacy_predicate(tmp_prd_dir: Path) -> None:
 
 
 def test_assign_all_returns_dict_keyed_by_id(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-070", "one")
-    write_prd(tmp_prd_dir, "PRD-071", "two")
-    write_prd(tmp_prd_dir, "PRD-072", "three")
+    write_prd(tmp_prd_dir / "prds","PRD-070", "one")
+    write_prd(tmp_prd_dir / "prds","PRD-071", "two")
+    write_prd(tmp_prd_dir / "prds","PRD-072", "three")
     prds = load_all(tmp_prd_dir)
 
     default = _make_workflow("default")
@@ -212,8 +212,8 @@ def test_assign_all_returns_dict_keyed_by_id(tmp_prd_dir: Path) -> None:
 
 
 def test_assign_all_respects_explicit_and_predicate_routing(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-070", "one", workflow="special")
-    write_prd(tmp_prd_dir, "PRD-071", "two")
+    write_prd(tmp_prd_dir / "prds","PRD-070", "one", workflow="special")
+    write_prd(tmp_prd_dir / "prds","PRD-071", "two")
     prds = load_all(tmp_prd_dir)
 
     default = _make_workflow("default")

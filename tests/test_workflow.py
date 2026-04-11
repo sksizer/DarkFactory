@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from darkfactory.prd import load_all
+from darkfactory.model import load_all
 from darkfactory.workflow import (
     AgentTask,
     BuiltIn,
@@ -139,7 +139,7 @@ def test_workflow_with_tasks() -> None:
 
 
 def test_workflow_custom_applies_to(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-070", "ui-task")
+    write_prd(tmp_prd_dir / "prds", "PRD-070", "ui-task")
     prds = load_all(tmp_prd_dir)
 
     def predicate(prd, prds):  # type: ignore[no-untyped-def]
@@ -150,7 +150,7 @@ def test_workflow_custom_applies_to(tmp_prd_dir: Path) -> None:
 
 
 def test_default_applies_to_returns_false(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-070", "task")
+    write_prd(tmp_prd_dir / "prds", "PRD-070", "task")
     prds = load_all(tmp_prd_dir)
     assert _default_applies_to(prds["PRD-070"], prds) is False
 
@@ -159,7 +159,7 @@ def test_default_applies_to_returns_false(tmp_prd_dir: Path) -> None:
 
 
 def _make_ctx(tmp_prd_dir: Path) -> ExecutionContext:
-    write_prd(tmp_prd_dir, "PRD-070", "tera-filter-obsidian-link")
+    write_prd(tmp_prd_dir / "prds", "PRD-070", "tera-filter-obsidian-link")
     prds = load_all(tmp_prd_dir)
     return ExecutionContext(
         prd=prds["PRD-070"],

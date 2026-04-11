@@ -10,7 +10,7 @@ from pathlib import Path
 
 from darkfactory import containment, graph
 from darkfactory.git_ops import git_check, git_run
-from darkfactory.prd import PRD, load_all, parse_id_sort_key
+from darkfactory.model import PRD, load_all, parse_id_sort_key
 from darkfactory.workflow import Workflow
 
 # Priority/effort orderings used for sorting actionable lists.
@@ -76,10 +76,11 @@ def _action_sort_key(prd: PRD) -> tuple[int, int, tuple[int, ...]]:
     )
 
 
-def _load(prd_dir: Path) -> dict[str, PRD]:
-    if not prd_dir.exists():
-        raise SystemExit(f"PRD directory not found: {prd_dir}")
-    return load_all(prd_dir)
+def _load(data_dir: Path) -> dict[str, PRD]:
+    prds_dir = data_dir / "prds"
+    if not prds_dir.exists():
+        raise SystemExit(f"PRD directory not found: {prds_dir}")
+    return load_all(data_dir)
 
 
 def _resolve_base_ref(explicit: str | None, repo_root: Path) -> str:

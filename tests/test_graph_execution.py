@@ -22,7 +22,7 @@ from darkfactory.graph_execution import (
     plan_execution,
     resolve_base_ref,
 )
-from darkfactory.prd import PRD, load_all, set_status_at
+from darkfactory.model import PRD, load_all, set_status_at
 from darkfactory.runner import RunResult
 from darkfactory.workflow import Workflow
 

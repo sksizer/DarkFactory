@@ -21,6 +21,19 @@ from darkfactory.cli._shared import _resolve_base_ref
 from .conftest import write_prd
 
 
+def _setup_project(tmp_path: Path) -> tuple[Path, Path]:
+    """Create .darkfactory/ layout with .git and return (prds_dir, workflows_dir)."""
+    (tmp_path / ".git").mkdir(exist_ok=True)
+    df = tmp_path / ".darkfactory"
+    df.mkdir()
+    prds = df / "data" / "prds"
+    prds.mkdir(parents=True)
+    (df / "data" / "archive").mkdir()
+    workflows = df / "workflows"
+    workflows.mkdir()
+    return prds, workflows
+
+
 def _write_workflow_with_prompts(workflows_dir: Path, name: str = "default") -> None:
     """Create a minimal workflow with prompt files for end-to-end tests.
 
@@ -59,14 +72,7 @@ workflow = Workflow(
 
 
 def _init_git_repo(path: Path) -> None:
-    """Minimal git init so ``_find_repo_root`` can locate the tmp dir.
-
-    The harness's CLI walks up from ``--prd-dir`` looking for ``.git``
-    to use as the repo root; without this, plan/run commands raise
-    ``SystemExit``. We use a bare `.git` directory rather than a full
-    ``git init`` because none of the tests in this file actually need
-    a functioning git repo — they mock subprocess calls where necessary.
-    """
+    """Minimal git init so ``_find_repo_root`` can locate the tmp dir."""
     (path / ".git").mkdir(exist_ok=True)
 
 
@@ -76,20 +82,15 @@ def _init_git_repo(path: Path) -> None:
 def test_plan_shows_workflow_and_tasks(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _init_git_repo(tmp_path)
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_workflow_with_prompts(workflows_dir)
 
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-070", "my-task", capability="simple")
 
     exit_code = main(
         [
-            "--prd-dir",
-            str(prd_dir),
-            "--workflows-dir",
-            str(workflows_dir),
+            "--directory",
+            str(tmp_path),
             "plan",
             "PRD-070",
         ]
@@ -107,20 +108,15 @@ def test_plan_shows_workflow_and_tasks(
 
 
 def test_plan_json_output(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    _init_git_repo(tmp_path)
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_workflow_with_prompts(workflows_dir)
 
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-070", "task", capability="complex")
 
     main(
         [
-            "--prd-dir",
-            str(prd_dir),
-            "--workflows-dir",
-            str(workflows_dir),
+            "--directory",
+            str(tmp_path),
             "--json",
             "plan",
             "PRD-070",
@@ -137,20 +133,15 @@ def test_plan_json_output(tmp_path: Path, capsys: pytest.CaptureFixture[str]) ->
 def test_plan_flags_not_runnable_done_prd(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _init_git_repo(tmp_path)
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_workflow_with_prompts(workflows_dir)
 
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-070", "done-task", status="done")
 
     main(
         [
-            "--prd-dir",
-            str(prd_dir),
-            "--workflows-dir",
-            str(workflows_dir),
+            "--directory",
+            str(tmp_path),
             "plan",
             "PRD-070",
         ]
@@ -164,21 +155,16 @@ def test_plan_workflow_override(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """--workflow pins an explicit workflow, bypassing assignment."""
-    _init_git_repo(tmp_path)
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_workflow_with_prompts(workflows_dir, name="default")
     _write_workflow_with_prompts(workflows_dir, name="special")
 
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-070", "task")
 
     main(
         [
-            "--prd-dir",
-            str(prd_dir),
-            "--workflows-dir",
-            str(workflows_dir),
+            "--directory",
+            str(tmp_path),
             "plan",
             "PRD-070",
             "--workflow",
@@ -190,19 +176,15 @@ def test_plan_workflow_override(
 
 
 def test_plan_unknown_prd_errors(tmp_path: Path) -> None:
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_workflow_with_prompts(workflows_dir)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-001", "exists")
 
     with pytest.raises(SystemExit, match="unknown PRD"):
         main(
             [
-                "--prd-dir",
-                str(prd_dir),
-                "--workflows-dir",
-                str(workflows_dir),
+                "--directory",
+                str(tmp_path),
                 "plan",
                 "PRD-999",
             ]
@@ -210,19 +192,15 @@ def test_plan_unknown_prd_errors(tmp_path: Path) -> None:
 
 
 def test_plan_unknown_workflow_errors(tmp_path: Path) -> None:
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_workflow_with_prompts(workflows_dir)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-070", "task")
 
     with pytest.raises(SystemExit, match="unknown workflow"):
         main(
             [
-                "--prd-dir",
-                str(prd_dir),
-                "--workflows-dir",
-                str(workflows_dir),
+                "--directory",
+                str(tmp_path),
                 "plan",
                 "PRD-070",
                 "--workflow",
@@ -238,20 +216,15 @@ def test_run_dry_run_default(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """`prd run` without --execute is a dry-run and doesn't touch anything."""
-    _init_git_repo(tmp_path)
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_workflow_with_prompts(workflows_dir)
 
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-070", "task")
 
     exit_code = main(
         [
-            "--prd-dir",
-            str(prd_dir),
-            "--workflows-dir",
-            str(workflows_dir),
+            "--directory",
+            str(tmp_path),
             "run",
             "PRD-070",
         ]
@@ -268,12 +241,9 @@ def test_run_dry_run_default(
 
 def test_run_dry_run_no_subprocess(tmp_path: Path) -> None:
     """Dry-run shouldn't actually invoke subprocess at any point."""
-    _init_git_repo(tmp_path)
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_workflow_with_prompts(workflows_dir)
 
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-070", "task")
 
     with patch("subprocess.run") as mock_run:
@@ -284,10 +254,8 @@ def test_run_dry_run_no_subprocess(tmp_path: Path) -> None:
         )
         main(
             [
-                "--prd-dir",
-                str(prd_dir),
-                "--workflows-dir",
-                str(workflows_dir),
+                "--directory",
+                str(tmp_path),
                 "run",
                 "PRD-070",
             ]
@@ -301,21 +269,16 @@ def test_run_dry_run_no_subprocess(tmp_path: Path) -> None:
 
 
 def test_run_execute_refuses_done_prd(tmp_path: Path) -> None:
-    _init_git_repo(tmp_path)
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_workflow_with_prompts(workflows_dir)
 
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-070", "done", status="done")
 
     with pytest.raises(SystemExit, match="already done"):
         main(
             [
-                "--prd-dir",
-                str(prd_dir),
-                "--workflows-dir",
-                str(workflows_dir),
+                "--directory",
+                str(tmp_path),
                 "run",
                 "PRD-070",
                 "--execute",
@@ -324,21 +287,16 @@ def test_run_execute_refuses_done_prd(tmp_path: Path) -> None:
 
 
 def test_run_execute_refuses_draft_prd(tmp_path: Path) -> None:
-    _init_git_repo(tmp_path)
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_workflow_with_prompts(workflows_dir)
 
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-070", "draft", status="draft")
 
     with pytest.raises(SystemExit, match="not 'ready'"):
         main(
             [
-                "--prd-dir",
-                str(prd_dir),
-                "--workflows-dir",
-                str(workflows_dir),
+                "--directory",
+                str(tmp_path),
                 "run",
                 "PRD-070",
                 "--execute",
@@ -359,12 +317,9 @@ def test_run_execute_with_unfinished_deps_walks_graph(
     assert on the graph-execution code path being entered (non-zero exit
     + "Executing graph" header), not on the specific failure reason.
     """
-    _init_git_repo(tmp_path)
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_workflow_with_prompts(workflows_dir)
 
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-070", "dep", status="ready")
     write_prd(
         prd_dir,
@@ -376,10 +331,8 @@ def test_run_execute_with_unfinished_deps_walks_graph(
 
     rc = main(
         [
-            "--prd-dir",
-            str(prd_dir),
-            "--workflows-dir",
-            str(workflows_dir),
+            "--directory",
+            str(tmp_path),
             "run",
             "PRD-071",
             "--execute",
@@ -395,8 +348,7 @@ def test_run_execute_exits_nonzero_on_workflow_failure(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """When the runner returns failure, `prd run --execute` exits 1."""
-    _init_git_repo(tmp_path)
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     # Write a workflow that will fail in its shell task
     wf = workflows_dir / "default"
     (wf / "prompts").mkdir(parents=True)
@@ -414,17 +366,13 @@ workflow = Workflow(
 '''
     )
 
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-070", "task", status="ready")
 
     with patch("darkfactory.cli.run._resolve_base_ref", return_value="main"):
         exit_code = main(
             [
-                "--prd-dir",
-                str(prd_dir),
-                "--workflows-dir",
-                str(workflows_dir),
+                "--directory",
+                str(tmp_path),
                 "run",
                 "PRD-070",
                 "--execute",
@@ -544,20 +492,15 @@ def test_run_all_mutual_exclusivity(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """AC-3: --all and a PRD ID are mutually exclusive."""
-    _init_git_repo(tmp_path)
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_workflow_with_prompts(workflows_dir)
 
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-070", "task")
 
     exit_code = main(
         [
-            "--prd-dir",
-            str(prd_dir),
-            "--workflows-dir",
-            str(workflows_dir),
+            "--directory",
+            str(tmp_path),
             "run",
             "PRD-070",
             "--all",
@@ -570,19 +513,12 @@ def test_run_all_mutual_exclusivity(
 
 def test_run_no_args_errors(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """AC-4: `prd run` with no PRD ID and no --all exits with a clear message."""
-    _init_git_repo(tmp_path)
-    workflows_dir = tmp_path / "workflows"
-    _write_workflow_with_prompts(workflows_dir)
-
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    prd_dir, _workflows_dir = _setup_project(tmp_path)
 
     exit_code = main(
         [
-            "--prd-dir",
-            str(prd_dir),
-            "--workflows-dir",
-            str(workflows_dir),
+            "--directory",
+            str(tmp_path),
             "run",
         ]
     )
@@ -595,22 +531,17 @@ def test_run_all_dry_run_shows_queue(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """AC-1: `prd run --all` in dry-run prints the ordered ready queue."""
-    _init_git_repo(tmp_path)
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_workflow_with_prompts(workflows_dir)
 
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-001", "first", priority="high")
     write_prd(prd_dir, "PRD-002", "second", priority="medium")
     write_prd(prd_dir, "PRD-003", "done-skip", status="done")
 
     exit_code = main(
         [
-            "--prd-dir",
-            str(prd_dir),
-            "--workflows-dir",
-            str(workflows_dir),
+            "--directory",
+            str(tmp_path),
             "run",
             "--all",
         ]
@@ -628,21 +559,16 @@ def test_run_all_dry_run_filters(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """AC-5: --priority, --tag, and --exclude are passed through to the queue."""
-    _init_git_repo(tmp_path)
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_workflow_with_prompts(workflows_dir)
 
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-001", "high-pri", priority="high")
     write_prd(prd_dir, "PRD-002", "low-pri", priority="low")
 
     exit_code = main(
         [
-            "--prd-dir",
-            str(prd_dir),
-            "--workflows-dir",
-            str(workflows_dir),
+            "--directory",
+            str(tmp_path),
             "run",
             "--all",
             "--priority",
@@ -659,21 +585,16 @@ def test_run_all_dry_run_exclude(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """AC-5: --exclude filters out specific PRD IDs."""
-    _init_git_repo(tmp_path)
-    workflows_dir = tmp_path / "workflows"
+    prd_dir, workflows_dir = _setup_project(tmp_path)
     _write_workflow_with_prompts(workflows_dir)
 
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
     write_prd(prd_dir, "PRD-001", "keep")
     write_prd(prd_dir, "PRD-002", "exclude-me")
 
     exit_code = main(
         [
-            "--prd-dir",
-            str(prd_dir),
-            "--workflows-dir",
-            str(workflows_dir),
+            "--directory",
+            str(tmp_path),
             "run",
             "--all",
             "--exclude",

@@ -6,7 +6,7 @@ import argparse
 import sys
 
 from darkfactory.cli._shared import _load, _resolve_prd_or_exit
-from darkfactory.prd import PRD, normalize_list_field_at, parse_id_sort_key
+from darkfactory.model import PRD, normalize_list_field_at, parse_id_sort_key
 
 #: List fields that ``prd normalize`` canonicalizes.
 _NORMALIZABLE_FIELDS: tuple[str, ...] = ("tags", "impacts", "depends_on", "blocks")
@@ -40,7 +40,7 @@ def cmd_normalize(args: argparse.Namespace) -> int:
     With ``--check``, prints how many files would change and exits non-zero
     without writing anything — suitable for CI.
     """
-    prds = _load(args.prd_dir)
+    prds = _load(args.data_dir)
 
     if args.all:
         targets = sorted(prds.values(), key=lambda p: parse_id_sort_key(p.id))

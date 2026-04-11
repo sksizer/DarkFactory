@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .prd import PRD
+from .model import PRD
 from .workflow import Workflow
 
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from darkfactory.prd import load_all
+from darkfactory.model import load_all
 from darkfactory.templates import (
     compose_prompt,
     load_prompt_files,
@@ -122,7 +122,8 @@ def _make_ctx(
     tmp_prd_dir: Path, workflow_dir: Path
 ) -> tuple[Workflow, ExecutionContext]:
     """Build a workflow (with workflow_dir set) and a context for testing compose."""
-    write_prd(tmp_prd_dir, "PRD-070", "test-task")
+    (tmp_prd_dir / "prds").mkdir(exist_ok=True)
+    write_prd(tmp_prd_dir / "prds", "PRD-070", "test-task")
     prds = load_all(tmp_prd_dir)
     wf = Workflow(name="default", workflow_dir=workflow_dir)
     ctx = ExecutionContext(
@@ -221,7 +222,8 @@ def test_compose_prompt_raises_when_workflow_dir_unset(tmp_path: Path) -> None:
     """A Workflow built by hand without workflow_dir can't compose prompts."""
     prd_dir = tmp_path / "prds"
     prd_dir.mkdir()
-    write_prd(prd_dir, "PRD-070", "test")
+    (prd_dir / "prds").mkdir()
+    write_prd(prd_dir / "prds", "PRD-070", "test")
     prds = load_all(prd_dir)
 
     wf = Workflow(name="hand-built")  # workflow_dir is None

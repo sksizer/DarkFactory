@@ -16,7 +16,7 @@ from darkfactory.checks import (
     is_resume_safe,
     validate_review_branches,
 )
-from darkfactory.prd import load_all
+from darkfactory.model import load_all
 
 from .conftest import write_prd
 

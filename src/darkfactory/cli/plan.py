@@ -15,7 +15,7 @@ from darkfactory.cli._shared import (
     _resolve_prd_or_exit,
 )
 from darkfactory.invoke import capability_to_model
-from darkfactory.prd import PRD
+from darkfactory.model import PRD
 from darkfactory.runner import _compute_branch_name, _pick_model
 from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Task
 
@@ -49,7 +49,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
     and prints the ordered task list with descriptions. Uses git
     subprocess only for base-ref resolution; no agent invocation.
     """
-    prds = _load(args.prd_dir)
+    prds = _load(args.data_dir)
     prd = _resolve_prd_or_exit(args.prd_id, prds)
 
     workflows = _load_workflows_or_fail(args.workflows_dir)
@@ -66,7 +66,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
             raise SystemExit(str(exc))
 
     branch = _compute_branch_name(prd)
-    repo_root = _find_repo_root(args.prd_dir)
+    repo_root = _find_repo_root(args.data_dir)
     base_ref = _resolve_base_ref(args.base, repo_root)
 
     # Note any runnability issues as warnings (plan still shows, but

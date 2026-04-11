@@ -19,12 +19,12 @@ def launch_discuss_for_prd(prd_id: str, args: argparse.Namespace) -> int:
     Shared entry point used by both ``cmd_discuss`` and ``prd new --discuss``.
     """
     cwd = Path.cwd()
-    check_prerequisites(args.prd_dir.parent if hasattr(args, "prd_dir") else cwd)
+    check_prerequisites(args.data_dir.parent if hasattr(args, "data_dir") else cwd)
 
-    prds = _load(args.prd_dir)
+    prds = _load(args.data_dir)
     _resolve_prd_or_exit(prd_id, prds)
 
-    repo_root = _find_repo_root(args.prd_dir)
+    repo_root = _find_repo_root(args.data_dir)
 
     pkg_dir = Path(__file__).resolve().parent.parent / "commands" / "discuss"
 

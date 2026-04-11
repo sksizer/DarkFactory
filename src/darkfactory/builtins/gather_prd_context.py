@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from darkfactory.builtins.system_builtins import _register
-from darkfactory.prd import PRD
+from darkfactory.model import PRD
 from darkfactory.system import SystemContext
 
 

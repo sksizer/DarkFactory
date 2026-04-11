@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from darkfactory.prd import (
+from darkfactory.model import (
     update_frontmatter_field_at,
     PRD_ID_RE,
     load_all,
@@ -97,7 +97,7 @@ def test_parse_wikilinks_handles_none() -> None:
 
 
 def test_parse_prd_minimal(tmp_prd_dir: Path) -> None:
-    path = write_prd(tmp_prd_dir, "PRD-070", "minimal-task")
+    path = write_prd(tmp_prd_dir / "prds", "PRD-070", "minimal-task")
     prd = parse_prd(path)
     assert prd.id == "PRD-070"
     assert prd.slug == "minimal-task"
@@ -111,9 +111,9 @@ def test_parse_prd_minimal(tmp_prd_dir: Path) -> None:
 
 
 def test_parse_prd_with_relations(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "epic", kind="epic")
     path = write_prd(
-        tmp_prd_dir,
+        tmp_prd_dir / "prds",
         "PRD-070",
         "child",
         parent="PRD-001",
@@ -131,15 +131,15 @@ def test_parse_prd_with_relations(tmp_prd_dir: Path) -> None:
 
 
 def test_load_all_skips_underscore_files(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "first")
-    (tmp_prd_dir / "_template.md").write_text("---\nid: bogus\n---\n", encoding="utf-8")
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "first")
+    (tmp_prd_dir / "prds" / "_template.md").write_text("---\nid: bogus\n---\n", encoding="utf-8")
     prds = load_all(tmp_prd_dir)
     assert set(prds.keys()) == {"PRD-001"}
 
 
 def test_load_all_rejects_duplicate_ids(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "a")
-    write_prd(tmp_prd_dir, "PRD-001", "b")
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "a")
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "b")
     with pytest.raises(ValueError, match="duplicate"):
         load_all(tmp_prd_dir)
 
@@ -148,7 +148,7 @@ def test_load_all_rejects_duplicate_ids(tmp_prd_dir: Path) -> None:
 
 
 def test_set_status_preserves_body(tmp_prd_dir: Path) -> None:
-    path = write_prd(tmp_prd_dir, "PRD-070", "task", body="# Title\n\nLine 1\nLine 2\n")
+    path = write_prd(tmp_prd_dir / "prds", "PRD-070", "task", body="# Title\n\nLine 1\nLine 2\n")
     prd = parse_prd(path)
     set_status(prd, "in-progress")
     reread = parse_prd(path)
@@ -160,7 +160,7 @@ def test_set_status_preserves_body(tmp_prd_dir: Path) -> None:
 def test_set_status_bumps_updated(tmp_prd_dir: Path) -> None:
     from datetime import date
 
-    path = write_prd(tmp_prd_dir, "PRD-070", "task")
+    path = write_prd(tmp_prd_dir / "prds", "PRD-070", "task")
     prd = parse_prd(path)
     set_status(prd, "review")
     reread = parse_prd(path)
