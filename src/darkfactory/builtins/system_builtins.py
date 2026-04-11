@@ -242,3 +242,11 @@ def audit_impacts_check(ctx: SystemContext) -> None:
         raise ValueError(
             f"{total_errors} declared impact path(s) missing on completed PRDs"
         )
+
+
+# Side-effect imports: each module's @_register decorator populates
+# SYSTEM_BUILTINS at import time. E402 because they must follow the _register
+# definition; F401 because the import is for its side effect, not its name.
+import darkfactory.builtins.gather_prd_context as _gather  # noqa: E402, F401
+import darkfactory.builtins.discuss_prd as _discuss  # noqa: E402, F401
+import darkfactory.builtins.commit_prd_changes as _commit  # noqa: E402, F401
