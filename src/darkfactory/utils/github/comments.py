@@ -20,5 +20,7 @@ def post_comment_reply(
     Returns the completed-process result — callers decide how to handle
     non-zero exit codes.
     """
-    endpoint = f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/comments/{target_id}/replies"
+    endpoint = (
+        f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/comments/{target_id}/replies"
+    )
     return gh_api("POST", endpoint, [("body", body)], cwd=cwd)

@@ -2,7 +2,7 @@
 id: PRD-621
 title: Refactor common functionality in regards to external systems, services, commands to util modules
 kind: task
-status: in-progress
+status: review
 priority: medium
 effort: m
 capability: moderate

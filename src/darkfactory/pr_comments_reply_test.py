@@ -181,7 +181,9 @@ def test_post_comment_replies_failure_returns_false(tmp_path: Path) -> None:
 def test_post_comment_replies_exception_returns_false(tmp_path: Path) -> None:
     replies = [CommentReply(thread_id="IC_exc", body="Something.")]
     threads = [_make_thread("IC_exc", reply_target_id="555exc")]
-    with patch("darkfactory.utils.github._cli.subprocess.run", side_effect=OSError("no gh")):
+    with patch(
+        "darkfactory.utils.github._cli.subprocess.run", side_effect=OSError("no gh")
+    ):
         results = post_comment_replies(
             pr_number=1,
             replies=replies,

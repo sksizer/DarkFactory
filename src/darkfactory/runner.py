@@ -552,5 +552,3 @@ def _run_shell(
             f"{(second_result.stdout + second_result.stderr).strip()[:500]}"
         ),
     )
-
-
