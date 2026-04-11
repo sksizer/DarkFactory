@@ -8,76 +8,15 @@ from unittest.mock import patch
 
 import pytest
 
-from conftest import write_prd
+from conftest import init_git_repo, make_system_ctx, setup_repo_with_prd, write_prd
 from darkfactory.builtins.commit_prd_changes import commit_prd_changes
-from darkfactory.prd import PRD, load_all
-from darkfactory.system import SystemContext, SystemOperation
-
-
-def _make_op() -> SystemOperation:
-    return SystemOperation(name="test-op", description="test", tasks=[])
-
-
-def _make_ctx(
-    tmp_path: Path,
-    prds: dict[str, PRD] | None = None,
-    target_prd: str | None = None,
-) -> SystemContext:
-    ctx = SystemContext(
-        repo_root=tmp_path,
-        prds=prds or {},
-        operation=_make_op(),
-        cwd=tmp_path,
-        dry_run=False,
-        target_prd=target_prd,
-    )
-    return ctx
-
-
-def _init_git_repo(tmp_path: Path) -> None:
-    """Initialize a real git repo for commit tests."""
-    sp.run(["git", "init"], cwd=str(tmp_path), check=True, capture_output=True)
-    sp.run(
-        ["git", "config", "user.email", "test@test.com"],
-        cwd=str(tmp_path),
-        check=True,
-        capture_output=True,
-    )
-    sp.run(
-        ["git", "config", "user.name", "Test"],
-        cwd=str(tmp_path),
-        check=True,
-        capture_output=True,
-    )
-
-
-def _setup_repo_with_prd(tmp_path: Path) -> tuple[Path, dict[str, PRD]]:
-    """Create git repo, write a PRD, commit it, load PRDs, then dirty the file."""
-    _init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
-    prd_path = write_prd(prd_dir, "PRD-070", "test-prd")
-
-    prds = load_all(prd_dir)
-
-    sp.run(["git", "add", "-A"], cwd=str(tmp_path), check=True, capture_output=True)
-    sp.run(
-        ["git", "commit", "-m", "init"],
-        cwd=str(tmp_path),
-        check=True,
-        capture_output=True,
-    )
-
-    content = prd_path.read_text(encoding="utf-8")
-    prd_path.write_text(content + "\n<!-- modified -->\n", encoding="utf-8")
-
-    return prd_path, prds
+from darkfactory.prd import load_all
 
 
 def test_no_changes_returns_cleanly(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _init_git_repo(tmp_path)
+    init_git_repo(tmp_path)
     prd_dir = tmp_path / "prds"
     prd_dir.mkdir()
     write_prd(prd_dir, "PRD-070", "test-prd")
@@ -91,7 +30,7 @@ def test_no_changes_returns_cleanly(
         capture_output=True,
     )
 
-    ctx = _make_ctx(tmp_path, prds=prds, target_prd="PRD-070")
+    ctx = make_system_ctx(tmp_path, prds=prds, target_prd="PRD-070")
     commit_prd_changes(ctx)
 
     captured = capsys.readouterr()
@@ -99,13 +38,11 @@ def test_no_changes_returns_cleanly(
 
 
 def test_user_accepts_commit(tmp_path: Path) -> None:
-    _, prds = _setup_repo_with_prd(tmp_path)
-    ctx = _make_ctx(tmp_path, prds=prds, target_prd="PRD-070")
+    _, prds = setup_repo_with_prd(tmp_path)
+    ctx = make_system_ctx(tmp_path, prds=prds, target_prd="PRD-070")
 
-    with patch(
-        "darkfactory.builtins.commit_prd_changes._prompt_user", return_value="y"
-    ):
-        with patch("darkfactory.builtins.commit_prd_changes._git_diff_show"):
+    with patch("darkfactory.builtins.commit_prd_changes.prompt_user", return_value="y"):
+        with patch("darkfactory.builtins.commit_prd_changes.diff_show"):
             commit_prd_changes(ctx)
 
     result = sp.run(
@@ -119,13 +56,11 @@ def test_user_accepts_commit(tmp_path: Path) -> None:
 
 
 def test_user_skips_commit(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    _, prds = _setup_repo_with_prd(tmp_path)
-    ctx = _make_ctx(tmp_path, prds=prds, target_prd="PRD-070")
+    _, prds = setup_repo_with_prd(tmp_path)
+    ctx = make_system_ctx(tmp_path, prds=prds, target_prd="PRD-070")
 
-    with patch(
-        "darkfactory.builtins.commit_prd_changes._prompt_user", return_value="n"
-    ):
-        with patch("darkfactory.builtins.commit_prd_changes._git_diff_show"):
+    with patch("darkfactory.builtins.commit_prd_changes.prompt_user", return_value="n"):
+        with patch("darkfactory.builtins.commit_prd_changes.diff_show"):
             commit_prd_changes(ctx)
 
     captured = capsys.readouterr()
@@ -133,11 +68,11 @@ def test_user_skips_commit(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -
 
 
 def test_user_default_skips(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    _, prds = _setup_repo_with_prd(tmp_path)
-    ctx = _make_ctx(tmp_path, prds=prds, target_prd="PRD-070")
+    _, prds = setup_repo_with_prd(tmp_path)
+    ctx = make_system_ctx(tmp_path, prds=prds, target_prd="PRD-070")
 
-    with patch("darkfactory.builtins.commit_prd_changes._prompt_user", return_value=""):
-        with patch("darkfactory.builtins.commit_prd_changes._git_diff_show"):
+    with patch("darkfactory.builtins.commit_prd_changes.prompt_user", return_value=""):
+        with patch("darkfactory.builtins.commit_prd_changes.diff_show"):
             commit_prd_changes(ctx)
 
     captured = capsys.readouterr()
@@ -145,14 +80,14 @@ def test_user_default_skips(tmp_path: Path, capsys: pytest.CaptureFixture[str]) 
 
 
 def test_user_edits_message(tmp_path: Path) -> None:
-    _, prds = _setup_repo_with_prd(tmp_path)
-    ctx = _make_ctx(tmp_path, prds=prds, target_prd="PRD-070")
+    _, prds = setup_repo_with_prd(tmp_path)
+    ctx = make_system_ctx(tmp_path, prds=prds, target_prd="PRD-070")
 
     responses = iter(["e", "custom commit message"])
     with patch(
-        "darkfactory.builtins.commit_prd_changes._prompt_user", side_effect=responses
+        "darkfactory.builtins.commit_prd_changes.prompt_user", side_effect=responses
     ):
-        with patch("darkfactory.builtins.commit_prd_changes._git_diff_show"):
+        with patch("darkfactory.builtins.commit_prd_changes.diff_show"):
             commit_prd_changes(ctx)
 
     result = sp.run(
@@ -168,15 +103,13 @@ def test_user_edits_message(tmp_path: Path) -> None:
 def test_other_dirty_files_noted(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _, prds = _setup_repo_with_prd(tmp_path)
+    _, prds = setup_repo_with_prd(tmp_path)
     (tmp_path / "other.txt").write_text("unrelated change\n", encoding="utf-8")
 
-    ctx = _make_ctx(tmp_path, prds=prds, target_prd="PRD-070")
+    ctx = make_system_ctx(tmp_path, prds=prds, target_prd="PRD-070")
 
-    with patch(
-        "darkfactory.builtins.commit_prd_changes._prompt_user", return_value="y"
-    ):
-        with patch("darkfactory.builtins.commit_prd_changes._git_diff_show"):
+    with patch("darkfactory.builtins.commit_prd_changes.prompt_user", return_value="y"):
+        with patch("darkfactory.builtins.commit_prd_changes.diff_show"):
             commit_prd_changes(ctx)
 
     captured = capsys.readouterr()
@@ -193,15 +126,13 @@ def test_other_dirty_files_noted(
 
 
 def test_commit_only_target_prd_file(tmp_path: Path) -> None:
-    _, prds = _setup_repo_with_prd(tmp_path)
+    _, prds = setup_repo_with_prd(tmp_path)
     (tmp_path / "other.txt").write_text("unrelated\n", encoding="utf-8")
 
-    ctx = _make_ctx(tmp_path, prds=prds, target_prd="PRD-070")
+    ctx = make_system_ctx(tmp_path, prds=prds, target_prd="PRD-070")
 
-    with patch(
-        "darkfactory.builtins.commit_prd_changes._prompt_user", return_value="y"
-    ):
-        with patch("darkfactory.builtins.commit_prd_changes._git_diff_show"):
+    with patch("darkfactory.builtins.commit_prd_changes.prompt_user", return_value="y"):
+        with patch("darkfactory.builtins.commit_prd_changes.diff_show"):
             commit_prd_changes(ctx)
 
     result = sp.run(

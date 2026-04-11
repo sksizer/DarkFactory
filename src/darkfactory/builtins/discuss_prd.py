@@ -2,35 +2,13 @@
 
 from __future__ import annotations
 
-import subprocess
-import sys
 import time
 from pathlib import Path
 
 from darkfactory.builtins.system_builtins import _register
 from darkfactory.system import SystemContext
-
-
-def _print_phase_banner(phase: str) -> None:
-    """Print a phase banner to stderr."""
-    bar = "\u2500" * 37
-    print(bar, file=sys.stderr)
-    print(f" Phase: {phase}", file=sys.stderr)
-    print(" Press Ctrl-C now to abort the chain.", file=sys.stderr)
-    print(bar, file=sys.stderr)
-
-
-def _spawn_claude(prompt: str, cwd: Path) -> int:
-    """Spawn an interactive Claude Code session. Returns the exit code.
-
-    Extracted for testability — tests monkeypatch this function.
-    """
-    result = subprocess.run(
-        ["claude", prompt],
-        cwd=str(cwd),
-        check=False,
-    )
-    return result.returncode
+from darkfactory.utils.claude_code import spawn_claude
+from darkfactory.utils.tui import print_phase_banner
 
 
 @_register("discuss_prd")
@@ -62,10 +40,10 @@ def discuss_prd(
         "{PHASE}", phase
     )
 
-    _print_phase_banner(phase)
+    print_phase_banner(phase)
     time.sleep(1)
 
-    exit_code = _spawn_claude(composed, ctx.cwd)
+    exit_code = spawn_claude(composed, ctx.cwd)
 
     if exit_code != 0:
         ctx.logger.warning(

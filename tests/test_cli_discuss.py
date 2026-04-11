@@ -37,7 +37,7 @@ def test_discuss_unknown_prd_exits(tmp_path: Path) -> None:
     args.prd_dir = prd_dir
     args.operations_dir = tmp_path / "operations"
 
-    with patch("darkfactory.cli.discuss.shutil") as mock_shutil:
+    with patch("darkfactory.utils.system.shutil") as mock_shutil:
         mock_shutil.which.return_value = "/usr/bin/claude"
         with pytest.raises(SystemExit, match="unknown PRD id"):
             args.func(args)
@@ -52,7 +52,7 @@ def test_discuss_missing_claude_exits(tmp_path: Path) -> None:
     args.prd_dir = prd_dir
     args.operations_dir = tmp_path / "operations"
 
-    with patch("darkfactory.cli.discuss.shutil") as mock_shutil:
+    with patch("darkfactory.utils.system.shutil") as mock_shutil:
         mock_shutil.which.side_effect = lambda name: (
             None if name == "claude" else "/usr/bin/git"
         )
@@ -69,7 +69,7 @@ def test_discuss_launches_chain(tmp_path: Path) -> None:
     args.prd_dir = prd_dir
     args.operations_dir = tmp_path / "operations"
 
-    with patch("darkfactory.cli.discuss.shutil") as mock_shutil:
+    with patch("darkfactory.utils.system.shutil") as mock_shutil:
         mock_shutil.which.return_value = "/usr/bin/claude"
         with patch("darkfactory.cli.discuss.run_system_operation") as mock_run:
             from darkfactory.runner import RunResult

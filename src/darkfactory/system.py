@@ -83,6 +83,15 @@ class SystemContext:
     target_prd: str | None = None
     _shared_state: dict[str, Any] = field(default_factory=dict)
 
+    def find_prd_file(self) -> Path:
+        """Resolve the file path for the target PRD."""
+        if not self.target_prd:
+            raise ValueError("requires target_prd to be set")
+        prd = self.prds.get(self.target_prd)
+        if prd is None:
+            raise ValueError(f"target PRD {self.target_prd!r} not found in loaded PRDs")
+        return Path(prd.path)
+
     def format_string(self, template: str) -> str:
         """Expand ``{placeholder}`` tokens against context state.
 

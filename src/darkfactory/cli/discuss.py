@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import shutil
 import sys
 from pathlib import Path
 
@@ -11,23 +10,7 @@ from darkfactory.cli._shared import _find_repo_root, _load, _resolve_prd_or_exit
 from darkfactory.commands.discuss import discuss_operation
 from darkfactory.system import SystemContext
 from darkfactory.system_runner import run_system_operation
-
-
-def _check_prerequisites(cwd: Path) -> None:
-    """Fail fast if claude or git are missing, or cwd is not a git repo."""
-    if shutil.which("claude") is None:
-        raise SystemExit(
-            "error: 'claude' is not on PATH. Install Claude Code to use 'prd discuss'."
-        )
-    if shutil.which("git") is None:
-        raise SystemExit("error: 'git' is not on PATH.")
-    if not (cwd / ".git").exists():
-        try:
-            _find_repo_root(cwd)
-        except SystemExit:
-            raise SystemExit(
-                "error: current directory is not inside a git working tree."
-            )
+from darkfactory.utils.system import check_prerequisites
 
 
 def launch_discuss_for_prd(prd_id: str, args: argparse.Namespace) -> int:
@@ -36,7 +19,7 @@ def launch_discuss_for_prd(prd_id: str, args: argparse.Namespace) -> int:
     Shared entry point used by both ``cmd_discuss`` and ``prd new --discuss``.
     """
     cwd = Path.cwd()
-    _check_prerequisites(args.prd_dir.parent if hasattr(args, "prd_dir") else cwd)
+    check_prerequisites(args.prd_dir.parent if hasattr(args, "prd_dir") else cwd)
 
     prds = _load(args.prd_dir)
     _resolve_prd_or_exit(prd_id, prds)

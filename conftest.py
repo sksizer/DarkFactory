@@ -2,9 +2,30 @@
 
 from __future__ import annotations
 
+import subprocess as sp
 from pathlib import Path
 
 import pytest
+
+from darkfactory.prd import PRD
+from darkfactory.system import SystemContext, SystemOperation
+
+
+def init_git_repo(path: Path) -> None:
+    """Initialize a git repo with dummy user config for testing."""
+    sp.run(["git", "init"], cwd=str(path), check=True, capture_output=True)
+    sp.run(
+        ["git", "config", "user.email", "test@test.com"],
+        cwd=str(path),
+        check=True,
+        capture_output=True,
+    )
+    sp.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=str(path),
+        check=True,
+        capture_output=True,
+    )
 
 
 @pytest.fixture
@@ -83,3 +104,59 @@ def write_prd(
     path = dir_path / f"{prd_id}-{slug}.md"
     path.write_text("\n".join(fm_lines), encoding="utf-8")
     return path
+
+
+def make_system_op(
+    name: str = "test-op",
+    description: str = "test",
+    operation_dir: Path | None = None,
+) -> SystemOperation:
+    """Create a SystemOperation for testing."""
+    return SystemOperation(
+        name=name,
+        description=description,
+        tasks=[],
+        operation_dir=operation_dir,
+    )
+
+
+def make_system_ctx(
+    tmp_path: Path,
+    prds: dict[str, PRD] | None = None,
+    target_prd: str | None = None,
+    operation: SystemOperation | None = None,
+) -> SystemContext:
+    """Create a SystemContext for testing."""
+    return SystemContext(
+        repo_root=tmp_path,
+        prds=prds or {},
+        operation=operation or make_system_op(),
+        cwd=tmp_path,
+        dry_run=False,
+        target_prd=target_prd,
+    )
+
+
+def setup_repo_with_prd(tmp_path: Path) -> tuple[Path, dict[str, PRD]]:
+    """Create git repo, write a PRD, commit it, load PRDs, then dirty the file."""
+    from darkfactory.prd import load_all
+
+    init_git_repo(tmp_path)
+    prd_dir = tmp_path / "prds"
+    prd_dir.mkdir()
+    prd_path = write_prd(prd_dir, "PRD-070", "test-prd")
+
+    prds = load_all(prd_dir)
+
+    sp.run(["git", "add", "-A"], cwd=str(tmp_path), check=True, capture_output=True)
+    sp.run(
+        ["git", "commit", "-m", "init"],
+        cwd=str(tmp_path),
+        check=True,
+        capture_output=True,
+    )
+
+    content = prd_path.read_text(encoding="utf-8")
+    prd_path.write_text(content + "\n<!-- modified -->\n", encoding="utf-8")
+
+    return prd_path, prds

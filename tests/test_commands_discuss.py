@@ -109,12 +109,10 @@ def test_chain_executes_in_order(tmp_path: Path) -> None:
             call_order.append("critique_claude")
         return 0
 
-    with patch(
-        "darkfactory.builtins.discuss_prd._spawn_claude", side_effect=mock_spawn
-    ):
+    with patch("darkfactory.builtins.discuss_prd.spawn_claude", side_effect=mock_spawn):
         with patch("darkfactory.builtins.discuss_prd.time.sleep"):
             with patch(
-                "darkfactory.builtins.commit_prd_changes._git_diff_quiet",
+                "darkfactory.builtins.commit_prd_changes.diff_quiet",
                 return_value=True,
             ):
                 from darkfactory.system_runner import run_system_operation
@@ -155,10 +153,10 @@ def test_nonzero_exit_does_not_abort_chain(tmp_path: Path) -> None:
         target_prd="PRD-070",
     )
 
-    with patch("darkfactory.builtins.discuss_prd._spawn_claude", return_value=130):
+    with patch("darkfactory.builtins.discuss_prd.spawn_claude", return_value=130):
         with patch("darkfactory.builtins.discuss_prd.time.sleep"):
             with patch(
-                "darkfactory.builtins.commit_prd_changes._git_diff_quiet",
+                "darkfactory.builtins.commit_prd_changes.diff_quiet",
                 return_value=True,
             ):
                 from darkfactory.system_runner import run_system_operation
