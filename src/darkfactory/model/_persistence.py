@@ -18,7 +18,6 @@ from darkfactory.model._prd import (
     FRONTMATTER_RE,
     PRD,
     PRD_ID_RE,
-    _WIKILINK_FIELDS,
     _yaml_item_repr,
     parse_wikilink,
     parse_wikilinks,
@@ -85,7 +84,7 @@ def _needs_quoting(value: str) -> bool:
         return True
     if value in _YAML_KEYWORDS:
         return True
-    if value[0] in '{[&*!|>%@`"\'#,?':
+    if value[0] in "{[&*!|>%@`\"'#,?":
         return True
     if value[0].isdigit():
         return True
@@ -224,9 +223,7 @@ def parse_prd(path: Path) -> PRD:
 # ---- Discovery -------------------------------------------------------------
 
 
-def load_all(
-    data_dir: Path, *, include_archived: bool = False
-) -> dict[str, PRD]:
+def load_all(data_dir: Path, *, include_archived: bool = False) -> dict[str, PRD]:
     """Load every PRD file in ``data_dir/prds/`` keyed by id.
 
     When ``include_archived=True``, also scans ``data_dir/archive/``.
@@ -259,9 +256,7 @@ def _discover_prds(directory: Path, prds: dict[str, PRD]) -> None:
         prds[prd.id] = prd
 
 
-def load_one(
-    data_dir: Path, prd_id: str, *, include_archived: bool = True
-) -> PRD:
+def load_one(data_dir: Path, prd_id: str, *, include_archived: bool = True) -> PRD:
     """Find and load a single PRD by ID.
 
     Searches ``prds/`` first, then ``archive/`` (when include_archived=True).
@@ -489,7 +484,11 @@ def _check_archive_guardrails(
         if current is None:
             continue
 
-        if current.parent and current.parent not in visited and current.parent in all_prds:
+        if (
+            current.parent
+            and current.parent not in visited
+            and current.parent in all_prds
+        ):
             visited.add(current.parent)
             queue.append(current.parent)
 
@@ -534,9 +533,7 @@ def archive(prd: PRD, data_dir: Path) -> PRD:
     all_prds = load_all(data_dir, include_archived=True)
     blockers = _check_archive_guardrails(prd, all_prds)
     if blockers:
-        lines = [
-            f"Cannot archive {prd.id}: related PRDs are not in a terminal state:"
-        ]
+        lines = [f"Cannot archive {prd.id}: related PRDs are not in a terminal state:"]
         for pid, status in blockers:
             lines.append(f"  {pid}: {status}")
         raise ValueError("\n".join(lines))
@@ -605,7 +602,6 @@ def ensure_data_layout(darkfactory_dir: Path) -> None:
             pass
 
     print(
-        f"Migration complete: {migrated} PRD(s) stamped with "
-        f"app_version {__version__}",
+        f"Migration complete: {migrated} PRD(s) stamped with app_version {__version__}",
         file=sys.stderr,
     )

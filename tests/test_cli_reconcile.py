@@ -87,7 +87,7 @@ def test_reconcile_dryrun_no_matching_prs(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """When merged PRs have no matching PRD file, prints 'up to date'."""
-    prd_dir = _setup_project(tmp_path)
+    _setup_project(tmp_path)
 
     prs = [_fake_pr("prd/PRD-999-nonexistent", 99)]
 
