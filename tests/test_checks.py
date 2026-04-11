@@ -16,7 +16,7 @@ from darkfactory.checks import (
     is_resume_safe,
     validate_review_branches,
 )
-from darkfactory.prd import load_all
+from darkfactory.model import load_all
 
 from .conftest import write_prd
 
@@ -31,18 +31,18 @@ def _mock_git(present: set[str]) -> MagicMock:
 # ---------- empty / no review PRDs ----------
 
 
-def test_empty_prds_returns_no_issues(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "lone", status="ready")
-    prds = load_all(tmp_prd_dir)
+def test_empty_prds_returns_no_issues(tmp_data_dir: Path) -> None:
+    write_prd(tmp_data_dir / "prds", "PRD-001", "lone", status="ready")
+    prds = load_all(tmp_data_dir)
     git = _mock_git(set())
     assert validate_review_branches(prds, git) == []
 
 
-def test_non_review_prds_ignored(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "alpha", status="ready")
-    write_prd(tmp_prd_dir, "PRD-002", "beta", status="done")
-    write_prd(tmp_prd_dir, "PRD-003", "gamma", status="blocked")
-    prds = load_all(tmp_prd_dir)
+def test_non_review_prds_ignored(tmp_data_dir: Path) -> None:
+    write_prd(tmp_data_dir / "prds", "PRD-001", "alpha", status="ready")
+    write_prd(tmp_data_dir / "prds", "PRD-002", "beta", status="done")
+    write_prd(tmp_data_dir / "prds", "PRD-003", "gamma", status="blocked")
+    prds = load_all(tmp_data_dir)
     git = _mock_git(set())
     assert validate_review_branches(prds, git) == []
 
@@ -50,9 +50,9 @@ def test_non_review_prds_ignored(tmp_prd_dir: Path) -> None:
 # ---------- review PRD, branch present ----------
 
 
-def test_review_branch_present_returns_no_issues(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "my-feature", status="review")
-    prds = load_all(tmp_prd_dir)
+def test_review_branch_present_returns_no_issues(tmp_data_dir: Path) -> None:
+    write_prd(tmp_data_dir / "prds", "PRD-001", "my-feature", status="review")
+    prds = load_all(tmp_data_dir)
     git = _mock_git({"prd/PRD-001-my-feature"})
     assert validate_review_branches(prds, git) == []
 
@@ -60,9 +60,9 @@ def test_review_branch_present_returns_no_issues(tmp_prd_dir: Path) -> None:
 # ---------- review PRD, branch gone ----------
 
 
-def test_review_branch_gone_returns_one_issue(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "my-feature", status="review")
-    prds = load_all(tmp_prd_dir)
+def test_review_branch_gone_returns_one_issue(tmp_data_dir: Path) -> None:
+    write_prd(tmp_data_dir / "prds", "PRD-001", "my-feature", status="review")
+    prds = load_all(tmp_data_dir)
     git = _mock_git(set())  # branch is absent
     issues = validate_review_branches(prds, git)
     assert len(issues) == 1
@@ -76,12 +76,12 @@ def test_review_branch_gone_returns_one_issue(tmp_prd_dir: Path) -> None:
 # ---------- multiple review PRDs, mixed ----------
 
 
-def test_multiple_review_mixed_returns_correct_subset(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "alpha", status="review")
-    write_prd(tmp_prd_dir, "PRD-002", "beta", status="review")
-    write_prd(tmp_prd_dir, "PRD-003", "gamma", status="review")
-    write_prd(tmp_prd_dir, "PRD-004", "delta", status="ready")
-    prds = load_all(tmp_prd_dir)
+def test_multiple_review_mixed_returns_correct_subset(tmp_data_dir: Path) -> None:
+    write_prd(tmp_data_dir / "prds", "PRD-001", "alpha", status="review")
+    write_prd(tmp_data_dir / "prds", "PRD-002", "beta", status="review")
+    write_prd(tmp_data_dir / "prds", "PRD-003", "gamma", status="review")
+    write_prd(tmp_data_dir / "prds", "PRD-004", "delta", status="ready")
+    prds = load_all(tmp_data_dir)
     # Only PRD-002's branch is present; PRD-001 and PRD-003 are gone
     git = _mock_git({"prd/PRD-002-beta"})
     issues = validate_review_branches(prds, git)

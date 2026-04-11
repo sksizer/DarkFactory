@@ -172,7 +172,7 @@ def _cleanup_all(force: bool, repo_root: Path) -> int:
 
 def cmd_cleanup(args: argparse.Namespace) -> int:
     """Remove worktrees for completed PRDs."""
-    repo_root = _find_repo_root(args.prd_dir)
+    repo_root = _find_repo_root(args.data_dir)
     prd_id: str | None = getattr(args, "prd_id", None)
     merged: bool = getattr(args, "merged", False)
     all_: bool = getattr(args, "all_", False)

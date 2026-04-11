@@ -8,6 +8,7 @@ from pathlib import Path
 
 def build_parser() -> argparse.ArgumentParser:
     # Extracted submodules — import directly
+    from darkfactory.cli.archive import cmd_archive
     from darkfactory.cli.assign_cmd import cmd_assign
     from darkfactory.cli.children import cmd_children
     from darkfactory.cli.cleanup import cmd_cleanup
@@ -43,12 +44,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="DIR",
         help="Project root containing .darkfactory/ (overrides DARKFACTORY_DIR env and walk-up)",
-    )
-    parser.add_argument(
-        "--prd-dir",
-        type=Path,
-        default=None,
-        help="Path to docs/prd directory (default: auto-detect from cwd)",
     )
     parser.add_argument(
         "--workflows-dir",
@@ -94,6 +89,10 @@ def build_parser() -> argparse.ArgumentParser:
         "init", help="Scaffold .darkfactory/ in the current project"
     )
     sub_init.set_defaults(func=cmd_init)
+
+    sub_archive = sub.add_parser("archive", help="Move a completed PRD to the archive")
+    sub_archive.add_argument("prd_id", help="PRD id to archive (e.g. PRD-070)")
+    sub_archive.set_defaults(func=cmd_archive)
 
     sub_new = sub.add_parser("new", help="Create a new draft PRD from a template")
     sub_new.add_argument("title", help="PRD title (positional)")

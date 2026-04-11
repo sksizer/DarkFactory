@@ -8,7 +8,7 @@ from unittest.mock import patch
 from conftest import write_prd
 from darkfactory.commands.discuss import discuss_operation
 from darkfactory.commands.discuss.operation import discuss_operation as op_from_module
-from darkfactory.prd import load_all
+from darkfactory.model import load_all
 from darkfactory.system import SystemContext, SystemOperation
 from darkfactory.workflow import BuiltIn
 
@@ -78,10 +78,12 @@ def test_prompt_files_have_placeholders() -> None:
 
 def test_chain_executes_in_order(tmp_path: Path) -> None:
     """AC-6: Full chain executes tasks in order with mocked subprocess."""
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
-    write_prd(prd_dir, "PRD-070", "test-prd", title="Test PRD")
-    prds = load_all(prd_dir)
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    prds_dir = data_dir / "prds"
+    prds_dir.mkdir()
+    write_prd(prds_dir, "PRD-070", "test-prd", title="Test PRD")
+    prds = load_all(data_dir)
 
     pkg_dir = (
         Path(__file__).resolve().parent.parent
@@ -136,10 +138,12 @@ def test_chain_executes_in_order(tmp_path: Path) -> None:
 
 def test_nonzero_exit_does_not_abort_chain(tmp_path: Path) -> None:
     """AC-8: Non-zero exit from claude in discuss phase does not abort the chain."""
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
-    write_prd(prd_dir, "PRD-070", "test-prd", title="Test PRD")
-    prds = load_all(prd_dir)
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    prds_dir = data_dir / "prds"
+    prds_dir.mkdir()
+    write_prd(prds_dir, "PRD-070", "test-prd", title="Test PRD")
+    prds = load_all(data_dir)
 
     pkg_dir = (
         Path(__file__).resolve().parent.parent

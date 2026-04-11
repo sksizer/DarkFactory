@@ -38,13 +38,13 @@ def cmd_rework(args: argparse.Namespace) -> int:
     state via ``context_overrides`` so the builtin at position 0 is a
     no-op and the workflow proceeds directly to fast-forward/rebase.
     """
-    prds = _load(args.prd_dir)
+    prds = _load(args.data_dir)
     prd = _resolve_prd_or_exit(args.prd_id, prds)
 
     if prd.status != "review":
         raise SystemExit(f"ERROR: {prd.id} is in '{prd.status}', not 'review'")
 
-    repo_root = _find_repo_root(args.prd_dir)
+    repo_root = _find_repo_root(args.data_dir)
 
     filters = CommentFilters(
         include_resolved=args.all,

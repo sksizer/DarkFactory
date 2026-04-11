@@ -42,12 +42,22 @@ class StyleConfig:
 
 
 @dataclass
+class PathsConfig:
+    """System paths resolved from project discovery."""
+
+    project_dir: Path | None = None
+    data_dir: Path | None = None
+    prds_dir: Path | None = None
+    archive_dir: Path | None = None
+
+
+@dataclass
 class Config:
     """Fully resolved configuration object."""
 
     model: ModelConfig = field(default_factory=ModelConfig)
     style: StyleConfig = field(default_factory=StyleConfig)
-    # Extensible: add TimeoutsConfig, etc.
+    paths: PathsConfig = field(default_factory=PathsConfig)
 
 
 def load_toml(path: Path) -> dict[str, Any]:
@@ -136,6 +146,12 @@ def resolve_config(
             ``{"style": {"theme": "light"}}``.
     """
     config = Config()
+
+    if project_dir is not None:
+        config.paths.project_dir = project_dir
+        config.paths.data_dir = project_dir / "data"
+        config.paths.prds_dir = project_dir / "data" / "prds"
+        config.paths.archive_dir = project_dir / "data" / "archive"
 
     # Layer 1: user config
     user_file = user_config_file()

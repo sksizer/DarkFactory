@@ -8,7 +8,7 @@ import re
 import subprocess
 from collections.abc import Mapping
 from datetime import date
-from darkfactory.prd import PRD_ID_RE, dump_frontmatter, load_all
+from darkfactory.model import PRD_ID_RE, dump_frontmatter, load_all
 
 
 def _slugify(title: str) -> str:
@@ -65,7 +65,7 @@ DRAFT_TEMPLATE_BODY = """# {title}
 
 
 def cmd_new(args: argparse.Namespace) -> int:
-    prds = load_all(args.prd_dir) if args.prd_dir.exists() else {}
+    prds = load_all(args.data_dir) if (args.data_dir / "prds").exists() else {}
 
     # Pick ID
     if args.id:
@@ -79,7 +79,7 @@ def cmd_new(args: argparse.Namespace) -> int:
 
     slug = _slugify(args.title)
     filename = f"{new_id}-{slug}.md"
-    path = args.prd_dir / filename
+    path = args.data_dir / "prds" / filename
     if path.exists():
         raise SystemExit(f"file already exists: {path}")
 
@@ -108,7 +108,7 @@ def cmd_new(args: argparse.Namespace) -> int:
     body = DRAFT_TEMPLATE_BODY.format(title=args.title)
     content = f"---\n{dump_frontmatter(frontmatter)}---\n\n{body}"
 
-    args.prd_dir.mkdir(parents=True, exist_ok=True)
+    (args.data_dir / "prds").mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
     print(f"Created {path}")
 

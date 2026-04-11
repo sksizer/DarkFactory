@@ -15,7 +15,7 @@ import pytest
 
 from darkfactory.builtins.fetch_pr_comments import fetch_pr_comments as builtin_fn
 from darkfactory.pr_comments import ReviewThread
-from darkfactory.prd import PRD
+from darkfactory.model import PRD
 from darkfactory.workflow import ExecutionContext, Workflow
 
 

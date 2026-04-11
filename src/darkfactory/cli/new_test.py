@@ -84,8 +84,10 @@ def _make_args(
     capability: str = "moderate",
     open_: bool = False,
 ) -> argparse.Namespace:
+    (tmp_path / "prds").mkdir(exist_ok=True)
+    (tmp_path / "archive").mkdir(exist_ok=True)
     return argparse.Namespace(
-        prd_dir=tmp_path / "prds",
+        data_dir=tmp_path,
         title=title,
         id=id,
         kind=kind,

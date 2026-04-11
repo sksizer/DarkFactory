@@ -42,7 +42,7 @@ import subprocess
 from pathlib import Path
 
 from . import containment
-from .prd import PRD, parse_id_sort_key
+from .model import PRD, parse_id_sort_key
 
 
 def tracked_files(repo_root: Path) -> list[str]:

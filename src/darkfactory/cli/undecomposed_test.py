@@ -11,9 +11,9 @@ import pytest
 from darkfactory.cli.undecomposed import cmd_undecomposed
 
 
-def _make_args(prd_dir: Path) -> argparse.Namespace:
+def _make_args(data_dir: Path) -> argparse.Namespace:
     ns = argparse.Namespace()
-    ns.prd_dir = prd_dir
+    ns.data_dir = data_dir
     return ns
 
 

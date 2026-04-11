@@ -93,7 +93,7 @@ def test_cmd_run_mutual_exclusivity_returns_1(
     args = argparse.Namespace(
         run_all=True,
         prd_id="PRD-001",
-        prd_dir=MagicMock(),
+        data_dir=MagicMock(),
         workflows_dir=MagicMock(),
         base=None,
         execute=False,
@@ -122,7 +122,7 @@ def test_cmd_run_no_args_returns_1(capsys: pytest.CaptureFixture[str]) -> None:
     args = argparse.Namespace(
         run_all=False,
         prd_id=None,
-        prd_dir=MagicMock(),
+        data_dir=MagicMock(),
         workflows_dir=MagicMock(),
         base=None,
         execute=False,

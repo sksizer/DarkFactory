@@ -152,12 +152,14 @@ def test_rework_workflow_has_no_legacy_fetch_pr_comments(
 
 
 def _make_prd(tmp_path: Path, prd_id: str = "PRD-001") -> object:
-    from darkfactory.prd import load_all
+    from darkfactory.model import load_all
 
-    prds_dir = tmp_path / "prds"
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(exist_ok=True)
+    prds_dir = data_dir / "prds"
     prds_dir.mkdir(exist_ok=True)
     write_prd(prds_dir, prd_id, "my-feature", status="review")
-    return load_all(prds_dir)[prd_id]
+    return load_all(data_dir)[prd_id]
 
 
 def _make_rework_workflow(tmp_path: Path) -> Workflow:

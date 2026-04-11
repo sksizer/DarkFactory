@@ -36,6 +36,17 @@ def _find_operations_dir() -> Path:
     )
 
 
+def _setup_project(tmp_path: Path) -> Path:
+    """Create .darkfactory/ layout with .git and return the prds dir."""
+    (tmp_path / ".git").mkdir(exist_ok=True)
+    df = tmp_path / ".darkfactory"
+    df.mkdir()
+    prds = df / "data" / "prds"
+    prds.mkdir(parents=True)
+    (df / "data" / "archive").mkdir()
+    return prds
+
+
 # ---------- operation loading ----------
 
 
@@ -147,16 +158,14 @@ def test_plan_operation_requires_target(tmp_path: Path) -> None:
     """Running the plan operation without --target is rejected by the CLI."""
     from darkfactory.cli import main
 
-    _init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    _setup_project(tmp_path)
     ops_dir = _find_operations_dir()
 
     with pytest.raises(SystemExit) as exc:
         main(
             [
-                "--prd-dir",
-                str(prd_dir),
+                "--directory",
+                str(tmp_path),
                 "--workflows-dir",
                 str(tmp_path / "workflows"),
                 "--operations-dir",
@@ -170,11 +179,6 @@ def test_plan_operation_requires_target(tmp_path: Path) -> None:
     assert exc.value.code != 0
 
 
-def _init_git_repo(path: Path) -> None:
-    """Minimal git init so ``_find_repo_root`` can locate the tmp dir."""
-    (path / ".git").mkdir(exist_ok=True)
-
-
 # ---------- CLI discoverability ----------
 
 
@@ -184,15 +188,13 @@ def test_plan_operation_discoverable_via_list(
     """prd system list shows the plan operation."""
     from darkfactory.cli import main
 
-    _init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    _setup_project(tmp_path)
     ops_dir = _find_operations_dir()
 
     exit_code = main(
         [
-            "--prd-dir",
-            str(prd_dir),
+            "--directory",
+            str(tmp_path),
             "--workflows-dir",
             str(tmp_path / "workflows"),
             "--operations-dir",

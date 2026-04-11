@@ -13,14 +13,14 @@ from darkfactory.cli.assign_cmd import cmd_assign
 
 
 def _make_args(
-    prd_dir: Path,
+    data_dir: Path,
     workflows_dir: Path,
     *,
     json_output: bool = False,
     write: bool = False,
 ) -> argparse.Namespace:
     ns = argparse.Namespace()
-    ns.prd_dir = prd_dir
+    ns.data_dir = data_dir
     ns.workflows_dir = workflows_dir
     ns.json = json_output
     ns.write = write

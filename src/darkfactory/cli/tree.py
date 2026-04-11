@@ -7,7 +7,7 @@ from collections.abc import Mapping
 
 from darkfactory import containment
 from darkfactory.cli._shared import _load, _resolve_prd_or_exit
-from darkfactory.prd import PRD
+from darkfactory.model import PRD
 from darkfactory.style import Element, Styler
 
 
@@ -46,7 +46,7 @@ def _print_tree(
 
 
 def cmd_tree(args: argparse.Namespace) -> int:
-    prds = _load(args.prd_dir)
+    prds = _load(args.data_dir)
     styler: Styler = args.styler
     if args.prd_id:
         prd = _resolve_prd_or_exit(args.prd_id, prds)

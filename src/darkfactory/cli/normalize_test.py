@@ -91,7 +91,7 @@ def test_normalize_prd_processes_all_normalizable_fields() -> None:
 
 def test_cmd_normalize_unknown_prd_id_raises(tmp_path: Path) -> None:
     args = argparse.Namespace(
-        prd_dir=tmp_path, prd_id="PRD-999", all=False, check=False
+        data_dir=tmp_path, prd_id="PRD-999", all=False, check=False
     )
     with patch("darkfactory.cli.normalize._load", return_value={}):
         with pytest.raises(SystemExit, match="unknown PRD id"):
@@ -99,7 +99,7 @@ def test_cmd_normalize_unknown_prd_id_raises(tmp_path: Path) -> None:
 
 
 def test_cmd_normalize_no_target_raises(tmp_path: Path) -> None:
-    args = argparse.Namespace(prd_dir=tmp_path, prd_id=None, all=False, check=False)
+    args = argparse.Namespace(data_dir=tmp_path, prd_id=None, all=False, check=False)
     with patch("darkfactory.cli.normalize._load", return_value={}):
         with pytest.raises(SystemExit):
             cmd_normalize(args)
@@ -110,7 +110,7 @@ def test_cmd_normalize_single_prd_no_changes(
 ) -> None:
     prd = _make_prd("PRD-001")
     args = argparse.Namespace(
-        prd_dir=tmp_path, prd_id="PRD-001", all=False, check=False
+        data_dir=tmp_path, prd_id="PRD-001", all=False, check=False
     )
     with (
         patch("darkfactory.cli.normalize._load", return_value={"PRD-001": prd}),
@@ -127,7 +127,7 @@ def test_cmd_normalize_single_prd_with_changes(
 ) -> None:
     prd = _make_prd("PRD-001")
     args = argparse.Namespace(
-        prd_dir=tmp_path, prd_id="PRD-001", all=False, check=False
+        data_dir=tmp_path, prd_id="PRD-001", all=False, check=False
     )
     with (
         patch("darkfactory.cli.normalize._load", return_value={"PRD-001": prd}),
@@ -143,7 +143,9 @@ def test_cmd_normalize_check_mode_no_changes(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     prd = _make_prd("PRD-001")
-    args = argparse.Namespace(prd_dir=tmp_path, prd_id="PRD-001", all=False, check=True)
+    args = argparse.Namespace(
+        data_dir=tmp_path, prd_id="PRD-001", all=False, check=True
+    )
     with (
         patch("darkfactory.cli.normalize._load", return_value={"PRD-001": prd}),
         patch("darkfactory.cli.normalize._normalize_prd", return_value=False),
@@ -158,7 +160,9 @@ def test_cmd_normalize_check_mode_with_changes(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     prd = _make_prd("PRD-001")
-    args = argparse.Namespace(prd_dir=tmp_path, prd_id="PRD-001", all=False, check=True)
+    args = argparse.Namespace(
+        data_dir=tmp_path, prd_id="PRD-001", all=False, check=True
+    )
     with (
         patch("darkfactory.cli.normalize._load", return_value={"PRD-001": prd}),
         patch("darkfactory.cli.normalize._normalize_prd", return_value=True),
@@ -173,7 +177,7 @@ def test_cmd_normalize_all_flag(tmp_path: Path) -> None:
     prd1 = _make_prd("PRD-001")
     prd2 = _make_prd("PRD-002")
     prds = {"PRD-001": prd1, "PRD-002": prd2}
-    args = argparse.Namespace(prd_dir=tmp_path, prd_id=None, all=True, check=False)
+    args = argparse.Namespace(data_dir=tmp_path, prd_id=None, all=True, check=False)
     with (
         patch("darkfactory.cli.normalize._load", return_value=prds),
         patch("darkfactory.cli.normalize._normalize_prd", return_value=False),

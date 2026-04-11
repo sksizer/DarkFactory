@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from darkfactory.prd import load_all
+from darkfactory.model import load_all
 from darkfactory.templates import (
     compose_prompt,
     load_prompt_files,
@@ -119,19 +119,20 @@ def test_substitute_nested_braces_in_code_blocks() -> None:
 
 
 def _make_ctx(
-    tmp_prd_dir: Path, workflow_dir: Path
+    tmp_data_dir: Path, workflow_dir: Path
 ) -> tuple[Workflow, ExecutionContext]:
     """Build a workflow (with workflow_dir set) and a context for testing compose."""
-    write_prd(tmp_prd_dir, "PRD-070", "test-task")
-    prds = load_all(tmp_prd_dir)
+    (tmp_data_dir / "prds").mkdir(exist_ok=True)
+    write_prd(tmp_data_dir / "prds", "PRD-070", "test-task")
+    prds = load_all(tmp_data_dir)
     wf = Workflow(name="default", workflow_dir=workflow_dir)
     ctx = ExecutionContext(
         prd=prds["PRD-070"],
-        repo_root=tmp_prd_dir,
+        repo_root=tmp_data_dir,
         workflow=wf,
         base_ref="main",
         branch_name="prd/PRD-070-test-task",
-        worktree_path=tmp_prd_dir / ".worktrees" / "PRD-070-test-task",
+        worktree_path=tmp_data_dir / ".worktrees" / "PRD-070-test-task",
     )
     return wf, ctx
 
@@ -219,15 +220,17 @@ def test_compose_prompt_extras_override_defaults(tmp_path: Path) -> None:
 
 def test_compose_prompt_raises_when_workflow_dir_unset(tmp_path: Path) -> None:
     """A Workflow built by hand without workflow_dir can't compose prompts."""
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
-    write_prd(prd_dir, "PRD-070", "test")
-    prds = load_all(prd_dir)
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    prds_dir = data_dir / "prds"
+    prds_dir.mkdir()
+    write_prd(prds_dir, "PRD-070", "test")
+    prds = load_all(data_dir)
 
     wf = Workflow(name="hand-built")  # workflow_dir is None
     ctx = ExecutionContext(
         prd=prds["PRD-070"],
-        repo_root=prd_dir,
+        repo_root=data_dir,
         workflow=wf,
         base_ref="main",
         branch_name="prd/PRD-070-test",

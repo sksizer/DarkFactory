@@ -15,7 +15,7 @@ from darkfactory.cli._shared import (
 
 
 def cmd_next(args: argparse.Namespace) -> int:
-    prds = _load(args.prd_dir)
+    prds = _load(args.data_dir)
     actionable = sorted(
         (prd for prd in prds.values() if graph.is_actionable(prd, prds)),
         key=_action_sort_key,

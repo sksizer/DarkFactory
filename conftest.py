@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from darkfactory.prd import PRD
+from darkfactory.model import PRD
 from darkfactory.system import SystemContext, SystemOperation
 
 
@@ -29,8 +29,10 @@ def init_git_repo(path: Path) -> None:
 
 
 @pytest.fixture
-def tmp_prd_dir(tmp_path: Path) -> Path:
-    """An empty temporary directory for PRD fixtures."""
+def tmp_data_dir(tmp_path: Path) -> Path:
+    """A temporary data directory with prds/ and archive/ subdirectories."""
+    (tmp_path / "prds").mkdir()
+    (tmp_path / "archive").mkdir()
     return tmp_path
 
 
@@ -139,14 +141,17 @@ def make_system_ctx(
 
 def setup_repo_with_prd(tmp_path: Path) -> tuple[Path, dict[str, PRD]]:
     """Create git repo, write a PRD, commit it, load PRDs, then dirty the file."""
-    from darkfactory.prd import load_all
+    from darkfactory.model import load_all
 
     init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
-    prd_path = write_prd(prd_dir, "PRD-070", "test-prd")
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    prds_dir = data_dir / "prds"
+    prds_dir.mkdir()
+    (data_dir / "archive").mkdir()
+    prd_path = write_prd(prds_dir, "PRD-070", "test-prd")
 
-    prds = load_all(prd_dir)
+    prds = load_all(data_dir)
 
     sp.run(["git", "add", "-A"], cwd=str(tmp_path), check=True, capture_output=True)
     sp.run(

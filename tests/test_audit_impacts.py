@@ -12,7 +12,7 @@ from darkfactory.builtins.system_builtins import (
     audit_impacts_check,
 )
 from darkfactory.loader import load_operations
-from darkfactory.prd import PRD, parse_prd
+from darkfactory.model import PRD, parse_prd
 from darkfactory.system import SystemContext, SystemOperation
 from darkfactory.system_runner import run_system_operation
 

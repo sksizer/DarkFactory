@@ -9,7 +9,7 @@ from darkfactory.cli._shared import _format_prd_line, _load
 
 
 def cmd_orphans(args: argparse.Namespace) -> int:
-    prds = _load(args.prd_dir)
+    prds = _load(args.data_dir)
     rs = containment.roots(prds)
     for prd in rs:
         print(_format_prd_line(prd, ("kind", "status")))

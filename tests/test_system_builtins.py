@@ -18,7 +18,7 @@ from darkfactory.builtins.system_builtins import (
     system_mark_done,
     system_load_review_prds,
 )
-from darkfactory.prd import PRD, parse_prd
+from darkfactory.model import PRD, parse_prd
 from darkfactory.system import SystemContext, SystemOperation
 
 from tests.conftest import write_prd
@@ -87,7 +87,7 @@ def test_set_status_bulk_updates_multiple_prds(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, prds, targets=["PRD-1", "PRD-2"])
 
     with patch(
-        "darkfactory.builtins.system_builtins.prd_module.set_status"
+        "darkfactory.builtins.system_builtins.model_module.set_status"
     ) as mock_set:
         set_status_bulk(ctx, status="done")
 
@@ -103,7 +103,7 @@ def test_set_status_bulk_updates_correct_status_value(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, {"PRD-10": prd}, targets=["PRD-10"])
 
     with patch(
-        "darkfactory.builtins.system_builtins.prd_module.set_status"
+        "darkfactory.builtins.system_builtins.model_module.set_status"
     ) as mock_set:
         set_status_bulk(ctx, status="done")
 
@@ -118,7 +118,7 @@ def test_set_status_bulk_dry_run_skips_writes(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, {"PRD-20": prd}, dry_run=True, targets=["PRD-20"])
 
     with patch(
-        "darkfactory.builtins.system_builtins.prd_module.set_status"
+        "darkfactory.builtins.system_builtins.model_module.set_status"
     ) as mock_set:
         set_status_bulk(ctx, status="done")
 
@@ -145,7 +145,7 @@ def test_set_status_bulk_skips_already_done_prds(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, {"PRD-30": prd}, targets=["PRD-30"])
 
     with patch(
-        "darkfactory.builtins.system_builtins.prd_module.set_status"
+        "darkfactory.builtins.system_builtins.model_module.set_status"
     ) as mock_set:
         set_status_bulk(ctx, status="done")
 
@@ -160,7 +160,7 @@ def test_set_status_bulk_partial_idempotency(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, prds, targets=["PRD-31", "PRD-32"])
 
     with patch(
-        "darkfactory.builtins.system_builtins.prd_module.set_status"
+        "darkfactory.builtins.system_builtins.model_module.set_status"
     ) as mock_set:
         set_status_bulk(ctx, status="done")
 
@@ -399,7 +399,7 @@ def test_system_mark_done_calls_set_status_bulk_with_done(tmp_path: Path) -> Non
     ctx = _make_ctx(tmp_path, {"PRD-100": prd}, targets=["PRD-100"])
 
     with patch(
-        "darkfactory.builtins.system_builtins.prd_module.set_status"
+        "darkfactory.builtins.system_builtins.model_module.set_status"
     ) as mock_set:
         system_mark_done(ctx)
 

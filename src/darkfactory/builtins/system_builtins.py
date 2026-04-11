@@ -11,9 +11,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
-from darkfactory import containment, prd as prd_module
+from darkfactory import containment, model as model_module
 from darkfactory.git_ops import git_run
-from darkfactory.prd import compute_branch_name
+from darkfactory.model import compute_branch_name
 from darkfactory.system import SystemContext
 
 SYSTEM_BUILTINS: dict[str, Callable[..., None]] = {}
@@ -67,7 +67,7 @@ def set_status_bulk(ctx: SystemContext, *, status: str) -> None:
             )
             continue
 
-        prd_module.set_status(prd, status)
+        model_module.set_status(prd, status)
         ctx.logger.info("set_status_bulk: %s -> %s", prd_id, status)
 
 

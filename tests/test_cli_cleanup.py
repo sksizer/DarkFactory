@@ -17,9 +17,15 @@ from darkfactory.cli import main
 from .conftest import write_prd
 
 
-def _init_git_repo(path: Path) -> None:
-    """Minimal git init so ``_find_repo_root`` can locate the tmp dir."""
-    (path / ".git").mkdir(exist_ok=True)
+def _setup_project(tmp_path: Path) -> Path:
+    """Create .darkfactory/ layout with .git and return the prds dir."""
+    (tmp_path / ".git").mkdir(exist_ok=True)
+    df = tmp_path / ".darkfactory"
+    df.mkdir()
+    prds = df / "data" / "prds"
+    prds.mkdir(parents=True)
+    (df / "data" / "archive").mkdir()
+    return prds
 
 
 def _make_worktree_dir(repo_root: Path, name: str) -> Path:
@@ -33,14 +39,14 @@ def _make_worktree_dir(repo_root: Path, name: str) -> Path:
 
 
 def test_find_stale_worktrees_no_dir(tmp_path: Path) -> None:
-    _init_git_repo(tmp_path)
+    (tmp_path / ".git").mkdir(exist_ok=True)
     # No .worktrees dir
     result = find_stale_worktrees(tmp_path)
     assert result == []
 
 
 def test_find_stale_worktrees_returns_merged(tmp_path: Path) -> None:
-    _init_git_repo(tmp_path)
+    (tmp_path / ".git").mkdir(exist_ok=True)
     _make_worktree_dir(tmp_path, "PRD-001-some-feature")
     _make_worktree_dir(tmp_path, "PRD-002-another")
 
@@ -59,7 +65,7 @@ def test_find_stale_worktrees_returns_merged(tmp_path: Path) -> None:
 
 
 def test_find_stale_worktrees_returns_closed(tmp_path: Path) -> None:
-    _init_git_repo(tmp_path)
+    (tmp_path / ".git").mkdir(exist_ok=True)
     _make_worktree_dir(tmp_path, "PRD-003-closed-one")
 
     with patch(
@@ -73,7 +79,7 @@ def test_find_stale_worktrees_returns_closed(tmp_path: Path) -> None:
 
 
 def test_find_stale_worktrees_skips_open(tmp_path: Path) -> None:
-    _init_git_repo(tmp_path)
+    (tmp_path / ".git").mkdir(exist_ok=True)
     _make_worktree_dir(tmp_path, "PRD-005-open-one")
 
     fake_states = {"prd/PRD-005-open-one": "OPEN"}
@@ -135,19 +141,11 @@ def test_is_safe_merged_no_unpushed(tmp_path: Path) -> None:
 # ---------- cmd cleanup single ----------
 
 
-def _setup_cleanup_env(tmp_path: Path) -> Path:
-    """Set up a minimal repo with PRD dir and .git."""
-    _init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
-    write_prd(prd_dir, "PRD-001", "my-feature", status="done")
-    return prd_dir
-
-
 def test_cleanup_single_merged_pr_removes(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    prd_dir = _setup_cleanup_env(tmp_path)
+    prd_dir = _setup_project(tmp_path)
+    write_prd(prd_dir, "PRD-001", "my-feature", status="done")
     _make_worktree_dir(tmp_path, "PRD-001-my-feature")
 
     stale = StaleWorktree(
@@ -162,7 +160,7 @@ def test_cleanup_single_merged_pr_removes(
         patch("darkfactory.checks._has_unpushed_commits", return_value=False),
         patch("darkfactory.cli.cleanup._remove_worktree") as mock_remove,
     ):
-        rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001"])
+        rc = main(["--directory", str(tmp_path), "cleanup", "PRD-001"])
 
     assert rc == 0
     mock_remove.assert_called_once()
@@ -173,7 +171,8 @@ def test_cleanup_single_merged_pr_removes(
 def test_cleanup_single_open_pr_refuses(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    prd_dir = _setup_cleanup_env(tmp_path)
+    prd_dir = _setup_project(tmp_path)
+    write_prd(prd_dir, "PRD-001", "my-feature", status="done")
     _make_worktree_dir(tmp_path, "PRD-001-my-feature")
 
     stale = StaleWorktree(
@@ -187,7 +186,7 @@ def test_cleanup_single_open_pr_refuses(
         patch("darkfactory.cli.cleanup._find_worktree_for_prd", return_value=stale),
         patch("darkfactory.cli.cleanup._remove_worktree") as mock_remove,
     ):
-        rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001"])
+        rc = main(["--directory", str(tmp_path), "cleanup", "PRD-001"])
 
     assert rc == 1
     mock_remove.assert_not_called()
@@ -198,7 +197,8 @@ def test_cleanup_single_open_pr_refuses(
 def test_cleanup_single_unpushed_refuses_without_force(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    prd_dir = _setup_cleanup_env(tmp_path)
+    prd_dir = _setup_project(tmp_path)
+    write_prd(prd_dir, "PRD-001", "my-feature", status="done")
     _make_worktree_dir(tmp_path, "PRD-001-my-feature")
 
     stale = StaleWorktree(
@@ -213,7 +213,7 @@ def test_cleanup_single_unpushed_refuses_without_force(
         patch("darkfactory.checks._has_unpushed_commits", return_value=True),
         patch("darkfactory.cli.cleanup._remove_worktree") as mock_remove,
     ):
-        rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001"])
+        rc = main(["--directory", str(tmp_path), "cleanup", "PRD-001"])
 
     assert rc == 1
     mock_remove.assert_not_called()
@@ -222,7 +222,8 @@ def test_cleanup_single_unpushed_refuses_without_force(
 def test_cleanup_single_unpushed_with_force_succeeds(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    prd_dir = _setup_cleanup_env(tmp_path)
+    prd_dir = _setup_project(tmp_path)
+    write_prd(prd_dir, "PRD-001", "my-feature", status="done")
     _make_worktree_dir(tmp_path, "PRD-001-my-feature")
 
     stale = StaleWorktree(
@@ -237,7 +238,7 @@ def test_cleanup_single_unpushed_with_force_succeeds(
         patch("darkfactory.checks._has_unpushed_commits", return_value=True),
         patch("darkfactory.cli.cleanup._remove_worktree") as mock_remove,
     ):
-        rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001", "--force"])
+        rc = main(["--directory", str(tmp_path), "cleanup", "PRD-001", "--force"])
 
     assert rc == 0
     mock_remove.assert_called_once()
@@ -250,7 +251,8 @@ def test_cleanup_orphaned_branch_no_commits_force(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Force-removing an orphaned branch with 0 commits ahead succeeds."""
-    prd_dir = _setup_cleanup_env(tmp_path)
+    prd_dir = _setup_project(tmp_path)
+    write_prd(prd_dir, "PRD-001", "my-feature", status="done")
 
     with (
         patch("darkfactory.cli.cleanup._find_worktree_for_prd", return_value=None),
@@ -263,7 +265,7 @@ def test_cleanup_orphaned_branch_no_commits_force(
     ):
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = ""
-        rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001", "--force"])
+        rc = main(["--directory", str(tmp_path), "cleanup", "PRD-001", "--force"])
 
     assert rc == 0
     out = capsys.readouterr().out
@@ -274,7 +276,8 @@ def test_cleanup_orphaned_branch_with_commits_refuses_without_force(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Orphaned branch with commits ahead should refuse without --force."""
-    prd_dir = _setup_cleanup_env(tmp_path)
+    prd_dir = _setup_project(tmp_path)
+    write_prd(prd_dir, "PRD-001", "my-feature", status="done")
 
     with (
         patch("darkfactory.cli.cleanup._find_worktree_for_prd", return_value=None),
@@ -284,7 +287,7 @@ def test_cleanup_orphaned_branch_with_commits_refuses_without_force(
         ),
         patch("darkfactory.cli.cleanup._orphaned_branch_commit_count", return_value=3),
     ):
-        rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001"])
+        rc = main(["--directory", str(tmp_path), "cleanup", "PRD-001"])
 
     assert rc == 1
     out = capsys.readouterr().out
@@ -296,7 +299,8 @@ def test_cleanup_orphaned_branch_with_commits_force_succeeds(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Force-removing an orphaned branch with commits prints count."""
-    prd_dir = _setup_cleanup_env(tmp_path)
+    prd_dir = _setup_project(tmp_path)
+    write_prd(prd_dir, "PRD-001", "my-feature", status="done")
 
     with (
         patch("darkfactory.cli.cleanup._find_worktree_for_prd", return_value=None),
@@ -309,7 +313,7 @@ def test_cleanup_orphaned_branch_with_commits_force_succeeds(
     ):
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = ""
-        rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001", "--force"])
+        rc = main(["--directory", str(tmp_path), "cleanup", "PRD-001", "--force"])
 
     assert rc == 0
     out = capsys.readouterr().out
@@ -320,13 +324,14 @@ def test_cleanup_no_worktree_no_branch(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """No worktree and no orphaned branch prints clear message."""
-    prd_dir = _setup_cleanup_env(tmp_path)
+    prd_dir = _setup_project(tmp_path)
+    write_prd(prd_dir, "PRD-001", "my-feature", status="done")
 
     with (
         patch("darkfactory.cli.cleanup._find_worktree_for_prd", return_value=None),
         patch("darkfactory.cli.cleanup._find_orphaned_branch", return_value=None),
     ):
-        rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001"])
+        rc = main(["--directory", str(tmp_path), "cleanup", "PRD-001"])
 
     assert rc == 1
     out = capsys.readouterr().out
@@ -337,7 +342,8 @@ def test_cleanup_orphaned_branch_no_commits_without_force(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Orphaned branch with 0 commits ahead can be removed without --force."""
-    prd_dir = _setup_cleanup_env(tmp_path)
+    prd_dir = _setup_project(tmp_path)
+    write_prd(prd_dir, "PRD-001", "my-feature", status="done")
 
     with (
         patch("darkfactory.cli.cleanup._find_worktree_for_prd", return_value=None),
@@ -350,7 +356,7 @@ def test_cleanup_orphaned_branch_no_commits_without_force(
     ):
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = ""
-        rc = main(["--prd-dir", str(prd_dir), "cleanup", "PRD-001"])
+        rc = main(["--directory", str(tmp_path), "cleanup", "PRD-001"])
 
     assert rc == 0
     out = capsys.readouterr().out
@@ -363,7 +369,8 @@ def test_cleanup_orphaned_branch_no_commits_without_force(
 def test_cleanup_merged_removes_only_merged(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    prd_dir = _setup_cleanup_env(tmp_path)
+    prd_dir = _setup_project(tmp_path)
+    write_prd(prd_dir, "PRD-001", "my-feature", status="done")
 
     stale_merged = StaleWorktree(
         prd_id="PRD-001",
@@ -379,7 +386,7 @@ def test_cleanup_merged_removes_only_merged(
         patch("darkfactory.checks._has_unpushed_commits", return_value=False),
         patch("darkfactory.cli.cleanup._remove_worktree") as mock_remove,
     ):
-        rc = main(["--prd-dir", str(prd_dir), "cleanup", "--merged"])
+        rc = main(["--directory", str(tmp_path), "cleanup", "--merged"])
 
     assert rc == 0
     mock_remove.assert_called_once()
@@ -388,10 +395,11 @@ def test_cleanup_merged_removes_only_merged(
 def test_cleanup_merged_no_stale_worktrees(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    prd_dir = _setup_cleanup_env(tmp_path)
+    prd_dir = _setup_project(tmp_path)
+    write_prd(prd_dir, "PRD-001", "my-feature", status="done")
 
     with patch("darkfactory.cli.cleanup.find_stale_worktrees", return_value=[]):
-        rc = main(["--prd-dir", str(prd_dir), "cleanup", "--merged"])
+        rc = main(["--directory", str(tmp_path), "cleanup", "--merged"])
 
     assert rc == 0
     out = capsys.readouterr().out
@@ -404,9 +412,7 @@ def test_cleanup_merged_no_stale_worktrees(
 def test_status_shows_hygiene_line_when_stale(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    prd_dir = _setup_project(tmp_path)
     write_prd(prd_dir, "PRD-001", "feat", status="done")
 
     stale = [
@@ -419,7 +425,7 @@ def test_status_shows_hygiene_line_when_stale(
     ]
 
     with patch("darkfactory.cli.status.find_stale_worktrees", return_value=stale):
-        rc = main(["--prd-dir", str(prd_dir), "status"])
+        rc = main(["--directory", str(tmp_path), "status"])
 
     assert rc == 0
     out = capsys.readouterr().out
@@ -430,13 +436,11 @@ def test_status_shows_hygiene_line_when_stale(
 def test_status_hides_hygiene_line_when_none(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    prd_dir = _setup_project(tmp_path)
     write_prd(prd_dir, "PRD-001", "feat", status="done")
 
     with patch("darkfactory.cli.status.find_stale_worktrees", return_value=[]):
-        rc = main(["--prd-dir", str(prd_dir), "status"])
+        rc = main(["--directory", str(tmp_path), "status"])
 
     assert rc == 0
     out = capsys.readouterr().out

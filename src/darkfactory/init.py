@@ -28,7 +28,8 @@ CONFIG_SKELETON = """\
 """
 
 _REQUIRED_DIRS = [
-    ".darkfactory/prds",
+    ".darkfactory/data/prds",
+    ".darkfactory/data/archive",
     ".darkfactory/workflows",
     ".darkfactory/worktrees",
     ".darkfactory/transcripts",

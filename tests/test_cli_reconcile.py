@@ -14,9 +14,15 @@ from darkfactory.cli import main
 from .conftest import write_prd
 
 
-def _init_git_repo(path: Path) -> None:
-    """Create a bare .git dir so ``_find_repo_root`` can locate the tmp dir."""
-    (path / ".git").mkdir(exist_ok=True)
+def _setup_project(tmp_path: Path) -> Path:
+    """Create .darkfactory/ layout with .git and return the prds dir."""
+    (tmp_path / ".git").mkdir(exist_ok=True)
+    df = tmp_path / ".darkfactory"
+    df.mkdir()
+    prds = df / "data" / "prds"
+    prds.mkdir(parents=True)
+    (df / "data" / "archive").mkdir()
+    return prds
 
 
 def _fake_pr(head_ref: str, number: int, *, sha: str = "abc123") -> dict[str, Any]:
@@ -37,9 +43,7 @@ def test_reconcile_dryrun_lists_candidates(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Dry-run with one candidate prints the change but makes no modifications."""
-    _init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    prd_dir = _setup_project(tmp_path)
     prd_file = write_prd(prd_dir, "PRD-224", "reconcile-test", status="review")
     original_text = prd_file.read_text()
 
@@ -49,7 +53,7 @@ def test_reconcile_dryrun_lists_candidates(
         patch("darkfactory.cli.reconcile._get_merged_prd_prs", return_value=prs),
         patch("darkfactory.cli.reconcile._merge_commit_is_ancestor", return_value=True),
     ):
-        rc = main(["--prd-dir", str(prd_dir), "reconcile"])
+        rc = main(["--directory", str(tmp_path), "reconcile"])
 
     assert rc == 0
     out = capsys.readouterr().out
@@ -65,16 +69,14 @@ def test_reconcile_dryrun_no_candidates(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """When no PRDs need reconciling, the command prints 'up to date'."""
-    _init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    prd_dir = _setup_project(tmp_path)
     # PRD is already 'done', not 'review'.
     write_prd(prd_dir, "PRD-001", "done-already", status="done")
 
     prs = [_fake_pr("prd/PRD-001-done-already", 10)]
 
     with patch("darkfactory.cli.reconcile._get_merged_prd_prs", return_value=prs):
-        rc = main(["--prd-dir", str(prd_dir), "reconcile"])
+        rc = main(["--directory", str(tmp_path), "reconcile"])
 
     assert rc == 0
     out = capsys.readouterr().out
@@ -85,14 +87,12 @@ def test_reconcile_dryrun_no_matching_prs(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """When merged PRs have no matching PRD file, prints 'up to date'."""
-    _init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    _setup_project(tmp_path)
 
     prs = [_fake_pr("prd/PRD-999-nonexistent", 99)]
 
     with patch("darkfactory.cli.reconcile._get_merged_prd_prs", return_value=prs):
-        rc = main(["--prd-dir", str(prd_dir), "reconcile"])
+        rc = main(["--directory", str(tmp_path), "reconcile"])
 
     assert rc == 0
     assert "up to date" in capsys.readouterr().out
@@ -107,9 +107,7 @@ def test_reconcile_execute_flips_status(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """--execute flips status from 'review' to 'done' and updates the updated field."""
-    _init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    prd_dir = _setup_project(tmp_path)
     prd_file = write_prd(prd_dir, "PRD-010", "my-feature", status="review")
 
     prs = [_fake_pr("prd/PRD-010-my-feature", 7)]
@@ -119,7 +117,7 @@ def test_reconcile_execute_flips_status(
         patch("darkfactory.cli.reconcile._merge_commit_is_ancestor", return_value=True),
         patch("darkfactory.cli.reconcile._create_reconcile_pr"),
     ):
-        rc = main(["--prd-dir", str(prd_dir), "reconcile", "--execute"])
+        rc = main(["--directory", str(tmp_path), "reconcile", "--execute"])
 
     assert rc == 0
     text = prd_file.read_text()
@@ -135,9 +133,7 @@ def test_reconcile_execute_creates_pr(
     tmp_path: Path,
 ) -> None:
     """--execute without --commit-to-main calls _create_reconcile_pr."""
-    _init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    prd_dir = _setup_project(tmp_path)
     write_prd(prd_dir, "PRD-020", "pr-test", status="review")
 
     prs = [_fake_pr("prd/PRD-020-pr-test", 20)]
@@ -149,7 +145,7 @@ def test_reconcile_execute_creates_pr(
         patch("darkfactory.cli.reconcile._merge_commit_is_ancestor", return_value=True),
         patch("darkfactory.cli.reconcile._create_reconcile_pr", mock_create_pr),
     ):
-        rc = main(["--prd-dir", str(prd_dir), "reconcile", "--execute"])
+        rc = main(["--directory", str(tmp_path), "reconcile", "--execute"])
 
     assert rc == 0
     assert mock_create_pr.called
@@ -164,9 +160,7 @@ def test_reconcile_execute_commit_to_main(
     tmp_path: Path,
 ) -> None:
     """--execute --commit-to-main calls _commit_to_main instead of _create_reconcile_pr."""
-    _init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    prd_dir = _setup_project(tmp_path)
     write_prd(prd_dir, "PRD-030", "direct-commit", status="review")
 
     prs = [_fake_pr("prd/PRD-030-direct-commit", 30)]
@@ -181,7 +175,7 @@ def test_reconcile_execute_commit_to_main(
         patch("darkfactory.cli.reconcile._create_reconcile_pr", mock_create_pr),
     ):
         rc = main(
-            ["--prd-dir", str(prd_dir), "reconcile", "--execute", "--commit-to-main"]
+            ["--directory", str(tmp_path), "reconcile", "--execute", "--commit-to-main"]
         )
 
     assert rc == 0
@@ -198,9 +192,7 @@ def test_reconcile_multiple_candidates_batched(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Multiple PRDs are reported in a single dry-run list."""
-    _init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    prd_dir = _setup_project(tmp_path)
     write_prd(prd_dir, "PRD-100", "alpha", status="review")
     write_prd(prd_dir, "PRD-101", "beta", status="review")
 
@@ -213,7 +205,7 @@ def test_reconcile_multiple_candidates_batched(
         patch("darkfactory.cli.reconcile._get_merged_prd_prs", return_value=prs),
         patch("darkfactory.cli.reconcile._merge_commit_is_ancestor", return_value=True),
     ):
-        rc = main(["--prd-dir", str(prd_dir), "reconcile"])
+        rc = main(["--directory", str(tmp_path), "reconcile"])
 
     assert rc == 0
     out = capsys.readouterr().out
@@ -225,9 +217,7 @@ def test_reconcile_multiple_execute_batched_commit_msg(
     tmp_path: Path,
 ) -> None:
     """Multiple candidates produce a batched commit message."""
-    _init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    prd_dir = _setup_project(tmp_path)
     write_prd(prd_dir, "PRD-200", "first", status="review")
     write_prd(prd_dir, "PRD-201", "second", status="review")
 
@@ -250,7 +240,7 @@ def test_reconcile_multiple_execute_batched_commit_msg(
         patch("darkfactory.cli.reconcile._merge_commit_is_ancestor", return_value=True),
         patch("darkfactory.cli.reconcile._create_reconcile_pr", fake_commit),
     ):
-        rc = main(["--prd-dir", str(prd_dir), "reconcile", "--execute"])
+        rc = main(["--directory", str(tmp_path), "reconcile", "--execute"])
 
     assert rc == 0
     assert len(captured_msg) == 1
@@ -262,9 +252,7 @@ def test_reconcile_single_commit_msg_format(
     tmp_path: Path,
 ) -> None:
     """Single candidate produces per-PRD commit message with PR number."""
-    _init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    prd_dir = _setup_project(tmp_path)
     write_prd(prd_dir, "PRD-300", "single", status="review")
 
     prs = [_fake_pr("prd/PRD-300-single", 55)]
@@ -283,7 +271,7 @@ def test_reconcile_single_commit_msg_format(
         patch("darkfactory.cli.reconcile._merge_commit_is_ancestor", return_value=True),
         patch("darkfactory.cli.reconcile._create_reconcile_pr", fake_commit),
     ):
-        rc = main(["--prd-dir", str(prd_dir), "reconcile", "--execute"])
+        rc = main(["--directory", str(tmp_path), "reconcile", "--execute"])
 
     assert rc == 0
     assert len(captured_msg) == 1
@@ -312,9 +300,7 @@ def test_reconcile_warns_on_clobbered_merge_commit(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """When a merge commit is not reachable from HEAD, warn and skip the PRD."""
-    _init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    prd_dir = _setup_project(tmp_path)
     write_prd(prd_dir, "PRD-400", "clobbered", status="review")
 
     prs = [_fake_pr_with_sha("prd/PRD-400-clobbered", 40, "deadbeef1234")]
@@ -326,7 +312,7 @@ def test_reconcile_warns_on_clobbered_merge_commit(
             return_value=False,
         ),
     ):
-        rc = main(["--prd-dir", str(prd_dir), "reconcile"])
+        rc = main(["--directory", str(tmp_path), "reconcile"])
 
     assert rc == 0
     out = capsys.readouterr().out
@@ -340,9 +326,7 @@ def test_reconcile_skips_clobbered_but_flips_valid(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Mixed case: one clobbered, one valid — only the valid one is a candidate."""
-    _init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    prd_dir = _setup_project(tmp_path)
     write_prd(prd_dir, "PRD-500", "bad", status="review")
     write_prd(prd_dir, "PRD-501", "good", status="review")
 
@@ -362,7 +346,7 @@ def test_reconcile_skips_clobbered_but_flips_valid(
             side_effect=fake_ancestor,
         ),
     ):
-        rc = main(["--prd-dir", str(prd_dir), "reconcile"])
+        rc = main(["--directory", str(tmp_path), "reconcile"])
 
     assert rc == 0
     out = capsys.readouterr().out

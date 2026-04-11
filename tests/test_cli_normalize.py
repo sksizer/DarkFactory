@@ -16,6 +16,16 @@ from .conftest import write_prd
 # ---------------------------------------------------------------------------
 
 
+def _setup_project(tmp_path: Path) -> Path:
+    """Create .darkfactory/ layout and return the prds dir."""
+    df = tmp_path / ".darkfactory"
+    df.mkdir()
+    prds = df / "data" / "prds"
+    prds.mkdir(parents=True)
+    (df / "data" / "archive").mkdir()
+    return prds
+
+
 def _prd_with_unsorted_tags(prd_dir: Path, prd_id: str = "PRD-070") -> Path:
     """Write a PRD whose tags block is intentionally out of order."""
     slug = prd_id.lower().replace("-", "")
@@ -85,8 +95,9 @@ def _prd_canonical(prd_dir: Path, prd_id: str = "PRD-070") -> Path:
 
 def test_normalize_single_prd_sorts_tags(tmp_path: Path) -> None:
     """``prd normalize PRD-070`` sorts tags and exits 0."""
-    path = _prd_with_unsorted_tags(tmp_path)
-    rc = main(["--prd-dir", str(tmp_path), "normalize", "PRD-070"])
+    prd_dir = _setup_project(tmp_path)
+    path = _prd_with_unsorted_tags(prd_dir)
+    rc = main(["--directory", str(tmp_path), "normalize", "PRD-070"])
     assert rc == 0
     after = path.read_text(encoding="utf-8")
     assert after.index("  - apple\n") < after.index("  - zebra\n")
@@ -96,8 +107,9 @@ def test_normalize_single_prd_no_changes_reports_canonical(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """AC-4: already-canonical PRD reports no changes."""
-    _prd_canonical(tmp_path)
-    rc = main(["--prd-dir", str(tmp_path), "normalize", "PRD-070"])
+    prd_dir = _setup_project(tmp_path)
+    _prd_canonical(prd_dir)
+    rc = main(["--directory", str(tmp_path), "normalize", "PRD-070"])
     assert rc == 0
     out = capsys.readouterr().out
     assert "No changes" in out or "already canonical" in out
@@ -105,9 +117,10 @@ def test_normalize_single_prd_no_changes_reports_canonical(
 
 def test_normalize_unknown_prd_exits_nonzero(tmp_path: Path) -> None:
     """Requesting a PRD that doesn't exist raises SystemExit."""
-    write_prd(tmp_path, "PRD-001", "existing")
+    prd_dir = _setup_project(tmp_path)
+    write_prd(prd_dir, "PRD-001", "existing")
     with pytest.raises(SystemExit):
-        main(["--prd-dir", str(tmp_path), "normalize", "PRD-999"])
+        main(["--directory", str(tmp_path), "normalize", "PRD-999"])
 
 
 # ---------------------------------------------------------------------------
@@ -117,9 +130,10 @@ def test_normalize_unknown_prd_exits_nonzero(tmp_path: Path) -> None:
 
 def test_normalize_all_normalizes_multiple_prds(tmp_path: Path) -> None:
     """``--all`` normalizes every PRD in the directory."""
-    path1 = _prd_with_unsorted_tags(tmp_path, "PRD-070")
-    path2 = _prd_with_unsorted_tags(tmp_path, "PRD-071")
-    rc = main(["--prd-dir", str(tmp_path), "normalize", "--all"])
+    prd_dir = _setup_project(tmp_path)
+    path1 = _prd_with_unsorted_tags(prd_dir, "PRD-070")
+    path2 = _prd_with_unsorted_tags(prd_dir, "PRD-071")
+    rc = main(["--directory", str(tmp_path), "normalize", "--all"])
     assert rc == 0
     for path in (path1, path2):
         after = path.read_text(encoding="utf-8")
@@ -133,9 +147,10 @@ def test_normalize_all_normalizes_multiple_prds(tmp_path: Path) -> None:
 
 def test_normalize_check_exits_nonzero_on_drifted_file(tmp_path: Path) -> None:
     """AC-5a: ``--check`` exits non-zero when at least one file is not canonical."""
-    path = _prd_with_unsorted_tags(tmp_path)
+    prd_dir = _setup_project(tmp_path)
+    path = _prd_with_unsorted_tags(prd_dir)
     original = path.read_text(encoding="utf-8")
-    rc = main(["--prd-dir", str(tmp_path), "normalize", "--all", "--check"])
+    rc = main(["--directory", str(tmp_path), "normalize", "--all", "--check"])
     assert rc != 0
     # --check must not modify the file.
     assert path.read_text(encoding="utf-8") == original
@@ -143,14 +158,16 @@ def test_normalize_check_exits_nonzero_on_drifted_file(tmp_path: Path) -> None:
 
 def test_normalize_check_exits_zero_on_canonical_set(tmp_path: Path) -> None:
     """AC-5b: ``--check`` exits 0 when all files are already canonical."""
-    _prd_canonical(tmp_path)
-    rc = main(["--prd-dir", str(tmp_path), "normalize", "--all", "--check"])
+    prd_dir = _setup_project(tmp_path)
+    _prd_canonical(prd_dir)
+    rc = main(["--directory", str(tmp_path), "normalize", "--all", "--check"])
     assert rc == 0
 
 
 def test_normalize_check_does_not_write(tmp_path: Path) -> None:
     """``--check`` must never write to disk."""
-    path = _prd_with_unsorted_tags(tmp_path)
+    prd_dir = _setup_project(tmp_path)
+    path = _prd_with_unsorted_tags(prd_dir)
     before = path.read_text(encoding="utf-8")
-    main(["--prd-dir", str(tmp_path), "normalize", "--all", "--check"])
+    main(["--directory", str(tmp_path), "normalize", "--all", "--check"])
     assert path.read_text(encoding="utf-8") == before

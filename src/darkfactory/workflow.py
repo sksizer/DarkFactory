@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     from .event_log import EventWriter
     from .invoke import InvokeResult
     from .pr_comments import CommentFilters, ReviewThread
-    from .prd import PRD
+    from .model import PRD
 
 
 # ---------- type aliases ----------

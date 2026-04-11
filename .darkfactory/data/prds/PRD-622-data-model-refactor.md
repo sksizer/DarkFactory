@@ -2,7 +2,7 @@
 id: PRD-622
 title: Data Model Refactor
 kind: task
-status: ready
+status: review
 priority: medium
 effort: xl
 capability: complex
@@ -15,7 +15,7 @@ assignee:
 reviewers: []
 target_version:
 created: 2026-04-11
-updated: 2026-04-11
+updated: '2026-04-11'
 tags: []
 ---
 
@@ -82,9 +82,9 @@ There is no way to know which version of DarkFactory last wrote a file, making f
    - **Guardrail algorithm**: Starting from the target PRD, BFS/DFS along four edge types: (a) parent axis upward — follow `parent` transitively to all ancestors, (b) parent axis downward — follow reverse-parent lookup transitively to all descendants, (c) dependency axis forward — follow `depends_on` transitively, (d) dependency axis backward — follow `blocks` transitively. Collect the union of all reachable PRDs. Every PRD in the set must be in a terminal state (`done`, `superseded`, `cancelled`, or `archived`). Non-terminal PRDs are reported as blockers with their IDs and current statuses. Uses `load_all(data_dir, include_archived=True)` to resolve references across both folders.
 
 6. **Cross-folder discovery** — `load_all(data_dir: Path, *, include_archived: bool = False)` takes the `.darkfactory/data/` directory (not the `prds/` subdirectory). Internally derives `data_dir / "prds"` and `data_dir / "archive"`:
-   - Default (`include_archived=False`): discovers PRDs in `data_dir/prds/` only
-   - `include_archived=True`: discovers across both `data_dir/prds/` and `data_dir/archive/`
-   - Reference resolution (`parent`, `depends_on`, `blocks`) uses `include_archived=True` internally so links to archived PRDs don't break
+   - Default (`include_archived=False`): discovers PRDs in `data_dir/prds/` only. This is the correct default for nearly all CLI commands (status, next, validate, tree, run, etc.) — they operate on the active DAG only. Archive guardrails ensure that active PRDs cannot reference archived ones, so archived PRDs are effectively orphaned from the active graph.
+   - `include_archived=True`: discovers across both `data_dir/prds/` and `data_dir/archive/`. Used by `archive()` itself (to run the transitive guardrail check against every existing PRD) and available to any caller that specifically needs to resolve an ID against both folders.
+   - `load_one(data_dir, prd_id)` defaults to `include_archived=True` because single-PRD lookups are typically reference resolution (following a link from one PRD to another, where the target may have been archived).
    - Archived PRDs may drift from current data model over time; links are maintained but full model conformance is not guaranteed for old archived files. Document this as a known constraint.
 
 7. **Callsite migration** — All imports and references to `prd.py` updated to `model`. No shims. This includes ~12 source files in `src/darkfactory/` and ~20 test files in `tests/` and peer test files.
@@ -140,11 +140,11 @@ Same logical content always produces the same bytes. Git diffs show only fields 
 
 ### Config expansion
 
-Expand the existing `Config` dataclass into a single state tree with two sections:
-- **User preferences** — model, style (existing)
-- **System paths** — `project_dir`, `data_dir`, `prds_dir`, `archive_dir` (new, resolved from `.darkfactory/` location)
+Expand the existing `Config` dataclass by adding a nested `PathsConfig` section alongside the existing `ModelConfig` and `StyleConfig`:
+- **User preferences** — `config.model`, `config.style` (existing)
+- **System paths** — `config.paths` with fields `project_dir`, `data_dir`, `prds_dir`, `archive_dir` (new, resolved from `.darkfactory/` location)
 
-`resolve_config()` resolves both sections. `_persistence.py` receives paths via `Config` rather than importing constants directly.
+Keeping paths in their own nested dataclass mirrors how `model` and `style` are organized and avoids widening the flat `Config` surface. `resolve_config()` resolves all sections. `_persistence.py` receives paths as explicit function arguments (derived from `config.paths`) rather than importing constants directly.
 
 ### Auto-migration flow
 
@@ -178,9 +178,9 @@ Expand the existing `Config` dataclass into a single state tree with two section
 - [ ] AC-6: Archive guardrails: only terminal-state PRDs (`done`, `superseded`, `cancelled`) can be archived, and only when their full transitive dependency chain (ancestors, descendants, depends_on, blocks — BFS across all four axes) is also terminal; `archive()` returns updated PRD with new `path`
 - [ ] AC-7: `save()` uses deterministic serialization (canonical field order, explicit quoting); `set_status`, `set_workflow`, `archive` delegate to `save()`; all stamp `app_version`; `set_status_at` (worktree variant) does not
 - [ ] AC-8: Auto-migration detects legacy layout, prompts interactively (or errors on non-TTY), migrates all contents including `Dashboard.base`; old `.darkfactory/prds/` directory is removed after move
-- [ ] AC-9: `load_all(data_dir, include_archived=True)` discovers PRDs across both folders; `load_one(data_dir, prd_id)` finds a single PRD by ID; reference resolution uses `include_archived=True`
+- [ ] AC-9: `load_all(data_dir, *, include_archived=False)` discovers PRDs in `data_dir/prds/` by default; `include_archived=True` also scans `data_dir/archive/`; `load_one(data_dir, prd_id)` finds a single PRD by ID and defaults to `include_archived=True` for reference-resolution use cases
 - [ ] AC-10: `pyproject.toml` uses `[tool.hatch.version]` to read version from `__init__.py`
-- [ ] AC-11: `Config` dataclass expanded with system paths (`data_dir`, `prds_dir`, `archive_dir`); `_persistence.py` receives paths via Config
+- [ ] AC-11: `Config` dataclass gains a nested `PathsConfig` section (`config.paths.project_dir`, `config.paths.data_dir`, `config.paths.prds_dir`, `config.paths.archive_dir`); `_persistence.py` receives paths as explicit arguments derived from `config.paths`
 - [ ] AC-12: `--prd-dir` CLI flag removed from `_parser.py`; `args.prd_dir` replaced with `args.data_dir` across all CLI commands
 - [ ] AC-13: `init.py` scaffolds `.darkfactory/data/prds/` and `.darkfactory/data/archive/` for new projects
 - [ ] AC-14: Test fixtures updated: `tmp_prd_dir` → `tmp_data_dir` with `prds/` and `archive/` subdirectories; all ~20 test files updated

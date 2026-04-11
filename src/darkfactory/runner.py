@@ -44,7 +44,7 @@ from typing import TYPE_CHECKING, Any
 from .builtins import BUILTINS
 from .event_log import EventWriter, emit_task_event
 from .invoke import InvokeResult, capability_to_model, invoke_claude
-from .prd import compute_branch_name
+from .model import compute_branch_name
 from .templates import compose_prompt
 from .timeouts import resolve_timeout
 from .workflow import (
@@ -57,7 +57,7 @@ from .workflow import (
 )
 
 if TYPE_CHECKING:
-    from .prd import PRD
+    from .model import PRD
     from .style import Styler
 
 

@@ -10,7 +10,7 @@ from darkfactory.cli._shared import _find_repo_root, _load
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
-    prds = _load(args.prd_dir)
+    prds = _load(args.data_dir)
     errors: list[str] = []
     warnings: list[str] = []
 
@@ -69,7 +69,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
     # Uses effective_impacts (aggregated for containers) and exempts
     # parent/child pairs (containment is not conflict).
     try:
-        repo_root = _find_repo_root(args.prd_dir)
+        repo_root = _find_repo_root(args.data_dir)
         files = impacts.tracked_files(repo_root)
     except Exception:  # noqa: BLE001 — best-effort outside a git repo
         files = []
@@ -110,7 +110,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
     # 8. Review-status PRDs whose branch is gone from origin.
     try:
-        repo_root = _find_repo_root(args.prd_dir)
+        repo_root = _find_repo_root(args.data_dir)
         git_state = checks.SubprocessGitState(str(repo_root))
         for issue in checks.validate_review_branches(prds, git_state):
             warnings.append(issue.message)

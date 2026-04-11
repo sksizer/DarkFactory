@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from .prd import PRD, compute_branch_name
+from .model import PRD, compute_branch_name
 
 logger = logging.getLogger(__name__)
 

@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
 from . import assign, containment, graph
 from .event_log import EventWriter
-from .prd import PRD, load_all, set_status_at
+from .model import PRD, load_all, set_status_at
 from .runner import RunResult, _compute_branch_name, run_workflow
 from .workflow import Workflow
 
@@ -254,7 +254,7 @@ def deps_satisfied(prd: PRD, prds: dict[str, PRD]) -> bool:
 
 
 def _prd_sort_key(prd: PRD) -> tuple[int, tuple[int, ...]]:
-    from .prd import parse_id_sort_key
+    from .model import parse_id_sort_key
 
     return (PRIORITY_RANK.get(prd.priority, 2), parse_id_sort_key(prd.id))
 
@@ -439,7 +439,7 @@ def plan_execution(
 
 
 def execute_graph(
-    prd_dir: Path,
+    data_dir: Path,
     repo_root: Path,
     workflows: dict[str, Workflow],
     *,
@@ -497,7 +497,7 @@ def execute_graph(
     total_runs = 0
 
     while True:
-        prds = load_all(prd_dir)
+        prds = load_all(data_dir)
 
         # For rooted mode, verify the root still exists after reload.
         if isinstance(strategy, RootedStrategy) and strategy.root_id not in prds:

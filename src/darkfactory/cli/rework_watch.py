@@ -364,19 +364,19 @@ def _cmd_stop(repo_root: Path) -> int:
 # ── Poll loop ────────────────────────────────────────────────────────────────
 
 
-def _trigger_rework(prd_id: str, prd_dir: Path) -> int:
+def _trigger_rework(prd_id: str, data_dir: Path) -> int:
     """Run ``prd rework PRD-X --execute`` as a subprocess.
 
     Returns the subprocess exit code.
     """
     cmd = [sys.executable, "-m", "darkfactory.cli", "rework", prd_id, "--execute"]
-    result = subprocess.run(cmd, cwd=prd_dir.parent)
+    result = subprocess.run(cmd, cwd=data_dir.parent)
     return result.returncode
 
 
 def run_poll_loop(
     repo_root: Path,
-    prd_dir: Path,
+    data_dir: Path,
     poll_interval: int = DEFAULT_POLL_INTERVAL,
     max_reworks_per_hour: int = DEFAULT_MAX_REWORKS_PER_HOUR,
 ) -> None:
@@ -443,7 +443,7 @@ def run_poll_loop(
                     prd_id,
                     pr_number,
                 )
-                rc = _trigger_rework(prd_id, prd_dir)
+                rc = _trigger_rework(prd_id, data_dir)
                 if rc == 0:
                     record_rework(pr_state, now)
                     pr_state.last_seen_comment_ids = current_ids
@@ -464,7 +464,7 @@ def cmd_rework_watch(args: argparse.Namespace) -> int:
     """Entry point for ``prd rework-watch``."""
     from darkfactory.cli._shared import _find_repo_root
 
-    repo_root = _find_repo_root(args.prd_dir)
+    repo_root = _find_repo_root(args.data_dir)
 
     # Control modes that don't need the poll loop
     if args.status:
@@ -504,7 +504,7 @@ def cmd_rework_watch(args: argparse.Namespace) -> int:
         logging.basicConfig(level=logging.INFO)
         _write_pid(repo_root)
         try:
-            run_poll_loop(repo_root, args.prd_dir, poll_interval, max_reworks)
+            run_poll_loop(repo_root, args.data_dir, poll_interval, max_reworks)
         finally:
             _remove_pid(repo_root)
         return 0
@@ -512,7 +512,7 @@ def cmd_rework_watch(args: argparse.Namespace) -> int:
     # Foreground mode
     _write_pid(repo_root)
     try:
-        run_poll_loop(repo_root, args.prd_dir, poll_interval, max_reworks)
+        run_poll_loop(repo_root, args.data_dir, poll_interval, max_reworks)
     except KeyboardInterrupt:
         print("\nrework-watch: interrupted")
     finally:

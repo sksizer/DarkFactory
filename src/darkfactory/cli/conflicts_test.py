@@ -13,13 +13,13 @@ from darkfactory.cli.conflicts import cmd_conflicts
 
 
 def _make_args(
-    prd_dir: Path,
+    data_dir: Path,
     prd_id: str = "PRD-001",
     *,
     json_output: bool = False,
 ) -> argparse.Namespace:
     ns = argparse.Namespace()
-    ns.prd_dir = prd_dir
+    ns.data_dir = data_dir
     ns.prd_id = prd_id
     ns.json = json_output
     return ns

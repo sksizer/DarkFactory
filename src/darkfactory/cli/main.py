@@ -42,9 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     _configure_logging(verbose=getattr(args, "verbose", False))
 
     darkfactory_dir: Path | None = None
-    if args.subcommand != "init" and (
-        args.prd_dir is None or args.workflows_dir is None
-    ):
+    if args.subcommand != "init":
         darkfactory_dir = resolve_project_root(
             cli_dir=getattr(args, "directory", None),
         )
@@ -54,21 +52,18 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 1
-        if args.prd_dir is None:
-            args.prd_dir = darkfactory_dir / "prds"
+
+        from darkfactory.model._persistence import ensure_data_layout
+
+        ensure_data_layout(darkfactory_dir)
+
+        args.data_dir = darkfactory_dir / "data"
         if args.workflows_dir is None:
             args.workflows_dir = darkfactory_dir / "workflows"
 
-    # Derive operations_dir from prd_dir's parent (.darkfactory/) if not explicit.
-    if getattr(args, "operations_dir", None) is None:
-        if darkfactory_dir is not None:
-            args.operations_dir = darkfactory_dir / "operations"
-        else:
-            args.operations_dir = args.prd_dir.parent / "operations"
+    if getattr(args, "operations_dir", None) is None and darkfactory_dir is not None:
+        args.operations_dir = darkfactory_dir / "operations"
 
-    # Resolve the full config cascade (files + env vars), then build Styler.
-    # Any command module that needs styled output reads args.styler — it never
-    # constructs one itself. JSON-output paths must NOT call styler.render().
     resolved_config = resolve_config(darkfactory_dir)
     style_config = resolve_style_config(
         config=resolved_config,

@@ -14,9 +14,9 @@ from darkfactory.cli._shared import (
 
 
 def cmd_conflicts(args: argparse.Namespace) -> int:
-    prds = _load(args.prd_dir)
+    prds = _load(args.data_dir)
     prd = _resolve_prd_or_exit(args.prd_id, prds)
-    repo_root = _find_repo_root(args.prd_dir)
+    repo_root = _find_repo_root(args.data_dir)
     conflicts = impacts.find_conflicts(prd, prds, repo_root)
 
     # Use effective_impacts so containers show their aggregated view
