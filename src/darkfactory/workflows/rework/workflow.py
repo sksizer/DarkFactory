@@ -53,7 +53,7 @@ workflow = Workflow(
                 "Bash(git diff:*)",
                 "Bash(git log:*)",
                 "Bash(git rm:*)",
-                "Bash(git mv:*)"
+                "Bash(git mv:*)",
             ],
             model_from_capability=True,
             retries=1,

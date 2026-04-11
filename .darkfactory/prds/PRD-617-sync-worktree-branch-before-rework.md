@@ -2,7 +2,7 @@
 id: PRD-617
 title: sync worktree branch before rework
 kind: task
-status: in-progress
+status: review
 priority: medium
 effort: m
 capability: simple

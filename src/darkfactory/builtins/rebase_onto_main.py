@@ -96,7 +96,10 @@ def rebase_onto_main(
     _fetch_origin_main(cwd, fetch_timeout)
 
     already_up_to_date = git_check(
-        "merge-base", "--is-ancestor", "origin/main", "HEAD",
+        "merge-base",
+        "--is-ancestor",
+        "origin/main",
+        "HEAD",
         cwd=cwd,
     )
 
@@ -126,7 +129,9 @@ def rebase_onto_main(
             text=True,
         )
 
-        files_str = ", ".join(conflicting) if conflicting else "(unknown — check git status)"
+        files_str = (
+            ", ".join(conflicting) if conflicting else "(unknown — check git status)"
+        )
         raise RuntimeError(
             f"git rebase origin/main produced conflicts in: {files_str}. "
             "Resolve conflicts manually and re-run."
