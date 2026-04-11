@@ -8,7 +8,7 @@ import pytest
 
 from conftest import write_prd
 from darkfactory.builtins.gather_prd_context import gather_prd_context
-from darkfactory.prd import load_all
+from darkfactory.prd import PRD, load_all
 from darkfactory.system import SystemContext, SystemOperation
 
 
@@ -18,12 +18,12 @@ def _make_op() -> SystemOperation:
 
 def _make_ctx(
     tmp_path: Path,
-    prds: dict[str, object] | None = None,
+    prds: dict[str, PRD] | None = None,
     target_prd: str | None = None,
 ) -> SystemContext:
     ctx = SystemContext(
         repo_root=tmp_path,
-        prds=prds or {},  # type: ignore[arg-type]
+        prds=prds or {},
         operation=_make_op(),
         cwd=tmp_path,
         dry_run=False,

@@ -72,7 +72,7 @@ def test_discuss_launches_chain(tmp_path: Path) -> None:
     with patch("darkfactory.cli.discuss.shutil") as mock_shutil:
         mock_shutil.which.return_value = "/usr/bin/claude"
         with patch("darkfactory.cli.discuss.run_system_operation") as mock_run:
-            from darkfactory.system_runner import RunResult
+            from darkfactory.runner import RunResult
 
             mock_run.return_value = RunResult(success=True)
             result = args.func(args)
@@ -100,19 +100,23 @@ def test_new_discuss_composes_with_open() -> None:
 
 def test_discuss_help_describes_chain() -> None:
     """AC-11: ``prd discuss --help`` and ``prd new --help`` describe the commands."""
+    import argparse
+
     parser = build_parser()
-    sub_actions = [
+    assert parser._subparsers is not None
+    sub_actions: list[argparse.Action] = [
         a for a in parser._subparsers._actions if hasattr(a, "_parser_class")
     ]
     found = False
     for action in sub_actions:
-        if hasattr(action, "choices") and "discuss" in action.choices:
-            discuss_parser = action.choices["discuss"]
+        choices = getattr(action, "choices", None)
+        if choices is not None and "discuss" in choices:
+            discuss_parser: argparse.ArgumentParser = choices["discuss"]
             discuss_help = discuss_parser.format_help().lower()
             assert "discussion" in discuss_help
             assert "phase" in discuss_help
 
-            new_parser = action.choices["new"]
+            new_parser: argparse.ArgumentParser = choices["new"]
             new_help = new_parser.format_help().lower()
             assert "--discuss" in new_help
             found = True
