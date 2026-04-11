@@ -2,7 +2,7 @@
 id: PRD-620
 title: prd discuss enhancements
 kind: task
-status: ready
+status: review
 priority: low
 effort: s
 capability: simple
@@ -17,7 +17,7 @@ assignee:
 reviewers: []
 target_version:
 created: 2026-04-11
-updated: 2026-04-11
+updated: '2026-04-11'
 tags: []
 ---
 

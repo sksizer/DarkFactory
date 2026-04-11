@@ -30,7 +30,7 @@ def commit_prd_changes(
         paths = [str(prd_file)]
 
     if message is None:
-        message = f"chore(prd): {ctx.target_prd} discuss session refinements"
+        message = f"docs(prd): {ctx.target_prd} discuss session refinements"
     elif "{target_prd}" in message:
         message = ctx.format_string(message)
 
