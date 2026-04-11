@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import NamedTuple
+from typing import Callable, NamedTuple
 from unittest.mock import MagicMock
 
 import pytest
@@ -80,7 +80,7 @@ def cli_project(tmp_path: Path) -> CliProject:
 
 
 @pytest.fixture
-def make_prd(tmp_path: Path) -> object:
+def make_prd(tmp_path: Path) -> Callable[..., PRD]:
     """Return a factory that writes and loads a single PRD.
 
     The factory signature::
@@ -132,7 +132,7 @@ def make_prd(tmp_path: Path) -> object:
 
 
 @pytest.fixture
-def make_workflow(tmp_path: Path) -> object:
+def make_workflow(tmp_path: Path) -> Callable[..., Workflow]:
     """Return a factory that creates a ``Workflow`` instance in a temp dir.
 
     The factory signature::
@@ -160,7 +160,7 @@ def make_workflow(tmp_path: Path) -> object:
 
 
 @pytest.fixture
-def make_execution_context() -> object:
+def make_execution_context() -> Callable[..., MagicMock]:
     """Return a factory that creates a mock ``ExecutionContext``.
 
     The returned factory creates a ``MagicMock`` pre-populated with the
