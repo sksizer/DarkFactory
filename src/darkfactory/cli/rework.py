@@ -107,7 +107,7 @@ def cmd_rework(args: argparse.Namespace) -> int:
         reviewer=args.reviewer,
         single_comment_id=args.from_pr_comment,
     )
-    threads = fetch_pr_comments(pr_number, filters=filters)
+    threads = fetch_pr_comments(pr_number, filters=filters, repo_root=repo_root)
     if not threads:
         print(f"No unaddressed comments found for {prd_id}")
         return 0

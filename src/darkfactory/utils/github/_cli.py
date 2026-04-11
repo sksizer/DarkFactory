@@ -15,13 +15,18 @@ from pathlib import Path
 from typing import Any
 
 
-def gh_repo_nwo() -> tuple[str, str]:
-    """Return ``(owner, name)`` for the current repo via ``gh``."""
+def gh_repo_nwo(cwd: Path | None = None) -> tuple[str, str]:
+    """Return ``(owner, name)`` for the current repo via ``gh``.
+
+    ``cwd`` is forwarded to :func:`subprocess.run` so the query is resolved
+    against the intended repository rather than the process working directory.
+    """
     result = subprocess.run(
         ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
         capture_output=True,
         text=True,
         check=True,
+        cwd=str(cwd) if cwd is not None else None,
     )
     nwo = result.stdout.strip()
     owner, _, name = nwo.partition("/")
@@ -33,11 +38,15 @@ def gh_graphql(
     name: str,
     pr_number: int,
     query: str,
+    cwd: Path | None = None,
 ) -> dict[str, Any]:
     """Run ``gh api graphql`` with PR variables and return parsed JSON.
 
     Passes ``owner``, ``name``, and ``number`` as GraphQL variables.
     Raises :class:`subprocess.CalledProcessError` on non-zero exit.
+
+    ``cwd`` is forwarded to :func:`subprocess.run` so the query is resolved
+    against the intended repository rather than the process working directory.
     """
     result = subprocess.run(
         [
@@ -56,6 +65,7 @@ def gh_graphql(
         capture_output=True,
         text=True,
         check=True,
+        cwd=str(cwd) if cwd is not None else None,
     )
     import json
 

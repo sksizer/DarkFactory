@@ -63,16 +63,21 @@ class CommentFilters:
 def fetch_pr_comments(
     pr_number: int,
     filters: CommentFilters | None = None,
+    repo_root: Path | None = None,
 ) -> list[ReviewThread]:
     """Fetch and filter PR review threads from GitHub.
 
     Shells out to ``gh api graphql`` to retrieve ``reviewThreads``,
     ``reviews``, and issue ``comments`` for the given PR, then returns
     a list of ``ReviewThread`` objects matching the given filters.
+
+    Pass ``repo_root`` so that the ``gh`` and ``git`` subprocess calls are
+    anchored to the intended repository instead of the process working
+    directory.
     """
-    raw = _gh_fetch(pr_number)
+    raw = _gh_fetch(pr_number, repo_root=repo_root)
     threads = _parse_threads(raw)
-    return _apply_filters(threads, filters or CommentFilters())
+    return _apply_filters(threads, filters or CommentFilters(), repo_root=repo_root)
 
 
 _GRAPHQL_QUERY = """
@@ -119,7 +124,7 @@ query($owner: String!, $name: String!, $number: Int!) {
 """
 
 
-def _gh_fetch(pr_number: int) -> dict[str, Any]:
+def _gh_fetch(pr_number: int, repo_root: Path | None = None) -> dict[str, Any]:
     """Fetch PR data via gh GraphQL and reshape into the parser's dict shape.
 
     ``gh pr view --json`` does not expose ``reviewThreads``, so we use
@@ -127,9 +132,12 @@ def _gh_fetch(pr_number: int) -> dict[str, Any]:
     shape ``_parse_threads`` expects::
 
         {"reviewThreads": [...], "reviews": [...], "comments": [...]}
+
+    Pass ``repo_root`` so that the ``gh`` subprocess calls are anchored to
+    the intended repository instead of the process working directory.
     """
-    owner, name = gh_repo_nwo()
-    payload = gh_graphql(owner, name, pr_number, _GRAPHQL_QUERY)
+    owner, name = gh_repo_nwo(cwd=repo_root)
+    payload = gh_graphql(owner, name, pr_number, _GRAPHQL_QUERY, cwd=repo_root)
     pr = payload["data"]["repository"]["pullRequest"]
 
     review_threads: list[dict[str, Any]] = []
@@ -415,6 +423,7 @@ def _is_bot_comment(author: str, body: str, bot_usernames: list[str]) -> bool:
 def _apply_filters(
     threads: list[ReviewThread],
     filters: CommentFilters,
+    repo_root: Path | None = None,
 ) -> list[ReviewThread]:
     """Apply filtering rules to threads.
 
@@ -425,6 +434,9 @@ def _apply_filters(
     3. ``reviewer`` — keep only threads from the specified author
     4. ``bot_usernames`` — drop comments authored by the bot
     5. ``since_commit`` — drop threads posted before the commit timestamp
+
+    ``repo_root`` is forwarded to :func:`resolve_commit_timestamp` so the
+    ``git log`` call runs in the correct repository.
     """
     # 1. Single comment shortcut
     if filters.single_comment_id is not None:
@@ -450,7 +462,7 @@ def _apply_filters(
 
     # 5. Since-commit filter
     if filters.since_commit is not None:
-        cutoff = resolve_commit_timestamp(filters.since_commit)
+        cutoff = resolve_commit_timestamp(filters.since_commit, cwd=repo_root)
         result = [t for t in result if t.posted_at >= cutoff]
 
     return result

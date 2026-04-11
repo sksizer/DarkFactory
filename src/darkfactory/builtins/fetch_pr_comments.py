@@ -45,7 +45,7 @@ def fetch_pr_comments(ctx: ExecutionContext) -> None:
     from darkfactory.pr_comments import CommentFilters
     from darkfactory.pr_comments import fetch_pr_comments as _fetch
 
-    threads = _fetch(ctx.pr_number, filters=CommentFilters())
+    threads = _fetch(ctx.pr_number, filters=CommentFilters(), repo_root=ctx.repo_root)
     ctx.review_threads = threads
     _log.info(
         "fetch_pr_comments: fetched %d thread(s) for PR #%d",
