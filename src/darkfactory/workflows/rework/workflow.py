@@ -9,11 +9,15 @@ this one:
 
 The task sequence:
 
-1. Fetch unresolved PR review threads (no-op if pre-fetched by the CLI).
-2. Invoke Claude Code with the review feedback in the prompt.
-3. Run format / lint / typecheck / test to verify correctness.
-4. Commit with the rework message.
-5. Push to the existing branch so the PR auto-updates.
+1. Resolve the rework context: worktree, open PR, guard state,
+   unresolved review threads. No-op when the CLI pre-discovered.
+2. Fast-forward and rebase the worktree branch so the agent works
+   against current mainline code.
+3. Invoke Claude Code with the review feedback in the prompt.
+4. Run format / lint / typecheck / test to verify correctness.
+5. Commit with the rework message.
+6. Push to the existing branch so the PR auto-updates.
+7. Optionally post reply notes on addressed PR comment threads.
 """
 
 from __future__ import annotations
@@ -24,6 +28,11 @@ workflow = Workflow(
     name="rework",
     description="Address PR review feedback for an existing PRD",
     tasks=[
+        # Discover the worktree, PR, guard state, and unresolved review
+        # threads.  When the CLI has pre-populated these on the context
+        # (the common ``prd rework --execute`` path), this is a no-op
+        # and returns immediately without re-querying gh/git.
+        BuiltIn("resolve_rework_context"),
         # Sync the worktree branch with origin before any mutation.
         # Fast-forwards local to match origin/<branch> so push_branch won't
         # be rejected; then rebases onto origin/main so the agent works
@@ -31,9 +40,6 @@ workflow = Workflow(
         # expensive agent invocation) if the branch is diverged or conflicted.
         BuiltIn("fast_forward_branch"),
         BuiltIn("rebase_onto_main"),
-        # Fetch unresolved review threads and store on ctx.review_threads.
-        # When cmd_rework --execute pre-fetches them, this is a no-op.
-        BuiltIn("fetch_pr_comments"),
         # Invoke the agent with the review feedback.
         AgentTask(
             name="agent",

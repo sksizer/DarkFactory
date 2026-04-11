@@ -53,6 +53,7 @@ from darkfactory.builtins.lint_attribution import lint_attribution
 from darkfactory.builtins.push_branch import push_branch
 from darkfactory.builtins.rebase_onto_main import rebase_onto_main
 from darkfactory.builtins.reply_pr_comments import reply_pr_comments
+from darkfactory.builtins.resolve_rework_context import resolve_rework_context
 from darkfactory.builtins.set_status import set_status
 from darkfactory.builtins.summarize_agent_run import summarize_agent_run
 
@@ -78,4 +79,5 @@ __all__ = [
     "check_rework_guard",
     "fast_forward_branch",
     "rebase_onto_main",
+    "resolve_rework_context",
 ]

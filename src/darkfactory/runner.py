@@ -39,7 +39,7 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .builtins import BUILTINS
 from .event_log import EventWriter, emit_task_event
@@ -57,7 +57,6 @@ from .workflow import (
 )
 
 if TYPE_CHECKING:
-    from .pr_comments import ReviewThread
     from .prd import PRD
     from .style import Styler
 
@@ -127,10 +126,7 @@ def run_workflow(
     config_timeouts: dict[str, object] | None = None,
     styler: "Styler | None" = None,
     session_id: str | None = None,
-    initial_worktree_path: Path | None = None,
-    initial_pr_number: int | None = None,
-    initial_review_threads: "list[ReviewThread] | None" = None,
-    initial_reply_to_comments: bool = False,
+    context_overrides: dict[str, Any] | None = None,
 ) -> RunResult:
     """Execute a workflow against a single PRD and return the result.
 
@@ -147,6 +143,14 @@ def run_workflow(
     invocation. When provided and ``dry_run=False``, an
     :class:`EventWriter` is created and threaded through the execution
     context.
+
+    ``context_overrides`` is a generic escape hatch for CLI-provided
+    runtime values that workflow builtins need on the context before
+    dispatch starts (e.g. the rework CLI pre-discovers the worktree,
+    PR, and review threads so ``resolve_rework_context`` is a no-op).
+    Keys must name existing :class:`ExecutionContext` fields — unknown
+    keys raise ``ValueError`` so typos fail loudly instead of silently
+    dropping state onto the object.
     """
     branch_name = _compute_branch_name(prd)
 
@@ -161,15 +165,14 @@ def run_workflow(
         workflow=workflow,
         base_ref=base_ref,
         branch_name=branch_name,
-        worktree_path=initial_worktree_path,
-        cwd=initial_worktree_path if initial_worktree_path is not None else repo_root,
-        pr_number=initial_pr_number,
-        review_threads=initial_review_threads,
-        reply_to_comments=initial_reply_to_comments,
+        cwd=repo_root,
         dry_run=dry_run,
         logger=logger,
         event_writer=writer,
     )
+
+    if context_overrides:
+        _apply_context_overrides(ctx, context_overrides)
 
     if writer:
         writer.emit(
@@ -281,6 +284,25 @@ def run_workflow(
 
     result.pr_url = ctx.pr_url
     return result
+
+
+def _apply_context_overrides(ctx: ExecutionContext, overrides: dict[str, Any]) -> None:
+    """Apply caller-supplied overrides to ``ctx`` before task dispatch.
+
+    Validates each key against the dataclass fields so an unknown key
+    fails with a clear ``ValueError`` instead of silently attaching a
+    stray attribute that no downstream task will read.
+    """
+    from dataclasses import fields
+
+    valid_fields = {f.name for f in fields(ctx)}
+    for key, value in overrides.items():
+        if key not in valid_fields:
+            raise ValueError(
+                f"run_workflow: unknown ExecutionContext field {key!r} in "
+                f"context_overrides"
+            )
+        setattr(ctx, key, value)
 
 
 def _release_worktree_lock(ctx: ExecutionContext) -> None:

@@ -2,10 +2,11 @@
 
 Covers:
 - Workflow loads correctly from the built-in workflows directory.
-- Task sequence: no ensure_worktree / set_status / create_pr steps.
+- Task sequence: starts with ``resolve_rework_context`` and skips
+  ``ensure_worktree`` / ``set_status`` / ``create_pr``.
 - Commit message format.
-- fetch_pr_comments builtin no-op when threads pre-loaded.
-- No comments found → cmd_rework early exit with message.
+- ``run_workflow`` applies ``context_overrides`` to the ExecutionContext
+  before dispatch so the resolve builtin is a no-op.
 """
 
 from __future__ import annotations
@@ -67,7 +68,7 @@ def test_rework_workflow_has_expected_task_names(real_builtin_workflows: None) -
     wf = workflows["rework"]
     task_names = [t.name for t in wf.tasks]
 
-    assert "fetch_pr_comments" in task_names
+    assert "resolve_rework_context" in task_names
     assert "agent" in task_names
     assert "format" in task_names
     assert "lint" in task_names
@@ -75,6 +76,13 @@ def test_rework_workflow_has_expected_task_names(real_builtin_workflows: None) -
     assert "test" in task_names
     assert "commit" in task_names
     assert "push_branch" in task_names
+
+
+def test_rework_workflow_starts_with_resolve(real_builtin_workflows: None) -> None:
+    """resolve_rework_context runs before any other task."""
+    workflows = load_workflows()
+    wf = workflows["rework"]
+    assert wf.tasks[0].name == "resolve_rework_context"
 
 
 def test_rework_workflow_agent_uses_max_effort(real_builtin_workflows: None) -> None:
@@ -130,119 +138,14 @@ def test_rework_workflow_has_push_branch(real_builtin_workflows: None) -> None:
     assert push_idx < reply_idx
 
 
-# ---------- fetch_pr_comments builtin ----------
-
-
-def test_fetch_pr_comments_builtin_noop_when_preloaded(tmp_path: Path) -> None:
-    """The builtin is a no-op when ctx.review_threads is already populated."""
-    from darkfactory.builtins.fetch_pr_comments import fetch_pr_comments as builtin_fn
-    from darkfactory.prd import load_all
-
-    prds_dir = tmp_path / "prds"
-    prds_dir.mkdir()
-    write_prd(prds_dir, "PRD-001", "my-feature", status="review")
-    prd = load_all(prds_dir)["PRD-001"]
-
-    threads = [_thread()]
-    ctx = ExecutionContext(
-        prd=prd,
-        repo_root=tmp_path,
-        workflow=Workflow(name="rework", tasks=[]),
-        base_ref="main",
-        branch_name="prd/PRD-001-my-feature",
-        review_threads=threads,
-        dry_run=True,
-    )
-
-    # Should not call gh at all — threads already loaded
-    with patch("darkfactory.pr_comments.fetch_pr_comments") as mock_fetch:
-        builtin_fn(ctx)
-        mock_fetch.assert_not_called()
-
-    assert ctx.review_threads is threads  # unchanged
-
-
-def test_fetch_pr_comments_builtin_dry_run_sets_empty_threads(tmp_path: Path) -> None:
-    """In dry-run with no pre-loaded threads, builtin sets review_threads to []."""
-    from darkfactory.builtins.fetch_pr_comments import fetch_pr_comments as builtin_fn
-    from darkfactory.prd import load_all
-
-    prds_dir = tmp_path / "prds"
-    prds_dir.mkdir()
-    write_prd(prds_dir, "PRD-001", "my-feature", status="review")
-    prd = load_all(prds_dir)["PRD-001"]
-
-    ctx = ExecutionContext(
-        prd=prd,
-        repo_root=tmp_path,
-        workflow=Workflow(name="rework", tasks=[]),
-        base_ref="main",
-        branch_name="prd/PRD-001-my-feature",
-        pr_number=42,
-        review_threads=None,
-        dry_run=True,
-    )
-
-    builtin_fn(ctx)
-    assert ctx.review_threads == []
-
-
-def test_fetch_pr_comments_builtin_fetches_when_pr_number_set(tmp_path: Path) -> None:
-    """When pr_number is set and threads not pre-loaded, builtin fetches threads."""
-    from darkfactory.builtins.fetch_pr_comments import fetch_pr_comments as builtin_fn
-    from darkfactory.prd import load_all
-
-    prds_dir = tmp_path / "prds"
-    prds_dir.mkdir()
-    write_prd(prds_dir, "PRD-001", "my-feature", status="review")
-    prd = load_all(prds_dir)["PRD-001"]
-
-    ctx = ExecutionContext(
-        prd=prd,
-        repo_root=tmp_path,
-        workflow=Workflow(name="rework", tasks=[]),
-        base_ref="main",
-        branch_name="prd/PRD-001-my-feature",
-        pr_number=42,
-        review_threads=None,
-        dry_run=False,
-    )
-
-    fetched = [_thread()]
-    with patch(
-        "darkfactory.pr_comments.fetch_pr_comments", return_value=fetched
-    ) as mock_fetch:
-        builtin_fn(ctx)
-        # Verify called with the pr_number; filters may vary
-        assert mock_fetch.call_count == 1
-        assert mock_fetch.call_args.args[0] == 42
-
-    assert ctx.review_threads == fetched
-
-
-def test_fetch_pr_comments_builtin_raises_without_pr_number(tmp_path: Path) -> None:
-    """Without pr_number or pre-loaded threads in live mode, raise RuntimeError."""
-    from darkfactory.builtins.fetch_pr_comments import fetch_pr_comments as builtin_fn
-    from darkfactory.prd import load_all
-
-    prds_dir = tmp_path / "prds"
-    prds_dir.mkdir()
-    write_prd(prds_dir, "PRD-001", "my-feature", status="review")
-    prd = load_all(prds_dir)["PRD-001"]
-
-    ctx = ExecutionContext(
-        prd=prd,
-        repo_root=tmp_path,
-        workflow=Workflow(name="rework", tasks=[]),
-        base_ref="main",
-        branch_name="prd/PRD-001-my-feature",
-        pr_number=None,
-        review_threads=None,
-        dry_run=False,
-    )
-
-    with pytest.raises(RuntimeError, match="pr_number must be set"):
-        builtin_fn(ctx)
+def test_rework_workflow_has_no_legacy_fetch_pr_comments(
+    real_builtin_workflows: None,
+) -> None:
+    """The legacy fetch_pr_comments task is gone — resolve_rework_context handles it."""
+    workflows = load_workflows()
+    wf = workflows["rework"]
+    task_names = [t.name for t in wf.tasks]
+    assert "fetch_pr_comments" not in task_names
 
 
 # ---------- run_workflow rework integration ----------
@@ -269,7 +172,7 @@ def _make_rework_workflow(tmp_path: Path) -> Workflow:
     return Workflow(
         name="rework",
         tasks=[
-            BuiltIn("fetch_pr_comments"),
+            BuiltIn("resolve_rework_context"),
             AgentTask(
                 name="agent",
                 prompts=["prompts/role.md", "prompts/task.md"],
@@ -284,8 +187,8 @@ def _make_rework_workflow(tmp_path: Path) -> Workflow:
     )
 
 
-def test_run_workflow_passes_review_threads_to_context(tmp_path: Path) -> None:
-    """review_threads passed to run_workflow appear on ExecutionContext."""
+def test_run_workflow_applies_context_overrides(tmp_path: Path) -> None:
+    """context_overrides values appear on the ExecutionContext for every task."""
     from darkfactory.invoke import InvokeResult
 
     prd = _make_prd(tmp_path)
@@ -312,7 +215,7 @@ def test_run_workflow_passes_review_threads_to_context(tmp_path: Path) -> None:
         patch.dict(
             BUILTINS,
             {
-                "fetch_pr_comments": _fake_builtin,
+                "resolve_rework_context": _fake_builtin,
                 "commit": _fake_builtin,
                 "push_branch": _fake_builtin,
             },
@@ -325,9 +228,12 @@ def test_run_workflow_passes_review_threads_to_context(tmp_path: Path) -> None:
             tmp_path,
             "main",
             dry_run=False,
-            initial_worktree_path=worktree,
-            initial_pr_number=42,
-            initial_review_threads=threads,
+            context_overrides={
+                "worktree_path": worktree,
+                "cwd": worktree,
+                "pr_number": 42,
+                "review_threads": threads,
+            },
         )
 
     assert result.success
@@ -335,6 +241,20 @@ def test_run_workflow_passes_review_threads_to_context(tmp_path: Path) -> None:
     assert captured_ctx[0].pr_number == 42
     assert captured_ctx[0].worktree_path == worktree
     assert captured_ctx[0].cwd == worktree
+
+
+def test_run_workflow_rejects_unknown_override_key(tmp_path: Path) -> None:
+    """Unknown context_overrides keys raise ValueError instead of silently dropping."""
+    prd = _make_prd(tmp_path)
+    with pytest.raises(ValueError, match="unknown ExecutionContext field"):
+        run_workflow(
+            prd,  # type: ignore[arg-type]
+            _make_rework_workflow(tmp_path),
+            tmp_path,
+            "main",
+            dry_run=True,
+            context_overrides={"not_a_real_field": "value"},
+        )
 
 
 def test_run_workflow_commit_message_uses_prd_id(tmp_path: Path) -> None:
@@ -365,7 +285,7 @@ def test_run_workflow_commit_message_uses_prd_id(tmp_path: Path) -> None:
         patch.dict(
             BUILTINS,
             {
-                "fetch_pr_comments": lambda ctx, **kw: None,
+                "resolve_rework_context": lambda ctx, **kw: None,
                 "commit": _fake_commit,
                 "push_branch": lambda ctx, **kw: None,
             },
@@ -378,9 +298,12 @@ def test_run_workflow_commit_message_uses_prd_id(tmp_path: Path) -> None:
             tmp_path,
             "main",
             dry_run=False,
-            initial_worktree_path=worktree,
-            initial_pr_number=42,
-            initial_review_threads=threads,
+            context_overrides={
+                "worktree_path": worktree,
+                "cwd": worktree,
+                "pr_number": 42,
+                "review_threads": threads,
+            },
         )
 
     assert commit_messages == ["chore(prd): PRD-007 address review feedback"]

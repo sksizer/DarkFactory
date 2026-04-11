@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 
     from .event_log import EventWriter
     from .invoke import InvokeResult
-    from .pr_comments import ReviewThread
+    from .pr_comments import CommentFilters, ReviewThread
     from .prd import PRD
 
 
@@ -254,12 +254,15 @@ class ExecutionContext:
         default_factory=lambda: logging.getLogger("darkfactory")
     )
     event_writer: "EventWriter | None" = None
-    # Rework-specific fields — populated by cmd_rework before invoking
-    # the workflow runner. When set, the fetch_pr_comments builtin
-    # treats them as pre-fetched and skips the gh subprocess call.
+    # Rework-specific fields — populated by the CLI (via run_workflow's
+    # ``context_overrides`` dict) or by the ``resolve_rework_context``
+    # builtin running as the first task in the rework workflow. When set
+    # before the workflow starts, the builtin treats the state as
+    # pre-discovered and skips its own ``gh``/``git`` round-trips.
     pr_number: int | None = None
     review_threads: "list[ReviewThread] | None" = None
     reply_to_comments: bool = False
+    comment_filters: "CommentFilters | None" = None
 
     # Advisory process-level lock held by ensure_worktree for the
     # lifetime of this run. Managed by builtins + runner; tests should
