@@ -85,6 +85,7 @@ def reply_pr_comments(ctx: ExecutionContext) -> None:
     results = post_comment_replies(
         pr_number=ctx.pr_number,
         replies=replies,
+        threads=ctx.review_threads or [],
         commit_sha=commit_sha,
         repo_root=ctx.repo_root,
     )

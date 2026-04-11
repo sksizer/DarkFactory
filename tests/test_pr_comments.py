@@ -30,12 +30,14 @@ FIXTURE_REVIEW_THREADS = [
         "comments": [
             {
                 "id": "rt-abc",
+                "databaseId": 1001,
                 "author": {"login": "alice"},
                 "body": "This needs a docstring.",
                 "createdAt": "2026-04-07T10:00:00Z",
             },
             {
                 "id": "rt-abc-reply",
+                "databaseId": 1002,
                 "author": {"login": "bob"},
                 "body": "Working on it.",
                 "createdAt": "2026-04-07T11:00:00Z",
@@ -49,6 +51,7 @@ FIXTURE_REVIEW_THREADS = [
         "comments": [
             {
                 "id": "rt-resolved",
+                "databaseId": 2001,
                 "author": {"login": "alice"},
                 "body": "Fixed already.",
                 "createdAt": "2026-04-06T09:00:00Z",
@@ -116,6 +119,26 @@ def test_parse_threads_inline_thread_fields() -> None:
     assert len(inline.replies) == 1
     assert isinstance(inline.replies[0], ReviewComment)
     assert inline.replies[0].author == "bob"
+
+
+def test_parse_threads_inline_thread_reply_target_id() -> None:
+    threads = _parse_threads(FIXTURE_RAW)
+    inline = next(t for t in threads if t.thread_id == "rt-abc")
+    # reply_target_id is the first comment's databaseId (as str) — what the
+    # REST /pulls/.../comments/{id}/replies endpoint accepts.
+    assert inline.reply_target_id == "1001"
+
+
+def test_parse_threads_review_summary_has_no_reply_target() -> None:
+    threads = _parse_threads(FIXTURE_RAW)
+    review = next(t for t in threads if t.thread_id == "review-1")
+    assert review.reply_target_id is None
+
+
+def test_parse_threads_issue_comment_has_no_reply_target() -> None:
+    threads = _parse_threads(FIXTURE_RAW)
+    comment = next(t for t in threads if t.thread_id == "comment-1")
+    assert comment.reply_target_id is None
 
 
 def test_parse_threads_resolved_flag() -> None:

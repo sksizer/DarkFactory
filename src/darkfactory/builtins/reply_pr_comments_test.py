@@ -6,6 +6,25 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from darkfactory.builtins.reply_pr_comments import reply_pr_comments
+from darkfactory.pr_comments import ReviewThread
+
+
+def _default_threads() -> list[ReviewThread]:
+    """Default threads matching the IC_001 reference in _VALID_OUTPUT."""
+    return [
+        ReviewThread(
+            thread_id="IC_001",
+            author="alice",
+            path="src/foo.py",
+            line=1,
+            body="original comment",
+            posted_at="2026-04-07T10:00:00Z",
+            is_resolved=False,
+            replies=[],
+            review_state=None,
+            reply_target_id="999001",
+        )
+    ]
 
 
 def _make_ctx(
@@ -16,6 +35,7 @@ def _make_ctx(
     dry_run: bool = False,
     cwd: Path | None = None,
     repo_root: Path | None = None,
+    review_threads: list[ReviewThread] | None = None,
 ) -> MagicMock:
     ctx = MagicMock()
     ctx.reply_to_comments = reply_to_comments
@@ -25,6 +45,7 @@ def _make_ctx(
     ctx.cwd = cwd or Path("/tmp/worktree")
     ctx.repo_root = repo_root or Path("/tmp/repo")
     ctx.event_writer = None
+    ctx.review_threads = review_threads if review_threads is not None else _default_threads()
     return ctx
 
 

@@ -41,6 +41,11 @@ class ReviewThread:
     is_resolved: bool
     replies: list[ReviewComment]
     review_state: str | None  # "CHANGES_REQUESTED", "APPROVED", etc.
+    # Numeric REST id (databaseId, as str) of the comment we can reply to via
+    # POST /pulls/{n}/comments/{id}/replies. Populated only for inline review
+    # threads — review summaries and issue-level comments have no reply
+    # endpoint, so it stays None for those sources.
+    reply_target_id: str | None = None
 
 
 @dataclass
@@ -80,6 +85,7 @@ query($owner: String!, $name: String!, $number: Int!) {
           comments(first: 100) {
             nodes {
               id
+              databaseId
               body
               createdAt
               author { login }
@@ -213,6 +219,8 @@ def _parse_threads(raw: dict[str, Any]) -> list[ReviewThread]:
             )
 
         thread_id = first.get("id") or f"rt-{idx}"
+        database_id = first.get("databaseId")
+        reply_target_id = str(database_id) if database_id is not None else None
         threads.append(
             ReviewThread(
                 thread_id=thread_id,
@@ -224,6 +232,7 @@ def _parse_threads(raw: dict[str, Any]) -> list[ReviewThread]:
                 is_resolved=is_resolved,
                 replies=replies,
                 review_state=None,
+                reply_target_id=reply_target_id,
             )
         )
 
@@ -345,37 +354,63 @@ def parse_agent_replies(agent_output: str) -> list[CommentReply]:
 def post_comment_replies(
     pr_number: int,
     replies: list[CommentReply],
+    threads: list[ReviewThread],
     commit_sha: str,
     repo_root: Path,
 ) -> list[tuple[str, bool]]:
-    """Post replies to PR comment threads.
+    """Post replies to PR review comment threads.
 
-    For each :class:`CommentReply`, posts a reply on the specified review
-    thread via ``gh api``.  The reply body is prefixed with
-    ``[harness] addressed in {commit_sha}: `` so reviewers can easily
-    distinguish bot replies from human ones.
+    For each :class:`CommentReply`, looks up the matching
+    :class:`ReviewThread` in ``threads`` by ``thread_id``, resolves its
+    numeric ``reply_target_id`` (the REST ``databaseId`` of the first
+    comment in the thread), and POSTs a reply via
+    ``repos/{owner}/{repo}/pulls/{pr}/comments/{target}/replies``.
+
+    The reply body is prefixed with ``[harness] addressed in {commit_sha}: ``
+    so reviewers can easily distinguish bot replies from human ones.
 
     Returns a list of ``(thread_id, success)`` pairs.  Failures are
     logged as warnings but do not raise — the caller decides whether to
-    surface them.
+    surface them.  Replies whose ``thread_id`` isn't found in ``threads``,
+    or whose target has no ``reply_target_id`` (review summaries and
+    issue-level comments), are logged and marked as failed: the REST
+    ``/pulls/.../comments/{id}/replies`` endpoint only accepts inline
+    review-thread comment ids.
 
     ``repo_root`` is used as the ``cwd`` for ``gh`` subprocess calls.
     """
     results: list[tuple[str, bool]] = []
+    target_by_thread_id = {t.thread_id: t.reply_target_id for t in threads}
 
     for reply in replies:
+        target_id = target_by_thread_id.get(reply.thread_id)
+        if target_id is None:
+            if reply.thread_id not in target_by_thread_id:
+                _log.warning(
+                    "post_comment_replies: unknown thread_id %s — skipping",
+                    reply.thread_id,
+                )
+            else:
+                _log.warning(
+                    "post_comment_replies: thread %s has no reply target "
+                    "(review summary or issue comment) — skipping",
+                    reply.thread_id,
+                )
+            results.append((reply.thread_id, False))
+            continue
+
         prefix = f"[harness] addressed in {commit_sha}: "
         body = prefix + reply.body
 
         # gh api POST to create a reply on the specific pull request review comment.
         # GitHub REST endpoint: POST /repos/{owner}/{repo}/pulls/{pull_number}/comments/{comment_id}/replies
-        # We use `gh api` which auto-resolves the repo from the remote.
+        # {comment_id} must be the numeric databaseId, not a GraphQL node id.
         cmd = [
             "gh",
             "api",
             "--method",
             "POST",
-            f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/comments/{reply.thread_id}/replies",
+            f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/comments/{target_id}/replies",
             "-f",
             f"body={body}",
         ]
