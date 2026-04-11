@@ -7,7 +7,7 @@ from pathlib import Path
 
 from darkfactory.builtins.system_builtins import _register
 from darkfactory.system import SystemContext
-from darkfactory.utils.claude_code import spawn_claude
+from darkfactory.utils.claude_code import EffortLevel, spawn_claude
 from darkfactory.utils.tui import print_phase_banner
 
 
@@ -17,6 +17,7 @@ def discuss_prd(
     *,
     phase: str,
     prompt_file: str,
+    effort_level: EffortLevel | None = None,
 ) -> None:
     """Launch an interactive Claude Code session for a discussion phase."""
     prd_context = ctx._shared_state.get("prd_context", "")
@@ -43,7 +44,7 @@ def discuss_prd(
     print_phase_banner(phase)
     time.sleep(1)
 
-    exit_code = spawn_claude(composed, ctx.cwd)
+    exit_code = spawn_claude(composed, ctx.cwd, effort_level=effort_level)
 
     if exit_code != 0:
         ctx.logger.warning(

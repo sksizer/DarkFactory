@@ -10,6 +10,7 @@ import pytest
 from conftest import make_system_ctx, make_system_op
 from darkfactory.builtins.discuss_prd import discuss_prd
 from darkfactory.system import SystemContext
+from darkfactory.utils.claude_code import EffortLevel
 from darkfactory.utils.tui import print_phase_banner
 
 
@@ -40,7 +41,9 @@ def test_discuss_prd_composes_prompt(tmp_path: Path) -> None:
 
     captured_prompts: list[str] = []
 
-    def mock_spawn(prompt: str, cwd: Path) -> int:
+    def mock_spawn(
+        prompt: str, cwd: Path, *, effort_level: EffortLevel | None = None
+    ) -> int:
         captured_prompts.append(prompt)
         return 0
 
@@ -83,6 +86,30 @@ def test_discuss_prd_missing_prompt_raises(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="prompt file not found"):
         with patch("darkfactory.builtins.discuss_prd.time.sleep"):
             discuss_prd(ctx, phase="discuss", prompt_file="prompts/nonexistent.md")
+
+
+def test_discuss_prd_forwards_effort_level(tmp_path: Path) -> None:
+    op_dir = _setup_prompt(tmp_path)
+    ctx = _make_discuss_ctx(tmp_path, operation_dir=op_dir)
+
+    captured: list[EffortLevel | None] = []
+
+    def mock_spawn(
+        prompt: str, cwd: Path, *, effort_level: EffortLevel | None = None
+    ) -> int:
+        captured.append(effort_level)
+        return 0
+
+    with patch("darkfactory.builtins.discuss_prd.spawn_claude", side_effect=mock_spawn):
+        with patch("darkfactory.builtins.discuss_prd.time.sleep"):
+            discuss_prd(
+                ctx,
+                phase="discuss",
+                prompt_file="prompts/discuss.md",
+                effort_level="max",
+            )
+
+    assert captured == ["max"]
 
 
 def test_print_phase_banner(capsys: pytest.CaptureFixture[str]) -> None:

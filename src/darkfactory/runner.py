@@ -413,6 +413,7 @@ def _run_agent(
         sentinel_failure=task.sentinel_failure,
         dry_run=ctx.dry_run,
         timeout_seconds=timeout_seconds,
+        effort_level=task.effort_level,
         styler=styler,
         event_writer=ctx.event_writer,
         event_task_name=task.name,

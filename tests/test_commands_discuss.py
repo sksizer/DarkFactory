@@ -37,10 +37,12 @@ def test_discuss_operation_task_order() -> None:
     assert isinstance(tasks[1], BuiltIn)
     assert tasks[1].name == "discuss_prd"
     assert tasks[1].kwargs["phase"] == "discuss"
+    assert tasks[1].kwargs["effort_level"] == "max"
 
     assert isinstance(tasks[2], BuiltIn)
     assert tasks[2].name == "discuss_prd"
     assert tasks[2].kwargs["phase"] == "critique"
+    assert tasks[2].kwargs["effort_level"] == "max"
 
     assert isinstance(tasks[3], BuiltIn)
     assert tasks[3].name == "commit_prd_changes"
@@ -102,7 +104,12 @@ def test_chain_executes_in_order(tmp_path: Path) -> None:
 
     call_order: list[str] = []
 
-    def mock_spawn(prompt: str, cwd: Path) -> int:
+    def mock_spawn(
+        prompt: str,
+        cwd: Path,
+        *,
+        effort_level: str | None = None,
+    ) -> int:
         if "Collaborative" in prompt or "discuss" in prompt.lower()[:200]:
             call_order.append("discuss_claude")
         else:
