@@ -117,4 +117,9 @@ def cmd_new(args: argparse.Namespace) -> int:
         if editor:
             subprocess.run([editor, str(path)], check=False)
 
+    if getattr(args, "discuss", False):
+        from darkfactory.cli.discuss import launch_discuss_for_prd
+
+        return launch_discuss_for_prd(new_id, args)
+
     return 0

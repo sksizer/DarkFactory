@@ -25,6 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
     from darkfactory.cli.undecomposed import cmd_undecomposed
     from darkfactory.cli.validate import cmd_validate
 
+    from darkfactory.cli.discuss import cmd_discuss
     from darkfactory.cli.init_cmd import cmd_init
     from darkfactory.cli.rework import cmd_rework
     from darkfactory.cli.rework_watch import cmd_rework_watch
@@ -116,7 +117,30 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Open the new file in $EDITOR after creation",
     )
+    sub_new.add_argument(
+        "--discuss",
+        action="store_true",
+        help=(
+            "Launch an interactive Claude Code discussion session for the new PRD. "
+            "Composes with --open: editor opens first, then the discuss chain starts."
+        ),
+    )
     sub_new.set_defaults(func=cmd_new)
+
+    _discuss_help = (
+        "Open an interactive Claude Code discussion for a PRD. "
+        "Runs a chain of phases: gather context, collaborative discussion, "
+        "critical review, and an optional commit of PRD edits. "
+        "Each phase launches Claude Code interactively; exit with /exit or "
+        "Ctrl-D to advance to the next phase."
+    )
+    sub_discuss = sub.add_parser(
+        "discuss",
+        help=_discuss_help,
+        description=_discuss_help,
+    )
+    sub_discuss.add_argument("prd_id", help="PRD id to discuss (e.g. PRD-070)")
+    sub_discuss.set_defaults(func=cmd_discuss)
 
     sub_status = sub.add_parser("status", help="DAG overview and counts")
     sub_status.set_defaults(func=cmd_status)

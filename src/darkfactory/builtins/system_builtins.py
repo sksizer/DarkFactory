@@ -242,3 +242,9 @@ def audit_impacts_check(ctx: SystemContext) -> None:
         raise ValueError(
             f"{total_errors} declared impact path(s) missing on completed PRDs"
         )
+
+
+# Import modules that register additional system builtins via @_register.
+import darkfactory.builtins.gather_prd_context as _gather  # noqa: E402, F401
+import darkfactory.builtins.discuss_prd as _discuss  # noqa: E402, F401
+import darkfactory.builtins.commit_prd_changes as _commit  # noqa: E402, F401
