@@ -14,14 +14,14 @@ from darkfactory.cli.next_cmd import cmd_next
 
 
 def _make_args(
-    prd_dir: Path,
+    data_dir: Path,
     *,
     json_output: bool = False,
     capability: str = "",
     limit: int = 10,
 ) -> argparse.Namespace:
     ns = argparse.Namespace()
-    ns.prd_dir = prd_dir
+    ns.data_dir = data_dir
     ns.json = json_output
     ns.capability = capability
     ns.limit = limit

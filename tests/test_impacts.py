@@ -90,14 +90,14 @@ def test_effective_impacts_container_aggregates_children(tmp_prd_dir: Path) -> N
     """A container returns the sorted union of leaf descendants' impacts."""
     write_prd(tmp_prd_dir / "prds","PRD-001", "epic", kind="epic")
     write_prd(
-        tmp_prd_dir,
+        tmp_prd_dir / "prds",
         "PRD-002",
         "task-a",
         parent="PRD-001",
         impacts=["src/foo.rs"],
     )
     write_prd(
-        tmp_prd_dir,
+        tmp_prd_dir / "prds",
         "PRD-003",
         "task-b",
         parent="PRD-001",
@@ -111,7 +111,7 @@ def test_effective_impacts_container_aggregates_children(tmp_prd_dir: Path) -> N
 def test_effective_impacts_container_with_declared_raises(tmp_prd_dir: Path) -> None:
     """A container that declares impacts is a tree-consistency violation."""
     write_prd(
-        tmp_prd_dir,
+        tmp_prd_dir / "prds",
         "PRD-001",
         "epic",
         kind="epic",
@@ -128,21 +128,21 @@ def test_effective_impacts_nested_containers_aggregate(tmp_prd_dir: Path) -> Non
     write_prd(tmp_prd_dir / "prds","PRD-001", "epic", kind="epic")
     write_prd(tmp_prd_dir / "prds","PRD-002", "feature", kind="feature", parent="PRD-001")
     write_prd(
-        tmp_prd_dir,
+        tmp_prd_dir / "prds",
         "PRD-003",
         "leaf-1",
         parent="PRD-002",
         impacts=["a.rs"],
     )
     write_prd(
-        tmp_prd_dir,
+        tmp_prd_dir / "prds",
         "PRD-004",
         "leaf-2",
         parent="PRD-002",
         impacts=["b.rs"],
     )
     write_prd(
-        tmp_prd_dir,
+        tmp_prd_dir / "prds",
         "PRD-005",
         "direct-child-leaf",
         parent="PRD-001",
@@ -219,7 +219,7 @@ def test_impacts_overlap_parent_child_exempt(tmp_prd_dir: Path) -> None:
     overlap between them is definitional — not a conflict."""
     write_prd(tmp_prd_dir / "prds","PRD-001", "epic", kind="epic")
     write_prd(
-        tmp_prd_dir,
+        tmp_prd_dir / "prds",
         "PRD-002",
         "child",
         parent="PRD-001",
@@ -240,7 +240,7 @@ def test_impacts_overlap_transitive_ancestor_exempt(tmp_prd_dir: Path) -> None:
     write_prd(tmp_prd_dir / "prds","PRD-001", "epic", kind="epic")
     write_prd(tmp_prd_dir / "prds","PRD-002", "feature", kind="feature", parent="PRD-001")
     write_prd(
-        tmp_prd_dir,
+        tmp_prd_dir / "prds",
         "PRD-003",
         "leaf",
         parent="PRD-002",
@@ -261,14 +261,14 @@ def test_impacts_overlap_siblings_still_warn(tmp_prd_dir: Path) -> None:
     """
     write_prd(tmp_prd_dir / "prds","PRD-001", "epic", kind="epic")
     write_prd(
-        tmp_prd_dir,
+        tmp_prd_dir / "prds",
         "PRD-002",
         "sibling-a",
         parent="PRD-001",
         impacts=["src/shared.rs"],
     )
     write_prd(
-        tmp_prd_dir,
+        tmp_prd_dir / "prds",
         "PRD-003",
         "sibling-b",
         parent="PRD-001",
@@ -294,7 +294,7 @@ def test_impacts_overlap_epic_vs_unrelated_uses_aggregate(tmp_prd_dir: Path) -> 
     """An epic's overlap with an unrelated PRD is computed from the aggregate."""
     write_prd(tmp_prd_dir / "prds","PRD-001", "epic", kind="epic")
     write_prd(
-        tmp_prd_dir,
+        tmp_prd_dir / "prds",
         "PRD-002",
         "child",
         parent="PRD-001",
@@ -302,7 +302,7 @@ def test_impacts_overlap_epic_vs_unrelated_uses_aggregate(tmp_prd_dir: Path) -> 
     )
     # Unrelated PRD in a different tree
     write_prd(
-        tmp_prd_dir,
+        tmp_prd_dir / "prds",
         "PRD-003",
         "unrelated",
         impacts=["src/shared.rs"],
@@ -321,7 +321,7 @@ def test_find_conflicts_excludes_parent(tmp_prd_dir: Path) -> None:
     """find_conflicts should not report a parent as conflicting with its child."""
     write_prd(tmp_prd_dir / "prds","PRD-001", "epic", kind="epic")
     write_prd(
-        tmp_prd_dir,
+        tmp_prd_dir / "prds",
         "PRD-002",
         "child",
         parent="PRD-001",

@@ -26,7 +26,8 @@ def test_fresh_repo_creates_full_structure(tmp_path: Path) -> None:
     _git_init(tmp_path)
     msg = init_project(tmp_path)
 
-    assert (tmp_path / ".darkfactory" / "prds").is_dir()
+    assert (tmp_path / ".darkfactory" / "data" / "prds").is_dir()
+    assert (tmp_path / ".darkfactory" / "data" / "archive").is_dir()
     assert (tmp_path / ".darkfactory" / "workflows").is_dir()
     assert (tmp_path / ".darkfactory" / "worktrees").is_dir()
     assert (tmp_path / ".darkfactory" / "transcripts").is_dir()
@@ -135,7 +136,7 @@ def test_partial_fill_in_does_not_overwrite_existing(tmp_path: Path) -> None:
     _git_init(tmp_path)
     init_project(tmp_path)
 
-    prds_dir = tmp_path / ".darkfactory" / "prds"
+    prds_dir = tmp_path / ".darkfactory" / "data" / "prds"
     sentinel = prds_dir / "keep-me.md"
     sentinel.write_text("existing content", encoding="utf-8")
 

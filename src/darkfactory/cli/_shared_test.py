@@ -50,6 +50,7 @@ def test_load_raises_when_dir_missing(tmp_path: Path) -> None:
 
 
 def test_load_returns_empty_dict_for_empty_dir(tmp_path: Path) -> None:
+    (tmp_path / "prds").mkdir()
     result = _load(tmp_path)
     assert result == {}
 

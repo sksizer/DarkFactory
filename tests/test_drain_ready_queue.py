@@ -132,7 +132,7 @@ def _exec_queue(
     fake = _fake_runner(outcomes)
     report = execute_graph(
         strategy=QueueStrategy(filters),
-        prd_dir=tmp_prd_dir,
+        data_dir=tmp_prd_dir,
         repo_root=tmp_prd_dir,
         workflows=_make_workflows(),
         default_base="main",
@@ -155,15 +155,15 @@ class TestDiscoverReadyQueue:
         assert result == []
 
     def test_single_ready(self, tmp_prd_dir: Path) -> None:
-        write_prd(tmp_prd_dir, "PRD-001", "solo")
+        write_prd(tmp_prd_dir / "prds", "PRD-001", "solo")
         prds = load_all(tmp_prd_dir)
         result = discover_ready_queue(prds, QueueFilters())
         assert [p.id for p in result] == ["PRD-001"]
 
     def test_priority_ordering(self, tmp_prd_dir: Path) -> None:
-        write_prd(tmp_prd_dir, "PRD-001", "low-prd", priority="low")
-        write_prd(tmp_prd_dir, "PRD-002", "high-prd", priority="high")
-        write_prd(tmp_prd_dir, "PRD-003", "medium-prd", priority="medium")
+        write_prd(tmp_prd_dir / "prds", "PRD-001", "low-prd", priority="low")
+        write_prd(tmp_prd_dir / "prds", "PRD-002", "high-prd", priority="high")
+        write_prd(tmp_prd_dir / "prds", "PRD-003", "medium-prd", priority="medium")
         prds = load_all(tmp_prd_dir)
         result = discover_ready_queue(prds, QueueFilters())
         ids = [p.id for p in result]
@@ -172,16 +172,16 @@ class TestDiscoverReadyQueue:
         assert ids.index("PRD-003") < ids.index("PRD-001")
 
     def test_unsatisfied_dep_excluded(self, tmp_prd_dir: Path) -> None:
-        write_prd(tmp_prd_dir, "PRD-001", "dep", status="draft")
-        write_prd(tmp_prd_dir, "PRD-002", "downstream", depends_on=["PRD-001"])
+        write_prd(tmp_prd_dir / "prds", "PRD-001", "dep", status="draft")
+        write_prd(tmp_prd_dir / "prds", "PRD-002", "downstream", depends_on=["PRD-001"])
         prds = load_all(tmp_prd_dir)
         result = discover_ready_queue(prds, QueueFilters())
         ids = [p.id for p in result]
         assert "PRD-002" not in ids  # dep not satisfied
 
     def test_review_dep_satisfied(self, tmp_prd_dir: Path) -> None:
-        write_prd(tmp_prd_dir, "PRD-001", "dep", status="review")
-        write_prd(tmp_prd_dir, "PRD-002", "downstream", depends_on=["PRD-001"])
+        write_prd(tmp_prd_dir / "prds", "PRD-001", "dep", status="review")
+        write_prd(tmp_prd_dir / "prds", "PRD-002", "downstream", depends_on=["PRD-001"])
         prds = load_all(tmp_prd_dir)
         result = discover_ready_queue(prds, QueueFilters())
         ids = [p.id for p in result]
@@ -200,7 +200,7 @@ class TestMatchesFilters:
         slug: str,
         **kwargs: object,
     ) -> PRD:
-        _write_tagged_prd(tmp_prd_dir, prd_id, slug, **kwargs)  # type: ignore[arg-type]
+        _write_tagged_prd(tmp_prd_dir / "prds", prd_id, slug, **kwargs)  # type: ignore[arg-type]
         prds = load_all(tmp_prd_dir)
         return prds[prd_id]
 
@@ -246,16 +246,16 @@ class TestMatchesFilters:
 
 class TestQueueExecution:
     def test_single_prd(self, tmp_prd_dir: Path) -> None:
-        write_prd(tmp_prd_dir, "PRD-001", "solo")
+        write_prd(tmp_prd_dir / "prds", "PRD-001", "solo")
         report, calls = _exec_queue(tmp_prd_dir)
         assert calls == ["PRD-001"]
         assert report.completed == ["PRD-001"]
         assert report.failed == []
 
     def test_priority_order(self, tmp_prd_dir: Path) -> None:
-        write_prd(tmp_prd_dir, "PRD-001", "low", priority="low")
-        write_prd(tmp_prd_dir, "PRD-002", "high", priority="high")
-        write_prd(tmp_prd_dir, "PRD-003", "medium", priority="medium")
+        write_prd(tmp_prd_dir / "prds", "PRD-001", "low", priority="low")
+        write_prd(tmp_prd_dir / "prds", "PRD-002", "high", priority="high")
+        write_prd(tmp_prd_dir / "prds", "PRD-003", "medium", priority="medium")
         report, calls = _exec_queue(tmp_prd_dir)
         # high runs first, then medium, then low
         assert calls.index("PRD-002") < calls.index("PRD-003")
@@ -264,8 +264,8 @@ class TestQueueExecution:
 
     def test_dependency_chain(self, tmp_prd_dir: Path) -> None:
         # A depends on B: B must run first
-        write_prd(tmp_prd_dir, "PRD-001", "b")
-        write_prd(tmp_prd_dir, "PRD-002", "a", depends_on=["PRD-001"])
+        write_prd(tmp_prd_dir / "prds", "PRD-001", "b")
+        write_prd(tmp_prd_dir / "prds", "PRD-002", "a", depends_on=["PRD-001"])
         report, calls = _exec_queue(tmp_prd_dir)
         assert calls.index("PRD-001") < calls.index("PRD-002")
         assert set(report.completed) == {"PRD-001", "PRD-002"}
@@ -276,8 +276,8 @@ class TestQueueExecution:
         # We simulate this by starting PRD-001 as ready and PRD-002 as
         # depending on it — the queue loop should re-discover PRD-002 after
         # PRD-001 completes.
-        write_prd(tmp_prd_dir, "PRD-001", "first")
-        write_prd(tmp_prd_dir, "PRD-002", "second", depends_on=["PRD-001"])
+        write_prd(tmp_prd_dir / "prds", "PRD-001", "first")
+        write_prd(tmp_prd_dir / "prds", "PRD-002", "second", depends_on=["PRD-001"])
         # PRD-002 is not in the initial queue because PRD-001 is not done yet.
         prds = load_all(tmp_prd_dir)
         initial = discover_ready_queue(prds, QueueFilters())
@@ -289,9 +289,9 @@ class TestQueueExecution:
         assert calls.index("PRD-001") < calls.index("PRD-002")
 
     def test_max_runs_cutoff(self, tmp_prd_dir: Path) -> None:
-        write_prd(tmp_prd_dir, "PRD-001", "a")
-        write_prd(tmp_prd_dir, "PRD-002", "b")
-        write_prd(tmp_prd_dir, "PRD-003", "c")
+        write_prd(tmp_prd_dir / "prds", "PRD-001", "a")
+        write_prd(tmp_prd_dir / "prds", "PRD-002", "b")
+        write_prd(tmp_prd_dir / "prds", "PRD-003", "c")
         report, calls = _exec_queue(tmp_prd_dir, max_runs=2)
         assert len(calls) == 2
         assert len(report.completed) == 2
@@ -300,9 +300,9 @@ class TestQueueExecution:
     def test_failure_isolation(self, tmp_prd_dir: Path) -> None:
         # PRD-001 fails; PRD-002 depends on it (should be skipped);
         # PRD-003 is unrelated (should succeed).
-        write_prd(tmp_prd_dir, "PRD-001", "fails")
-        write_prd(tmp_prd_dir, "PRD-002", "blocked-by-001", depends_on=["PRD-001"])
-        write_prd(tmp_prd_dir, "PRD-003", "unrelated")
+        write_prd(tmp_prd_dir / "prds", "PRD-001", "fails")
+        write_prd(tmp_prd_dir / "prds", "PRD-002", "blocked-by-001", depends_on=["PRD-001"])
+        write_prd(tmp_prd_dir / "prds", "PRD-003", "unrelated")
         report, calls = _exec_queue(tmp_prd_dir, outcomes={"PRD-001": False})
         assert "PRD-001" in calls
         assert "PRD-002" not in calls  # pruned because PRD-001 failed

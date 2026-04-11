@@ -115,9 +115,9 @@ def test_print_tree_recurses_into_children(
 # ---------- cmd_tree ----------
 
 
-def _make_args(prd_dir: Path, prd_id: str | None = None) -> argparse.Namespace:
+def _make_args(data_dir: Path, prd_id: str | None = None) -> argparse.Namespace:
     ns = argparse.Namespace()
-    ns.prd_dir = prd_dir
+    ns.data_dir = data_dir
     ns.prd_id = prd_id
     ns.styler = _make_plain_styler()
     return ns

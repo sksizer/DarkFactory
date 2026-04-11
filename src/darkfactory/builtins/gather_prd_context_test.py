@@ -33,10 +33,12 @@ def _make_ctx(
 
 
 def test_gather_context_basic(tmp_path: Path) -> None:
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
-    write_prd(prd_dir, "PRD-070", "test-prd", title="Test PRD", status="draft")
-    prds = load_all(prd_dir)
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    prds_dir = data_dir / "prds"
+    prds_dir.mkdir()
+    write_prd(prds_dir, "PRD-070", "test-prd", title="Test PRD", status="draft")
+    prds = load_all(data_dir)
 
     ctx = _make_ctx(tmp_path, prds=prds, target_prd="PRD-070")
     gather_prd_context(ctx)
@@ -49,20 +51,22 @@ def test_gather_context_basic(tmp_path: Path) -> None:
 
 
 def test_gather_context_with_parent_and_deps(tmp_path: Path) -> None:
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
-    write_prd(prd_dir, "PRD-001", "parent", title="Parent Epic", kind="epic")
-    write_prd(prd_dir, "PRD-002", "dep-a", title="Dependency A")
-    write_prd(prd_dir, "PRD-003", "dep-b", title="Dependency B")
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    prds_dir = data_dir / "prds"
+    prds_dir.mkdir()
+    write_prd(prds_dir, "PRD-001", "parent", title="Parent Epic", kind="epic")
+    write_prd(prds_dir, "PRD-002", "dep-a", title="Dependency A")
+    write_prd(prds_dir, "PRD-003", "dep-b", title="Dependency B")
     write_prd(
-        prd_dir,
+        prds_dir,
         "PRD-070",
         "target",
         title="Target PRD",
         parent="PRD-001",
         depends_on=["PRD-002", "PRD-003"],
     )
-    prds = load_all(prd_dir)
+    prds = load_all(data_dir)
 
     ctx = _make_ctx(tmp_path, prds=prds, target_prd="PRD-070")
     gather_prd_context(ctx)
@@ -91,16 +95,18 @@ def test_gather_context_no_target_prd_raises(tmp_path: Path) -> None:
 
 
 def test_gather_context_missing_dep_graceful(tmp_path: Path) -> None:
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    prds_dir = data_dir / "prds"
+    prds_dir.mkdir()
     write_prd(
-        prd_dir,
+        prds_dir,
         "PRD-070",
         "target",
         title="Target",
         depends_on=["PRD-999"],
     )
-    prds = load_all(prd_dir)
+    prds = load_all(data_dir)
 
     ctx = _make_ctx(tmp_path, prds=prds, target_prd="PRD-070")
     gather_prd_context(ctx)

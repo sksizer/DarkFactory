@@ -55,10 +55,12 @@ def _make_workflow(tmp_path: Path, tasks: list[Task]) -> Workflow:
 def _make_prd(
     tmp_path: Path, prd_id: str = "PRD-070", capability: str = "simple"
 ) -> PRD:
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir(exist_ok=True)
-    write_prd(prd_dir, prd_id, "test-task", capability=capability)
-    prds = load_all(prd_dir)
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(exist_ok=True)
+    prds_dir = data_dir / "prds"
+    prds_dir.mkdir(exist_ok=True)
+    write_prd(prds_dir, prd_id, "test-task", capability=capability)
+    prds = load_all(data_dir)
     return prds[prd_id]
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from darkfactory import prd as prd_module
+from darkfactory import model as prd_module
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect

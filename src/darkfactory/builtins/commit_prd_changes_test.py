@@ -17,10 +17,12 @@ def test_no_changes_returns_cleanly(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     init_git_repo(tmp_path)
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
-    write_prd(prd_dir, "PRD-070", "test-prd")
-    prds = load_all(prd_dir)
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    prds_dir = data_dir / "prds"
+    prds_dir.mkdir()
+    write_prd(prds_dir, "PRD-070", "test-prd")
+    prds = load_all(data_dir)
 
     sp.run(["git", "add", "-A"], cwd=str(tmp_path), check=True, capture_output=True)
     sp.run(

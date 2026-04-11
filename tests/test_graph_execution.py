@@ -95,7 +95,7 @@ def _exec(
     fake = _fake_runner(outcomes)
     report = execute_graph(
         root_id=root_id,
-        prd_dir=tmp_prd_dir,
+        data_dir=tmp_prd_dir,
         repo_root=tmp_prd_dir,
         workflows=_make_workflows(),
         default_base="main",
@@ -112,38 +112,38 @@ def _exec(
 
 
 def test_graph_scope_leaf_only(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "leaf")
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "leaf")
     prds = load_all(tmp_prd_dir)
     assert graph_scope("PRD-001", prds) == {"PRD-001"}
 
 
 def test_graph_scope_containment_descendants(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "epic", kind="epic")
-    write_prd(tmp_prd_dir, "PRD-002", "child-a", parent="PRD-001")
-    write_prd(tmp_prd_dir, "PRD-003", "child-b", parent="PRD-001")
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds", "PRD-002", "child-a", parent="PRD-001")
+    write_prd(tmp_prd_dir / "prds", "PRD-003", "child-b", parent="PRD-001")
     prds = load_all(tmp_prd_dir)
     assert graph_scope("PRD-001", prds) == {"PRD-001", "PRD-002", "PRD-003"}
 
 
 def test_graph_scope_pulls_unmet_deps(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "upstream", status="ready")
-    write_prd(tmp_prd_dir, "PRD-002", "downstream", depends_on=["PRD-001"])
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "upstream", status="ready")
+    write_prd(tmp_prd_dir / "prds", "PRD-002", "downstream", depends_on=["PRD-001"])
     prds = load_all(tmp_prd_dir)
     # Running PRD-002 pulls in PRD-001 as an unmet dep.
     assert graph_scope("PRD-002", prds) == {"PRD-001", "PRD-002"}
 
 
 def test_graph_scope_skips_done_deps(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "upstream", status="done")
-    write_prd(tmp_prd_dir, "PRD-002", "downstream", depends_on=["PRD-001"])
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "upstream", status="done")
+    write_prd(tmp_prd_dir / "prds", "PRD-002", "downstream", depends_on=["PRD-001"])
     prds = load_all(tmp_prd_dir)
     assert graph_scope("PRD-002", prds) == {"PRD-002"}
 
 
 def test_actionable_order_topo(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "first")
-    write_prd(tmp_prd_dir, "PRD-002", "second", depends_on=["PRD-001"])
-    write_prd(tmp_prd_dir, "PRD-003", "third", depends_on=["PRD-002"])
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "first")
+    write_prd(tmp_prd_dir / "prds", "PRD-002", "second", depends_on=["PRD-001"])
+    write_prd(tmp_prd_dir / "prds", "PRD-003", "third", depends_on=["PRD-002"])
     prds = load_all(tmp_prd_dir)
     assert actionable_order({"PRD-001", "PRD-002", "PRD-003"}, prds) == [
         "PRD-001",
@@ -153,14 +153,14 @@ def test_actionable_order_topo(tmp_prd_dir: Path) -> None:
 
 
 def test_resolve_base_ref_independent(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "solo")
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "solo")
     prds = load_all(tmp_prd_dir)
     assert resolve_base_ref(prds["PRD-001"], {}, "main", prds) == "main"
 
 
 def test_resolve_base_ref_single_dep_stacked(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "upstream", status="ready")
-    write_prd(tmp_prd_dir, "PRD-002", "downstream", depends_on=["PRD-001"])
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "upstream", status="ready")
+    write_prd(tmp_prd_dir / "prds", "PRD-002", "downstream", depends_on=["PRD-001"])
     prds = load_all(tmp_prd_dir)
     completed = {"PRD-001": "prd/PRD-001-upstream"}
     assert (
@@ -170,9 +170,9 @@ def test_resolve_base_ref_single_dep_stacked(tmp_prd_dir: Path) -> None:
 
 
 def test_resolve_base_ref_multi_dep_raises(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "a", status="ready")
-    write_prd(tmp_prd_dir, "PRD-002", "b", status="ready")
-    write_prd(tmp_prd_dir, "PRD-003", "c", depends_on=["PRD-001", "PRD-002"])
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "a", status="ready")
+    write_prd(tmp_prd_dir / "prds", "PRD-002", "b", status="ready")
+    write_prd(tmp_prd_dir / "prds", "PRD-003", "c", depends_on=["PRD-001", "PRD-002"])
     prds = load_all(tmp_prd_dir)
     with pytest.raises(MultiDepUnsupported):
         resolve_base_ref(prds["PRD-003"], {}, "main", prds)
@@ -182,7 +182,7 @@ def test_resolve_base_ref_multi_dep_raises(tmp_prd_dir: Path) -> None:
 
 
 def test_execute_single_leaf(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "leaf")
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "leaf")
     report, events, calls = _exec(tmp_prd_dir, "PRD-001")
     assert report.completed == ["PRD-001"]
     assert report.failed == []
@@ -194,9 +194,9 @@ def test_execute_single_leaf(tmp_prd_dir: Path) -> None:
 
 
 def test_execute_linear_chain_stacks_single_dep(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-001", "a")
-    write_prd(tmp_prd_dir, "PRD-002", "b", depends_on=["PRD-001"])
-    write_prd(tmp_prd_dir, "PRD-003", "c", depends_on=["PRD-002"])
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "a")
+    write_prd(tmp_prd_dir / "prds", "PRD-002", "b", depends_on=["PRD-001"])
+    write_prd(tmp_prd_dir / "prds", "PRD-003", "c", depends_on=["PRD-002"])
     report, _events, calls = _exec(tmp_prd_dir, "PRD-001")
     # Need an epic container to scope into 002 and 003 — without a parent
     # epic, starting at PRD-001 only walks PRD-001's subtree. Fix: use
@@ -207,10 +207,10 @@ def test_execute_linear_chain_stacks_single_dep(tmp_prd_dir: Path) -> None:
 
 
 def test_execute_epic_linear_chain_stacks_single_dep(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-100", "epic", kind="epic")
-    write_prd(tmp_prd_dir, "PRD-001", "a", parent="PRD-100")
-    write_prd(tmp_prd_dir, "PRD-002", "b", parent="PRD-100", depends_on=["PRD-001"])
-    write_prd(tmp_prd_dir, "PRD-003", "c", parent="PRD-100", depends_on=["PRD-002"])
+    write_prd(tmp_prd_dir / "prds", "PRD-100", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "a", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-002", "b", parent="PRD-100", depends_on=["PRD-001"])
+    write_prd(tmp_prd_dir / "prds", "PRD-003", "c", parent="PRD-100", depends_on=["PRD-002"])
     report, _events, calls = _exec(tmp_prd_dir, "PRD-100")
     assert report.completed == ["PRD-001", "PRD-002", "PRD-003"]
     # Stacking: 002 bases on 001's branch, 003 on 002's.
@@ -227,10 +227,10 @@ def test_execute_epic_linear_chain_stacks_single_dep(tmp_prd_dir: Path) -> None:
 def test_execute_branching_epic_independent_siblings_base_on_main(
     tmp_prd_dir: Path,
 ) -> None:
-    write_prd(tmp_prd_dir, "PRD-100", "epic", kind="epic")
-    write_prd(tmp_prd_dir, "PRD-001", "a", parent="PRD-100")
-    write_prd(tmp_prd_dir, "PRD-002", "b", parent="PRD-100")
-    write_prd(tmp_prd_dir, "PRD-003", "c", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-100", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "a", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-002", "b", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-003", "c", parent="PRD-100")
     report, _events, calls = _exec(tmp_prd_dir, "PRD-100")
     assert set(report.completed) == {"PRD-001", "PRD-002", "PRD-003"}
     assert all(base == "main" for _, base in calls)
@@ -240,11 +240,11 @@ def test_execute_branching_epic_independent_siblings_base_on_main(
 
 
 def test_execute_cross_edges_respected(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-100", "epic", kind="epic")
-    write_prd(tmp_prd_dir, "PRD-001", "a", parent="PRD-100")
-    write_prd(tmp_prd_dir, "PRD-002", "b", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-100", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "a", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-002", "b", parent="PRD-100")
     write_prd(
-        tmp_prd_dir,
+        tmp_prd_dir / "prds",
         "PRD-003",
         "c",
         parent="PRD-100",
@@ -262,16 +262,16 @@ def test_execute_cross_edges_respected(tmp_prd_dir: Path) -> None:
 def test_execute_failure_marks_blocked_and_prunes_dependents(
     tmp_prd_dir: Path,
 ) -> None:
-    write_prd(tmp_prd_dir, "PRD-100", "epic", kind="epic")
-    write_prd(tmp_prd_dir, "PRD-001", "a", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-100", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "a", parent="PRD-100")
     write_prd(
-        tmp_prd_dir,
+        tmp_prd_dir / "prds",
         "PRD-002",
         "b",
         parent="PRD-100",
         depends_on=["PRD-001"],
     )
-    write_prd(tmp_prd_dir, "PRD-003", "c", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-003", "c", parent="PRD-100")
     report, events, calls = _exec(tmp_prd_dir, "PRD-100", outcomes={"PRD-001": False})
     call_ids = [c[0] for c in calls]
     assert "PRD-001" in call_ids
@@ -287,10 +287,10 @@ def test_execute_failure_marks_blocked_and_prunes_dependents(
 
 
 def test_execute_max_runs_caps_total(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-100", "epic", kind="epic")
-    write_prd(tmp_prd_dir, "PRD-001", "a", parent="PRD-100")
-    write_prd(tmp_prd_dir, "PRD-002", "b", parent="PRD-100")
-    write_prd(tmp_prd_dir, "PRD-003", "c", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-100", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "a", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-002", "b", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-003", "c", parent="PRD-100")
     report, _events, calls = _exec(tmp_prd_dir, "PRD-100", max_runs=2)
     assert len(calls) == 2
     assert len(report.completed) == 2
@@ -301,8 +301,8 @@ def test_execute_max_runs_caps_total(tmp_prd_dir: Path) -> None:
 
 
 def test_execute_mid_run_new_children_are_picked_up(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-100", "epic", kind="epic")
-    write_prd(tmp_prd_dir, "PRD-001", "seed", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-100", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "seed", parent="PRD-100")
 
     fake_calls: list[tuple[str, str]] = []
 
@@ -321,7 +321,7 @@ def test_execute_mid_run_new_children_are_picked_up(tmp_prd_dir: Path) -> None:
         # new sibling child PRD-002 under the same epic.
         if prd.id == "PRD-001":
             write_prd(
-                tmp_prd_dir,
+                tmp_prd_dir / "prds",
                 "PRD-002",
                 "generated",
                 parent="PRD-100",
@@ -331,7 +331,7 @@ def test_execute_mid_run_new_children_are_picked_up(tmp_prd_dir: Path) -> None:
 
     report = execute_graph(
         root_id="PRD-100",
-        prd_dir=tmp_prd_dir,
+        data_dir=tmp_prd_dir,
         repo_root=tmp_prd_dir,
         workflows=_make_workflows(),
         default_base="main",
@@ -346,8 +346,8 @@ def test_execute_mid_run_new_children_are_picked_up(tmp_prd_dir: Path) -> None:
 
 
 def test_execute_max_runs_counts_introduced_prds(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-100", "epic", kind="epic")
-    write_prd(tmp_prd_dir, "PRD-001", "seed", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-100", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "seed", parent="PRD-100")
 
     def fake(
         *,
@@ -360,13 +360,13 @@ def test_execute_max_runs_counts_introduced_prds(tmp_prd_dir: Path) -> None:
         **_kw: object,
     ) -> RunResult:
         if prd.id == "PRD-001":
-            write_prd(tmp_prd_dir, "PRD-002", "generated", parent="PRD-100")
+            write_prd(tmp_prd_dir / "prds", "PRD-002", "generated", parent="PRD-100")
         set_status_at(prd.path, "done")
         return RunResult(success=True)
 
     report = execute_graph(
         root_id="PRD-100",
-        prd_dir=tmp_prd_dir,
+        data_dir=tmp_prd_dir,
         repo_root=tmp_prd_dir,
         workflows=_make_workflows(),
         default_base="main",
@@ -385,11 +385,11 @@ def test_execute_max_runs_counts_introduced_prds(tmp_prd_dir: Path) -> None:
 
 
 def test_execute_multi_dep_skipped_with_reason(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-100", "epic", kind="epic")
-    write_prd(tmp_prd_dir, "PRD-001", "a", parent="PRD-100")
-    write_prd(tmp_prd_dir, "PRD-002", "b", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-100", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "a", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-002", "b", parent="PRD-100")
     write_prd(
-        tmp_prd_dir,
+        tmp_prd_dir / "prds",
         "PRD-003",
         "c",
         parent="PRD-100",
@@ -410,9 +410,9 @@ def test_execute_multi_dep_skipped_with_reason(tmp_prd_dir: Path) -> None:
 
 
 def test_plan_execution_shows_full_dag_and_slice(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-100", "epic", kind="epic")
-    write_prd(tmp_prd_dir, "PRD-001", "a", parent="PRD-100")
-    write_prd(tmp_prd_dir, "PRD-002", "b", parent="PRD-100", depends_on=["PRD-001"])
+    write_prd(tmp_prd_dir / "prds", "PRD-100", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "a", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-002", "b", parent="PRD-100", depends_on=["PRD-001"])
     prds = load_all(tmp_prd_dir)
     plan = plan_execution(prds["PRD-100"], prds, max_runs=None, default_base="main")
     assert plan.full_dag == ["PRD-001", "PRD-002"]
@@ -420,9 +420,9 @@ def test_plan_execution_shows_full_dag_and_slice(tmp_prd_dir: Path) -> None:
 
 
 def test_plan_execution_max_runs_trims_slice(tmp_prd_dir: Path) -> None:
-    write_prd(tmp_prd_dir, "PRD-100", "epic", kind="epic")
-    write_prd(tmp_prd_dir, "PRD-001", "a", parent="PRD-100")
-    write_prd(tmp_prd_dir, "PRD-002", "b", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-100", "epic", kind="epic")
+    write_prd(tmp_prd_dir / "prds", "PRD-001", "a", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-002", "b", parent="PRD-100")
     prds = load_all(tmp_prd_dir)
     plan = plan_execution(prds["PRD-100"], prds, max_runs=1, default_base="main")
     assert len(plan.full_dag) == 2

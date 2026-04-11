@@ -45,7 +45,7 @@ def _make_prd(
 
 
 def _make_plan_args(
-    prd_dir: Path,
+    data_dir: Path,
     *,
     prd_id: str = "PRD-001",
     workflows_dir: Path | None = None,
@@ -55,8 +55,8 @@ def _make_plan_args(
     json_output: bool = False,
 ) -> argparse.Namespace:
     ns = argparse.Namespace()
-    ns.prd_dir = prd_dir
-    ns.workflows_dir = workflows_dir or prd_dir
+    ns.data_dir = data_dir
+    ns.workflows_dir = workflows_dir or data_dir
     ns.prd_id = prd_id
     ns.workflow = workflow
     ns.base = base

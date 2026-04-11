@@ -12,9 +12,9 @@ import pytest
 from darkfactory.cli.status import cmd_status
 
 
-def _make_args(prd_dir: Path, *, json_output: bool = False) -> argparse.Namespace:
+def _make_args(data_dir: Path, *, json_output: bool = False) -> argparse.Namespace:
     ns = argparse.Namespace()
-    ns.prd_dir = prd_dir
+    ns.data_dir = data_dir
     ns.json = json_output
     return ns
 

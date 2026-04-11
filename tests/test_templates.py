@@ -220,16 +220,17 @@ def test_compose_prompt_extras_override_defaults(tmp_path: Path) -> None:
 
 def test_compose_prompt_raises_when_workflow_dir_unset(tmp_path: Path) -> None:
     """A Workflow built by hand without workflow_dir can't compose prompts."""
-    prd_dir = tmp_path / "prds"
-    prd_dir.mkdir()
-    (prd_dir / "prds").mkdir()
-    write_prd(prd_dir / "prds", "PRD-070", "test")
-    prds = load_all(prd_dir)
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    prds_dir = data_dir / "prds"
+    prds_dir.mkdir()
+    write_prd(prds_dir, "PRD-070", "test")
+    prds = load_all(data_dir)
 
     wf = Workflow(name="hand-built")  # workflow_dir is None
     ctx = ExecutionContext(
         prd=prds["PRD-070"],
-        repo_root=prd_dir,
+        repo_root=data_dir,
         workflow=wf,
         base_ref="main",
         branch_name="prd/PRD-070-test",

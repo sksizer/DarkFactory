@@ -271,7 +271,7 @@ def test_cleanup_all_removes_on_confirm(tmp_path: Path) -> None:
 
 def test_cmd_cleanup_no_args_returns_1(tmp_path: Path) -> None:
     args = argparse.Namespace(
-        prd_dir=tmp_path, prd_id=None, merged=False, all_=False, force=False
+        data_dir=tmp_path, prd_id=None, merged=False, all_=False, force=False
     )
     with patch("darkfactory.cli.cleanup._find_repo_root", return_value=tmp_path):
         result = cmd_cleanup(args)
@@ -280,7 +280,7 @@ def test_cmd_cleanup_no_args_returns_1(tmp_path: Path) -> None:
 
 def test_cmd_cleanup_delegates_to_single(tmp_path: Path) -> None:
     args = argparse.Namespace(
-        prd_dir=tmp_path, prd_id="PRD-1", merged=False, all_=False, force=False
+        data_dir=tmp_path, prd_id="PRD-1", merged=False, all_=False, force=False
     )
     with (
         patch("darkfactory.cli.cleanup._find_repo_root", return_value=tmp_path),
@@ -293,7 +293,7 @@ def test_cmd_cleanup_delegates_to_single(tmp_path: Path) -> None:
 
 def test_cmd_cleanup_delegates_to_merged(tmp_path: Path) -> None:
     args = argparse.Namespace(
-        prd_dir=tmp_path, prd_id=None, merged=True, all_=False, force=False
+        data_dir=tmp_path, prd_id=None, merged=True, all_=False, force=False
     )
     with (
         patch("darkfactory.cli.cleanup._find_repo_root", return_value=tmp_path),
@@ -306,7 +306,7 @@ def test_cmd_cleanup_delegates_to_merged(tmp_path: Path) -> None:
 
 def test_cmd_cleanup_delegates_to_all(tmp_path: Path) -> None:
     args = argparse.Namespace(
-        prd_dir=tmp_path, prd_id=None, merged=False, all_=True, force=False
+        data_dir=tmp_path, prd_id=None, merged=False, all_=True, force=False
     )
     with (
         patch("darkfactory.cli.cleanup._find_repo_root", return_value=tmp_path),

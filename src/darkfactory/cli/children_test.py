@@ -11,9 +11,9 @@ import pytest
 from darkfactory.cli.children import cmd_children
 
 
-def _make_args(prd_dir: Path, prd_id: str) -> argparse.Namespace:
+def _make_args(data_dir: Path, prd_id: str) -> argparse.Namespace:
     ns = argparse.Namespace()
-    ns.prd_dir = prd_dir
+    ns.data_dir = data_dir
     ns.prd_id = prd_id
     return ns
 

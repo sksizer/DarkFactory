@@ -65,15 +65,15 @@ def _write_prd_with_decomposition(
 
 def test_partially_decomposed_false_for_zero_children(tmp_prd_dir: Path) -> None:
     """An epic with no children is not partially decomposed."""
-    write_prd(tmp_prd_dir, "PRD-100", "epic", kind="epic", status="ready")
+    write_prd(tmp_prd_dir / "prds", "PRD-100", "epic", kind="epic", status="ready")
     prds = load_all(tmp_prd_dir)
     assert not is_partially_decomposed(prds["PRD-100"], prds)
 
 
 def test_partially_decomposed_true_for_has_children(tmp_prd_dir: Path) -> None:
     """An epic with task children and no decomposition flag is partially decomposed."""
-    write_prd(tmp_prd_dir, "PRD-100", "epic", kind="epic", status="ready")
-    write_prd(tmp_prd_dir, "PRD-100.1", "child-task", kind="task", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-100", "epic", kind="epic", status="ready")
+    write_prd(tmp_prd_dir / "prds", "PRD-100.1", "child-task", kind="task", parent="PRD-100")
     prds = load_all(tmp_prd_dir)
     assert is_partially_decomposed(prds["PRD-100"], prds)
 
@@ -81,9 +81,9 @@ def test_partially_decomposed_true_for_has_children(tmp_prd_dir: Path) -> None:
 def test_partially_decomposed_false_for_complete_flag(tmp_prd_dir: Path) -> None:
     """An epic with decomposition: complete is not partially decomposed."""
     _write_prd_with_decomposition(
-        tmp_prd_dir, "PRD-100", "epic", "complete", kind="epic", status="ready"
+        tmp_prd_dir / "prds", "PRD-100", "epic", "complete", kind="epic", status="ready"
     )
-    write_prd(tmp_prd_dir, "PRD-100.1", "child-task", kind="task", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-100.1", "child-task", kind="task", parent="PRD-100")
     prds = load_all(tmp_prd_dir)
     assert not is_partially_decomposed(prds["PRD-100"], prds)
 
@@ -114,8 +114,8 @@ def test_planning_review_workflow_description() -> None:
 
 def test_applies_to_partially_decomposed_epic(tmp_prd_dir: Path) -> None:
     """A partially-decomposed epic in ready status matches planning-review."""
-    write_prd(tmp_prd_dir, "PRD-100", "epic", kind="epic", status="ready")
-    write_prd(tmp_prd_dir, "PRD-100.1", "child-task", kind="task", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-100", "epic", kind="epic", status="ready")
+    write_prd(tmp_prd_dir / "prds", "PRD-100.1", "child-task", kind="task", parent="PRD-100")
     prds = load_all(tmp_prd_dir)
     workflows = load_workflows()
     assert workflows["planning-review"].applies_to(prds["PRD-100"], prds)
@@ -123,8 +123,8 @@ def test_applies_to_partially_decomposed_epic(tmp_prd_dir: Path) -> None:
 
 def test_applies_to_partially_decomposed_in_progress(tmp_prd_dir: Path) -> None:
     """A partially-decomposed epic in in-progress status matches planning-review."""
-    write_prd(tmp_prd_dir, "PRD-100", "epic", kind="epic", status="in-progress")
-    write_prd(tmp_prd_dir, "PRD-100.1", "child-task", kind="task", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-100", "epic", kind="epic", status="in-progress")
+    write_prd(tmp_prd_dir / "prds", "PRD-100.1", "child-task", kind="task", parent="PRD-100")
     prds = load_all(tmp_prd_dir)
     workflows = load_workflows()
     assert workflows["planning-review"].applies_to(prds["PRD-100"], prds)
@@ -132,7 +132,7 @@ def test_applies_to_partially_decomposed_in_progress(tmp_prd_dir: Path) -> None:
 
 def test_does_not_apply_to_undecomposed_epic(tmp_prd_dir: Path) -> None:
     """An epic with zero children should NOT match planning-review."""
-    write_prd(tmp_prd_dir, "PRD-100", "epic", kind="epic", status="ready")
+    write_prd(tmp_prd_dir / "prds", "PRD-100", "epic", kind="epic", status="ready")
     prds = load_all(tmp_prd_dir)
     workflows = load_workflows()
     assert not workflows["planning-review"].applies_to(prds["PRD-100"], prds)
@@ -141,9 +141,9 @@ def test_does_not_apply_to_undecomposed_epic(tmp_prd_dir: Path) -> None:
 def test_does_not_apply_to_complete_epic(tmp_prd_dir: Path) -> None:
     """An epic with decomposition: complete should NOT match planning-review."""
     _write_prd_with_decomposition(
-        tmp_prd_dir, "PRD-100", "epic", "complete", kind="epic", status="ready"
+        tmp_prd_dir / "prds", "PRD-100", "epic", "complete", kind="epic", status="ready"
     )
-    write_prd(tmp_prd_dir, "PRD-100.1", "child-task", kind="task", parent="PRD-100")
+    write_prd(tmp_prd_dir / "prds", "PRD-100.1", "child-task", kind="task", parent="PRD-100")
     prds = load_all(tmp_prd_dir)
     workflows = load_workflows()
     assert not workflows["planning-review"].applies_to(prds["PRD-100"], prds)
@@ -151,7 +151,7 @@ def test_does_not_apply_to_complete_epic(tmp_prd_dir: Path) -> None:
 
 def test_does_not_apply_to_task(tmp_prd_dir: Path) -> None:
     """A task PRD does not match planning-review."""
-    write_prd(tmp_prd_dir, "PRD-100", "leaf-task", kind="task", status="ready")
+    write_prd(tmp_prd_dir / "prds", "PRD-100", "leaf-task", kind="task", status="ready")
     prds = load_all(tmp_prd_dir)
     workflows = load_workflows()
     assert not workflows["planning-review"].applies_to(prds["PRD-100"], prds)

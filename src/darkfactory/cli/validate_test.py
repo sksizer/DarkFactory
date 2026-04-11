@@ -46,9 +46,9 @@ def _make_prd(
     return prd
 
 
-def _make_args(prd_dir: Path, *, verbose: bool = False) -> argparse.Namespace:
+def _make_args(data_dir: Path, *, verbose: bool = False) -> argparse.Namespace:
     ns = argparse.Namespace()
-    ns.prd_dir = prd_dir
+    ns.data_dir = data_dir
     ns.verbose = verbose
     return ns
 
