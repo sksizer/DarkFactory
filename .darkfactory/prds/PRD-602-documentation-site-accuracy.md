@@ -2,7 +2,7 @@
 id: PRD-602
 title: Documentation site accuracy overhaul
 kind: task
-status: ready
+status: in-progress
 priority: medium
 effort: m
 capability: moderate
@@ -14,7 +14,7 @@ impacts:
 workflow:
 target_version:
 created: 2026-04-09
-updated: 2026-04-09
+updated: '2026-04-10'
 tags:
   - docs
   - quality
