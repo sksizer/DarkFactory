@@ -143,7 +143,9 @@ def test_cmd_normalize_check_mode_no_changes(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     prd = _make_prd("PRD-001")
-    args = argparse.Namespace(data_dir=tmp_path, prd_id="PRD-001", all=False, check=True)
+    args = argparse.Namespace(
+        data_dir=tmp_path, prd_id="PRD-001", all=False, check=True
+    )
     with (
         patch("darkfactory.cli.normalize._load", return_value={"PRD-001": prd}),
         patch("darkfactory.cli.normalize._normalize_prd", return_value=False),
@@ -158,7 +160,9 @@ def test_cmd_normalize_check_mode_with_changes(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     prd = _make_prd("PRD-001")
-    args = argparse.Namespace(data_dir=tmp_path, prd_id="PRD-001", all=False, check=True)
+    args = argparse.Namespace(
+        data_dir=tmp_path, prd_id="PRD-001", all=False, check=True
+    )
     with (
         patch("darkfactory.cli.normalize._load", return_value={"PRD-001": prd}),
         patch("darkfactory.cli.normalize._normalize_prd", return_value=True),

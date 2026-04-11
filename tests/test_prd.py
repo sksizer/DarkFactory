@@ -132,7 +132,9 @@ def test_parse_prd_with_relations(tmp_prd_dir: Path) -> None:
 
 def test_load_all_skips_underscore_files(tmp_prd_dir: Path) -> None:
     write_prd(tmp_prd_dir / "prds", "PRD-001", "first")
-    (tmp_prd_dir / "prds" / "_template.md").write_text("---\nid: bogus\n---\n", encoding="utf-8")
+    (tmp_prd_dir / "prds" / "_template.md").write_text(
+        "---\nid: bogus\n---\n", encoding="utf-8"
+    )
     prds = load_all(tmp_prd_dir)
     assert set(prds.keys()) == {"PRD-001"}
 
@@ -148,7 +150,9 @@ def test_load_all_rejects_duplicate_ids(tmp_prd_dir: Path) -> None:
 
 
 def test_set_status_preserves_body(tmp_prd_dir: Path) -> None:
-    path = write_prd(tmp_prd_dir / "prds", "PRD-070", "task", body="# Title\n\nLine 1\nLine 2\n")
+    path = write_prd(
+        tmp_prd_dir / "prds", "PRD-070", "task", body="# Title\n\nLine 1\nLine 2\n"
+    )
     prd = parse_prd(path)
     set_status(prd, "in-progress")
     reread = parse_prd(path)

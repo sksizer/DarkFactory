@@ -204,7 +204,16 @@ def test_new_invalid_priority_rejected(tmp_path: Path) -> None:
     """Invalid --priority value is rejected by argparse."""
     _setup_project(tmp_path)
     with pytest.raises(SystemExit):
-        main(["--directory", str(tmp_path), "new", "Bad Priority", "--priority", "urgent"])
+        main(
+            [
+                "--directory",
+                str(tmp_path),
+                "new",
+                "Bad Priority",
+                "--priority",
+                "urgent",
+            ]
+        )
 
 
 def test_new_no_existing_prds_starts_at_001(tmp_path: Path) -> None:

@@ -209,8 +209,12 @@ def test_execute_linear_chain_stacks_single_dep(tmp_prd_dir: Path) -> None:
 def test_execute_epic_linear_chain_stacks_single_dep(tmp_prd_dir: Path) -> None:
     write_prd(tmp_prd_dir / "prds", "PRD-100", "epic", kind="epic")
     write_prd(tmp_prd_dir / "prds", "PRD-001", "a", parent="PRD-100")
-    write_prd(tmp_prd_dir / "prds", "PRD-002", "b", parent="PRD-100", depends_on=["PRD-001"])
-    write_prd(tmp_prd_dir / "prds", "PRD-003", "c", parent="PRD-100", depends_on=["PRD-002"])
+    write_prd(
+        tmp_prd_dir / "prds", "PRD-002", "b", parent="PRD-100", depends_on=["PRD-001"]
+    )
+    write_prd(
+        tmp_prd_dir / "prds", "PRD-003", "c", parent="PRD-100", depends_on=["PRD-002"]
+    )
     report, _events, calls = _exec(tmp_prd_dir, "PRD-100")
     assert report.completed == ["PRD-001", "PRD-002", "PRD-003"]
     # Stacking: 002 bases on 001's branch, 003 on 002's.
@@ -412,7 +416,9 @@ def test_execute_multi_dep_skipped_with_reason(tmp_prd_dir: Path) -> None:
 def test_plan_execution_shows_full_dag_and_slice(tmp_prd_dir: Path) -> None:
     write_prd(tmp_prd_dir / "prds", "PRD-100", "epic", kind="epic")
     write_prd(tmp_prd_dir / "prds", "PRD-001", "a", parent="PRD-100")
-    write_prd(tmp_prd_dir / "prds", "PRD-002", "b", parent="PRD-100", depends_on=["PRD-001"])
+    write_prd(
+        tmp_prd_dir / "prds", "PRD-002", "b", parent="PRD-100", depends_on=["PRD-001"]
+    )
     prds = load_all(tmp_prd_dir)
     plan = plan_execution(prds["PRD-100"], prds, max_runs=None, default_base="main")
     assert plan.full_dag == ["PRD-001", "PRD-002"]

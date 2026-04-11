@@ -90,9 +90,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub_init.set_defaults(func=cmd_init)
 
-    sub_archive = sub.add_parser(
-        "archive", help="Move a completed PRD to the archive"
-    )
+    sub_archive = sub.add_parser("archive", help="Move a completed PRD to the archive")
     sub_archive.add_argument("prd_id", help="PRD id to archive (e.g. PRD-070)")
     sub_archive.set_defaults(func=cmd_archive)
 

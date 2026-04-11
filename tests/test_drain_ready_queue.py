@@ -301,7 +301,9 @@ class TestQueueExecution:
         # PRD-001 fails; PRD-002 depends on it (should be skipped);
         # PRD-003 is unrelated (should succeed).
         write_prd(tmp_prd_dir / "prds", "PRD-001", "fails")
-        write_prd(tmp_prd_dir / "prds", "PRD-002", "blocked-by-001", depends_on=["PRD-001"])
+        write_prd(
+            tmp_prd_dir / "prds", "PRD-002", "blocked-by-001", depends_on=["PRD-001"]
+        )
         write_prd(tmp_prd_dir / "prds", "PRD-003", "unrelated")
         report, calls = _exec_queue(tmp_prd_dir, outcomes={"PRD-001": False})
         assert "PRD-001" in calls

@@ -72,7 +72,9 @@ def test_applies_to_undecomposed_epic(tmp_prd_dir: Path) -> None:
 
 def test_applies_to_undecomposed_feature(tmp_prd_dir: Path) -> None:
     """An undecomposed feature in ready status matches the planning workflow."""
-    write_prd(tmp_prd_dir / "prds", "PRD-100", "big-feat", kind="feature", status="ready")
+    write_prd(
+        tmp_prd_dir / "prds", "PRD-100", "big-feat", kind="feature", status="ready"
+    )
     prds = load_all(tmp_prd_dir)
     workflows = load_workflows()
     assert workflows["planning"].applies_to(prds["PRD-100"], prds)
@@ -89,7 +91,9 @@ def test_does_not_apply_to_task(tmp_prd_dir: Path) -> None:
 def test_does_not_apply_to_decomposed_epic(tmp_prd_dir: Path) -> None:
     """An epic with a task descendant is already decomposed — no match."""
     write_prd(tmp_prd_dir / "prds", "PRD-100", "epic", kind="epic", status="ready")
-    write_prd(tmp_prd_dir / "prds", "PRD-100.1", "child-task", kind="task", parent="PRD-100")
+    write_prd(
+        tmp_prd_dir / "prds", "PRD-100.1", "child-task", kind="task", parent="PRD-100"
+    )
     prds = load_all(tmp_prd_dir)
     workflows = load_workflows()
     assert not workflows["planning"].applies_to(prds["PRD-100"], prds)

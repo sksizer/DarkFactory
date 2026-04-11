@@ -19,7 +19,9 @@ def test_build_graph_empty(tmp_prd_dir: Path) -> None:
 def test_build_graph_with_edges(tmp_prd_dir: Path) -> None:
     write_prd(tmp_prd_dir / "prds", "PRD-001", "first")
     write_prd(tmp_prd_dir / "prds", "PRD-002", "second", depends_on=["PRD-001"])
-    write_prd(tmp_prd_dir / "prds", "PRD-003", "third", depends_on=["PRD-001", "PRD-002"])
+    write_prd(
+        tmp_prd_dir / "prds", "PRD-003", "third", depends_on=["PRD-001", "PRD-002"]
+    )
     g = graph.build_graph(load_all(tmp_prd_dir))
     # PRD-001 has downstream edges to both 002 and 003
     assert g["PRD-001"] == {"PRD-002", "PRD-003"}
@@ -82,14 +84,18 @@ def test_transitive_blocks(tmp_prd_dir: Path) -> None:
 
 def test_is_actionable_ready_with_done_dep(tmp_prd_dir: Path) -> None:
     write_prd(tmp_prd_dir / "prds", "PRD-001", "a", status="done")
-    write_prd(tmp_prd_dir / "prds", "PRD-002", "b", status="ready", depends_on=["PRD-001"])
+    write_prd(
+        tmp_prd_dir / "prds", "PRD-002", "b", status="ready", depends_on=["PRD-001"]
+    )
     prds = load_all(tmp_prd_dir)
     assert graph.is_actionable(prds["PRD-002"], prds)
 
 
 def test_is_actionable_blocked_by_open_dep(tmp_prd_dir: Path) -> None:
     write_prd(tmp_prd_dir / "prds", "PRD-001", "a", status="ready")
-    write_prd(tmp_prd_dir / "prds", "PRD-002", "b", status="ready", depends_on=["PRD-001"])
+    write_prd(
+        tmp_prd_dir / "prds", "PRD-002", "b", status="ready", depends_on=["PRD-001"]
+    )
     prds = load_all(tmp_prd_dir)
     assert not graph.is_actionable(prds["PRD-002"], prds)
 
