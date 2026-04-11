@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import logging
 import shutil
-import subprocess
-from datetime import datetime
 
 from darkfactory.builtins._registry import builtin
+from darkfactory.builtins._shared import _log_dry_run
+from darkfactory.git_ops import git_run
+from darkfactory.timestamps import now_filename_safe
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -38,18 +39,16 @@ def commit_transcript(ctx: ExecutionContext) -> None:
         ctx.logger.info("commit_transcript: no transcript found; skipping")
         return
 
-    if ctx.dry_run:
-        timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-        dest = (
-            ctx.cwd / ".darkfactory" / "transcripts" / f"{ctx.prd.id}-{timestamp}.jsonl"
-        )
-        ctx.logger.info("[dry-run] copy %s -> %s && git add", src, dest)
+    if _log_dry_run(
+        ctx,
+        f"copy {src} -> {ctx.cwd / '.darkfactory' / 'transcripts' / ctx.prd.id}-*.jsonl && git add",
+    ):
         return
 
     transcript_dir = ctx.cwd / ".darkfactory" / "transcripts"
     transcript_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    timestamp = now_filename_safe()
     dest = transcript_dir / f"{ctx.prd.id}-{timestamp}.jsonl"
 
     # Copy (not move) so the repo-root transcript persists as a local-only
@@ -57,5 +56,5 @@ def commit_transcript(ctx: ExecutionContext) -> None:
     # the runner overwrites the source file anyway.
     shutil.copy2(str(src), str(dest))
 
-    subprocess.run(["git", "add", str(dest)], cwd=str(ctx.cwd), check=True)
+    git_run("add", str(dest), cwd=ctx.cwd)
     ctx.logger.info("commit_transcript: staged %s", dest.relative_to(ctx.cwd))

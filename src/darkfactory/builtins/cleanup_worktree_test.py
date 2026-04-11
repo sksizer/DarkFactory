@@ -3,25 +3,17 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
+from darkfactory.builtins._test_helpers import make_builtin_ctx
 from darkfactory.builtins.cleanup_worktree import cleanup_worktree
-
-
-def _make_ctx(tmp_path: Path, *, dry_run: bool = False) -> MagicMock:
-    """Build a minimal ExecutionContext mock for cleanup_worktree tests."""
-    ctx = MagicMock()
-    ctx.dry_run = dry_run
-    ctx.repo_root = tmp_path
-    ctx.worktree_path = None
-    return ctx
 
 
 # ---------- no worktree path set ----------
 
 
 def test_no_worktree_path_logs_and_returns(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path)
+    ctx = make_builtin_ctx(tmp_path)
     ctx.worktree_path = None
     cleanup_worktree(ctx)
     ctx.logger.info.assert_called_once()
@@ -29,9 +21,9 @@ def test_no_worktree_path_logs_and_returns(tmp_path: Path) -> None:
 
 
 def test_no_worktree_path_no_subprocess(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path)
+    ctx = make_builtin_ctx(tmp_path)
     ctx.worktree_path = None
-    with patch("darkfactory.builtins.cleanup_worktree.subprocess.run") as mock_run:
+    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
         cleanup_worktree(ctx)
     mock_run.assert_not_called()
 
@@ -40,7 +32,7 @@ def test_no_worktree_path_no_subprocess(tmp_path: Path) -> None:
 
 
 def test_worktree_already_gone_logs_and_returns(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path)
+    ctx = make_builtin_ctx(tmp_path)
     ctx.worktree_path = tmp_path / "nonexistent-worktree"
     cleanup_worktree(ctx)
     ctx.logger.info.assert_called_once()
@@ -48,9 +40,9 @@ def test_worktree_already_gone_logs_and_returns(tmp_path: Path) -> None:
 
 
 def test_worktree_already_gone_no_subprocess(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path)
+    ctx = make_builtin_ctx(tmp_path)
     ctx.worktree_path = tmp_path / "nonexistent-worktree"
-    with patch("darkfactory.builtins.cleanup_worktree.subprocess.run") as mock_run:
+    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
         cleanup_worktree(ctx)
     mock_run.assert_not_called()
 
@@ -59,7 +51,7 @@ def test_worktree_already_gone_no_subprocess(tmp_path: Path) -> None:
 
 
 def test_dry_run_logs_command(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path, dry_run=True)
+    ctx = make_builtin_ctx(tmp_path, dry_run=True)
     ctx.worktree_path = tmp_path / "my-worktree"
     ctx.worktree_path.mkdir()
     cleanup_worktree(ctx)
@@ -69,10 +61,10 @@ def test_dry_run_logs_command(tmp_path: Path) -> None:
 
 
 def test_dry_run_no_subprocess(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path, dry_run=True)
+    ctx = make_builtin_ctx(tmp_path, dry_run=True)
     ctx.worktree_path = tmp_path / "my-worktree"
     ctx.worktree_path.mkdir()
-    with patch("darkfactory.builtins.cleanup_worktree.subprocess.run") as mock_run:
+    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
         cleanup_worktree(ctx)
     mock_run.assert_not_called()
 
@@ -81,11 +73,11 @@ def test_dry_run_no_subprocess(tmp_path: Path) -> None:
 
 
 def test_successful_removal_calls_git_worktree_remove(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path)
+    ctx = make_builtin_ctx(tmp_path)
     ctx.worktree_path = tmp_path / "my-worktree"
     ctx.worktree_path.mkdir()
 
-    with patch("darkfactory.builtins.cleanup_worktree.subprocess.run") as mock_run:
+    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
         cleanup_worktree(ctx)
 
     mock_run.assert_called_once()
@@ -97,12 +89,12 @@ def test_successful_removal_calls_git_worktree_remove(tmp_path: Path) -> None:
 
 
 def test_successful_removal_passes_repo_root(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path)
+    ctx = make_builtin_ctx(tmp_path)
     ctx.worktree_path = tmp_path / "my-worktree"
     ctx.worktree_path.mkdir()
 
-    with patch("darkfactory.builtins.cleanup_worktree.subprocess.run") as mock_run:
+    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
         cleanup_worktree(ctx)
 
-    cmd = mock_run.call_args[0][0]
-    assert str(tmp_path) in cmd
+    call_kwargs = mock_run.call_args[1]
+    assert call_kwargs["cwd"] == str(tmp_path)

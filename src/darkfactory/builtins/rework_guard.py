@@ -10,8 +10,12 @@ from __future__ import annotations
 
 import logging
 import subprocess
+from pathlib import Path
 
 from darkfactory.builtins._registry import builtin
+from darkfactory.builtins._shared import _log_dry_run
+from darkfactory.event_log import emit_task_event
+from darkfactory.git_ops import git_run
 from darkfactory.rework_guard import ReworkGuard
 from darkfactory.workflow import ExecutionContext
 
@@ -19,15 +23,16 @@ _log = logging.getLogger(__name__)
 
 
 def _has_changes(cwd: str) -> bool:
-    """Return True if there are any staged or unstaged changes in the worktree."""
-    result = subprocess.run(
-        ["git", "status", "--porcelain"],
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return bool(result.stdout.strip())
+    """Return True if there are any staged or unstaged changes in the worktree.
+
+    Returns False if the directory is not a git worktree or git errors for any
+    reason, preserving the original non-raising semantics.
+    """
+    try:
+        result = git_run("status", "--porcelain", cwd=Path(cwd))
+        return bool(result.stdout.strip())
+    except subprocess.CalledProcessError:
+        return False
 
 
 @builtin("check_rework_guard")
@@ -42,8 +47,7 @@ def check_rework_guard(ctx: ExecutionContext) -> None:
 
     In dry-run mode, logs what would happen without updating guard state.
     """
-    if ctx.dry_run:
-        ctx.logger.info("[dry-run] check_rework_guard: would check git status")
+    if _log_dry_run(ctx, "check_rework_guard: would check git status"):
         return
 
     had_changes = _has_changes(str(ctx.cwd))
@@ -56,15 +60,14 @@ def check_rework_guard(ctx: ExecutionContext) -> None:
             "check_rework_guard: %s produced changes, guard counter reset",
             ctx.prd.id,
         )
-        if ctx.event_writer:
-            ctx.event_writer.emit(
-                "task",
-                "rework_guard",
-                prd_id=ctx.prd.id,
-                had_changes=True,
-                blocked=False,
-                consecutive_no_change=0,
-            )
+        emit_task_event(
+            ctx,
+            "rework_guard",
+            prd_id=ctx.prd.id,
+            had_changes=True,
+            blocked=False,
+            consecutive_no_change=0,
+        )
         return
 
     # No changes — log and potentially block.
@@ -74,16 +77,15 @@ def check_rework_guard(ctx: ExecutionContext) -> None:
         else:
             _log.warning("rework no-change: %s", outcome.warning)
 
-    if ctx.event_writer:
-        ctx.event_writer.emit(
-            "task",
-            "rework_guard",
-            prd_id=ctx.prd.id,
-            had_changes=False,
-            blocked=outcome.blocked,
-            consecutive_no_change=outcome.consecutive_no_change,
-            warning=outcome.warning,
-        )
+    emit_task_event(
+        ctx,
+        "rework_guard",
+        prd_id=ctx.prd.id,
+        had_changes=False,
+        blocked=outcome.blocked,
+        consecutive_no_change=outcome.consecutive_no_change,
+        warning=outcome.warning,
+    )
 
     if outcome.blocked:
         raise RuntimeError(

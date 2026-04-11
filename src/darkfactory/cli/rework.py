@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -13,38 +12,23 @@ from darkfactory.loader import load_workflows
 from darkfactory.pr_comments import CommentFilters, fetch_pr_comments
 from darkfactory.rework_guard import ReworkGuard
 from darkfactory.runner import _compute_branch_name, run_workflow
+from darkfactory.worktree_utils import find_worktree_for_prd
 
 from darkfactory.cli._shared import (
     _find_repo_root,
     _load,
     _resolve_base_ref,
+    _resolve_prd_or_exit,
 )
 
 
 def find_worktree(prd_id: str, repo_root: Path) -> Path | None:
-    """Find the worktree path for the given PRD id using git worktree list."""
-    try:
-        result = subprocess.run(
-            ["git", "worktree", "list", "--porcelain"],
-            capture_output=True,
-            text=True,
-            cwd=repo_root,
-        )
-        if result.returncode != 0:
-            return None
-    except FileNotFoundError:
-        return None
+    """Find the worktree path for the given PRD id.
 
-    current_path: str | None = None
-    for line in result.stdout.splitlines():
-        if line.startswith("worktree "):
-            current_path = line[len("worktree ") :]
-        elif line.startswith("branch "):
-            branch_ref = line[len("branch ") :]
-            branch = branch_ref.removeprefix("refs/heads/")
-            if re.match(rf"^prd/{re.escape(prd_id)}-", branch):
-                return Path(current_path) if current_path else None
-    return None
+    Delegates to :func:`~darkfactory.worktree_utils.find_worktree_for_prd`.
+    Kept for backward compatibility with any callers outside this module.
+    """
+    return find_worktree_for_prd(prd_id, repo_root)
 
 
 def find_open_pr(branch_name: str, repo_root: Path) -> int | None:
@@ -80,9 +64,7 @@ def cmd_rework(args: argparse.Namespace) -> int:
     """Rework a PRD by addressing PR review feedback."""
     prds = _load(args.prd_dir)
     prd_id = args.prd_id
-    if prd_id not in prds:
-        raise SystemExit(f"unknown PRD id: {prd_id}")
-    prd = prds[prd_id]
+    prd = _resolve_prd_or_exit(prd_id, prds)
 
     if prd.status != "review":
         raise SystemExit(f"ERROR: {prd_id} is in '{prd.status}', not 'review'")

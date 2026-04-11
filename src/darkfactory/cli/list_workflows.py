@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import argparse
-import json
 
-from darkfactory.cli._shared import _load_workflows_or_fail
+from darkfactory.cli._shared import _emit_json, _load_workflows_or_fail
 
 
 def cmd_list_workflows(args: argparse.Namespace) -> int:
@@ -22,18 +21,18 @@ def cmd_list_workflows(args: argparse.Namespace) -> int:
     )
 
     if args.json:
-        payload = [
-            {
-                "name": w.name,
-                "priority": w.priority,
-                "description": w.description,
-                "task_count": len(w.tasks),
-                "workflow_dir": str(w.workflow_dir) if w.workflow_dir else None,
-            }
-            for w in sorted_wfs
-        ]
-        print(json.dumps(payload, indent=2))
-        return 0
+        return _emit_json(
+            [
+                {
+                    "name": w.name,
+                    "priority": w.priority,
+                    "description": w.description,
+                    "task_count": len(w.tasks),
+                    "workflow_dir": str(w.workflow_dir) if w.workflow_dir else None,
+                }
+                for w in sorted_wfs
+            ]
+        )
 
     for w in sorted_wfs:
         # Header line: name, priority, task count

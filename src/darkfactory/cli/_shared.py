@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
 from pathlib import Path
 
 from darkfactory import containment, graph
+from darkfactory.git_ops import git_check, git_run
 from darkfactory.prd import PRD, load_all, parse_id_sort_key
 from darkfactory.workflow import Workflow
 
@@ -106,29 +108,21 @@ def _resolve_base_ref(explicit: str | None, repo_root: Path) -> str:
         return env_override
 
     for candidate in ("main", "master"):
-        result = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(repo_root),
-                "rev-parse",
-                "--verify",
-                "--quiet",
-                f"refs/heads/{candidate}",
-            ],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode == 0:
+        if git_check(
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            f"refs/heads/{candidate}",
+            cwd=repo_root,
+        ):
             return candidate
 
     # Try remote's default branch (e.g. for fresh clones with no local main)
     try:
-        result = subprocess.run(
-            ["git", "-C", str(repo_root), "symbolic-ref", "refs/remotes/origin/HEAD"],
-            check=True,
-            capture_output=True,
-            text=True,
+        result = git_run(
+            "symbolic-ref",
+            "refs/remotes/origin/HEAD",
+            cwd=repo_root,
         )
         # Output looks like "refs/remotes/origin/main"
         return result.stdout.strip().rsplit("/", 1)[-1]
@@ -136,6 +130,62 @@ def _resolve_base_ref(explicit: str | None, repo_root: Path) -> str:
         pass
 
     return "main"
+
+
+def _resolve_prd_or_exit(prd_id: str, prds: dict[str, PRD]) -> PRD:
+    """Look up *prd_id* in *prds*, raising ``SystemExit`` if not found.
+
+    Consolidates the 8 ``if args.prd_id not in prds: raise SystemExit(...)``
+    sites across CLI commands so the error message is consistent and the
+    literal string ``"unknown PRD id:"`` appears only here.
+    """
+    if prd_id not in prds:
+        raise SystemExit(f"unknown PRD id: {prd_id}")
+    return prds[prd_id]
+
+
+def _emit_json(payload: object) -> int:
+    """Print *payload* as indented JSON and return 0.
+
+    Collapses the repeated ``if args.json: print(json.dumps(payload, indent=2)); return 0``
+    pattern across CLI commands.
+    """
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+_PRD_FIELDS_DEFAULT: tuple[str, ...] = (
+    "id",
+    "title",
+    "priority",
+    "effort",
+    "capability",
+    "kind",
+    "status",
+)
+
+
+def _prd_to_dict(
+    prd: PRD,
+    fields: tuple[str, ...] = _PRD_FIELDS_DEFAULT,
+) -> dict[str, object]:
+    """Serialize *prd* to a dict with the requested fields.
+
+    Replaces near-identical PRD-to-dict payloads scattered across ``next_cmd.py``,
+    ``status.py``, and ``assign_cmd.py``.
+    """
+    return {f: getattr(prd, f) for f in fields}
+
+
+def _format_prd_line(prd: PRD, fields: tuple[str, ...]) -> str:
+    """Format a single-line PRD summary: ``{id:14} [{f1/f2/...}]  {title}``.
+
+    Collapses the 5 sites that print this pattern with subtly different
+    attribute selections (children.py, orphans.py, undecomposed.py,
+    next_cmd.py, status.py).
+    """
+    attrs = "/".join(getattr(prd, f) for f in fields)
+    return f"{prd.id:14} [{attrs}]  {prd.title}"
 
 
 def _check_runnable(prd: PRD, prds: dict[str, PRD]) -> str | None:

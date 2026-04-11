@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import argparse
-import json
 
 from darkfactory import assign
-from darkfactory.cli._shared import _load, _load_workflows_or_fail
+from darkfactory.cli._shared import _emit_json, _load, _load_workflows_or_fail
 from darkfactory.prd import parse_id_sort_key, set_workflow
 
 
@@ -23,7 +22,7 @@ def cmd_assign(args: argparse.Namespace) -> int:
 
     if not workflows:
         if args.json:
-            print(json.dumps([], indent=2))
+            return _emit_json([])
         else:
             print(f"{'PRD':14} {'Workflow':20} Source")
             print("-" * 50)
@@ -35,19 +34,19 @@ def cmd_assign(args: argparse.Namespace) -> int:
         raise SystemExit(str(exc))
 
     if args.json:
-        payload = [
-            {
-                "id": prd_id,
-                "workflow": wf.name,
-                "explicit": prds[prd_id].workflow is not None,
-            }
-            for prd_id, wf in sorted(
-                assignments.items(),
-                key=lambda kv: parse_id_sort_key(kv[0]),
-            )
-        ]
-        print(json.dumps(payload, indent=2))
-        return 0
+        return _emit_json(
+            [
+                {
+                    "id": prd_id,
+                    "workflow": wf.name,
+                    "explicit": prds[prd_id].workflow is not None,
+                }
+                for prd_id, wf in sorted(
+                    assignments.items(),
+                    key=lambda kv: parse_id_sort_key(kv[0]),
+                )
+            ]
+        )
 
     # Human-readable table. Show assignment origin in the `Source` column.
     print(f"{'PRD':14} {'Workflow':20} Source")

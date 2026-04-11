@@ -20,11 +20,12 @@ from __future__ import annotations
 import json
 import logging
 import subprocess
-import tomllib
 from pathlib import Path
 from typing import Any
 
 from darkfactory.builtins._registry import builtin
+from darkfactory.builtins._shared import _log_dry_run
+from darkfactory.config import load_section
 from darkfactory.builtins.analyze_transcript_detectors import (
     DETECTORS,
     Finding,
@@ -57,14 +58,8 @@ def _load_analysis_config(repo_root: Path) -> dict[str, str]:
         model_severe    -- model for error-severity runs (default: "sonnet")
     """
     config_path = repo_root / ".darkfactory" / "config.toml"
-    if not config_path.exists():
-        return {}
     try:
-        with open(config_path, "rb") as fh:
-            data = tomllib.load(fh)
-        # Prefer [workflow.analysis], fall back to [analysis]
-        workflow_cfg = data.get("workflow", {})
-        cfg = workflow_cfg.get("analysis", data.get("analysis", {}))
+        cfg = load_section(config_path, "analysis")
         return {str(k): str(v) for k, v in cfg.items()}
     except Exception as exc:
         _log.warning("analyze_transcript: failed to read config: %s", exc)
@@ -236,11 +231,10 @@ def analyze_transcript(ctx: ExecutionContext) -> None:
     Missing transcript, scanner failure, or LLM failure all log a warning
     and return cleanly -- analysis is advisory.
     """
-    if ctx.dry_run:
-        ctx.logger.info(
-            "[dry-run] analyze_transcript: would scan transcript for %s and write analysis",
-            ctx.prd.id,
-        )
+    if _log_dry_run(
+        ctx,
+        f"analyze_transcript: would scan transcript for {ctx.prd.id} and write analysis",
+    ):
         return
 
     # --- Find transcript ---

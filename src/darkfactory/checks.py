@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from .prd import PRD
+from .prd import PRD, compute_branch_name
 
 logger = logging.getLogger(__name__)
 
@@ -336,7 +336,7 @@ def validate_review_branches(
     for prd_id, meta in prds.items():
         if meta.status != "review":
             continue
-        branch = f"prd/{prd_id}-{meta.slug}"
+        branch = compute_branch_name(meta)
         if not git_state.remote_branch_exists(branch):
             issues.append(
                 Issue(

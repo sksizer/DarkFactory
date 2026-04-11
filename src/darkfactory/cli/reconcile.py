@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from darkfactory.cli._shared import _find_repo_root
+from darkfactory.git_ops import git_check, git_run
 from darkfactory.prd import update_frontmatter_field_at
 
 
@@ -80,11 +81,7 @@ def _merge_commit_is_ancestor(pr: dict[str, Any], repo_root: Path) -> bool:
     sha = merge_commit.get("oid")
     if not sha:
         return False  # can't verify — treat as suspicious
-    result = subprocess.run(
-        ["git", "-C", str(repo_root), "merge-base", "--is-ancestor", sha, "HEAD"],
-        capture_output=True,
-    )
-    return result.returncode == 0
+    return git_check("merge-base", "--is-ancestor", sha, "HEAD", cwd=repo_root)
 
 
 def _build_reconcile_commit_msg(
@@ -107,12 +104,9 @@ def _commit_to_main(
 ) -> None:
     """Stage changed PRD files and commit directly to main."""
     files = [str(c[0]) for c in candidates]
-    subprocess.run(["git", "-C", str(repo_root), "add"] + files, check=True)
+    git_run("add", *files, cwd=repo_root)
     msg = _build_reconcile_commit_msg(candidates)
-    subprocess.run(
-        ["git", "-C", str(repo_root), "commit", "-m", msg],
-        check=True,
-    )
+    git_run("commit", "-m", msg, cwd=repo_root)
 
 
 def _create_reconcile_pr(
@@ -122,25 +116,13 @@ def _create_reconcile_pr(
     """Create a PR with the reconciled status changes."""
     branch = f"prd/reconcile-status-{date.today().strftime('%Y%m%d')}"
     # Delete stale branch from a previous run, if any.
-    subprocess.run(
-        ["git", "-C", str(repo_root), "branch", "-D", branch],
-        capture_output=True,
-    )
-    subprocess.run(
-        ["git", "-C", str(repo_root), "checkout", "-b", branch],
-        check=True,
-    )
+    git_check("branch", "-D", branch, cwd=repo_root)
+    git_run("checkout", "-b", branch, cwd=repo_root)
     files = [str(c[0]) for c in candidates]
-    subprocess.run(["git", "-C", str(repo_root), "add"] + files, check=True)
+    git_run("add", *files, cwd=repo_root)
     msg = _build_reconcile_commit_msg(candidates)
-    subprocess.run(
-        ["git", "-C", str(repo_root), "commit", "-m", msg],
-        check=True,
-    )
-    subprocess.run(
-        ["git", "-C", str(repo_root), "push", "-u", "origin", branch],
-        check=True,
-    )
+    git_run("commit", "-m", msg, cwd=repo_root)
+    git_run("push", "-u", "origin", branch, cwd=repo_root)
     subprocess.run(
         [
             "gh",

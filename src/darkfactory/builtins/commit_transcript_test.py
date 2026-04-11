@@ -3,26 +3,17 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
+from darkfactory.builtins._test_helpers import make_builtin_ctx
 from darkfactory.builtins.commit_transcript import commit_transcript
-
-
-def _make_ctx(tmp_path: Path, *, dry_run: bool = False) -> MagicMock:
-    """Build a minimal ExecutionContext mock for commit_transcript tests."""
-    ctx = MagicMock()
-    ctx.dry_run = dry_run
-    ctx.cwd = tmp_path
-    ctx.repo_root = tmp_path
-    ctx.prd.id = "PRD-549.8"
-    return ctx
 
 
 # ---------- no transcript file ----------
 
 
 def test_no_transcript_skips_and_logs(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path)
+    ctx = make_builtin_ctx(tmp_path, prd_id="PRD-549.8")
     # No transcript file created — src will not exist
     commit_transcript(ctx)
     ctx.logger.info.assert_called()
@@ -31,8 +22,8 @@ def test_no_transcript_skips_and_logs(tmp_path: Path) -> None:
 
 
 def test_no_transcript_no_subprocess(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path)
-    with patch("darkfactory.builtins.commit_transcript.subprocess.run") as mock_run:
+    ctx = make_builtin_ctx(tmp_path, prd_id="PRD-549.8")
+    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
         commit_transcript(ctx)
     mock_run.assert_not_called()
 
@@ -41,7 +32,7 @@ def test_no_transcript_no_subprocess(tmp_path: Path) -> None:
 
 
 def test_dry_run_logs_intended_move(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path, dry_run=True)
+    ctx = make_builtin_ctx(tmp_path, dry_run=True, prd_id="PRD-549.8")
     transcript_dir = tmp_path / ".harness-transcripts"
     transcript_dir.mkdir()
     (transcript_dir / "PRD-549.8.jsonl").write_text("transcript content")
@@ -54,18 +45,18 @@ def test_dry_run_logs_intended_move(tmp_path: Path) -> None:
 
 
 def test_dry_run_no_subprocess(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path, dry_run=True)
+    ctx = make_builtin_ctx(tmp_path, dry_run=True, prd_id="PRD-549.8")
     transcript_dir = tmp_path / ".harness-transcripts"
     transcript_dir.mkdir()
     (transcript_dir / "PRD-549.8.jsonl").write_text("transcript content")
 
-    with patch("darkfactory.builtins.commit_transcript.subprocess.run") as mock_run:
+    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
         commit_transcript(ctx)
     mock_run.assert_not_called()
 
 
 def test_dry_run_no_file_created(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path, dry_run=True)
+    ctx = make_builtin_ctx(tmp_path, dry_run=True, prd_id="PRD-549.8")
     transcript_dir = tmp_path / ".harness-transcripts"
     transcript_dir.mkdir()
     (transcript_dir / "PRD-549.8.jsonl").write_text("transcript content")
@@ -80,13 +71,13 @@ def test_dry_run_no_file_created(tmp_path: Path) -> None:
 
 
 def test_successful_run_creates_dest_and_stages(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path, dry_run=False)
+    ctx = make_builtin_ctx(tmp_path, dry_run=False, prd_id="PRD-549.8")
     transcript_dir = tmp_path / ".harness-transcripts"
     transcript_dir.mkdir()
     src = transcript_dir / "PRD-549.8.jsonl"
     src.write_text("transcript content")
 
-    with patch("darkfactory.builtins.commit_transcript.subprocess.run") as mock_run:
+    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
         commit_transcript(ctx)
 
     # Destination directory should be created
@@ -106,12 +97,12 @@ def test_successful_run_creates_dest_and_stages(tmp_path: Path) -> None:
 
 
 def test_successful_run_logs_staged(tmp_path: Path) -> None:
-    ctx = _make_ctx(tmp_path, dry_run=False)
+    ctx = make_builtin_ctx(tmp_path, dry_run=False, prd_id="PRD-549.8")
     transcript_dir = tmp_path / ".harness-transcripts"
     transcript_dir.mkdir()
     (transcript_dir / "PRD-549.8.jsonl").write_text("data")
 
-    with patch("darkfactory.builtins.commit_transcript.subprocess.run"):
+    with patch("darkfactory.git_ops.subprocess.run"):
         commit_transcript(ctx)
 
     ctx.logger.info.assert_called()

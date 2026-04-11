@@ -50,12 +50,35 @@ class Config:
     # Extensible: add TimeoutsConfig, etc.
 
 
-def _load_toml(path: Path) -> dict[str, Any]:
+def load_toml(path: Path) -> dict[str, Any]:
     """Load a TOML file, returning {} if absent."""
     if not path.is_file():
         return {}
     with open(path, "rb") as f:
         return tomllib.load(f)
+
+
+# Private alias kept for internal use within this module.
+_load_toml = load_toml
+
+
+def load_section(
+    path: Path,
+    section: str,
+    fallback: str | None = None,
+) -> dict[str, Any]:
+    """Load a named section from a TOML config file.
+
+    Checks ``[workflow.<section>]`` first, then falls back to
+    ``[<fallback>]`` if given, or ``[<section>]`` directly.  Returns
+    ``{}`` when the file is absent or the section is not present.
+    """
+    data = load_toml(path)
+    workflow_cfg = data.get("workflow", {})
+    section_data = workflow_cfg.get(section)
+    if section_data is None:
+        section_data = data.get(fallback if fallback is not None else section, {})
+    return section_data if isinstance(section_data, dict) else {}
 
 
 def _merge_section(target: object, section_data: dict[str, Any]) -> None:

@@ -11,10 +11,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from darkfactory.cli._shared import _check_runnable, _resolve_base_ref
 from darkfactory.cli.plan import (
-    _check_runnable,
     _describe_task,
-    _resolve_base_ref,
     cmd_plan,
 )
 

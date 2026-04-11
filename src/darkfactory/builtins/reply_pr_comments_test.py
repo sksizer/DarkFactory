@@ -100,7 +100,7 @@ def test_posts_replies_on_success(tmp_path: Path) -> None:
 
     with (
         patch(
-            "darkfactory.builtins.reply_pr_comments.subprocess.run",
+            "darkfactory.git_ops.subprocess.run",
             return_value=sha_result,
         ),
         patch(
@@ -126,7 +126,7 @@ def test_failure_does_not_raise(tmp_path: Path) -> None:
 
     with (
         patch(
-            "darkfactory.builtins.reply_pr_comments.subprocess.run",
+            "darkfactory.git_ops.subprocess.run",
             return_value=sha_result,
         ),
         patch(

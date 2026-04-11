@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import logging
 import shutil
-import subprocess
 
 from darkfactory.builtins._registry import builtin
+from darkfactory.builtins._shared import _log_dry_run
+from darkfactory.config import load_section
+from darkfactory.git_ops import git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -26,13 +28,7 @@ def commit_events(ctx: ExecutionContext) -> None:
     # Check config — opt-in only.
     config_path = ctx.repo_root / ".darkfactory" / "config.toml"
     if config_path.is_file():
-        import tomllib
-
-        with open(config_path, "rb") as f:
-            config = tomllib.load(f)
-        # Prefer [workflow.events], fall back to [events]
-        workflow_cfg = config.get("workflow", {})
-        events_config = workflow_cfg.get("events", config.get("events", {}))
+        events_config = load_section(config_path, "events")
         if not events_config.get("commit", False):
             ctx.logger.info(
                 "commit_events: disabled (workflow.events.commit != true); skipping"
@@ -51,8 +47,7 @@ def commit_events(ctx: ExecutionContext) -> None:
         ctx.logger.info("commit_events: no event file found; skipping")
         return
 
-    if ctx.dry_run:
-        ctx.logger.info("[dry-run] copy %s -> worktree && git add", src)
+    if _log_dry_run(ctx, f"copy {src} -> worktree && git add"):
         return
 
     dest_dir = ctx.cwd / ".darkfactory" / "events"
@@ -60,5 +55,5 @@ def commit_events(ctx: ExecutionContext) -> None:
     dest = dest_dir / src.name
 
     shutil.copy2(str(src), str(dest))
-    subprocess.run(["git", "add", str(dest)], cwd=str(ctx.cwd), check=True)
+    git_run("add", str(dest), cwd=ctx.cwd)
     ctx.logger.info("commit_events: staged %s", dest.relative_to(ctx.cwd))

@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from darkfactory.cli._shared import _load
+from darkfactory.cli._shared import _load, _resolve_prd_or_exit
 from darkfactory.prd import PRD, normalize_list_field_at, parse_id_sort_key
 
 #: List fields that ``prd normalize`` canonicalizes.
@@ -45,9 +45,7 @@ def cmd_normalize(args: argparse.Namespace) -> int:
     if args.all:
         targets = sorted(prds.values(), key=lambda p: parse_id_sort_key(p.id))
     elif args.prd_id:
-        if args.prd_id not in prds:
-            raise SystemExit(f"unknown PRD id: {args.prd_id}")
-        targets = [prds[args.prd_id]]
+        targets = [_resolve_prd_or_exit(args.prd_id, prds)]
     else:
         raise SystemExit("specify a PRD id or --all")
 

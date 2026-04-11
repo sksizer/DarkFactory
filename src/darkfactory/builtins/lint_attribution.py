@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import logging
-import subprocess
 
 from darkfactory.builtins._registry import builtin
-from darkfactory.builtins._shared import _scan_for_forbidden_attribution
+from darkfactory.builtins._shared import _log_dry_run, _scan_for_forbidden_attribution
+from darkfactory.git_ops import git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -26,20 +26,18 @@ def lint_attribution(ctx: ExecutionContext) -> None:
     before anything lands on the remote or in a PR. Dry-run is a no-op
     because there are no real commits to scan.
     """
-    if ctx.dry_run:
-        ctx.logger.info("[dry-run] lint_attribution: skipped")
+    if _log_dry_run(ctx, "lint_attribution: skipped"):
         return
 
     _scan_for_forbidden_attribution(
         ctx.run_summary or "", source=f"run summary for {ctx.prd.id}"
     )
 
-    result = subprocess.run(
-        ["git", "log", f"{ctx.base_ref}..HEAD", "--format=%H%x00%B%x1e"],
-        cwd=str(ctx.cwd),
-        check=True,
-        capture_output=True,
-        text=True,
+    result = git_run(
+        "log",
+        f"{ctx.base_ref}..HEAD",
+        "--format=%H%x00%B%x1e",
+        cwd=ctx.cwd,
     )
     # Record separator \x1e between commits; field separator \x00 between
     # sha and body. Keeps us robust against newlines in commit messages.

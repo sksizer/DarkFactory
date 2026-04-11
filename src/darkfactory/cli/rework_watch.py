@@ -24,6 +24,8 @@ import signal
 import subprocess
 import sys
 import time
+
+from darkfactory.git_ops import git_run
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -170,15 +172,8 @@ def fetch_open_prd_prs(repo_root: Path) -> list[dict[str, Any]]:
 def _worktree_exists(prd_id: str, repo_root: Path) -> bool:
     """Return True if a git worktree for ``prd_id`` is registered."""
     try:
-        result = subprocess.run(
-            ["git", "worktree", "list", "--porcelain"],
-            capture_output=True,
-            text=True,
-            cwd=repo_root,
-        )
-        if result.returncode != 0:
-            return False
-    except FileNotFoundError:
+        result = git_run("worktree", "list", "--porcelain", cwd=repo_root)
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return False
 
     for line in result.stdout.splitlines():

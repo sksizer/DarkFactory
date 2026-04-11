@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 
 from darkfactory.loader import load_operations
 from darkfactory.style import Element, Styler
@@ -11,7 +10,7 @@ from darkfactory.system import SystemContext
 from darkfactory.system_runner import run_system_operation
 from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Task
 
-from darkfactory.cli._shared import _find_repo_root, _load
+from darkfactory.cli._shared import _emit_json, _find_repo_root, _load
 
 
 def _describe_system_task(task: Task) -> str:
@@ -42,19 +41,19 @@ def cmd_system_list(args: argparse.Namespace) -> int:
     sorted_ops = sorted(operations.values(), key=lambda op: op.name)
 
     if args.json:
-        payload = [
-            {
-                "name": op.name,
-                "description": op.description,
-                "task_count": len(op.tasks),
-                "creates_pr": op.creates_pr,
-                "requires_clean_main": op.requires_clean_main,
-                "accepts_target": op.accepts_target,
-            }
-            for op in sorted_ops
-        ]
-        print(json.dumps(payload, indent=2))
-        return 0
+        return _emit_json(
+            [
+                {
+                    "name": op.name,
+                    "description": op.description,
+                    "task_count": len(op.tasks),
+                    "creates_pr": op.creates_pr,
+                    "requires_clean_main": op.requires_clean_main,
+                    "accepts_target": op.accepts_target,
+                }
+                for op in sorted_ops
+            ]
+        )
 
     for op in sorted_ops:
         print(f"{op.name:30} tasks={len(op.tasks)}")
@@ -74,18 +73,18 @@ def cmd_system_describe(args: argparse.Namespace) -> int:
     op = operations[args.name]
 
     if args.json:
-        payload: dict[str, object] = {
-            "name": op.name,
-            "description": op.description,
-            "requires_clean_main": op.requires_clean_main,
-            "creates_pr": op.creates_pr,
-            "pr_title": op.pr_title,
-            "pr_body": op.pr_body,
-            "accepts_target": op.accepts_target,
-            "tasks": [_describe_system_task(t) for t in op.tasks],
-        }
-        print(json.dumps(payload, indent=2))
-        return 0
+        return _emit_json(
+            {
+                "name": op.name,
+                "description": op.description,
+                "requires_clean_main": op.requires_clean_main,
+                "creates_pr": op.creates_pr,
+                "pr_title": op.pr_title,
+                "pr_body": op.pr_body,
+                "accepts_target": op.accepts_target,
+                "tasks": [_describe_system_task(t) for t in op.tasks],
+            }
+        )
 
     print(f"# {op.name}")
     print()

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import subprocess
-
 from darkfactory.builtins._registry import builtin
-from darkfactory.builtins._shared import _scan_for_forbidden_attribution
+from darkfactory.builtins._shared import _log_dry_run, _scan_for_forbidden_attribution
+from darkfactory.event_log import emit_builtin_effect
+from darkfactory.git_ops import git_check, git_run
 from darkfactory.workflow import ExecutionContext
 
 
@@ -24,55 +24,30 @@ def commit(ctx: ExecutionContext, *, message: str) -> None:
         formatted, source=f"commit message for {ctx.prd.id}"
     )
 
-    if ctx.dry_run:
-        ctx.logger.info("[dry-run] git add -A && git commit -m %r", formatted)
+    if _log_dry_run(ctx, f"git add -A && git commit -m {formatted!r}"):
         return
 
     # Stage everything
-    subprocess.run(
-        ["git", "add", "-A"],
-        cwd=str(ctx.cwd),
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    git_run("add", "-A", cwd=ctx.cwd)
 
     # Check if there's anything to commit
-    diff_result = subprocess.run(
-        ["git", "diff", "--cached", "--quiet"],
-        cwd=str(ctx.cwd),
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if diff_result.returncode == 0:
+    if git_check("diff", "--cached", "--quiet", cwd=ctx.cwd):
         # No staged changes — skip gracefully.
         ctx.logger.info("commit skipped: no changes to commit")
         return
 
     # Commit
-    commit_result = subprocess.run(
-        ["git", "commit", "-m", formatted],
-        cwd=str(ctx.cwd),
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    commit_result = git_run("commit", "-m", formatted, cwd=ctx.cwd)
 
-    if ctx.event_writer:
-        # Extract the short SHA from git commit output.
-        sha = ""
-        for line in commit_result.stdout.splitlines():
-            if line.strip():
-                # git commit output starts with "[branch sha] message"
-                parts = line.strip().split()
-                if len(parts) >= 2:
-                    sha = parts[1].rstrip("]")
-                break
-        ctx.event_writer.emit(
-            "task",
-            "builtin_effect",
-            task="commit",
-            effect="commit",
-            detail={"sha": sha, "message": formatted},
-        )
+    # Extract the short SHA from git commit output.
+    sha = ""
+    for line in commit_result.stdout.splitlines():
+        if line.strip():
+            # git commit output starts with "[branch sha] message"
+            parts = line.strip().split()
+            if len(parts) >= 2:
+                sha = parts[1].rstrip("]")
+            break
+    emit_builtin_effect(
+        ctx, "commit", "commit", detail={"sha": sha, "message": formatted}
+    )

@@ -9,7 +9,8 @@ import tempfile
 from pathlib import Path
 
 from darkfactory.builtins._registry import builtin
-from darkfactory.builtins._shared import _scan_for_forbidden_attribution
+from darkfactory.builtins._shared import _log_dry_run, _scan_for_forbidden_attribution
+from darkfactory.event_log import emit_builtin_effect
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -64,12 +65,9 @@ def create_pr(ctx: ExecutionContext) -> None:
     _scan_for_forbidden_attribution(title, source=f"PR title for {ctx.prd.id}")
     _scan_for_forbidden_attribution(body, source=f"PR body for {ctx.prd.id}")
 
-    if ctx.dry_run:
-        ctx.logger.info(
-            "[dry-run] gh pr create --base %s --title %r --body <generated>",
-            ctx.base_ref,
-            title,
-        )
+    if _log_dry_run(
+        ctx, f"gh pr create --base {ctx.base_ref} --title {title!r} --body <generated>"
+    ):
         ctx.pr_url = "https://example.test/dry-run/pr/0"
         return
 
@@ -114,11 +112,9 @@ def create_pr(ctx: ExecutionContext) -> None:
     url_line = result.stdout.strip().splitlines()[-1] if result.stdout.strip() else ""
     ctx.pr_url = url_line or None
 
-    if ctx.event_writer:
-        ctx.event_writer.emit(
-            "task",
-            "builtin_effect",
-            task="create_pr",
-            effect="create_pr",
-            detail={"pr_url": ctx.pr_url, "base": ctx.base_ref, "title": title},
-        )
+    emit_builtin_effect(
+        ctx,
+        "create_pr",
+        "create_pr",
+        detail={"pr_url": ctx.pr_url, "base": ctx.base_ref, "title": title},
+    )

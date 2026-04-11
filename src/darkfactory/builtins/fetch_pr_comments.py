@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 
 from darkfactory.builtins._registry import builtin
+from darkfactory.builtins._shared import _log_dry_run
+from darkfactory.event_log import emit_builtin_effect
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -29,9 +31,8 @@ def fetch_pr_comments(ctx: ExecutionContext) -> None:
         )
         return
 
-    if ctx.dry_run:
-        pr_label = f"#{ctx.pr_number}" if ctx.pr_number is not None else "<pr>"
-        ctx.logger.info("[dry-run] would fetch PR comments for %s", pr_label)
+    pr_label = f"#{ctx.pr_number}" if ctx.pr_number is not None else "<pr>"
+    if _log_dry_run(ctx, f"would fetch PR comments for {pr_label}"):
         ctx.review_threads = []
         return
 
@@ -52,11 +53,9 @@ def fetch_pr_comments(ctx: ExecutionContext) -> None:
         ctx.pr_number,
     )
 
-    if ctx.event_writer:
-        ctx.event_writer.emit(
-            "task",
-            "builtin_effect",
-            task="fetch_pr_comments",
-            effect="fetch",
-            detail={"pr_number": ctx.pr_number, "thread_count": len(threads)},
-        )
+    emit_builtin_effect(
+        ctx,
+        "fetch_pr_comments",
+        "fetch",
+        detail={"pr_number": ctx.pr_number, "thread_count": len(threads)},
+    )
