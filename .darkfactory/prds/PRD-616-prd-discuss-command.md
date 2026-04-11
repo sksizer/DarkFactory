@@ -1,7 +1,7 @@
 ---
 id: PRD-616
 title: Interactive PRD discussion via phased Claude Code chain
-kind: feature
+kind: task
 status: ready
 priority: medium
 effort: m
