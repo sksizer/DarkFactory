@@ -20,6 +20,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from darkfactory.utils.git import resolve_commit_timestamp
+
 _log = logging.getLogger(__name__)
 
 
@@ -446,17 +448,6 @@ def post_comment_replies(
     return results
 
 
-def _resolve_commit_timestamp(commit: str) -> str:
-    """Resolve a commit SHA or ref to an ISO-8601 author timestamp."""
-    result = subprocess.run(
-        ["git", "log", "-1", "--format=%aI", commit],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return result.stdout.strip()
-
-
 def _is_bot_comment(author: str, body: str, bot_usernames: list[str]) -> bool:
     """Return True if the comment was authored by the harness bot."""
     if author in bot_usernames:
@@ -504,7 +495,7 @@ def _apply_filters(
 
     # 5. Since-commit filter
     if filters.since_commit is not None:
-        cutoff = _resolve_commit_timestamp(filters.since_commit)
+        cutoff = resolve_commit_timestamp(filters.since_commit)
         result = [t for t in result if t.posted_at >= cutoff]
 
     return result

@@ -1,4 +1,4 @@
-"""Shared git subprocess helpers.
+"""Git subprocess primitives.
 
 Three thin wrappers over ``subprocess.run(["git", ...])``:
 
@@ -85,3 +85,17 @@ def git_probe(*args: str, cwd: Path, timeout: int = 10) -> bool:
         )
         return False
     return result.returncode == 0
+
+
+def resolve_commit_timestamp(commit: str) -> str:
+    """Resolve a commit SHA or ref to an ISO-8601 author timestamp.
+
+    Runs ``git log -1 --format=%aI <commit>`` in the current working directory.
+    """
+    result = subprocess.run(
+        ["git", "log", "-1", "--format=%aI", commit],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
