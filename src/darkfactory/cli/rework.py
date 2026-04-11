@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from darkfactory.event_log import generate_session_id
 from darkfactory.loader import load_workflows
 from darkfactory.pr_comments import CommentFilters, fetch_pr_comments
 from darkfactory.rework_guard import ReworkGuard
@@ -118,12 +119,14 @@ def cmd_rework(args: argparse.Namespace) -> int:
         raise SystemExit("ERROR: rework workflow not found in built-in workflows")
 
     base_ref = _resolve_base_ref(None, repo_root)
+    session = generate_session_id()
     result = run_workflow(
         prd,
         rework_wf,
         repo_root,
         base_ref,
         dry_run=False,
+        session_id=session,
         initial_worktree_path=worktree_path,
         initial_pr_number=pr_number,
         initial_review_threads=threads,
