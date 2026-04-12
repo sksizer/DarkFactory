@@ -2,7 +2,7 @@
 id: PRD-630
 title: Unify execution engine and introduce typed inter-task state
 kind: epic
-status: draft
+status: ready
 priority: high
 effort: l
 capability: complex
@@ -139,6 +139,16 @@ field. The rework-specific fields (`pr_number`, `review_threads`,
 side-channel for `_last_agent_result` is replaced by an `AgentResult`
 bundle in `PhaseState`.
 
+The unified engine unconditionally calls `state.put(AgentResult(...))`
+after every agent invocation. Builtins that currently read
+`ctx.agent_output`, `ctx.agent_success`, or `ctx.last_invoke_result`
+migrate to reading from `PhaseState` instead. Fields like `invoke_count`
+become derivable from the PhaseState contents (or a simple counter on
+the engine) rather than context fields. This eliminates the post-agent
+mutation asymmetry between the workflow and system operation paths —
+both paths produce the same `AgentResult` bundle, and consumers pull
+from `PhaseState` if they need it.
+
 ### Unified dispatch engine
 
 Extract the core dispatch loop into a function parameterized on what varies:
@@ -163,6 +173,9 @@ provides the system-specific callables.
 The unified engine handles: task dispatch, event logging, styler
 passthrough, timeout resolution, dry-run, retry-on-failure, and worktree
 lock lifecycle. Features implemented once apply to both execution paths.
+System operations gain event logging, styler passthrough, and timeout
+resolution — these were previously workflow-only. `system_runner.py` is
+deleted entirely (no backward-compat shim needed — alpha, single user).
 
 ### Template data-flow contracts
 
@@ -251,16 +264,25 @@ builtins.
    and `expects` fields. Runner asserts after open and before close phases.
    `PRD_IMPLEMENTATION_TEMPLATE` declares its contracts.
 
-7. **Backward compatibility** — `from darkfactory.runner import
-   run_workflow, RunResult, TaskStep` and `from darkfactory.system_runner
-   import run_system_operation` continue to work. CLI behavior unchanged.
+7. **Post-agent results via PhaseState** — the unified engine
+   unconditionally calls `state.put(AgentResult(...))` after every agent
+   invocation. `ctx.agent_output`, `ctx.agent_success`,
+   `ctx.last_invoke_result`, `ctx.model`, and `ctx.invoke_count` are
+   removed from `ExecutionContext`. Builtins that consumed these fields
+   migrate to reading `AgentResult` from `PhaseState`.
+
+8. **System operations gain event logging, styler, and timeout** — the
+   unified engine threads `EventWriter`, `Styler`, and timeout config
+   through to system operation runs. `cli/system.py` passes `styler` to
+   the engine. System agent invocations produce colorized streaming output
+   and emit `task_start`/`task_finish` events.
 
 ### Non-functional
 
-8. All existing tests pass without modification to assertions (test setup
+9. All existing tests pass without modification to assertions (test setup
    may need updating for new context shape).
-9. mypy strict passes across all modified files.
-10. No new runtime dependencies.
+10. mypy strict passes across all modified files.
+11. No new runtime dependencies.
 
 ## Relationships to existing PRDs
 
@@ -297,24 +319,30 @@ builtins.
   instead of a builtin that calls `spawn_claude()`.
 - [ ] AC-6: `WorkflowTemplate` supports `provides`/`expects` and the
   runner asserts them at phase boundaries.
-- [ ] AC-7: `just test && just lint && just typecheck && just format-check`
+- [ ] AC-7: `AgentResult` bundle stored in `PhaseState` after every agent
+  invocation. `ctx.agent_output`, `ctx.agent_success`,
+  `ctx.last_invoke_result`, `ctx.model`, `ctx.invoke_count` removed from
+  `ExecutionContext`. No `setattr` side-channel.
+- [ ] AC-8: `system_runner.py` deleted. All callers updated.
+- [ ] AC-9: `just test && just lint && just typecheck && just format-check`
   clean.
-- [ ] AC-8: Public API backward compatible — existing imports from
-  `runner` and `system_runner` modules continue to work.
+
+## Resolved questions
+
+- **Context types**: keep `ExecutionContext` and `SystemContext` separate.
+  Both carry `PhaseState`. Revisit after unification reveals whether the
+  remaining differences justify two types.
+- **Engine shape**: function with callables, not a class. Matches existing
+  codebase style.
+- **`frozenset[type]` for template contracts**: accepted. If declarative
+  YAML/TOML templates are needed later, write a loader/adapter that maps
+  string names to Python types via a registry.
+- **Post-agent mutation**: the unified engine unconditionally stores
+  `AgentResult` in `PhaseState`. No per-path callbacks. Consumers pull
+  from state.
 
 ## Open questions
 
-- [ ] Should `ExecutionContext` and `SystemContext` merge into a single
-  context type with optional PRD fields, or remain separate types that
-  both carry `PhaseState`? Merging reduces duplication further but means
-  the engine's generic parameter `C` disappears. Separate types are more
-  honest about the shape difference. Recommend: keep separate for now,
-  revisit after the engine unification reveals whether the remaining
-  differences justify two types.
-- [ ] Should the unified engine be a class or a function? A function with
-  callables as parameters is simpler and more testable. A class with
-  method overrides is more extensible. Recommend: function — matches the
-  existing codebase style.
 - [ ] Should unused templates (`REWORK_TEMPLATE`, `SYSTEM_OPERATION_TEMPLATE`
   in `templates_builtin.py`) be removed as part of this work, or left for
   a separate cleanup? They were defined by PRD-227.5/227.6 but never

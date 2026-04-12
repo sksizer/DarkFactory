@@ -24,7 +24,7 @@ tags: []
 
 ## Summary
 
-Consolidate scattered `gh` CLI interactions into `utils/github/` with a Result type hierarchy parallel to PRD-628's git design, move Claude Code subprocess logic into `utils/claude_code/`, and extract the duplicated shell runner into `utils/shell.py`. Promote `Ok[T]` from `utils/git/_types.py` to a shared `utils/_result.py` so both `utils/git/` and `utils/github/` use the same success type. The `utils/git/` consolidation is handled by PRD-628; this PRD covers the remaining three packages.
+Consolidate scattered `gh` CLI interactions into `utils/github/` with a Result type hierarchy parallel to PRD-628's git design, move Claude Code subprocess logic into `utils/claude_code/`, and extract the duplicated shell runner into `utils/shell.py`. Promote `Ok[T]` and `Timeout` from `utils/git/_types.py` to a shared `utils/_result.py` so both `utils/git/` and `utils/github/` use the same success and timeout types. Merge `git_probe` into `git_run` with an optional `timeout` parameter (one primitive instead of two), and apply the same pattern to `gh_run`. The `utils/git/` consolidation is handled by PRD-628; this PRD covers the remaining three packages.
 
 ## Motivation
 
@@ -38,18 +38,18 @@ Consolidating behind typed primitives with Result returns — parallel to what P
 
 **Ok[T] promotion:**
 
-1. `Ok[T]` moves from `utils/git/_types.py` to `utils/_result.py`. `utils/git/_types.py` re-imports it from there so PRD-628 callers are unaffected. `Ok[T]` is not git-specific — it is a generic success wrapper reused across `utils/git/` and `utils/github/`.
+1. `Ok[T]` and `Timeout` move from `utils/git/_types.py` to `utils/_result.py`. `utils/git/_types.py` re-imports both from there so PRD-628 callers are unaffected. Neither type is git-specific — `Ok[T]` is a generic success wrapper and `Timeout` represents any subprocess timeout. `GitTimeout` is renamed to `Timeout` in the move. `git_probe` is merged into `git_run` with an optional `timeout: int | None = None` parameter. `ProbeResult` is dropped; `CheckResult` becomes `Ok[None] | GitErr | Timeout`. All former `git_probe` call sites become `git_run(..., timeout=N)`. One primitive instead of two.
 
 **GitHub CLI — `utils/github/`:**
 
 2. `utils/github/_types.py` is created and exports:
    - `GhErr` — frozen dataclass with fields `returncode: int`, `stdout: str`, `stderr: str`, `cmd: list[str]`. Same shape as `GitErr` but a distinct type for type-level discrimination.
    - `type GhResult[T] = Ok[T] | GhErr`
-   - `type GhCheckResult = GhResult[None]`
+   - `type GhCheckResult = Ok[None] | GhErr | Timeout` — includes `Timeout` (from `utils/_result.py`) for `gh` calls with timeout bounds.
 
 3. `utils/github/_cli.py` is created with two primitives:
-   - `gh_run(*args, cwd) -> GhCheckResult` — runs `gh` subprocess, never raises. Returns `Ok(None, stdout=...)` on exit 0, `GhErr` on non-zero. Parallel to `git_run`.
-   - `gh_json(*args, cwd) -> GhResult[Any]` — runs `gh` subprocess, parses stdout as JSON on success. Returns `Ok(parsed, stdout=raw)` or `GhErr`.
+   - `gh_run(*args, cwd, timeout=None) -> GhCheckResult` — runs `gh` subprocess, never raises. Returns `Ok(None, stdout=...)` on exit 0, `GhErr` on non-zero, `Timeout` on timeout. Parallel to `git_run`.
+   - `gh_json(*args, cwd, timeout=None) -> GhResult[Any] | Timeout` — runs `gh` subprocess, parses stdout as JSON on success. Returns `Ok(parsed, stdout=raw)`, `GhErr`, or `Timeout`.
 
 4. `utils/github/pull_request.py` is created. Functions that move here:
    - `get_pr_state(branch, repo_root) -> GhResult[str]` — from `checks.py:_get_pr_state`. Returns `Ok("MERGED")`, `Ok("OPEN")`, etc., or `GhErr`. Callers distinguish "gh failed" from "no PR" (currently conflated into `"UNKNOWN"`).
@@ -104,18 +104,18 @@ Consolidating behind typed primitives with Result returns — parallel to what P
 
 ```
 utils/
-  _result.py              # Ok[T] — shared success type (promoted from utils/git/_types.py)
+  _result.py              # Ok[T], Timeout — shared types (promoted from utils/git/_types.py)
   shell.py                # run_shell(cmd, cwd, env)
   git/
-    _types.py             # imports Ok from .._result; GitErr, GitTimeout, CheckResult, ProbeResult
-    _run.py               # git_run, git_probe (from PRD-628)
+    _types.py             # imports Ok, Timeout from .._result; GitErr, CheckResult (ProbeResult dropped)
+    _run.py               # git_run (single primitive; git_probe merged in, timeout optional)
     _operations.py        # diff_quiet, run_add, etc. + _resolve_commit_timestamp (from PRD-628 + this PRD)
     branch.py             # (from PRD-628)
     worktree.py           # (from PRD-628)
     __init__.py           # re-exports
   github/
-    _types.py             # GhErr, GhResult[T], GhCheckResult
-    _cli.py               # gh_run, gh_json (primitives)
+    _types.py             # GhErr, GhResult[T], GhCheckResult (uses shared Ok, Timeout)
+    _cli.py               # gh_run, gh_json (primitives; timeout optional)
     _comments.py          # graphql_fetch, post_reply, repo_nwo
     pull_request.py       # get_pr_state, fetch_all_pr_states, create_pr, list_open_prs, close_pr, PrInfo
     __init__.py           # re-exports
@@ -139,9 +139,14 @@ T = TypeVar("T")
 class Ok(Generic[T]):
     value: T
     stdout: str = ""
+
+@dataclass(frozen=True)
+class Timeout:
+    cmd: list[str]
+    timeout: int
 ```
 
-`utils/git/_types.py` changes its `Ok` definition to `from darkfactory.utils._result import Ok`. All existing callers are unaffected — they import `Ok` from `utils.git` which re-exports it.
+`utils/git/_types.py` changes to import `Ok` and `Timeout` from `darkfactory.utils._result`, drops its local `Ok` and renames `GitTimeout` → `Timeout`. `ProbeResult` is deleted; `CheckResult` becomes `Ok[None] | GitErr | Timeout`. `git_probe` is deleted from `_run.py`; `git_run` gains `timeout: int | None = None`. All existing callers are unaffected — they import from `utils.git` which re-exports.
 
 **GitHub Result types — `utils/github/_types.py`:**
 
@@ -149,7 +154,7 @@ class Ok(Generic[T]):
 # utils/github/_types.py
 from __future__ import annotations
 from dataclasses import dataclass
-from darkfactory.utils._result import Ok
+from darkfactory.utils._result import Ok, Timeout
 
 @dataclass(frozen=True)
 class GhErr:
@@ -159,24 +164,31 @@ class GhErr:
     cmd: list[str]
 
 type GhResult[T] = Ok[T] | GhErr
-type GhCheckResult = GhResult[None]
+type GhCheckResult = Ok[None] | GhErr | Timeout
 ```
 
 **GitHub primitives — `utils/github/_cli.py`:**
 
 ```python
-def gh_run(*args: str, cwd: Path) -> GhCheckResult:
-    result = subprocess.run(["gh", *args], cwd=str(cwd), capture_output=True, text=True)
+def gh_run(*args: str, cwd: Path, timeout: int | None = None) -> GhCheckResult:
+    try:
+        result = subprocess.run(["gh", *args], cwd=str(cwd), capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return Timeout(["gh", *args], timeout or 0)
+    except Exception as exc:
+        return GhErr(-1, "", str(exc), ["gh", *args])
     if result.returncode != 0:
         return GhErr(result.returncode, result.stdout, result.stderr, ["gh", *args])
     return Ok(None, stdout=result.stdout)
 
-def gh_json(*args: str, cwd: Path) -> GhResult[Any]:
-    match gh_run(*args, cwd=cwd):
+def gh_json(*args: str, cwd: Path, timeout: int | None = None) -> GhResult[Any] | Timeout:
+    match gh_run(*args, cwd=cwd, timeout=timeout):
         case Ok(stdout=raw):
             return Ok(json.loads(raw), stdout=raw)
         case GhErr() as err:
             return err
+        case Timeout() as t:
+            return t
 ```
 
 **GitHub call site patterns:**
@@ -213,9 +225,10 @@ match create_pr(ctx.base_ref, title, body_path, ctx.cwd):
 
 **Migration order — 4 atomic commits:**
 
-**Commit 1 — `Ok[T]` promotion + `_resolve_commit_timestamp`:**
-- Create `utils/_result.py` with `Ok[T]`.
-- Update `utils/git/_types.py` to import `Ok` from `utils._result`.
+**Commit 1 — `Ok[T]`/`Timeout` promotion + `git_probe` merge + `_resolve_commit_timestamp`:**
+- Create `utils/_result.py` with `Ok[T]` and `Timeout`.
+- Update `utils/git/_types.py`: import `Ok` and `Timeout` from `utils._result`, rename `GitTimeout` → `Timeout`, drop `ProbeResult`, update `CheckResult = Ok[None] | GitErr | Timeout`.
+- Merge `git_probe` into `git_run` in `_run.py`: add `timeout: int | None = None` parameter, delete `git_probe`. Update all former `git_probe` call sites to `git_run(..., timeout=N)`.
 - Move `_resolve_commit_timestamp()` from `pr_comments.py` to `utils/git/_operations.py`, using `git_run`.
 - Verify: all existing git Result call sites still work.
 
@@ -239,10 +252,11 @@ match create_pr(ctx.base_ref, title, body_path, ctx.cwd):
 
 ## Acceptance Criteria
 
-- [ ] AC-1: `utils/_result.py` exports `Ok[T]`; `utils/git/_types.py` imports `Ok` from there (not locally defined).
-- [ ] AC-2: `utils/github/_types.py` exports `GhErr`, `GhResult`, `GhCheckResult`.
-- [ ] AC-3: `utils/github/_cli.py` exports `gh_run → GhCheckResult` and `gh_json → GhResult[Any]`.
-- [ ] AC-4: `utils/github/pull_request.py` exports `get_pr_state`, `fetch_all_pr_states`, `get_resume_pr_state`, `create_pr`, `list_open_prs`, `close_pr`, `PrInfo` — all returning `GhResult`/`GhCheckResult` types.
+- [ ] AC-1: `utils/_result.py` exports `Ok[T]` and `Timeout`; `utils/git/_types.py` and `utils/github/_types.py` import both from there (not locally defined).
+- [ ] AC-1a: `git_probe` does not exist. `git_run` accepts `timeout: int | None = None`. `ProbeResult` and `GitTimeout` do not exist. `CheckResult = Ok[None] | GitErr | Timeout`.
+- [ ] AC-2: `utils/github/_types.py` exports `GhErr`, `GhResult`, `GhCheckResult` (where `GhCheckResult = Ok[None] | GhErr | Timeout`).
+- [ ] AC-3: `utils/github/_cli.py` exports `gh_run → GhCheckResult` (with optional `timeout`) and `gh_json → GhResult[Any] | Timeout` (with optional `timeout`).
+- [ ] AC-4: `utils/github/pull_request.py` exports `get_pr_state`, `fetch_all_pr_states`, `get_resume_pr_state`, `create_pr`, `list_open_prs`, `close_pr`, `PrInfo` — all returning `GhResult`/`GhCheckResult` types. `get_pr_state` and `fetch_all_pr_states` pass timeout through to `gh_run`/`gh_json`.
 - [ ] AC-5: `utils/github/_comments.py` exports `graphql_fetch`, `post_reply`, `repo_nwo` — all returning `GhResult`/`GhCheckResult` types.
 - [ ] AC-6: Zero occurrences of `subprocess.run(["gh"` outside `utils/github/` in `src/`. (Tests excluded.)
 - [ ] AC-7: `pr_comments.py` retains business logic (filtering, threading, reply parsing) but contains zero direct `gh` or `git` subprocess calls.
