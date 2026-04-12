@@ -26,3 +26,4 @@ See `README.md § Architectural Principles` for the canonical list. Key points:
 - Use `_next_flat_prd_id()` from `src/darkfactory/cli/new.py` for new PRD IDs
 - Workflows in `src/darkfactory/workflows/{name}/workflow.py`
 - Config in `.darkfactory/config.toml`
+- When referencing other PRDs in Markdown prose **ALWAYS** use a wikiink to the file

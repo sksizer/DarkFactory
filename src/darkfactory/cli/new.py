@@ -61,6 +61,7 @@ DRAFT_TEMPLATE_BODY = """# {title}
 
 ## References
 
+<!-- ALWAYS use wikilinks to reference other PRDs. -->
 """
 
 
