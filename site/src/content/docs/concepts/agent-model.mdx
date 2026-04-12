@@ -9,17 +9,18 @@ DarkFactory treats AI agents as **untrusted subprocesses**. The harness composes
 
 ## Invocation
 
-`compose_prompt()` assembles the prompt from workflow prompt files and PRD content. `invoke_claude()` spawns the agent as a subprocess with `--print` mode:
+`compose_prompt()` assembles the prompt from workflow prompt files and PRD content. `invoke_claude()` spawns the agent as a subprocess with `--print --verbose --output-format stream-json` mode:
 
 ```bash frame="terminal" title="Simplified invocation"
-claude --print \
+pnpm dlx @anthropic-ai/claude-code --print \
+  --verbose \
+  --output-format stream-json \
   --model sonnet \
-  --allowedTools 'Read,Edit,Write,Glob,Grep,Bash(just:*)' \
-  --max-turns 30 \
+  --allowed-tools 'Read,Edit,Write,Glob,Grep,Bash(just:*)' \
   < composed_prompt.md
 ```
 
-The agent receives the full PRD body, role prompts, and task prompts as a single composed input. It operates inside the PRD's [worktree](/concepts/worktrees) and must emit a sentinel string as its final line.
+The agent receives the full PRD body, role prompts, and task prompts as a single composed input via stdin. It operates inside the PRD's [worktree](/concepts/worktrees) and must emit a sentinel string to signal completion.
 
 ## Sentinel Contract
 
@@ -69,7 +70,7 @@ Set `capability` on your PRDs to control cost. A `trivial` rename task does not 
 
 ## Tool Allowlist
 
-Each `AgentTask` declares which tools the agent may use. This list is passed to `--allowedTools`:
+Each `AgentTask` declares which tools the agent may use. This list is passed to `--allowed-tools`:
 
 ```python
 tools=[
@@ -152,7 +153,7 @@ prd run PRD-312 --execute
 
 ```bash frame="terminal" title="Harness log"
 [PRD-312] Model resolution: capability=moderate → sonnet
-[PRD-312] Invoking: claude --print --model sonnet ...
+[PRD-312] Invoking: pnpm dlx @anthropic-ai/claude-code --print --model sonnet ...
 ```
 
 **Override from the CLI**: force `opus` regardless of capability mapping.
@@ -163,7 +164,7 @@ prd run PRD-312 --execute --model opus
 
 ```bash frame="terminal" title="Harness log with override"
 [PRD-312] Model resolution: CLI override → opus
-[PRD-312] Invoking: claude --print --model opus ...
+[PRD-312] Invoking: pnpm dlx @anthropic-ai/claude-code --print --model opus ...
 ```
 
 **Override from the workflow**: set the model directly on the AgentTask. This takes precedence over capability mapping but not the CLI flag.
@@ -178,7 +179,7 @@ AgentTask(
 
 ```bash frame="terminal" title="Task-level override"
 [PRD-312] Model resolution: AgentTask.model → opus
-[PRD-312] Invoking: claude --print --model opus ...
+[PRD-312] Invoking: pnpm dlx @anthropic-ai/claude-code --print --model opus ...
 ```
 
 The priority order means you can set sensible defaults via `capability` on every PRD, override specific tasks in workflows, and still force a model from the command line during debugging or cost-sensitive runs.

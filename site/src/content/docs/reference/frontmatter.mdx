@@ -5,7 +5,7 @@ description: "Complete field reference for PRD document frontmatter."
 
 import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
 
-Every PRD is a Markdown file with YAML frontmatter that defines its metadata. The frontmatter drives workflow assignment, dependency resolution, status tracking, and scope computation. This page documents all 20 fields from the PRD dataclass.
+Every PRD is a Markdown file with YAML frontmatter that defines its metadata. The frontmatter drives workflow assignment, dependency resolution, status tracking, and scope computation. This page documents all fields from the PRD dataclass.
 
 ## ID Format
 
@@ -35,27 +35,27 @@ The harness resolves wikilinks by matching the numeric ID prefix. The slug porti
 | `id` | `str` | Unique identifier matching `PRD-\d+`. Must be unique across the project. |
 | `title` | `str` | Human-readable title. Used in PR titles, commit messages, and CLI output. |
 | `status` | `enum` | Current lifecycle status. See Status Transitions below. |
-| `kind` | `enum` | PRD type: `epic`, `feature`, `task`, `spike`, `bug`. Determines executability. |
+| `kind` | `enum` | PRD type: `epic`, `feature`, `component`, `task`. Determines executability. |
 
 ### Optional Fields
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `priority` | `enum` | `medium` | Execution priority: `critical`, `high`, `medium`, `low`. Affects ordering within the same DAG depth. |
-| `effort` | `enum` | `medium` | Effort estimate: `trivial`, `simple`, `moderate`, `complex`, `xl`. Maps to timeout tiers and model selection. |
+| `effort` | `enum` | `m` | Effort estimate: `xs`, `s`, `m`, `l`, `xl`. Maps to timeout tiers. |
+| `capability` | `str` | `moderate` | Complexity tier: `trivial`, `simple`, `moderate`, `complex`. Drives model selection and timeout multipliers. |
 | `parent` | `wikilink` | `null` | Parent PRD ID for containment hierarchy. Creates parent-child relationships for epic decomposition. |
 | `depends_on` | `wikilink[]` | `[]` | PRD IDs that must be `done` before this PRD is actionable. Drives DAG ordering. |
 | `blocks` | `wikilink[]` | `[]` | PRD IDs that this PRD blocks. Inverse of `depends_on` (informational, not enforced). |
 | `tags` | `str[]` | `[]` | Freeform tags for filtering, grouping, and workflow matching. |
-| `capability` | `str` | `null` | Capability domain (e.g., `auth`, `cli`, `observability`). Used by `capability_multipliers` in config. |
-| `workflow` | `str` | `auto` | Explicit workflow override. Bypasses `applies_to` predicate matching. |
-| `impacts` | `str[]` | `[]` | Glob patterns for files this PRD will modify. Relative to repo root. Used for conflict detection and scope. |
-| `pr_url` | `str` | `null` | GitHub PR URL. Set automatically by the `create_pr` builtin. |
-| `branch` | `str` | `null` | Git branch name. Set automatically by `ensure_worktree`. |
-| `created` | `date` | `null` | Creation date in ISO 8601 format. |
-| `updated` | `date` | `null` | Last modification date. Updated by the harness on status transitions. |
-| `assigned_to` | `str` | `null` | GitHub username of the assignee. Informational. |
+| `workflow` | `str` | `null` | Explicit workflow override. Bypasses `applies_to` predicate matching. |
+| `assignee` | `str` | `null` | GitHub username of the assignee. Informational. |
 | `reviewers` | `str[]` | `[]` | GitHub usernames to request review from when creating the PR. |
+| `target_version` | `str` | `null` | Release version this PRD targets. |
+| `impacts` | `str[]` | `[]` | Glob patterns for files this PRD will modify. Relative to repo root. Used for conflict detection and scope. |
+| `created` | `date` | `null` | Creation date in ISO 8601 format. |
+| `updated` | `date` | `null` | Last modification date. Updated by the harness on every save. |
+| `app_version` | `str` | `null` | DarkFactory version that last wrote this file. Stamped automatically on every save. |
 
 ## Status Transitions
 
@@ -65,15 +65,17 @@ PRDs follow a defined lifecycle state machine:
 draft → ready → in-progress → review → done
 ```
 
-Additionally, any status can transition to `blocked` or `cancelled`:
+Additionally, any status can transition to `blocked`, `cancelled`, or `superseded`:
 
 | From | Valid Transitions |
 |------|------------------|
-| `draft` | `ready`, `blocked`, `cancelled` |
-| `ready` | `in-progress`, `blocked`, `cancelled` |
-| `in-progress` | `review`, `blocked`, `cancelled` |
-| `review` | `done`, `blocked`, `cancelled` |
+| `draft` | `ready`, `blocked`, `cancelled`, `superseded` |
+| `ready` | `in-progress`, `blocked`, `cancelled`, `superseded` |
+| `in-progress` | `review`, `blocked`, `cancelled`, `superseded` |
+| `review` | `done`, `blocked`, `cancelled`, `superseded` |
 | `blocked` | `ready` (when blocker is resolved) |
+
+The full set of valid statuses is: `draft`, `ready`, `in-progress`, `review`, `done`, `blocked`, `cancelled`, `superseded`. The terminal statuses (`done`, `superseded`, `cancelled`) are eligible for archiving via `prd archive`.
 
 The harness enforces these transitions. The `set_status` builtin rejects invalid transitions (e.g., `draft` directly to `done`).
 
@@ -87,11 +89,10 @@ Manual edits to the `status` field in a PRD file are not validated until the nex
 |------|-----------|-------------|
 | `epic` | No (unless leaf) | Top-level container. Decomposed by planning workflows into features/tasks. |
 | `feature` | No (unless leaf) | Mid-level grouping. Contains tasks. |
+| `component` | No (unless leaf) | Technology-scoped grouping (e.g., a single service or library). Contains tasks. |
 | `task` | Yes | Leaf-level work item. The agent implements this. |
-| `spike` | Yes | Investigation or research. Agent produces findings. |
-| `bug` | Yes | Defect fix. Agent receives reproduction steps and expected behavior. |
 
-The `is_runnable` predicate: `kind in ("task", "spike", "bug") OR is_leaf(prd)`. A `feature` with no children is treated as executable.
+The `is_runnable` predicate: a PRD is executable if it is a `task` or if it is a leaf node (has no children) regardless of kind. `epic`, `feature`, and `component` PRDs with no children are treated as executable.
 
 ## Full Example
 
@@ -99,20 +100,17 @@ The `is_runnable` predicate: `kind in ("task", "spike", "bug") OR is_leaf(prd)`.
 ---
 id: PRD-042
 title: Add retry logic to task runner
-status: ready
 kind: task
+status: ready
 priority: high
-effort: moderate
+effort: m
+capability: moderate
 parent: "[[PRD-010-epic-runner-v2]]"
 depends_on:
   - "[[PRD-038-config-schema]]"
   - "[[PRD-039-error-types]]"
 blocks:
   - "[[PRD-050-integration-suite]]"
-tags:
-  - reliability
-  - runner
-capability: core
 impacts:
   - "src/darkfactory/runner.py"
   - "src/darkfactory/config.py"
@@ -120,7 +118,12 @@ impacts:
 reviewers:
   - alice
   - bob
-created: 2026-04-01
+created: '2026-04-01'
+updated: '2026-04-01'
+app_version: 0.5.0
+tags:
+  - reliability
+  - runner
 ---
 
 ## Summary

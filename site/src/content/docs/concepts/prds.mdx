@@ -5,7 +5,7 @@ description: PRDs are the atomic unit of work in DarkFactory, encoding what need
 
 import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
 
-A **PRD** is a Markdown file with YAML frontmatter stored in `.darkfactory/prds/`. Each file follows the naming convention `PRD-{id}-{slug}.md` -- for example, `PRD-070-retry-webhook.md`.
+A **PRD** is a Markdown file with YAML frontmatter stored in `.darkfactory/data/prds/`. Each file follows the naming convention `PRD-{id}-{slug}.md` -- for example, `PRD-070-retry-webhook.md`.
 
 ## Frontmatter Schema
 
@@ -63,7 +63,8 @@ tags:
 | `reviewers` | `list[str]` | Who should review the PR. |
 | `target_version` | `str \| None` | Release version this PRD targets. |
 | `created` | `date` | When the PRD was created. |
-| `updated` | `date` | When the PRD was last modified. |
+| `updated` | `date` | When the PRD was last modified. Updated automatically on every save. |
+| `app_version` | `str \| None` | DarkFactory version that last wrote this file. Stamped automatically on every save. Not in frontmatter until first save. |
 | `tags` | `list[str]` | Freeform labels for filtering and grouping. |
 
 ### ID Schemes
@@ -144,10 +145,10 @@ The body is passed directly to the agent as its primary task specification. Conc
 
 ## File Organization
 
-All PRDs live in a single flat directory:
+All active PRDs live in a single flat directory:
 
 ```bash frame="terminal" title="PRD directory structure"
-.darkfactory/prds/
+.darkfactory/data/prds/
   PRD-001-project-init.md
   PRD-030-webhook-system.md
   PRD-068-http-client.md
@@ -157,3 +158,5 @@ All PRDs live in a single flat directory:
 ```
 
 The filename must match the pattern `PRD-{id}-{slug}.md`. The loader uses this to derive the `slug` field and cross-reference with the `id` in frontmatter.
+
+PRDs that have reached a terminal state (`done`, `superseded`, `cancelled`) can be moved to `.darkfactory/data/archive/` using `prd archive <PRD-ID>`. Archived PRDs are still visible to read-only commands but are excluded from execution planning.

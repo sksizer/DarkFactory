@@ -26,27 +26,28 @@ The filename follows the pattern `PRD-{id}-{slug}.md` where the slug is derived 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--id` | next flat ID | Explicit PRD ID (e.g. `PRD-42`) |
-| `--kind` | | PRD kind: `epic`, `feature`, `component`, `task` |
-| `--priority` | | Priority: `critical`, `high`, `medium`, `low` |
-| `--effort` | | Estimated effort: `xs`, `s`, `m`, `l`, `xl` |
-| `--capability` | | Implementation complexity: `trivial`, `simple`, `moderate`, `complex` |
+| `--kind` | `task` | PRD kind: `epic`, `feature`, `component`, `task` |
+| `--priority` | `medium` | Priority: `critical`, `high`, `medium`, `low` |
+| `--effort` | `m` | Estimated effort: `xs`, `s`, `m`, `l`, `xl` |
+| `--capability` | `moderate` | Implementation complexity: `trivial`, `simple`, `moderate`, `complex` |
 | `--open` | `false` | Open in `$EDITOR` after creation |
+| `--discuss` | `false` | Launch an interactive Claude Code discussion session after creation. Composes with `--open`: editor opens first. |
 
 ## Examples
 
 ```bash frame="terminal" title="Create a task with defaults"
 $ prd new "Add retry logic to runner"
-Created .darkfactory/prds/PRD-42-add-retry-logic-to-runner.md
+Created .darkfactory/data/prds/PRD-42-add-retry-logic-to-runner.md
 ```
 
 ```bash frame="terminal" title="Create a high-priority feature"
 $ prd new "DAG visualization" --kind feature --priority high --capability moderate
-Created .darkfactory/prds/PRD-43-dag-visualization.md
+Created .darkfactory/data/prds/PRD-43-dag-visualization.md
 ```
 
 ```bash frame="terminal" title="Explicit ID, open in editor"
 $ prd new "Auth refactor" --id PRD-100 --kind epic --open
-Created .darkfactory/prds/PRD-100-auth-refactor.md
+Created .darkfactory/data/prds/PRD-100-auth-refactor.md
 Opening in $EDITOR...
 ```
 

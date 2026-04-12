@@ -41,7 +41,7 @@ import { Tabs, TabItem, Steps, Aside } from '@astrojs/starlight/components';
    ```bash frame="terminal"
    $ prd init
    Created .darkfactory/
-   Created .darkfactory/prds/
+   Created .darkfactory/data/prds/
    Created .darkfactory/config.toml
    ```
 
@@ -52,19 +52,22 @@ import { Tabs, TabItem, Steps, Aside } from '@astrojs/starlight/components';
    ```
    your-project/
    ├── .darkfactory/
-   │   ├── prds/           # Your PRD files (tracked in git)
+   │   ├── data/
+   │   │   ├── prds/       # Your PRD files (tracked in git)
+   │   │   └── archive/    # Archived PRDs (tracked in git)
    │   ├── workflows/      # Custom workflows (optional, tracked)
    │   ├── config.toml     # Project config (optional, tracked)
-   │   ├── worktrees/      # Runtime state (git-ignored)
-   │   ├── transcripts/    # Agent transcripts (git-ignored)
+   │   ├── transcripts/    # Agent transcripts (optional, tracked)
    │   └── events/         # Event logs (git-ignored)
+   ├── .worktrees/         # Git worktrees (git-ignored, at repo root)
+   ├── .harness-transcripts/ # Raw agent output (git-ignored, at repo root)
    └── ... your code ...
    ```
 
 </Steps>
 
 <Aside type="tip">
-  Add `.worktrees/`, `.harness-transcripts/`, and `.darkfactory/events/` to your repo-root `.gitignore`. Only `prds/`, `workflows/`, and `config.toml` under `.darkfactory/` should be tracked.
+  Add `.worktrees/`, `.harness-transcripts/`, and `.darkfactory/events/` to your repo-root `.gitignore`. Track `data/prds/`, `data/archive/`, `workflows/`, and `config.toml` under `.darkfactory/`. The `prd init` command sets this up automatically.
 </Aside>
 
 ## Next step
