@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from darkfactory.utils.git._run import git_run
-from darkfactory.utils.git._types import GitErr, Ok
+from darkfactory.utils.git._types import GitErr, Ok, Timeout
 
 __all__ = [
     "find_local_branches",
@@ -26,7 +26,7 @@ def find_local_branches(prd_id: str, repo_root: Path) -> list[str]:
                 for line in output.splitlines()
                 if line.strip()
             ]
-        case GitErr():
+        case GitErr() | Timeout():
             return []
 
 
@@ -40,5 +40,5 @@ def find_remote_branches(prd_id: str, repo_root: Path) -> list[str]:
     match git_run("branch", "-r", "--list", f"origin/prd/{prd_id}-*", cwd=repo_root):
         case Ok(stdout=output):
             return [line.strip() for line in output.splitlines() if line.strip()]
-        case GitErr():
+        case GitErr() | Timeout():
             return []

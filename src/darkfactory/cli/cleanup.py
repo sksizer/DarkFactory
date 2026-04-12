@@ -9,7 +9,7 @@ from pathlib import Path
 from darkfactory import checks
 from darkfactory.checks import StaleWorktree, find_stale_worktrees, is_safe_to_remove
 from darkfactory.cli._shared import _find_repo_root
-from darkfactory.utils.git import GitErr, Ok, git_run
+from darkfactory.utils.git import GitErr, Ok, Timeout, git_run
 from darkfactory.utils.git.branch import find_local_branches
 from darkfactory.utils.git.worktree import find_stale_worktree_for_prd, remove_worktree
 
@@ -37,7 +37,7 @@ def _orphaned_branch_commit_count(
     match git_run("rev-list", "--count", f"{base}..{branch}", cwd=repo_root):
         case Ok(stdout=output):
             return int(output.strip() or "0")
-        case GitErr():
+        case GitErr() | Timeout():
             return 0
 
 

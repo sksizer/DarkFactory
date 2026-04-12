@@ -8,11 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from darkfactory.utils._result import Ok, Timeout
-
-# Re-export so existing callers can still import from here.
-Ok = Ok
-Timeout = Timeout
+from darkfactory.utils._result import Ok as Ok
+from darkfactory.utils._result import Timeout as Timeout
 
 
 @dataclass(frozen=True)

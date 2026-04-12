@@ -38,7 +38,7 @@ def _branch_exists_local(repo_root: Path, branch: str) -> bool:
     ):
         case Ok():
             return True
-        case GitErr():
+        case GitErr() | Timeout():
             return False
 
 
@@ -148,6 +148,8 @@ def ensure_worktree(ctx: ExecutionContext) -> None:
             pass
         case GitErr(returncode=code, stderr=err):
             raise RuntimeError(f"git worktree add failed (exit {code}):\n{err}")
+        case Timeout(timeout=t):
+            raise RuntimeError(f"git worktree add timed out after {t}s")
 
     ctx.worktree_path = worktree_path
     ctx.cwd = worktree_path

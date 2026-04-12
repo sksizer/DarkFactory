@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 
 from darkfactory.utils.git._run import git_run
-from darkfactory.utils.git._types import CheckResult, GitErr, GitResult, Ok
+from darkfactory.utils.git._types import CheckResult, GitErr, GitResult, Ok, Timeout
 
 __all__ = [
     "diff_quiet",
@@ -52,6 +52,8 @@ def status_other_dirty(paths: list[str], cwd: Path) -> GitResult[list[str]]:
             return Ok(other, stdout=raw)
         case GitErr() as err:
             return err
+        case Timeout(cmd=cmd, timeout=t):
+            return GitErr(-1, "", f"timed out after {t}s", cmd)
 
 
 def resolve_commit_timestamp(commit: str, cwd: Path) -> GitResult[str]:
@@ -64,6 +66,8 @@ def resolve_commit_timestamp(commit: str, cwd: Path) -> GitResult[str]:
             return Ok(raw.strip(), stdout=raw)
         case GitErr() as err:
             return err
+        case Timeout(cmd=cmd, timeout=t):
+            return GitErr(-1, "", f"timed out after {t}s", cmd)
 
 
 def diff_show(paths: list[str], cwd: Path) -> None:

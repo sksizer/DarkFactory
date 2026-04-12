@@ -12,7 +12,7 @@ from typing import Any
 
 from darkfactory.cli._shared import _find_repo_root
 from darkfactory.model import update_frontmatter_field_at
-from darkfactory.utils.git import GitErr, Ok, git_run
+from darkfactory.utils.git import GitErr, Ok, Timeout, git_run
 
 
 def _get_merged_prd_prs() -> list[dict[str, Any]]:
@@ -84,7 +84,7 @@ def _merge_commit_is_ancestor(pr: dict[str, Any], repo_root: Path) -> bool:
     match git_run("merge-base", "--is-ancestor", sha, "HEAD", cwd=repo_root):
         case Ok():
             return True
-        case GitErr():
+        case GitErr() | Timeout():
             return False
 
 

@@ -135,8 +135,8 @@ def _gh_fetch(pr_number: int) -> dict[str, Any]:
     match repo_nwo(cwd=Path(".")):
         case Ok(value=(owner, name)):
             pass
-        case err:
-            raise RuntimeError(f"Failed to get repo owner/name: {err}")
+        case nwo_err:
+            raise RuntimeError(f"Failed to get repo owner/name: {nwo_err}")
 
     variables = {
         "owner": owner,
@@ -146,8 +146,8 @@ def _gh_fetch(pr_number: int) -> dict[str, Any]:
     match graphql_fetch(_GRAPHQL_QUERY, variables, cwd=Path(".")):
         case Ok(value=payload):
             pass
-        case err:
-            raise RuntimeError(f"GraphQL fetch failed: {err}")
+        case gql_err:
+            raise RuntimeError(f"GraphQL fetch failed: {gql_err}")
 
     pr = payload["data"]["repository"]["pullRequest"]
 
@@ -394,8 +394,7 @@ def post_comment_replies(
         body = prefix + reply.body
 
         endpoint = (
-            f"repos/{{owner}}/{{repo}}/pulls/{pr_number}"
-            f"/comments/{target_id}/replies"
+            f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/comments/{target_id}/replies"
         )
 
         match post_reply(endpoint, body, cwd=repo_root):

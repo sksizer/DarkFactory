@@ -6,9 +6,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from darkfactory.utils._result import Ok
+from darkfactory.utils._result import Ok, Timeout
 from darkfactory.utils.github._cli import gh_json, gh_run
 from darkfactory.utils.github._types import GhCheckResult, GhErr, GhResult
+
+
+def _timeout_to_gherr(t: Timeout) -> GhErr:
+    return GhErr(-1, "", f"timed out after {t.timeout}s", t.cmd)
 
 
 @dataclass(frozen=True)
@@ -45,7 +49,9 @@ def get_pr_state(
             return Ok("NONE")
         case Ok():
             return GhErr(-1, "", "unexpected response format", ["gh", "pr", "list"])
-        case err:
+        case Timeout() as t:
+            return _timeout_to_gherr(t)
+        case GhErr() as err:
             return err
 
 
@@ -86,7 +92,9 @@ def fetch_all_pr_states(
             return Ok(states)
         case Ok():
             return GhErr(-1, "", "unexpected response format", ["gh", "pr", "list"])
-        case err:
+        case Timeout() as t:
+            return _timeout_to_gherr(t)
+        case GhErr() as err:
             return err
 
 
@@ -110,7 +118,9 @@ def get_resume_pr_state(branch: str, repo_root: Path) -> GhResult[list[dict[str,
             return Ok(prs)
         case Ok():
             return GhErr(-1, "", "unexpected response format", ["gh", "pr", "list"])
-        case err:
+        case Timeout() as t:
+            return _timeout_to_gherr(t)
+        case GhErr() as err:
             return err
 
 
@@ -130,7 +140,9 @@ def create_pr(base: str, title: str, body_path: str, cwd: Path) -> GhResult[str]
         case Ok(stdout=raw):
             url_line = raw.strip().splitlines()[-1] if raw.strip() else ""
             return Ok(url_line, stdout=raw)
-        case err:
+        case Timeout() as t:
+            return _timeout_to_gherr(t)
+        case GhErr() as err:
             return err
 
 
@@ -161,7 +173,9 @@ def list_open_prs(repo_root: Path, *, limit: int = 100) -> GhResult[list[PrInfo]
                 return GhErr(-1, "", str(exc), ["gh", "pr", "list"])
         case Ok():
             return GhErr(-1, "", "unexpected response format", ["gh", "pr", "list"])
-        case err:
+        case Timeout() as t:
+            return _timeout_to_gherr(t)
+        case GhErr() as err:
             return err
 
 

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from darkfactory.checks import StaleWorktree
 from darkfactory.utils.git._run import git_run
-from darkfactory.utils.git._types import GitErr, Ok
+from darkfactory.utils.git._types import GitErr, Ok, Timeout
 
 __all__ = [
     "find_worktree_for_prd",

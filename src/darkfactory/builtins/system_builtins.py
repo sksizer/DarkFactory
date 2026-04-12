@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Callable
 
 from darkfactory import containment, model as model_module
-from darkfactory.utils.git import GitErr, Ok, git_run
+from darkfactory.utils.git import GitErr, Ok, Timeout, git_run
 from darkfactory.model import compute_branch_name
 from darkfactory.system import SystemContext
 
@@ -112,7 +112,7 @@ def _is_merged_standard(repo_root: str, branch: str) -> bool:
     ):
         case Ok(stdout=output):
             return bool(output.strip())
-        case GitErr():
+        case GitErr() | Timeout():
             return False
 
 
@@ -127,7 +127,7 @@ def _is_merged_squash(repo_root: str, branch: str) -> bool:
     match git_run("log", "main", "--oneline", f"--grep={branch}", cwd=Path(repo_root)):
         case Ok(stdout=output):
             return bool(output.strip())
-        case GitErr():
+        case GitErr() | Timeout():
             return False
 
 
