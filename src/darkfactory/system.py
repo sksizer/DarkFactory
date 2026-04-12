@@ -14,11 +14,13 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
+from .engine import PhaseState
 from .workflow import Task
 
 if TYPE_CHECKING:
+    from .event_log import EventWriter
     from .model import PRD
 
 
@@ -65,8 +67,8 @@ class SystemContext:
     :attr:`report` accumulates human-readable output lines produced by tasks
     during the run.
 
-    :attr:`_shared_state` is an escape hatch for tasks that need to pass
-    arbitrary data to downstream tasks without adding new typed fields.
+    :attr:`state` is a typed inter-task data registry that replaces the
+    former ``_shared_state`` dict.
     """
 
     repo_root: Path
@@ -81,7 +83,8 @@ class SystemContext:
     report: list[str] = field(default_factory=list)
     pr_url: str | None = None
     target_prd: str | None = None
-    _shared_state: dict[str, Any] = field(default_factory=dict)
+    state: PhaseState = field(default_factory=PhaseState)
+    event_writer: "EventWriter | None" = None
 
     def find_prd_file(self) -> Path:
         """Resolve the file path for the target PRD."""

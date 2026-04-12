@@ -9,15 +9,16 @@ from darkfactory.builtins.summarize_agent_run import (
     _format_tool_counts,
     summarize_agent_run,
 )
+from darkfactory.engine import AgentResult, PhaseState
 
 
-def _make_ctx(*, invoke_count: int = 1, last_invoke_result: object = None) -> MagicMock:
+def _make_ctx(*, agent_result: AgentResult | None = None) -> MagicMock:
     ctx = MagicMock()
-    ctx.invoke_count = invoke_count
-    ctx.last_invoke_result = last_invoke_result
-    ctx.model = "claude-test"
+    ctx.state = PhaseState()
     ctx.workflow.name = "test-workflow"
     ctx.run_summary = None
+    if agent_result is not None:
+        ctx.state.put(agent_result)
     return ctx
 
 
@@ -25,7 +26,7 @@ def _make_ctx(*, invoke_count: int = 1, last_invoke_result: object = None) -> Ma
 
 
 def test_no_last_invoke_result_returns_early() -> None:
-    ctx = _make_ctx(last_invoke_result=None)
+    ctx = _make_ctx()
     summarize_agent_run(ctx)
     assert ctx.run_summary is None
 
@@ -34,10 +35,17 @@ def test_no_last_invoke_result_returns_early() -> None:
 
 
 def test_successful_run_sets_run_summary() -> None:
-    result = MagicMock()
-    result.tool_counts = {"Read": 5, "Edit": 3}
-    result.sentinel = "PRD_EXECUTE_OK: PRD-999"
-    ctx = _make_ctx(invoke_count=2, last_invoke_result=result)
+    result = AgentResult(
+        stdout="",
+        stderr="",
+        exit_code=0,
+        success=True,
+        tool_counts={"Read": 5, "Edit": 3},
+        sentinel="PRD_EXECUTE_OK: PRD-999",
+        model="claude-test",
+        invoke_count=2,
+    )
+    ctx = _make_ctx(agent_result=result)
 
     summarize_agent_run(ctx)
 
@@ -51,10 +59,17 @@ def test_successful_run_sets_run_summary() -> None:
 
 
 def test_run_summary_with_no_tools_shows_none() -> None:
-    result = MagicMock()
-    result.tool_counts = {}
-    result.sentinel = None
-    ctx = _make_ctx(invoke_count=1, last_invoke_result=result)
+    result = AgentResult(
+        stdout="",
+        stderr="",
+        exit_code=0,
+        success=True,
+        tool_counts={},
+        sentinel=None,
+        model="claude-test",
+        invoke_count=1,
+    )
+    ctx = _make_ctx(agent_result=result)
 
     summarize_agent_run(ctx)
 
@@ -81,15 +96,31 @@ def test_format_tool_counts_single_entry() -> None:
 
 
 def test_format_invocations_zero() -> None:
-    ctx = _make_ctx(invoke_count=0)
+    ctx = _make_ctx()
     assert _format_invocations(ctx) == "0"
 
 
 def test_format_invocations_one() -> None:
-    ctx = _make_ctx(invoke_count=1)
+    ctx = _make_ctx(
+        agent_result=AgentResult(
+            stdout="",
+            stderr="",
+            exit_code=0,
+            success=True,
+            invoke_count=1,
+        )
+    )
     assert _format_invocations(ctx) == "1"
 
 
 def test_format_invocations_many() -> None:
-    ctx = _make_ctx(invoke_count=7)
+    ctx = _make_ctx(
+        agent_result=AgentResult(
+            stdout="",
+            stderr="",
+            exit_code=0,
+            success=True,
+            invoke_count=7,
+        )
+    )
     assert _format_invocations(ctx) == "7"

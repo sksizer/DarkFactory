@@ -19,6 +19,7 @@ from darkfactory.builtins.system_builtins import (
     system_load_review_prds,
 )
 from darkfactory.model import PRD, parse_prd
+from darkfactory.engine import CandidateList
 from darkfactory.system import SystemContext, SystemOperation
 
 from tests.conftest import write_prd
@@ -47,8 +48,10 @@ def _make_ctx(
         dry_run=dry_run,
         targets=targets or [],
     )
-    if shared_state:
-        ctx._shared_state.update(shared_state)
+    if shared_state and "candidates" in shared_state:
+        candidates = shared_state["candidates"]
+        assert isinstance(candidates, list)
+        ctx.state.put(CandidateList(prd_ids=candidates))
     return ctx
 
 
@@ -192,7 +195,7 @@ def test_system_load_prds_by_status_filters_correctly(tmp_path: Path) -> None:
 
     system_load_prds_by_status(ctx, status="review")
 
-    assert set(ctx._shared_state["candidates"]) == {"PRD-40", "PRD-41"}
+    assert set(ctx.state.get(CandidateList).prd_ids) == {"PRD-40", "PRD-41"}
 
 
 def test_system_load_prds_by_status_empty_result(tmp_path: Path) -> None:
@@ -201,7 +204,7 @@ def test_system_load_prds_by_status_empty_result(tmp_path: Path) -> None:
 
     system_load_prds_by_status(ctx, status="ready")
 
-    assert ctx._shared_state["candidates"] == []
+    assert ctx.state.get(CandidateList).prd_ids == []
 
 
 def test_system_load_prds_by_status_stores_in_shared_state(tmp_path: Path) -> None:
@@ -210,8 +213,8 @@ def test_system_load_prds_by_status_stores_in_shared_state(tmp_path: Path) -> No
 
     system_load_prds_by_status(ctx, status="ready")
 
-    assert "candidates" in ctx._shared_state
-    assert "PRD-51" in ctx._shared_state["candidates"]
+    assert ctx.state.has(CandidateList)
+    assert "PRD-51" in ctx.state.get(CandidateList).prd_ids
 
 
 def test_system_load_review_prds_uses_review_status(tmp_path: Path) -> None:
@@ -222,7 +225,7 @@ def test_system_load_review_prds_uses_review_status(tmp_path: Path) -> None:
 
     system_load_review_prds(ctx)
 
-    assert ctx._shared_state["candidates"] == ["PRD-52"]
+    assert ctx.state.get(CandidateList).prd_ids == ["PRD-52"]
 
 
 # ---------- system_check_merged — standard merge ----------

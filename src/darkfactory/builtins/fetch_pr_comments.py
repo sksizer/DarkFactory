@@ -1,4 +1,4 @@
-"""Built-in: fetch_pr_comments — load unresolved PR review threads into context."""
+"""Built-in: fetch_pr_comments — load unresolved PR review threads into PhaseState."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import logging
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
+from darkfactory.engine import ReworkState
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -14,48 +15,68 @@ _log = logging.getLogger(__name__)
 
 @builtin("fetch_pr_comments")
 def fetch_pr_comments(ctx: ExecutionContext) -> None:
-    """Fetch unresolved PR review threads and store them on the context.
+    """Fetch unresolved PR review threads and store them in PhaseState.
 
-    If ``ctx.review_threads`` is already populated (e.g. pre-fetched by
-    ``cmd_rework --execute``), this is a no-op — threads are used as-is.
+    If ``ReworkState`` already has ``review_threads`` populated (e.g.
+    pre-fetched by ``cmd_rework --execute``), this is a no-op.
 
-    When threads are not yet fetched, ``ctx.pr_number`` must be set.
-    The builtin calls ``pr_comments.fetch_pr_comments`` to retrieve all
-    unresolved threads via the ``gh`` CLI and stores the result on
-    ``ctx.review_threads``.
+    When threads are not yet fetched, ``pr_number`` must be set in
+    ``ReworkState``. The builtin calls ``pr_comments.fetch_pr_comments``
+    to retrieve all unresolved threads and updates ``ReworkState``.
     """
-    if ctx.review_threads is not None:
+    rework = ctx.state.get(ReworkState, ReworkState())
+
+    if rework.review_threads is not None:
         _log.debug(
             "fetch_pr_comments: %d thread(s) already loaded, skipping fetch",
-            len(ctx.review_threads),
+            len(rework.review_threads),
         )
         return
 
-    pr_label = f"#{ctx.pr_number}" if ctx.pr_number is not None else "<pr>"
+    pr_label = f"#{rework.pr_number}" if rework.pr_number is not None else "<pr>"
     if _log_dry_run(ctx, f"would fetch PR comments for {pr_label}"):
-        ctx.review_threads = []
+        ctx.state.put(
+            ReworkState(
+                pr_number=rework.pr_number,
+                review_threads=[],
+                reply_to_comments=rework.reply_to_comments,
+                comment_filters=rework.comment_filters,
+            )
+        )
         return
 
-    if ctx.pr_number is None:
+    if rework.pr_number is None:
         raise RuntimeError(
-            "fetch_pr_comments builtin: ctx.pr_number must be set before "
+            "fetch_pr_comments builtin: pr_number must be set in ReworkState before "
             "this builtin can fetch PR review threads"
         )
 
     from darkfactory.pr_comments import CommentFilters
     from darkfactory.pr_comments import fetch_pr_comments as _fetch
 
-    threads = _fetch(ctx.pr_number, filters=CommentFilters())
-    ctx.review_threads = threads
+    effective_filters = (
+        rework.comment_filters
+        if rework.comment_filters is not None
+        else CommentFilters()
+    )
+    threads = _fetch(rework.pr_number, filters=effective_filters)
+    ctx.state.put(
+        ReworkState(
+            pr_number=rework.pr_number,
+            review_threads=threads,
+            reply_to_comments=rework.reply_to_comments,
+            comment_filters=effective_filters,
+        )
+    )
     _log.info(
         "fetch_pr_comments: fetched %d thread(s) for PR #%d",
         len(threads),
-        ctx.pr_number,
+        rework.pr_number,
     )
 
     emit_builtin_effect(
         ctx,
         "fetch_pr_comments",
         "fetch",
-        detail={"pr_number": ctx.pr_number, "thread_count": len(threads)},
+        detail={"pr_number": rework.pr_number, "thread_count": len(threads)},
     )

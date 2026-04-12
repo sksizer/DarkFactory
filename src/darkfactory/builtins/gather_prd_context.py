@@ -1,9 +1,10 @@
-"""System builtin: gather_prd_context — read target PRD and related PRDs into shared state."""
+"""System builtin: gather_prd_context — read target PRD and related PRDs into PhaseState."""
 
 from __future__ import annotations
 
 from darkfactory.builtins.system_builtins import _register
 from darkfactory.model import PRD
+from darkfactory.engine import PrdContext
 from darkfactory.system import SystemContext
 
 
@@ -22,7 +23,7 @@ def _format_prd_ref(prd: PRD) -> str:
 
 @_register("gather_prd_context")
 def gather_prd_context(ctx: SystemContext) -> None:
-    """Read the target PRD file plus parent and dependencies, store context in shared state."""
+    """Read the target PRD file plus parent and dependencies, store context in PhaseState."""
     if not ctx.target_prd:
         raise ValueError("gather_prd_context requires ctx.target_prd to be set")
 
@@ -41,24 +42,37 @@ def gather_prd_context(ctx: SystemContext) -> None:
     lines.append("### Body")
     lines.append(prd.body)
 
+    parent_ref: str | None = None
     if prd.parent:
         lines.append("")
         lines.append("## Parent")
         parent = ctx.prds.get(prd.parent)
         if parent:
-            lines.append(_format_prd_ref(parent))
+            parent_ref = _format_prd_ref(parent)
+            lines.append(parent_ref)
         else:
             lines.append(f"- {prd.parent}: (not found)")
 
+    dep_refs: list[str] = []
     if prd.depends_on:
         lines.append("")
         lines.append("## Dependencies")
         for dep_id in prd.depends_on:
             dep = ctx.prds.get(dep_id)
             if dep:
-                lines.append(_format_prd_ref(dep))
+                ref = _format_prd_ref(dep)
+                dep_refs.append(ref)
+                lines.append(ref)
             else:
                 lines.append(f"- {dep_id}: (not found)")
 
-    ctx._shared_state["prd_context"] = "\n".join(lines)
+    body = "\n".join(lines)
+    ctx.state.put(
+        PrdContext(
+            summary=prd.title,
+            body=body,
+            parent_ref=parent_ref,
+            dependency_refs=tuple(dep_refs),
+        )
+    )
     ctx.logger.info("gather_prd_context: collected context for %s", ctx.target_prd)

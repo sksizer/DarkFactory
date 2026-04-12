@@ -31,14 +31,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
+from .engine import PhaseState
 from .utils.claude_code import EffortLevel
 
 if TYPE_CHECKING:
     from filelock import FileLock
 
     from .event_log import EventWriter
-    from .invoke import InvokeResult
-    from .pr_comments import CommentFilters, ReviewThread
     from .model import PRD
 
 
@@ -175,6 +174,23 @@ class ShellTask(Task):
     env: dict[str, str] = field(default_factory=dict)
 
 
+@dataclass
+class InteractiveTask(Task):
+    """Launch an interactive Claude Code session that takes over the terminal.
+
+    Unlike :class:`AgentTask` (headless, sentinel-parsed), an
+    ``InteractiveTask`` calls :func:`~darkfactory.utils.claude_code.spawn_claude`
+    which hands the terminal to the user. Used for discussion and
+    critique phases where the agent and human collaborate interactively.
+    """
+
+    name: str = "interactive"
+    prompt_file: str = ""
+    tools: list[str] = field(default_factory=list)
+    model: str | None = None
+    effort_level: EffortLevel | None = None
+
+
 # ---------- Workflow ----------
 
 
@@ -242,27 +258,14 @@ class ExecutionContext:
     branch_name: str
     worktree_path: Path | None = None
     cwd: Path = field(default_factory=Path.cwd)
-    agent_output: str | None = None
-    agent_success: bool = False
     pr_url: str | None = None
     run_summary: str | None = None
-    last_invoke_result: "InvokeResult | None" = None
-    model: str | None = None
-    invoke_count: int = 0
     dry_run: bool = True
     logger: logging.Logger = field(
         default_factory=lambda: logging.getLogger("darkfactory")
     )
     event_writer: "EventWriter | None" = None
-    # Rework-specific fields — populated by the CLI (via run_workflow's
-    # ``context_overrides`` dict) or by the ``resolve_rework_context``
-    # builtin running as the first task in the rework workflow. When set
-    # before the workflow starts, the builtin treats the state as
-    # pre-discovered and skips its own ``gh``/``git`` round-trips.
-    pr_number: int | None = None
-    review_threads: "list[ReviewThread] | None" = None
-    reply_to_comments: bool = False
-    comment_filters: "CommentFilters | None" = None
+    state: PhaseState = field(default_factory=PhaseState)
 
     # Advisory process-level lock held by ensure_worktree for the
     # lifetime of this run. Managed by builtins + runner; tests should

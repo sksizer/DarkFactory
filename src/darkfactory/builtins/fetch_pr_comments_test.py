@@ -14,6 +14,7 @@ from unittest.mock import patch
 import pytest
 
 from darkfactory.builtins.fetch_pr_comments import fetch_pr_comments as builtin_fn
+from darkfactory.engine import ReworkState
 from darkfactory.pr_comments import ReviewThread
 from darkfactory.model import PRD
 from darkfactory.workflow import ExecutionContext, Workflow
@@ -67,16 +68,21 @@ def _make_ctx(
     review_threads: list[ReviewThread] | None = None,
     dry_run: bool = False,
 ) -> ExecutionContext:
-    return ExecutionContext(
+    ctx = ExecutionContext(
         prd=_make_prd(),
         repo_root=tmp_path,
         workflow=Workflow(name="rework", tasks=[]),
         base_ref="main",
         branch_name="prd/PRD-001-my-feature",
-        pr_number=pr_number,
-        review_threads=review_threads,
         dry_run=dry_run,
     )
+    ctx.state.put(
+        ReworkState(
+            pr_number=pr_number,
+            review_threads=review_threads,
+        )
+    )
+    return ctx
 
 
 def test_noop_when_preloaded(tmp_path: Path) -> None:
@@ -88,14 +94,14 @@ def test_noop_when_preloaded(tmp_path: Path) -> None:
         builtin_fn(ctx)
         mock_fetch.assert_not_called()
 
-    assert ctx.review_threads is threads
+    assert ctx.state.get(ReworkState).review_threads is threads
 
 
 def test_dry_run_sets_empty_threads(tmp_path: Path) -> None:
     """In dry-run, ``review_threads`` is set to ``[]`` without calling gh."""
     ctx = _make_ctx(tmp_path, pr_number=42, dry_run=True)
     builtin_fn(ctx)
-    assert ctx.review_threads == []
+    assert ctx.state.get(ReworkState).review_threads == []
 
 
 def test_fetches_when_pr_number_set(tmp_path: Path) -> None:
@@ -110,7 +116,7 @@ def test_fetches_when_pr_number_set(tmp_path: Path) -> None:
         assert mock_fetch.call_count == 1
         assert mock_fetch.call_args.args[0] == 42
 
-    assert ctx.review_threads == fetched
+    assert ctx.state.get(ReworkState).review_threads == fetched
 
 
 def test_raises_without_pr_number(tmp_path: Path) -> None:
