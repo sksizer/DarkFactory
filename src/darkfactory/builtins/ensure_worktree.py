@@ -10,7 +10,7 @@ from filelock import FileLock, Timeout
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.checks import is_resume_safe
-from darkfactory.git_ops import git_check, git_probe, git_run
+from darkfactory.utils.git import GitErr, GitTimeout, Ok, git_probe, git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -27,13 +27,17 @@ def _worktree_target(ctx: ExecutionContext) -> Path:
 
 def _branch_exists_local(repo_root: Path, branch: str) -> bool:
     """Return True if ``branch`` exists in the local repo's refs."""
-    return git_check(
+    match git_run(
         "rev-parse",
         "--verify",
         "--quiet",
         f"refs/heads/{branch}",
         cwd=repo_root,
-    )
+    ):
+        case Ok():
+            return True
+        case GitErr():
+            return False
 
 
 def _branch_exists_remote(repo_root: Path, branch: str) -> bool:
@@ -42,13 +46,20 @@ def _branch_exists_remote(repo_root: Path, branch: str) -> bool:
     Best-effort: returns False (and logs a warning) on timeout or any
     subprocess error so the caller can fall back to the local check.
     """
-    return git_probe(
+    match git_probe(
         "ls-remote",
         "--exit-code",
         "origin",
         f"refs/heads/{branch}",
         cwd=repo_root,
-    )
+    ):
+        case Ok():
+            return True
+        case GitTimeout(timeout=t):
+            _log.warning("ls-remote timed out after %ds", t)
+            return False
+        case GitErr():
+            return False
 
 
 @builtin("ensure_worktree")
@@ -121,7 +132,7 @@ def ensure_worktree(ctx: ExecutionContext) -> None:
 
     # git worktree add -b <branch> <path> <base>
     # Run from the repo root, not from ctx.cwd (which may not be a git dir yet).
-    git_run(
+    match git_run(
         "worktree",
         "add",
         "-b",
@@ -129,7 +140,11 @@ def ensure_worktree(ctx: ExecutionContext) -> None:
         str(worktree_path),
         ctx.base_ref,
         cwd=ctx.repo_root,
-    )
+    ):
+        case Ok():
+            pass
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(f"git worktree add failed (exit {code}):\n{err}")
 
     ctx.worktree_path = worktree_path
     ctx.cwd = worktree_path

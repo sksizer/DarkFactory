@@ -110,7 +110,7 @@ def test_fast_forward_calls_git_merge(tmp_path: Path) -> None:
             "darkfactory.builtins.fast_forward_branch._get_head_sha",
             side_effect=["aaa00001", "bbb00002"],
         ),
-        patch("darkfactory.git_ops.subprocess.run") as mock_git,
+        patch("darkfactory.utils.git._run.subprocess.run") as mock_git,
     ):
         mock_git.return_value = _ok()
         fast_forward_branch(ctx)
@@ -137,7 +137,7 @@ def test_fast_forward_emits_builtin_effect(tmp_path: Path) -> None:
             "darkfactory.builtins.fast_forward_branch._get_head_sha",
             side_effect=["aaa00001", "bbb00002"],
         ),
-        patch("darkfactory.git_ops.subprocess.run", return_value=_ok()),
+        patch("darkfactory.utils.git._run.subprocess.run", return_value=_ok()),
     ):
         fast_forward_branch(ctx)
 
@@ -185,7 +185,7 @@ def test_up_to_date_does_not_call_merge(tmp_path: Path) -> None:
             "darkfactory.builtins.fast_forward_branch._check_divergence",
             return_value=(0, 0),
         ),
-        patch("darkfactory.git_ops.subprocess.run") as mock_git,
+        patch("darkfactory.utils.git._run.subprocess.run") as mock_git,
     ):
         fast_forward_branch(ctx)
 

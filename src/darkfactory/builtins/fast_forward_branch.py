@@ -14,7 +14,7 @@ from pathlib import Path
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
-from darkfactory.git_ops import git_run
+from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -167,7 +167,11 @@ def fast_forward_branch(
 
     # ahead == 0, behind > 0: fast-forward
     old_sha = _get_head_sha(cwd)
-    git_run("merge", "--ff-only", f"origin/{branch}", cwd=cwd)
+    match git_run("merge", "--ff-only", f"origin/{branch}", cwd=cwd):
+        case Ok():
+            pass
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(f"git merge --ff-only failed (exit {code}):\n{err}")
     new_sha = _get_head_sha(cwd)
 
     _log.info(

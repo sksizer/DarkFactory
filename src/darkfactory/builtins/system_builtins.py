@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Callable
 
 from darkfactory import containment, model as model_module
-from darkfactory.git_ops import git_run
+from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.model import compute_branch_name
 from darkfactory.system import SystemContext
 
@@ -101,14 +101,19 @@ def _is_merged_standard(repo_root: str, branch: str) -> bool:
     """Return True if ``branch`` (local or remote) is listed in ``git branch --merged main``."""
     cwd = Path(repo_root)
     # Check local branch merged into main
-    result = git_run("branch", "--merged", "main", "--list", branch, cwd=cwd)
-    if result.stdout.strip():
-        return True
+    match git_run("branch", "--merged", "main", "--list", branch, cwd=cwd):
+        case Ok(stdout=output) if output.strip():
+            return True
+        case _:
+            pass
     # Check remote branch
-    result = git_run(
+    match git_run(
         "branch", "-r", "--merged", "main", "--list", f"origin/{branch}", cwd=cwd
-    )
-    return bool(result.stdout.strip())
+    ):
+        case Ok(stdout=output):
+            return bool(output.strip())
+        case GitErr():
+            return False
 
 
 def _is_merged_squash(repo_root: str, branch: str) -> bool:
@@ -119,10 +124,13 @@ def _is_merged_squash(repo_root: str, branch: str) -> bool:
     A more reliable signal is the ``prd/PRD-X-slug`` pattern that GitHub
     appends to squash-merge commit messages when auto-generated.
     """
-    result = git_run(
+    match git_run(
         "log", "main", "--oneline", f"--grep={branch}", cwd=Path(repo_root)
-    )
-    return bool(result.stdout.strip())
+    ):
+        case Ok(stdout=output):
+            return bool(output.strip())
+        case GitErr():
+            return False
 
 
 @_register("system_check_merged")

@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import argparse
 import re
-import subprocess
 from pathlib import Path
 
 from darkfactory import checks
 from darkfactory.checks import StaleWorktree, find_stale_worktrees, is_safe_to_remove
 from darkfactory.cli._shared import _find_repo_root
-from darkfactory.git_ops import git_check, git_run
+from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.utils.git.branch import find_local_branches
 from darkfactory.utils.git.worktree import find_stale_worktree_for_prd, remove_worktree
 
@@ -35,11 +34,11 @@ def _orphaned_branch_commit_count(
     branch: str, repo_root: Path, base: str = "main"
 ) -> int:
     """Count commits on *branch* ahead of *base*."""
-    try:
-        result = git_run("rev-list", "--count", f"{base}..{branch}", cwd=repo_root)
-        return int(result.stdout.strip() or "0")
-    except subprocess.CalledProcessError:
-        return 0
+    match git_run("rev-list", "--count", f"{base}..{branch}", cwd=repo_root):
+        case Ok(stdout=output):
+            return int(output.strip() or "0")
+        case GitErr():
+            return 0
 
 
 def _cleanup_single(prd_id: str, force: bool, repo_root: Path) -> int:
@@ -58,8 +57,12 @@ def _cleanup_single(prd_id: str, force: bool, repo_root: Path) -> int:
             )
             return 1
         # Prune any stale git worktree bookkeeping for the missing directory.
-        git_check("worktree", "prune", cwd=repo_root)
-        git_run("branch", "-D", orphaned, cwd=repo_root)
+        git_run("worktree", "prune", cwd=repo_root)
+        match git_run("branch", "-D", orphaned, cwd=repo_root):
+            case Ok():
+                pass
+            case GitErr(returncode=code, stderr=err):
+                raise RuntimeError(f"git branch -D failed (exit {code}):\n{err}")
         label = f"orphaned branch '{orphaned}'"
         if ahead > 0:
             label += f" ({ahead} commit(s) ahead of main)"

@@ -261,7 +261,7 @@ def test_cleanup_orphaned_branch_no_commits_force(
             return_value="prd/PRD-001-my-feature",
         ),
         patch("darkfactory.cli.cleanup._orphaned_branch_commit_count", return_value=0),
-        patch("darkfactory.git_ops.subprocess.run") as mock_run,
+        patch("darkfactory.utils.git._run.subprocess.run") as mock_run,
     ):
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = ""
@@ -309,7 +309,7 @@ def test_cleanup_orphaned_branch_with_commits_force_succeeds(
             return_value="prd/PRD-001-my-feature",
         ),
         patch("darkfactory.cli.cleanup._orphaned_branch_commit_count", return_value=5),
-        patch("darkfactory.git_ops.subprocess.run") as mock_run,
+        patch("darkfactory.utils.git._run.subprocess.run") as mock_run,
     ):
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = ""
@@ -352,7 +352,7 @@ def test_cleanup_orphaned_branch_no_commits_without_force(
             return_value="prd/PRD-001-my-feature",
         ),
         patch("darkfactory.cli.cleanup._orphaned_branch_commit_count", return_value=0),
-        patch("darkfactory.git_ops.subprocess.run") as mock_run,
+        patch("darkfactory.utils.git._run.subprocess.run") as mock_run,
     ):
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = ""

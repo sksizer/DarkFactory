@@ -9,14 +9,13 @@ and either warns (below threshold) or raises :class:`RuntimeError`
 from __future__ import annotations
 
 import logging
-import subprocess
 from pathlib import Path
 
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.event_log import emit_task_event
-from darkfactory.git_ops import git_run
 from darkfactory.rework_guard import ReworkGuard
+from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -28,11 +27,11 @@ def _has_changes(cwd: str) -> bool:
     Returns False if the directory is not a git worktree or git errors for any
     reason, preserving the original non-raising semantics.
     """
-    try:
-        result = git_run("status", "--porcelain", cwd=Path(cwd))
-        return bool(result.stdout.strip())
-    except subprocess.CalledProcessError:
-        return False
+    match git_run("status", "--porcelain", cwd=Path(cwd)):
+        case Ok(stdout=output):
+            return bool(output.strip())
+        case GitErr():
+            return False
 
 
 @builtin("check_rework_guard")

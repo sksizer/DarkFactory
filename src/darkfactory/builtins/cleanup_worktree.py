@@ -6,7 +6,7 @@ import logging
 
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run
-from darkfactory.git_ops import git_run
+from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -34,4 +34,8 @@ def cleanup_worktree(ctx: ExecutionContext) -> None:
     if _log_dry_run(ctx, f"git -C {ctx.repo_root} worktree remove {ctx.worktree_path}"):
         return
 
-    git_run("worktree", "remove", str(ctx.worktree_path), cwd=ctx.repo_root)
+    match git_run("worktree", "remove", str(ctx.worktree_path), cwd=ctx.repo_root):
+        case Ok():
+            pass
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(f"git worktree remove failed (exit {code}):\n{err}")

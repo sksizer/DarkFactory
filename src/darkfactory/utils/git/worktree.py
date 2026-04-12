@@ -7,11 +7,11 @@ and for worktree/branch removal operations shared across CLI commands.
 from __future__ import annotations
 
 import re
-import subprocess
 from pathlib import Path
 
 from darkfactory.checks import StaleWorktree
-from darkfactory.git_ops import git_check, git_run
+from darkfactory.utils.git._run import git_run
+from darkfactory.utils.git._types import GitErr, Ok
 
 __all__ = [
     "find_worktree_for_prd",
@@ -43,19 +43,19 @@ def find_worktree_for_prd(prd_id: str, repo_root: Path) -> Path | None:
     union of both strategies.
     """
     # Strategy 1: git worktree list --porcelain
-    try:
-        result = git_run("worktree", "list", "--porcelain", cwd=repo_root)
-        current_path: str | None = None
-        for line in result.stdout.splitlines():
-            if line.startswith("worktree "):
-                current_path = line[len("worktree ") :]
-            elif line.startswith("branch "):
-                branch_ref = line[len("branch ") :]
-                branch = branch_ref.removeprefix("refs/heads/")
-                if re.match(rf"^prd/{re.escape(prd_id)}-", branch):
-                    return Path(current_path) if current_path else None
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pass
+    match git_run("worktree", "list", "--porcelain", cwd=repo_root):
+        case Ok(stdout=output):
+            current_path: str | None = None
+            for line in output.splitlines():
+                if line.startswith("worktree "):
+                    current_path = line[len("worktree ") :]
+                elif line.startswith("branch "):
+                    branch_ref = line[len("branch ") :]
+                    branch = branch_ref.removeprefix("refs/heads/")
+                    if re.match(rf"^prd/{re.escape(prd_id)}-", branch):
+                        return Path(current_path) if current_path else None
+        case GitErr():
+            pass
 
     # Strategy 2: .worktrees/ directory scan
     worktrees_dir = repo_root / ".worktrees"
@@ -79,30 +79,31 @@ def _find_worktree_path_and_branch_for_prd(
     preserved even when the worktree directory name does not match the branch
     suffix.
     """
-    try:
-        result = git_run("worktree", "list", "--porcelain", cwd=repo_root)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return None
+    match git_run("worktree", "list", "--porcelain", cwd=repo_root):
+        case Ok(stdout=output):
+            pass
+        case GitErr():
+            return None
 
     worktree_path: Path | None = None
-    branch: str | None = None
+    branch_name: str | None = None
 
-    for line in result.stdout.splitlines() + [""]:
+    for line in output.splitlines() + [""]:
         if not line:
             if (
                 worktree_path is not None
-                and branch is not None
-                and re.fullmatch(rf"prd/{re.escape(prd_id)}-[^/]+", branch)
+                and branch_name is not None
+                and re.fullmatch(rf"prd/{re.escape(prd_id)}-[^/]+", branch_name)
             ):
-                return worktree_path, branch
+                return worktree_path, branch_name
             worktree_path = None
-            branch = None
+            branch_name = None
             continue
 
         if line.startswith("worktree "):
             worktree_path = Path(line.removeprefix("worktree ").strip())
         elif line.startswith("branch refs/heads/"):
-            branch = line.removeprefix("branch refs/heads/").strip()
+            branch_name = line.removeprefix("branch refs/heads/").strip()
 
     return None
 
@@ -116,9 +117,9 @@ def find_stale_worktree_for_prd(prd_id: str, repo_root: Path) -> StaleWorktree |
     """
     from darkfactory import checks
 
-    match = _find_worktree_path_and_branch_for_prd(prd_id, repo_root)
-    if match is not None:
-        entry, branch = match
+    result = _find_worktree_path_and_branch_for_prd(prd_id, repo_root)
+    if result is not None:
+        entry, branch = result
     else:
         fallback = find_worktree_for_prd(prd_id, repo_root)
         if fallback is None:
@@ -137,6 +138,15 @@ def find_stale_worktree_for_prd(prd_id: str, repo_root: Path) -> StaleWorktree |
 
 
 def remove_worktree(worktree: StaleWorktree, repo_root: Path) -> None:
-    """Remove a worktree directory and delete the local branch."""
-    git_run("worktree", "remove", "--force", str(worktree.worktree_path), cwd=repo_root)
-    git_check("branch", "-D", worktree.branch, cwd=repo_root)
+    """Remove a worktree directory and delete the local branch.
+
+    Raises ``RuntimeError`` if the worktree removal fails. Branch deletion
+    is best-effort (may already be gone).
+    """
+    match git_run("worktree", "remove", "--force", str(worktree.worktree_path), cwd=repo_root):
+        case Ok():
+            pass
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(f"git worktree remove failed (exit {code}):\n{err}")
+    # Branch deletion is best-effort — the branch may already be gone.
+    git_run("branch", "-D", worktree.branch, cwd=repo_root)

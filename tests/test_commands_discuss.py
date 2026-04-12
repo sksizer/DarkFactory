@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
+from darkfactory.utils.git._types import Ok
+
 from conftest import write_prd
 from darkfactory.commands.discuss import discuss_operation
 from darkfactory.commands.discuss.operation import discuss_operation as op_from_module
@@ -122,7 +124,7 @@ def test_chain_executes_in_order(tmp_path: Path) -> None:
         with patch("darkfactory.builtins.discuss_prd.time.sleep"):
             with patch(
                 "darkfactory.builtins.commit_prd_changes.diff_quiet",
-                return_value=True,
+                return_value=Ok(None),
             ):
                 from darkfactory.system_runner import run_system_operation
 
@@ -168,7 +170,7 @@ def test_nonzero_exit_does_not_abort_chain(tmp_path: Path) -> None:
         with patch("darkfactory.builtins.discuss_prd.time.sleep"):
             with patch(
                 "darkfactory.builtins.commit_prd_changes.diff_quiet",
-                return_value=True,
+                return_value=Ok(None),
             ):
                 from darkfactory.system_runner import run_system_operation
 
