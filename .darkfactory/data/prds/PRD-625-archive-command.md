@@ -30,7 +30,7 @@ PRD-622 delivered the full scope of this PRD as part of the data model refactor:
 - `load_all(data_dir, *, include_archived=False)` discovers PRDs across both folders when requested.
 - Callsites resolving frontmatter references use appropriate `include_archived` values.
 
-One semantic difference worth noting: PRD-622 uses terminal-status guardrails (plus transitive dependency checks via BFS across parent/children/depends_on/blocks) rather than simply blocking `in-progress` PRDs, and it does NOT introduce a new `archived` status — archived PRDs retain their terminal status (`done`, `superseded`, `cancelled`) and are distinguished by location on disk only.
+PRD-622 also introduces `archived` as a new terminal status: it is added to `TERMINAL_STATUSES` in `src/darkfactory/model/_persistence.py:49`, and `archive()` flips the PRD's `status:` to `archived` on write. This matches PRD-625's original intent (the Summary section below already specifies `sets its status to archived`). The one approach difference is the guardrail: PRD-622 requires terminal status (`done`, `superseded`, `cancelled`) plus a transitive dependency check via BFS across the parent/children/depends_on/blocks axes, rather than simply blocking when an in-progress PRD is encountered.
 
 ## Summary
 

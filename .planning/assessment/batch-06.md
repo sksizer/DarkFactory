@@ -29,7 +29,7 @@
   - `status: draft` -> `status: superseded`
   - Bumped `updated` to `'2026-04-11'`
   - Added `## Superseded by` section noting `src/darkfactory/cli.py` has already been removed
-- **Notes:** Verified `src/darkfactory/cli.py` no longer exists; only `src/darkfactory/cli/__init__.py` remains. The file was deleted as part of the PRD-556 CLI split work.
+- **Notes:** Verified `src/darkfactory/cli.py` no longer exists. The monolithic stub file was deleted as part of the PRD-556 CLI split work; the `src/darkfactory/cli/` package (with per-subcommand submodules like `archive.py`, `validate.py`, `run.py`, etc.) replaced it.
 
 ## PRD-600.3 — Operational hardening and CLI quality improvements
 - **Impact:** none

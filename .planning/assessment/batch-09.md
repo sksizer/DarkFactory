@@ -38,5 +38,5 @@
   - Changed `status: ready` → `status: superseded`.
   - Quoted `updated` to `'2026-04-11'`.
   - Added a `## Superseded by` section near the top explaining that PRD-622 delivered the full scope: the `prd archive` CLI command (with stricter terminal-status + transitive-dep guardrails), the `data/archive/` folder, the `archive()` function in `model/_persistence.py`, and `load_all(include_archived=...)`.
-  - Noted one semantic difference: PRD-622 does not introduce a new `archived` status — archived PRDs retain their terminal status (`done`/`superseded`/`cancelled`) and are distinguished by disk location only.
+  - Noted that PRD-622 adds `archived` to `TERMINAL_STATUSES` and `archive()` flips the PRD's `status:` to `archived` on write — matching PRD-625's original intent. The one approach difference is the guardrail: PRD-622 requires terminal status plus a transitive-dependency check, rather than simply blocking when something is `in-progress`.
 - **Notes:** This PRD's full technical approach was delivered verbatim by PRD-622. No further work remains.

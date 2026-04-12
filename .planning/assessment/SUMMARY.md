@@ -24,7 +24,7 @@
 | PRD | Title | Superseded by | Why |
 |---|---|---|---|
 | **PRD-601** | YAML date quoting consistency | PRD-622 | Deterministic serializer in `model/_persistence.py` enforces single-quoted dates and double-quoted wikilinks. `save()` is the single write path. |
-| **PRD-625** | Archive Command | PRD-622 | `prd archive PRD-NNN` + `data/archive/` + `archive()` in `model/_persistence.py` all delivered. One semantic difference noted: PRD-622 uses terminal-status guardrails rather than blocking `in-progress`, and doesn't introduce a new `archived` status (archived PRDs keep their terminal status, distinguished only by disk location). |
+| **PRD-625** | Archive Command | PRD-622 | `prd archive PRD-NNN` + `data/archive/` + `archive()` in `model/_persistence.py` all delivered. PRD-622 also introduces `archived` as a new terminal status (added to `TERMINAL_STATUSES` in `model/_persistence.py:49`), and `archive()` flips the PRD's `status:` to `archived` on write. The one notable approach difference from PRD-625's original draft: PRD-622's guardrails require terminal status (`done`/`superseded`/`cancelled`) plus a transitive dependency check across all four axes, rather than simply blocking when something is `in-progress`. |
 | **PRD-600.2.4** | Single-source the package version | PRD-622 | `[tool.hatch.version]` in `pyproject.toml` reads `__version__` from `src/darkfactory/__init__.py`. |
 | **PRD-600.2.7** | Delete dead cli stub file | PRD-556 (effectively) | `src/darkfactory/cli.py` is already gone after the cli/ package split. |
 
