@@ -90,8 +90,14 @@ def is_resume_safe(branch: str, repo_root: Path) -> ResumeStatus:
                         ),
                         kind="pr_closed",
                     )
+        case GhErr(returncode=-1, stderr=err):
+            logger.warning("gh not found; skipping PR state check")
         case GhErr(stderr=err):
-            if "gh" in err.lower() or "not found" in err.lower():
+            err_lower = err.lower()
+            if (
+                "no such file or directory" in err_lower
+                or "command not found" in err_lower
+            ):
                 logger.warning("gh not found; skipping PR state check")
             else:
                 logger.warning("gh pr list failed; skipping PR state check")
