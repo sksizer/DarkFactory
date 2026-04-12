@@ -9,7 +9,7 @@ This lets workflow authors drop a new workflow into
 ``tools/prd-harness/workflows/<name>/`` without editing any registry
 or manifest — the loader picks it up automatically. The authored
 ``workflow.py`` can import from ``darkfactory.workflow`` and
-``darkfactory.builtins`` just like any normal Python module.
+``darkfactory.operations`` just like any normal Python module.
 
 Import errors in one workflow.py don't block the others — we log the
 error and skip. Duplicate workflow *names* (two modules both exporting

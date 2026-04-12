@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from darkfactory.system import SystemContext, SystemOperation
-from darkfactory.builtins.system_builtins import SYSTEM_BUILTINS
+from darkfactory.operations.system_builtins import SYSTEM_BUILTINS
 from darkfactory.runner import run_system_operation
 from darkfactory.workflow import AgentTask, BuiltIn, ShellTask
 

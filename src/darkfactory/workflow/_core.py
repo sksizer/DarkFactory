@@ -98,7 +98,7 @@ class Task:
 class BuiltIn(Task):
     """Reference a deterministic primitive from the ``BUILTINS`` registry.
 
-    The runner looks up ``name`` in ``darkfactory.builtins.BUILTINS`` and
+    The runner looks up ``name`` in ``darkfactory.operations.BUILTINS`` and
     calls the registered function with ``(ctx, **kwargs)``. String values
     in ``kwargs`` are formatted via :meth:`ExecutionContext.format_string`
     before the call, so workflow authors can use ``{prd_id}``-style

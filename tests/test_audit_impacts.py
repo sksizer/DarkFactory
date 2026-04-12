@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from darkfactory.builtins.system_builtins import (
+from darkfactory.operations.system_builtins import (
     SYSTEM_BUILTINS,
     audit_impacts_check,
 )
@@ -288,7 +288,7 @@ def test_operation_via_runner_clean(tmp_path: Path) -> None:
         dry_run=False,
     )
 
-    from darkfactory.builtins.system_builtins import SYSTEM_BUILTINS as runner_builtins
+    from darkfactory.operations.system_builtins import SYSTEM_BUILTINS as runner_builtins
 
     assert "audit_impacts_check" in runner_builtins
 

@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Protocol, TypeVar
 
-from .builtins import BUILTINS
+from .operations import BUILTINS
 from .event_log import EventWriter, emit_task_event
 from .utils.claude_code import InvokeResult, capability_to_model, invoke_claude
 from .utils.shell import run_shell
@@ -789,7 +789,7 @@ def run_system_operation(
     :class:`EventWriter` is created automatically so system operations
     produce event logs just like workflow runs.
     """
-    from .builtins.system_builtins import SYSTEM_BUILTINS
+    from .operations.system_builtins import SYSTEM_BUILTINS
 
     writer: EventWriter | None = getattr(ctx, "event_writer", None)
     owns_writer = False

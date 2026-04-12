@@ -217,7 +217,7 @@ def test_run_workflow_applies_context_overrides(tmp_path: Path) -> None:
         review_threads=threads,
     )
 
-    from darkfactory.builtins._registry import BUILTINS
+    from darkfactory.operations._registry import BUILTINS
 
     with (
         patch.dict(
@@ -293,7 +293,7 @@ def test_run_workflow_commit_message_uses_prd_id(tmp_path: Path) -> None:
         review_threads=threads,
     )
 
-    from darkfactory.builtins._registry import BUILTINS
+    from darkfactory.operations._registry import BUILTINS
 
     with (
         patch.dict(
