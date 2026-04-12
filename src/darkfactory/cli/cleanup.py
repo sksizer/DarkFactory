@@ -11,42 +11,24 @@ from darkfactory import checks
 from darkfactory.checks import StaleWorktree, find_stale_worktrees, is_safe_to_remove
 from darkfactory.cli._shared import _find_repo_root
 from darkfactory.git_ops import git_check, git_run
-from darkfactory.worktree_utils import find_worktree_for_prd
+from darkfactory.utils.git.branch import find_local_branches
+from darkfactory.utils.git.worktree import find_stale_worktree_for_prd, remove_worktree
 
 
 def _remove_worktree(worktree: StaleWorktree, repo_root: Path) -> None:
     """Remove a worktree directory and delete the local branch."""
-    git_run("worktree", "remove", "--force", str(worktree.worktree_path), cwd=repo_root)
-    git_check("branch", "-D", worktree.branch.removeprefix("prd/"), cwd=repo_root)
+    remove_worktree(worktree, repo_root)
 
 
 def _find_worktree_for_prd(prd_id: str, repo_root: Path) -> StaleWorktree | None:
-    """Find the worktree entry for the given PRD id, regardless of PR state.
-
-    Delegates path discovery to :func:`~darkfactory.worktree_utils.find_worktree_for_prd`,
-    then wraps the result in a :class:`StaleWorktree` with PR state for cleanup operations.
-    """
-    entry = find_worktree_for_prd(prd_id, repo_root)
-    if entry is None:
-        return None
-    branch = f"prd/{entry.name}"
-    pr_state = checks._get_pr_state(branch, repo_root)
-    return StaleWorktree(
-        prd_id=prd_id,
-        branch=branch,
-        worktree_path=entry,
-        pr_state=pr_state,
-    )
+    """Find the worktree entry for the given PRD id, regardless of PR state."""
+    return find_stale_worktree_for_prd(prd_id, repo_root)
 
 
 def _find_orphaned_branch(prd_id: str, repo_root: Path) -> str | None:
     """Find a local branch for *prd_id* when the worktree dir is gone."""
-    result = git_run("branch", "--list", f"prd/{prd_id}-*", cwd=repo_root)
-    for line in result.stdout.splitlines():
-        branch = line.strip().lstrip("* ")
-        if branch:
-            return branch
-    return None
+    branches = find_local_branches(prd_id, repo_root)
+    return branches[0] if branches else None
 
 
 def _orphaned_branch_commit_count(

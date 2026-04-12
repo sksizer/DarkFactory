@@ -1,0 +1,89 @@
+---
+title: "prd reset"
+description: "Undo all outstanding work on a PRD and return it to ready"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd reset PRD-ID [flags]
+```
+
+## Description
+
+Tears down every artifact created by a previous `prd run` or `prd rework` and returns the PRD to `ready` status so it can be re-executed from scratch. Useful when a branch is irreparably broken, a PR needs to be abandoned, or you want a clean slate after a failed run.
+
+Default is dry-run. Pass `--execute` to perform the reset.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `PRD-ID` | Yes | The PRD whose outstanding work to reset |
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--execute` | `false` | Actually perform the reset (default is dry-run) |
+| `--yes` | `false` | Skip the confirmation prompt |
+
+## Examples
+
+```bash frame="terminal" title="Preview what would be reset"
+$ prd reset PRD-42
+Artifacts for PRD-42:
+  Status:          in-progress
+  Worktree:        .worktrees/PRD-42-add-retry-logic
+  Local branch:    prd/PRD-42-add-retry-logic
+  Remote branches: origin/prd/PRD-42-add-retry-logic
+  Open PRs:        #142
+  Rework guard:    (none)
+  Lock file:       (none)
+
+Dry run. Use --execute to perform the reset.
+```
+
+```bash frame="terminal" title="Execute the reset"
+$ prd reset PRD-42 --execute
+Artifacts for PRD-42:
+  Status:          in-progress
+  Worktree:        .worktrees/PRD-42-add-retry-logic
+  Local branch:    prd/PRD-42-add-retry-logic
+  Remote branches: origin/prd/PRD-42-add-retry-logic
+  Open PRs:        #142
+  Rework guard:    (none)
+  Lock file:       (none)
+
+Reset PRD-42? All artifacts will be removed. [y/N] y
+
+Resetting PRD-42...
+  Closed PR #142
+  Removed worktree .worktrees/PRD-42-add-retry-logic
+  Deleted local branch prd/PRD-42-add-retry-logic
+  Deleted remote branch prd/PRD-42-add-retry-logic
+  Status: in-progress -> ready
+
+Reset complete: 5 artifact(s) cleaned, 0 skipped.
+```
+
+```bash frame="terminal" title="Skip confirmation in scripts"
+$ prd reset PRD-42 --execute --yes
+```
+
+## Behavior
+
+- **Dry-run by default.** Without `--execute`, prints discovered artifacts and exits.
+- **Terminal-state guard.** Refuses to reset PRDs in `done`, `cancelled`, or other terminal states — those statuses are final.
+- **Draft/ready warning.** If the PRD has never been run, a warning is printed and the command still probes for orphaned artifacts before proceeding.
+- **Teardown order.** Artifacts are removed in dependency order: open PRs closed first, then worktree removed, then local branches deleted, then remote branches deleted, then rework guard cleared, then status reset to `ready`.
+- **Concurrency guard.** Acquires the PRD's advisory lock before executing. If a workflow is actively running (`prd run` holds the lock), the reset is rejected rather than racing it.
+- **Partial failures.** Individual artifact removals that fail are skipped and reported — the reset continues rather than aborting entirely.
+- **Event log.** A `prd_reset` event is emitted listing what was cleaned and what was skipped.
+
+## Related
+
+- [`prd run`](/reference/cli/run/) -- Re-execute the PRD after reset
+- [`prd cleanup`](/reference/cli/cleanup/) -- Remove worktrees only, without touching branches or PRs
+- [`prd rework`](/reference/cli/rework/) -- Address review feedback without a full reset
+- [`prd status`](/reference/cli/status/) -- Verify PRD status after reset
