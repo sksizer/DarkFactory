@@ -19,7 +19,7 @@ from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
 from darkfactory.engine import ReworkState
 from darkfactory.utils.github.pr.comments import CommentFilters
-from darkfactory.rework_context import ReworkError, discover_rework_context
+from darkfactory.rework.context import ReworkError, discover_rework_context
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)

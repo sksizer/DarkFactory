@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from darkfactory.rework_guard import DEFAULT_MAX_CONSECUTIVE, ReworkGuard
+from darkfactory.rework.guard import DEFAULT_MAX_CONSECUTIVE, ReworkGuard
 
 
 # ---------- helpers ----------

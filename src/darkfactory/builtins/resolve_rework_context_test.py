@@ -11,7 +11,7 @@ from darkfactory.builtins.resolve_rework_context import resolve_rework_context
 from darkfactory.engine import ReworkState
 from darkfactory.utils.github.pr.comments import CommentFilters, ReviewThread
 from darkfactory.model import PRD
-from darkfactory.rework_context import ReworkContext, ReworkError
+from darkfactory.rework.context import ReworkContext, ReworkError
 from darkfactory.workflow import ExecutionContext, Workflow
 
 

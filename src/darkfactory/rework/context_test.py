@@ -1,4 +1,4 @@
-"""Tests for darkfactory.rework_context — shared rework discovery."""
+"""Tests for darkfactory.rework.context — shared rework discovery."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import pytest
 
 from darkfactory.utils.github.pr.comments import CommentFilters, ReviewThread
 from darkfactory.model import PRD
-from darkfactory.rework_context import (
+from darkfactory.rework.context import (
     ReworkContext,
     ReworkError,
     discover_rework_context,
@@ -62,32 +62,32 @@ def _thread(thread_id: str = "t-1") -> ReviewThread:
 
 
 def test_find_open_pr_returns_number_on_match(tmp_path: Path) -> None:
-    with patch("darkfactory.rework_context.subprocess.run") as mock_run:
+    with patch("darkfactory.rework.context.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0, stdout='[{"number": 42}]')
         assert find_open_pr("prd/PRD-001-my-feature", tmp_path) == 42
 
 
 def test_find_open_pr_returns_none_when_no_prs(tmp_path: Path) -> None:
-    with patch("darkfactory.rework_context.subprocess.run") as mock_run:
+    with patch("darkfactory.rework.context.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0, stdout="[]")
         assert find_open_pr("prd/PRD-001-my-feature", tmp_path) is None
 
 
 def test_find_open_pr_returns_none_on_gh_failure(tmp_path: Path) -> None:
-    with patch("darkfactory.rework_context.subprocess.run") as mock_run:
+    with patch("darkfactory.rework.context.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="err")
         assert find_open_pr("prd/PRD-001-my-feature", tmp_path) is None
 
 
 def test_find_open_pr_returns_none_on_missing_gh(tmp_path: Path) -> None:
     with patch(
-        "darkfactory.rework_context.subprocess.run", side_effect=FileNotFoundError
+        "darkfactory.rework.context.subprocess.run", side_effect=FileNotFoundError
     ):
         assert find_open_pr("prd/PRD-001-my-feature", tmp_path) is None
 
 
 def test_find_open_pr_returns_none_on_invalid_json(tmp_path: Path) -> None:
-    with patch("darkfactory.rework_context.subprocess.run") as mock_run:
+    with patch("darkfactory.rework.context.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0, stdout="NOT JSON")
         assert find_open_pr("prd/PRD-001-my-feature", tmp_path) is None
 
@@ -97,7 +97,7 @@ def test_find_open_pr_returns_none_on_invalid_json(tmp_path: Path) -> None:
 
 def test_discover_raises_when_no_worktree(tmp_path: Path) -> None:
     prd = _make_prd()
-    with patch("darkfactory.rework_context.find_worktree_for_prd", return_value=None):
+    with patch("darkfactory.rework.context.find_worktree_for_prd", return_value=None):
         with pytest.raises(ReworkError, match="No worktree found"):
             discover_rework_context(
                 prd,
@@ -113,9 +113,9 @@ def test_discover_raises_when_no_open_pr(tmp_path: Path) -> None:
     worktree.mkdir(parents=True)
     with (
         patch(
-            "darkfactory.rework_context.find_worktree_for_prd", return_value=worktree
+            "darkfactory.rework.context.find_worktree_for_prd", return_value=worktree
         ),
-        patch("darkfactory.rework_context.find_open_pr", return_value=None),
+        patch("darkfactory.rework.context.find_open_pr", return_value=None),
     ):
         with pytest.raises(ReworkError, match="No open PR found"):
             discover_rework_context(
@@ -138,10 +138,10 @@ def test_discover_raises_when_guard_blocked(tmp_path: Path) -> None:
 
     with (
         patch(
-            "darkfactory.rework_context.find_worktree_for_prd", return_value=worktree
+            "darkfactory.rework.context.find_worktree_for_prd", return_value=worktree
         ),
-        patch("darkfactory.rework_context.find_open_pr", return_value=42),
-        patch("darkfactory.rework_context.ReworkGuard", return_value=fake_guard),
+        patch("darkfactory.rework.context.find_open_pr", return_value=42),
+        patch("darkfactory.rework.context.ReworkGuard", return_value=fake_guard),
     ):
         with pytest.raises(ReworkError, match="blocked by the rework loop guard"):
             discover_rework_context(
@@ -163,12 +163,12 @@ def test_discover_returns_context_with_threads(tmp_path: Path) -> None:
 
     with (
         patch(
-            "darkfactory.rework_context.find_worktree_for_prd", return_value=worktree
+            "darkfactory.rework.context.find_worktree_for_prd", return_value=worktree
         ),
-        patch("darkfactory.rework_context.find_open_pr", return_value=42),
-        patch("darkfactory.rework_context.ReworkGuard", return_value=fake_guard),
+        patch("darkfactory.rework.context.find_open_pr", return_value=42),
+        patch("darkfactory.rework.context.ReworkGuard", return_value=fake_guard),
         patch(
-            "darkfactory.rework_context._fetch_pr_comments", return_value=threads
+            "darkfactory.rework.context._fetch_pr_comments", return_value=threads
         ) as mock_fetch,
     ):
         filters = CommentFilters(include_resolved=True, reviewer="alice")
@@ -200,11 +200,11 @@ def test_discover_skips_fetch_when_disabled(tmp_path: Path) -> None:
 
     with (
         patch(
-            "darkfactory.rework_context.find_worktree_for_prd", return_value=worktree
+            "darkfactory.rework.context.find_worktree_for_prd", return_value=worktree
         ),
-        patch("darkfactory.rework_context.find_open_pr", return_value=42),
-        patch("darkfactory.rework_context.ReworkGuard", return_value=fake_guard),
-        patch("darkfactory.rework_context._fetch_pr_comments") as mock_fetch,
+        patch("darkfactory.rework.context.find_open_pr", return_value=42),
+        patch("darkfactory.rework.context.ReworkGuard", return_value=fake_guard),
+        patch("darkfactory.rework.context._fetch_pr_comments") as mock_fetch,
     ):
         ctx = discover_rework_context(
             prd,

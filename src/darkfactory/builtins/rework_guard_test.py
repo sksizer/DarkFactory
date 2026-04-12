@@ -10,7 +10,7 @@ import pytest
 
 from darkfactory.builtins._test_helpers import make_builtin_ctx
 from darkfactory.builtins.rework_guard import check_rework_guard, _has_changes
-from darkfactory.rework_guard import ReworkGuard
+from darkfactory.rework.guard import ReworkGuard
 
 
 # ---------- _has_changes helper ----------

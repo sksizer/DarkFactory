@@ -8,7 +8,7 @@ from darkfactory.event_log import generate_session_id
 from darkfactory.loader import load_workflows
 from darkfactory.engine import ReworkState
 from darkfactory.utils.github.pr.comments import CommentFilters
-from darkfactory.rework_context import (
+from darkfactory.rework.context import (
     ReworkContext,
     ReworkError,
     discover_rework_context,

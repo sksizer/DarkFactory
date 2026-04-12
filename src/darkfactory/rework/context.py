@@ -4,7 +4,7 @@ Single source of truth for the pre-conditions a rework cycle needs:
 
 - An existing worktree for the PRD.
 - An open PR on the PRD's branch.
-- A non-blocked :class:`~darkfactory.rework_guard.ReworkGuard` state.
+- A non-blocked :class:`~darkfactory.rework.guard.ReworkGuard` state.
 - The current unresolved review threads, filtered per CLI flags.
 
 Used by both ``cli/rework.py`` (for dry-run summaries and execute-mode
@@ -26,7 +26,7 @@ from pathlib import Path
 from darkfactory.utils.github.pr.comments import CommentFilters, ReviewThread
 from darkfactory.utils.github.pr.comments import fetch_pr_comments as _fetch_pr_comments
 from darkfactory.model import PRD, compute_branch_name
-from darkfactory.rework_guard import ReworkGuard
+from darkfactory.rework.guard import ReworkGuard
 from darkfactory.utils.git.worktree import find_worktree_for_prd
 
 _log = logging.getLogger(__name__)

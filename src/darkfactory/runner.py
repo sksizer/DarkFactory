@@ -638,7 +638,7 @@ def _workflow_compose_prompt(
     if ctx.state.has(ReworkState):
         rework = ctx.state.get(ReworkState)
         if rework.review_threads is not None:
-            from .rework_prompt import render_rework_feedback
+            from darkfactory.rework.prompt import render_rework_feedback
 
             rework_extras["REWORK_FEEDBACK"] = render_rework_feedback(
                 rework.review_threads

@@ -16,7 +16,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
-_log = logging.getLogger("darkfactory.rework_guard")
+_log = logging.getLogger("darkfactory.rework.guard")
 
 DEFAULT_MAX_CONSECUTIVE: int = 2
 _STATE_RELPATH = Path(".darkfactory") / "state" / "rework-guard.json"
