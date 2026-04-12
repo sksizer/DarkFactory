@@ -13,11 +13,11 @@ views:
       - status
       - kind
     sort:
+      - property: status
+        direction: DESC
       - property: file.name
         direction: ASC
       - property: value
-        direction: ASC
-      - property: status
         direction: ASC
     columnSize:
       file.name: 467
