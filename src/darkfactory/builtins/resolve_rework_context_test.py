@@ -74,11 +74,13 @@ def _make_ctx(
         worktree_path=worktree_path,
         dry_run=dry_run,
     )
-    ctx.state.put(ReworkState(
-        review_threads=review_threads,
-        comment_filters=comment_filters,
-        reply_to_comments=reply_to_comments,
-    ))
+    ctx.state.put(
+        ReworkState(
+            review_threads=review_threads,
+            comment_filters=comment_filters,
+            reply_to_comments=reply_to_comments,
+        )
+    )
     return ctx
 
 

@@ -101,14 +101,26 @@ def test_format_invocations_zero() -> None:
 
 
 def test_format_invocations_one() -> None:
-    ctx = _make_ctx(agent_result=AgentResult(
-        stdout="", stderr="", exit_code=0, success=True, invoke_count=1,
-    ))
+    ctx = _make_ctx(
+        agent_result=AgentResult(
+            stdout="",
+            stderr="",
+            exit_code=0,
+            success=True,
+            invoke_count=1,
+        )
+    )
     assert _format_invocations(ctx) == "1"
 
 
 def test_format_invocations_many() -> None:
-    ctx = _make_ctx(agent_result=AgentResult(
-        stdout="", stderr="", exit_code=0, success=True, invoke_count=7,
-    ))
+    ctx = _make_ctx(
+        agent_result=AgentResult(
+            stdout="",
+            stderr="",
+            exit_code=0,
+            success=True,
+            invoke_count=7,
+        )
+    )
     assert _format_invocations(ctx) == "7"

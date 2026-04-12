@@ -40,18 +40,24 @@ def _make_ctx(
 ) -> MagicMock:
     ctx = MagicMock()
     ctx.state = PhaseState()
-    ctx.state.put(ReworkState(
-        reply_to_comments=reply_to_comments,
-        pr_number=pr_number,
-        review_threads=review_threads if review_threads is not None else _default_threads(),
-    ))
+    ctx.state.put(
+        ReworkState(
+            reply_to_comments=reply_to_comments,
+            pr_number=pr_number,
+            review_threads=review_threads
+            if review_threads is not None
+            else _default_threads(),
+        )
+    )
     if agent_output is not None:
-        ctx.state.put(AgentResult(
-            stdout=agent_output,
-            stderr="",
-            exit_code=0,
-            success=True,
-        ))
+        ctx.state.put(
+            AgentResult(
+                stdout=agent_output,
+                stderr="",
+                exit_code=0,
+                success=True,
+            )
+        )
     ctx.dry_run = dry_run
     ctx.cwd = cwd or Path("/tmp/worktree")
     ctx.repo_root = repo_root or Path("/tmp/repo")

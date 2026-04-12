@@ -76,10 +76,12 @@ def _make_ctx(
         branch_name="prd/PRD-001-my-feature",
         dry_run=dry_run,
     )
-    ctx.state.put(ReworkState(
-        pr_number=pr_number,
-        review_threads=review_threads,
-    ))
+    ctx.state.put(
+        ReworkState(
+            pr_number=pr_number,
+            review_threads=review_threads,
+        )
+    )
     return ctx
 
 
