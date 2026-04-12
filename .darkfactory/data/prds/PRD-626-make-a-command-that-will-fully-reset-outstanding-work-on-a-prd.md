@@ -40,18 +40,18 @@ When an agent run produces garbage output, requirements change mid-flight, or a 
 4. **Status guard** — behaviour depends on current PRD status:
    - `in-progress`, `review`, `blocked`: proceed normally (active/stuck states with potential artifacts).
    - `draft`, `ready`: warn "no workflow has run"; still probe for orphaned artifacts from partial failures but do not change the status field.
-   - `done`, `cancelled`, `superseded`: reject with error — these are terminal states (resetting them is semantically wrong).
+   - `done`, `cancelled`, `superseded`, `archived`: reject with error — these are terminal states (resetting them is semantically wrong).
 5. **Concurrency check** — before any mutation, attempt to acquire the `FileLock` at `.worktrees/{prd_id}.lock` with `timeout=0` (non-blocking), matching `ensure_worktree.py`. If the lock is held, abort with: *"Cannot reset {prd_id}: a workflow is currently running (lock held at {path}). Stop the running process first."*
 6. On confirmation, execute cleanup in dependency order:
    a. Close **all** open PRs for the branch on GitHub, each with a comment: "Closed by `prd reset`." Log each closed PR number. <!-- Close all, not just first — orphaned open PRs are worse than closing an unexpected extra. -->
    b. Remove the worktree via `git worktree remove --force`, then `git worktree prune` to clean any stale metadata. <!-- Raw rm -rf leaves stale .git/worktrees/ entries — never use it. -->
    c. Release and remove the worktree lock file (`.worktrees/{prd_id}.lock`). <!-- Lock must be acquired in FR-5 before reaching this step. -->
-   d. Delete the local branch (`prd/{prd_id}-{slug}`).
-   e. Delete the remote branch (`origin/prd/{prd_id}-{slug}`).
+   d. Delete all local branches matching `prd/{prd_id}-*` (glob match, no slug reconstruction needed).
+   e. Delete all remote branches matching `origin/prd/{prd_id}-*`.
    f. Remove the PRD's entry from `.darkfactory/state/rework-guard.json` via `ReworkGuard.reset()`.
-   g. Reset the PRD's `status` field to `ready` and `updated` field to today's date in the source repo's frontmatter, using `prd_module.set_status_at()`. <!-- Unlike set_status builtin (which writes to the worktree copy per PRD-213), reset writes to the source repo because the worktree is destroyed and the PR is closed — no merge path remains. This is the one place a direct source-repo status write is correct. -->
-   h. Emit a `cli/prd_reset` event to the event log containing `prd_id`, lists of artifacts cleaned and artifacts skipped.
-7. Each step (6a–6g) is best-effort and non-fatal — if a PR doesn't exist or a branch is already gone, skip that step and continue. Report what was done and what was skipped. Step 6h (event emission) must always execute.
+   g. Reset the PRD's status to `ready` by loading the PRD via `model.load_one(data_dir, prd_id)` and calling `model.set_status(prd, "ready")`. The model handles path resolution, `updated` timestamp, and persistence internally.
+   h. Emit a `cli/prd_reset` event to the event log containing `prd_id`, lists of artifacts cleaned and artifacts skipped. (Execute mode only — dry-run must not emit events.)
+7. Each step (6a–6g) is best-effort and non-fatal — if a PR doesn't exist or a branch is already gone, skip that step and continue. Report what was done and what was skipped. Step 6h (event emission) must always execute when in `--execute` mode.
 8. Leave the `workflow` assignment in frontmatter intact.
 9. Single-PRD only — no batch/`--all` mode.
 
@@ -65,9 +65,9 @@ When an agent run produces garbage output, requirements change mid-flight, or a 
 
 - New CLI subcommand in `src/darkfactory/cli/reset.py`, registered in `_parser.py`.
 - **Shared utilities refactor**: before implementing, extract `_find_worktree_for_prd` (the `StaleWorktree`-wrapping variant), `_find_orphaned_branch`, and `_remove_worktree` from `cleanup.py` into `worktree_utils.py`. Update `cleanup.py` to import from there. Then `reset.py` imports the same functions.
-- **Discovery phase**: probe for each artifact type — `find_worktree_for_prd()`, `gh pr list --state open --head {branch}`, `git branch --list prd/{prd_id}-*`, `ReworkGuard.is_blocked()` / entry existence, frontmatter status read. Collect results into a summary dataclass.
+- **Discovery phase**: probe for each artifact type — `find_worktree_for_prd()`, `gh pr list --state open --head {branch}`, `git branch --list prd/{prd_id}-*` (glob match, no slug needed), `ReworkGuard.is_blocked()` / entry existence, frontmatter status read via `model.load_one(data_dir, prd_id)`. Collect results into a summary dataclass.
 - **Concurrency gate**: acquire `FileLock` at `.worktrees/{prd_id}.lock` (non-blocking) before entering execution phase. Abort if held.
-- **Execution phase**: ordered teardown per FR-6, using `subprocess` for git/gh commands, `ReworkGuard.reset()` for guard state, and `prd_module.set_status_at()` for frontmatter (handles both `status` and `updated` fields).
+- **Execution phase**: ordered teardown per FR-6, using `subprocess` for git/gh commands, `ReworkGuard.reset()` for guard state, and `model.set_status(prd, "ready")` for frontmatter (model handles path resolution and persistence).
 - **Event emission**: write a `cli/prd_reset` event via `EventWriter` with the artifact cleanup results. This runs outside an `ExecutionContext` — instantiate the writer directly as `reconcile.py` does.
 - Rich output for the summary table and confirmation prompt.
 
@@ -83,7 +83,7 @@ When an agent run produces garbage output, requirements change mid-flight, or a 
 - [ ] AC-8: Rework guard entry for the PRD is removed after reset.
 - [ ] AC-9: `updated` frontmatter field is set to today's date after reset.
 - [ ] AC-10: A `cli/prd_reset` event is emitted to the event log with artifact cleanup details.
-- [ ] AC-11: Reset on a `done`/`cancelled`/`superseded` PRD fails with a clear error.
+- [ ] AC-11: Reset on a `done`/`cancelled`/`superseded`/`archived` PRD fails with a clear error.
 - [ ] AC-12: Reset while a workflow is actively running (lock held) fails with a clear error.
 - [ ] AC-13: Shared worktree utilities extracted from `cleanup.py` into `worktree_utils.py`; `cleanup.py` still passes its existing tests.
 
@@ -93,8 +93,8 @@ When an agent run produces garbage output, requirements change mid-flight, or a 
 - RESOLVED: Confirmation model → dry-run by default, `--execute` to act, `--yes` to skip prompt
 - RESOLVED: Batch mode → not in scope, single PRD only
 - RESOLVED: Workflow assignment → preserved, not cleared
-- RESOLVED: Terminal status handling → `done`/`cancelled`/`superseded` rejected with error
-- RESOLVED: Source-repo frontmatter write → safe because PR is closed and branch deleted; use `set_status_at()`
+- RESOLVED: Terminal status handling → `done`/`cancelled`/`superseded`/`archived` rejected with error (matches `TERMINAL_STATUSES` in model)
+- RESOLVED: Source-repo frontmatter write → use `model.load_one()` + `model.set_status()` — model owns path resolution and persistence
 - RESOLVED: Worktree removal → `git worktree remove --force` + `prune`, never raw `rm -rf`
 - RESOLVED: Concurrent execution → acquire `FileLock` non-blocking, abort if held
 - RESOLVED: Multiple open PRs → close all, log each
