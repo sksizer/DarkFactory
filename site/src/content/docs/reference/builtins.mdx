@@ -1,11 +1,11 @@
 ---
 title: "Built-in Tasks"
-description: "Registry of all 10 built-in tasks, their parameters, and dry-run behavior."
+description: "Registry of all 17 built-in tasks, their parameters, and dry-run behavior."
 ---
 
 import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
 
-Built-in tasks are the atomic operations that DarkFactory provides in the `builtins/` package. They handle git operations, status management, logging, and cleanup. Workflows compose these builtins alongside agent and shell tasks.
+Built-in tasks are the atomic operations that DarkFactory provides in the `builtins/` package. They handle git operations, status management, PR review, logging, and cleanup. Workflows compose these builtins alongside agent and shell tasks.
 
 Each builtin is registered in the `BUILTINS` dictionary and dispatched by name from `runner.py`.
 
@@ -129,6 +129,18 @@ Commits the JSONL event log for the current execution.
 
 **Dry-run**: Prints the event file path. No file operations.
 
+### `analyze_transcript`
+
+Scans the agent run transcript for problem signals in a two-stage pipeline.
+
+| Kwarg | Type | Default | Description |
+|-------|------|---------|-------------|
+| None | | | No configurable parameters. |
+
+**Behavior**: Stage 1 runs deterministic Python detectors to produce `Finding` records. Stage 2 fires an LLM narrative (Haiku or Sonnet, config-driven) only when Stage 1 finds issues above a severity threshold. Writes a markdown retro alongside the transcript. Failures in either stage are logged as warnings — analysis is advisory and never fatal to the workflow.
+
+**Dry-run**: Prints that transcript analysis would run. No file operations.
+
 ### `summarize_agent_run`
 
 Generates a human-readable summary of what the agent did during execution.
@@ -141,6 +153,82 @@ Generates a human-readable summary of what the agent did during execution.
 
 **Dry-run**: Prints that a summary would be generated. No API calls.
 
+## PR Review
+
+### `fetch_pr_comments`
+
+Loads unresolved PR review threads into the execution context.
+
+| Kwarg | Type | Default | Description |
+|-------|------|---------|-------------|
+| None | | | No configurable parameters. |
+
+**Behavior**: If `ctx.review_threads` is already populated (pre-fetched by `prd rework`), this is a no-op. Otherwise, calls the `gh` CLI to retrieve unresolved threads from the PR and stores them on `ctx.review_threads`.
+
+**Dry-run**: Prints that PR comments would be fetched. No network operations.
+
+### `reply_pr_comments`
+
+Posts bot replies to addressed PR comment threads.
+
+| Kwarg | Type | Default | Description |
+|-------|------|---------|-------------|
+| None | | | No configurable parameters. |
+
+**Behavior**: Parses structured reply notes from agent output and posts each as a GitHub comment reply prefixed with `[harness] addressed in <sha>:`. Only executes when `ctx.reply_to_comments` is `True`. Failures are logged as warnings and do not fail the workflow.
+
+**Dry-run**: Prints the replies that would be posted. No network operations.
+
+## Rework
+
+### `rebase_onto_main`
+
+Rebases the worktree branch onto `origin/main`.
+
+| Kwarg | Type | Default | Description |
+|-------|------|---------|-------------|
+| None | | | No configurable parameters. |
+
+**Behavior**: Fetches `origin/main` then rebases the worktree branch onto it so the agent always works against current mainline code. On conflict, aborts the rebase and fails with the list of conflicting files.
+
+**Dry-run**: Prints the rebase command that would execute. No git operations.
+
+### `fast_forward_branch`
+
+Syncs the local worktree branch with its remote counterpart.
+
+| Kwarg | Type | Default | Description |
+|-------|------|---------|-------------|
+| None | | | No configurable parameters. |
+
+**Behavior**: Fetches `origin/<branch>` and fast-forwards the local branch to match. Solves the "push rejected" problem when a prior rework cycle or external push has advanced the remote branch.
+
+**Dry-run**: Prints the sync command that would execute. No git operations.
+
+### `resolve_rework_context`
+
+Discovers and populates the worktree path, PR number, rework guard state, and review threads.
+
+| Kwarg | Type | Default | Description |
+|-------|------|---------|-------------|
+| None | | | No configurable parameters. |
+
+**Behavior**: First task in rework workflows. Populates `ctx.worktree_path`, `ctx.cwd`, `ctx.pr_number`, and `ctx.review_threads`. No-op if the context is already populated by `prd rework`.
+
+**Dry-run**: Prints the context that would be resolved. No filesystem changes.
+
+### `check_rework_guard`
+
+Detects no-change rework loops.
+
+| Kwarg | Type | Default | Description |
+|-------|------|---------|-------------|
+| None | | | No configurable parameters. |
+
+**Behavior**: Checks whether the current rework cycle produced any file modifications. Records a no-change cycle in the rework guard. Warns below threshold; raises an error at or above threshold to block the commit and push steps.
+
+**Dry-run**: Prints the guard status. No modifications.
+
 ## Quick Reference
 
 | Builtin | Category | Modifies Git? | Modifies PRD? | Network? |
@@ -150,8 +238,15 @@ Generates a human-readable summary of what the agent did during execution.
 | `push_branch` | Git | No | No | Yes |
 | `create_pr` | Git | No | Yes (`pr_url`) | Yes |
 | `cleanup_worktree` | Git | Yes | No | No |
+| `rebase_onto_main` | Rework | No | No | Yes |
+| `fast_forward_branch` | Rework | No | No | Yes |
+| `resolve_rework_context` | Rework | No | No | No |
+| `check_rework_guard` | Rework | No | No | No |
 | `set_status` | Lifecycle | No | Yes (`status`, `updated`) | No |
 | `lint_attribution` | Quality | No | No | No |
+| `fetch_pr_comments` | PR Review | No | No | Yes |
+| `reply_pr_comments` | PR Review | No | No | Yes |
 | `commit_transcript` | Logging | Yes | No | No |
 | `commit_events` | Logging | Yes | No | No |
+| `analyze_transcript` | Logging | No | No | No |
 | `summarize_agent_run` | Logging | No | No | No |

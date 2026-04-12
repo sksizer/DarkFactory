@@ -20,10 +20,13 @@ DarkFactory stores all configuration, PRDs, workflows, operations, and runtime a
     PRD-045.jsonl
   .darkfactory/
     config.toml                        # Project configuration
-    prds/                              # PRD documents
-      PRD-001-auth-refactor.md
-      PRD-002-add-logging.md
-      PRD-010-epic-runner-v2.md
+    data/                              # All PRD data lives under here
+      prds/                            # Active PRD documents
+        PRD-001-auth-refactor.md
+        PRD-002-add-logging.md
+        PRD-010-epic-runner-v2.md
+      archive/                         # Completed/cancelled PRDs (terminal states)
+        PRD-001-auth-refactor.md
     workflows/                         # Custom workflow definitions
       frontend/
         workflow.py
@@ -52,13 +55,14 @@ DarkFactory stores all configuration, PRDs, workflows, operations, and runtime a
 | Path | Tracked | Notes |
 |------|---------|-------|
 | `.darkfactory/config.toml` | Yes (optional) | Project configuration. Committed to share settings across team. |
-| `.darkfactory/prds/` | Yes | PRD documents. These are the source of truth for all work items. |
+| `.darkfactory/data/prds/` | Yes | Active PRD documents. These are the source of truth for all work items. |
+| `.darkfactory/data/archive/` | Yes (optional) | Archived PRDs (terminal states: `done`, `superseded`, `cancelled`). |
 | `.darkfactory/workflows/` | Yes (optional) | Custom workflow definitions. Committed to share workflow logic. |
 | `.darkfactory/operations/` | Yes (optional) | Custom system operations. Committed to share operational scripts. |
 | `.darkfactory/transcripts/` | Yes (optional) | Committed transcript copies produced by `commit_transcript`. |
 | `.darkfactory/events/` | No (git-ignored) | Runtime artifact. JSONL event logs for post-mortem analysis. |
 | `.worktrees/` | No (git-ignored) | Runtime artifact at repo root. Created by `ensure_worktree`. |
-| `.harness-transcripts/` | No (git-ignored) | Runtime artifact at repo root. Raw agent transcripts written by `claude --print`. |
+| `.harness-transcripts/` | No (git-ignored) | Runtime artifact at repo root. Raw agent transcripts written by `pnpm dlx @anthropic-ai/claude-code --print`. |
 
 The `.gitignore` entries for runtime directories:
 
@@ -77,19 +81,27 @@ Project configuration file. Controls model selection, timeout tiers, capability 
 
 This file is optional. DarkFactory uses sensible defaults for all settings. Create it only when you need to override defaults.
 
-## `prds/`
+## `data/`
 
-Contains all PRD documents as Markdown files with YAML frontmatter. This is the primary data store for DarkFactory -- the harness reads PRDs from this directory on every invocation.
+All PRD data lives under `.darkfactory/data/`. The harness auto-migrates older layouts (where PRDs were stored directly under `.darkfactory/prds/`) on startup via `ensure_data_layout()`.
+
+## `data/prds/`
+
+Contains all active PRD documents as Markdown files with YAML frontmatter. This is the primary data store for DarkFactory -- the harness reads PRDs from this directory on every invocation.
 
 **File naming**: `PRD-NNN-slug.md` (e.g., `PRD-042-add-retry-logic.md`). The frontmatter `id` field is authoritative; the filename is for human convenience.
 
-**Subdirectories**: Not supported. All PRDs must be direct children of `prds/`. The containment hierarchy is expressed via the `parent` frontmatter field, not via filesystem nesting.
+**Subdirectories**: Not supported. All PRDs must be direct children of `data/prds/`. The containment hierarchy is expressed via the `parent` frontmatter field, not via filesystem nesting.
 
 See the [PRD Frontmatter Schema](/reference/frontmatter/) for field definitions.
 
 <Aside type="caution">
-Do not nest PRDs in subdirectories. The harness scans `prds/*.md` (not recursive). PRDs in subdirectories will not be discovered.
+Do not nest PRDs in subdirectories. The harness scans `data/prds/*.md` (not recursive). PRDs in subdirectories will not be discovered.
 </Aside>
+
+## `data/archive/`
+
+Contains PRDs that have reached a terminal state (`done`, `superseded`, or `cancelled`) and been moved out of the active queue via `prd archive <PRD-ID>`. Archived PRDs are still visible to `prd tree` and other read-only commands but are excluded from execution planning.
 
 ## `workflows/`
 
@@ -131,9 +143,13 @@ prd cleanup --all
 
 ## `.harness-transcripts/` (repo root)
 
-Raw agent conversation transcripts in JSONL format. Written directly by `claude --print` during agent invocations. One file per PRD ID.
+Raw agent conversation transcripts in JSONL format. Written directly by `pnpm dlx @anthropic-ai/claude-code --print` during agent invocations. One file per PRD ID.
 
 These are the source files that `commit_transcript` copies into `.darkfactory/transcripts/`. They are git-ignored and can be deleted after the committed copy exists.
+
+<Aside type="note">
+These files are written by `pnpm dlx @anthropic-ai/claude-code --print` (the Claude Code CLI), not by `claude --print`. The harness invokes Claude Code via `pnpm dlx` to avoid a global installation requirement.
+</Aside>
 
 ## `.darkfactory/transcripts/`
 
@@ -159,4 +175,4 @@ To keep the `.darkfactory/` directory clean, periodically prune runtime artifact
 prd init
 ```
 
-This creates the `.darkfactory/` directory with a default `config.toml` and the `prds/` directory. The `.gitignore` for runtime directories is created automatically.
+This creates the `.darkfactory/` directory with a default `config.toml` and the `data/prds/` directory. The `.gitignore` for runtime directories is created automatically.
