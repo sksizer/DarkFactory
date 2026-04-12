@@ -49,7 +49,9 @@ def _make_ctx(
         targets=targets or [],
     )
     if shared_state and "candidates" in shared_state:
-        ctx.state.put(CandidateList(prd_ids=list(shared_state["candidates"])))  # type: ignore[arg-type]
+        candidates = shared_state["candidates"]
+        assert isinstance(candidates, list)
+        ctx.state.put(CandidateList(prd_ids=candidates))
     return ctx
 
 

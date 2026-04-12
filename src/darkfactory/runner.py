@@ -174,7 +174,7 @@ def run_tasks(
     styler: "Styler | None" = None,
     timeout_effort: str | None = None,
     timeout_capability: str | None = None,
-    timeout_frontmatter: object = None,
+    timeout_frontmatter: int | None = None,
 ) -> RunResult:
     """Unified dispatch loop for both workflow and system operation runs.
 
@@ -349,7 +349,7 @@ def _run_agent(
     styler: "Styler | None" = None,
     timeout_effort: str | None = None,
     timeout_capability: str | None = None,
-    timeout_frontmatter: object = None,
+    timeout_frontmatter: int | None = None,
 ) -> tuple[TaskStep, InvokeResult | None]:
     """Compose prompts, invoke Claude Code, store AgentResult in PhaseState."""
     prompt = compose_prompt_fn(task, ctx, extras)
@@ -425,7 +425,7 @@ def _run_shell(
     styler: "Styler | None" = None,
     timeout_effort: str | None = None,
     timeout_capability: str | None = None,
-    timeout_frontmatter: object = None,
+    timeout_frontmatter: int | None = None,
 ) -> TaskStep:
     """Run a shell command, handling on_failure policy with agent retry if configured."""
     cmd = ctx.format_string(task.cmd)

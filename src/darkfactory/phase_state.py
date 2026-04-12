@@ -13,7 +13,7 @@ typed data via :meth:`PhaseState.get`.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, TypeVar, overload
+from typing import Any, TypeVar, cast, overload
 
 T = TypeVar("T")
 
@@ -50,15 +50,15 @@ class PhaseState:
     @overload
     def get(self, key: type[T], default: T) -> T: ...
 
-    def get(self, key: type[T], default: Any = _SENTINEL) -> T:  # type: ignore[assignment]
+    def get(self, key: type[T], default: Any = _SENTINEL) -> T:
         """Retrieve the value for ``key``, or raise ``KeyError``.
 
         With a default, returns the default instead of raising.
         """
         if key in self._store:
-            return self._store[key]  # type: ignore[no-any-return]
+            return cast(T, self._store[key])
         if default is not _SENTINEL:
-            return default  # type: ignore[return-value]
+            return cast(T, default)
         raise KeyError(f"PhaseState has no {key.__name__!r} entry")
 
     def has(self, key: type) -> bool:
