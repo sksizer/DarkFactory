@@ -168,3 +168,25 @@ The right time to revisit this is **after PRD-224 has been in use for a few week
 - **PRD-213, 214, 215, 217, 218, 225** — all motivated by problems that don't exist in a derived-state world
 - **PRD-223 reconcile-status operation** — partially obsoleted by this PRD: if status is derived there's nothing to reconcile
 - **PRD-222 `.darkfactory/`** — provides the layout for the optional event log
+
+## Assessment (2026-04-11)
+
+- **Value**: 2/5 today (rising to 4/5 only if drift becomes a recurring
+  problem). The PRD author explicitly says this is "not a near-term
+  task" and that PRD-224's patch-based fixes need to "be in use for a
+  few weeks" before revisiting. PRD-224 is now landed. The honest
+  follow-up is "have we seen drift since?" and the answer today is
+  "rarely, and never painfully."
+- **Effort**: xl — this is an architectural migration, not a task.
+  Three phases, field rename, removal of the `set_status` builtin,
+  update of every read site, migration of every tool/CI integration
+  that currently reads the `status:` field.
+- **Current state**: greenfield. No derivation function, no
+  `--derived` flag, no phase-1 dual-source wiring.
+- **Gaps to fully implement**: everything in the PRD body.
+- **Recommendation**: defer — do not schedule. Re-score in one quarter
+  (2026-07 or later). If by then the drift patches are still
+  sufficient, close this PRD as "deliberately not pursued." The
+  cost of the migration is real and the pain it solves is currently
+  hypothetical. Keep the PRD as a design artifact in case the
+  situation changes.

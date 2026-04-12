@@ -91,3 +91,29 @@ Status `draft` until CI (PRD-530) is in place.
 - [[PRD-500-darkfactory-extraction]] — parent epic
 - [[PRD-530-darkfactory-ci-setup]] — must complete first
 - https://docs.pypi.org/trusted-publishers/
+
+## Assessment (2026-04-11)
+
+- **Value**: 2/5 today — PyPI publishing only matters for adoption
+  outside the author's machine. Currently zero external adopters.
+  Value jumps to 4/5 as soon as adoption is a real goal.
+- **Effort**: s — one GitHub Actions workflow file, pyproject metadata
+  completion, one-time PyPI account + Trusted Publishing setup. The
+  manual steps (PyPI reservation, TP config, `pypi` environment
+  creation) are not things the agent can do — they require human
+  action.
+- **Current state**: greenfield. `.github/workflows/release.yml`
+  doesn't exist. `pyproject.toml` metadata is minimal (check
+  `description`, `classifiers`, `urls`).
+- **Gaps to fully implement**:
+  - Author `release.yml` per the PRD's skeleton.
+  - Flesh out pyproject metadata (description, keywords, classifiers,
+    homepage URL).
+  - Human-only steps (reserve `darkfactory` on PyPI, configure
+    Trusted Publishing, create `pypi` environment).
+  - Document the install command in README.
+- **Recommendation**: defer — schedule alongside whatever other
+  "time to announce DarkFactory" milestone arrives. There's no point
+  publishing v0.1.0 to PyPI if nobody's going to `uv tool install`
+  it. Keep the PRD ready-to-go so the day you decide to release,
+  this is an afternoon of work.

@@ -136,3 +136,17 @@ Topological sort ensures dependencies run before dependents. The tiebreak (prior
 - [[PRD-220-graph-execution]] — the sequential rooted execution this extends.
 - [[PRD-551-parallel-graph-execution]] — parallel execution, natural next step for queue mode.
 - [[PRD-555-backlog-review-workflow]] — complementary: review hygiene ensures the ready queue is healthy before draining it.
+
+## Assessment (2026-04-11)
+
+- **Value**: 5/5 — this is how batch/overnight runs work at all. Every
+  `prd run --all --execute --max-runs N` invocation depends on it.
+- **Effort remaining**: 0 — all 5 children (563.1–563.5) are in `done`.
+  The `in-progress` status on the epic is purely stale bookkeeping.
+- **Current state**: drift / done. The feature shipped; only the epic
+  metadata hasn't caught up.
+- **Gaps to fully implement**:
+  - None in code. Flip `status: in-progress` → `status: done`.
+- **Recommendation**: supersede — flip epic to `done` in the next cleanup
+  pass. Any future queue-mode improvements (watch mode, parallel queue)
+  should land as new PRDs, not as new children of this one.

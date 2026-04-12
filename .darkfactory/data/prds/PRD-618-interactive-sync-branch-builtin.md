@@ -84,3 +84,18 @@ strict failure mode causes frequent friction in practice.
 ## References
 
 - PRD-617: `fast_forward_branch` builtin (prerequisite).
+
+## Assessment (2026-04-11)
+
+- **Value**: 2/5 — speculative. The PRD itself says "deferred until we
+  see whether `fast_forward_branch`'s strict failure mode causes
+  frequent friction in practice." No incident driving it yet.
+- **Effort**: m as scoped — interactive prompts, rebase/merge/force-reset
+  paths, event logging, non-TTY fallback. But it's largely composition
+  of already-existing primitives.
+- **Current state**: greenfield. `fast_forward_branch` exists
+  (`builtins/fast_forward_branch.py`), `sync_branch` does not.
+- **Gaps**: the whole PRD.
+- **Recommendation**: defer — keep the PRD as a design-in-waiting.
+  Only schedule after at least three documented incidents where
+  `fast_forward_branch`'s strict failure caused user friction.

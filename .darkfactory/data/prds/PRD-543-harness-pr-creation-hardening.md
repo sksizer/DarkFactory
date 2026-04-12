@@ -140,3 +140,33 @@ Furthermore, the deeper mistake was that the PRD should never have been re-run a
 
 - Incident today, 2026-04-08: PRD-228 was merged via PR #21 against `main` at 14:50:32. A subsequent re-run of the same PRD against base `docs/prd-231-planning-review` completed all steps through `push_branch` and then failed at `create_pr` with `returned non-zero exit status 1` — no error text. Manual re-invocation of the same `gh pr create` argv succeeded as PR #23, indicating the original failure was either transient or a gh-side cache artifact of the just-merged PR #21. Either way, the user had no way to diagnose it from the harness output alone, and the deeper issue was that the re-run should never have been started.
 - Related: PRD-542 (effort-based agent timeouts) — another reliability improvement to the harness motivated by the same class of "the run completed but the harness reported failure" problem.
+
+## Assessment (2026-04-11)
+
+- **Value**: 4/5 — two concrete incidents worth of pain, both high-signal.
+  (A) Opaque `gh` failures are currently the most common "the run almost
+  worked, now what?" moment; (B) re-running a merged PRD is a pattern
+  the harness should block by default, not produce confusing CI noise.
+- **Effort**: s — `builtins/create_pr.py` and `builtins/push_branch.py`
+  already exist as their own files post-PRD-549. The PR proposes a small
+  shared `run_cli` helper plus a `check_prd_already_merged` guard. No new
+  architecture.
+- **Current state**: greenfield. `create_pr.py` currently re-raises
+  `CalledProcessError` with argv only; there is no `_gh_check_merged`
+  helper and no `--force` flag on `prd run`.
+- **Gaps to fully implement**:
+  - Add `run_cli` (or inline in `create_pr.py` / `push_branch.py`)
+    capturing stdout + stderr and rendering the first stderr line
+    verbatim in the failure message.
+  - Add `check_prd_already_merged(prd, branch)` using
+    `gh pr list --head <branch> --state merged --json ... --limit 1`.
+    Call it from `runner.run_workflow` start-of-run and again inside
+    `create_pr` as a belt-and-suspenders check.
+  - Add `--force` to `prd run` in `cli/run.py`, plumb through
+    `ExecutionContext` (or the workflow kwargs).
+  - Unit tests for: stderr capture, merged-PR hit, merged-PR miss,
+    GitHub unreachable → warn-and-continue, `--force` override.
+- **Recommendation**: do-now — highest value-per-effort in the standalone
+  batch. Can land as a single PR paired with PRD-619 (which is a related
+  runner fix in the same area). Do not block on PRD-621 / utils refactor;
+  the `run_cli` helper can live in `builtins/_shared.py` for now.

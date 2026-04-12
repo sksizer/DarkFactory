@@ -43,3 +43,20 @@ This was surfaced across multiple PR reviews:
 - [ ] `prd new` creates PRDs with quoted date fields
 - [ ] Round-trip test passes (write PRD, read back, dates are `str` not `datetime.date`)
 - [ ] No unquoted date fields in `.darkfactory/prds/` after migration
+
+## Assessment (2026-04-11)
+
+- **Value**: n/a — the condition is already met by a different route.
+- **Effort**: xs (just flip status)
+- **Current state**: drift / done. PRD-622's deterministic serializer
+  in `src/darkfactory/model/_persistence.py` writes all date fields as
+  quoted strings by construction. A grep across the 220 active PRD files
+  shows every `created:` and `updated:` field is string-quoted. The
+  round-trip test that would be required to close this PRD is implicitly
+  covered by the deterministic-serialization contract in PRD-622.
+- **Gaps to fully implement**:
+  - None in code.
+  - Optional: add an explicit round-trip test for date preservation (xs).
+- **Recommendation**: supersede — flip status to `superseded` and
+  point at PRD-622 as the delivery vehicle. The blocked status is what
+  held this up; that block cleared when PRD-622 merged.

@@ -70,3 +70,25 @@ Completed PRDs accumulate alongside active work, cluttering status views and wor
 ## References
 
 - Parent epic: PRD-622
+
+## Assessment (2026-04-11)
+
+- **Value**: n/a — fully delivered.
+- **Effort**: n/a
+- **Current state**: drift / done. PRD-622 delivered the full
+  scope of this PRD:
+  - `src/darkfactory/cli/archive.py` exists and the `archive`
+    subcommand is wired in the parser (state survey confirmed).
+  - `archive()` is implemented in
+    `src/darkfactory/model/_persistence.py`.
+  - `load_all(data_dir, *, include_archived=False)` is the
+    post-PRD-622 signature.
+  - `archived` is a terminal status in `TERMINAL_STATUSES`.
+  - Guardrails are stricter than AC-4 (terminal status + BFS
+    transitive-dependency check, not just "not in-progress").
+- **Gaps**: none. Status is currently `ready` but the work is
+  done — the PRD frontmatter hasn't caught up.
+- **Recommendation**: supersede — flip to `superseded` in the
+  sweep. This one should have been handled in PR #173's
+  assessment but was only marked superseded on that branch,
+  not on main. Fixing the drift in this PR.

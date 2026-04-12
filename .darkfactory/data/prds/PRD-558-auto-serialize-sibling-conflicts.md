@@ -186,3 +186,38 @@ None of this is settled. The open questions below need discussion before committ
 - [[PRD-556-modularize-cli]] — 18-way fan-out, next victim of the pattern.
 - [[PRD-557-modularize-runner]] — 4-way fan-out, also affected.
 - `src/darkfactory/impacts.py` — existing overlap-detection helper.
+
+## Assessment (2026-04-11)
+
+- **Value**: 4/5 — this is the MVP that unblocks future N-way fan-outs
+  (PRD-556's 18 children already exposed the pain, any future
+  modularization will hit it again). The scheduler's "parallel siblings
+  collide on rebase" bug is the single most consistent source of
+  laboriously-hand-resolved conflicts. Even just shipping Option 1 buys
+  relief for every epic with a shared file.
+- **Effort**: m — the infrastructure already exists. `impacts.py` has
+  `impacts_overlap()`, `prd validate` already warns on sibling overlap,
+  PRD-220's executor already supports single-dep stacking. Option 1
+  (phantom `depends_on` at scheduling time) is a scheduler patch, not
+  a new subsystem.
+- **Current state**: scaffolded. `impacts.py` + the validate warning
+  are the plumbing. The executor in `graph_execution.py` does not yet
+  consult overlaps when picking the next sibling.
+- **Gaps to fully implement (Option 1 MVP)**:
+  - Extend `graph_execution.py` candidate selection: when multiple
+    sibling PRDs under the same parent are `ready`, compute
+    `impacts_overlap()` pairwise and order them by `(priority_rank, number)`
+    among overlapping siblings so later siblings wait.
+  - Emit a scheduling event line explaining why a sibling was deferred
+    (per AC-5). Reuse the existing `RunEvent` or extend to a new event
+    type.
+  - `prd run --no-auto-serialize` escape hatch flag (per the open
+    question).
+  - Tests: two-sibling overlap → serialized; three siblings where
+    only two overlap → the odd one out runs in parallel (once PRD-551
+    exists) or first (sequential).
+- **Recommendation**: do-next — schedule immediately after the next
+  fan-out epic is planned. Skip Options 2–6 entirely for now; revisit
+  only if Option 1 produces noticeable false-positives. Bind this PRD's
+  Option-1 scope into a single PR instead of waiting for the broader
+  PRD-545 cluster to be re-planned.

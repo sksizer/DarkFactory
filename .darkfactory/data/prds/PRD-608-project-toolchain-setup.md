@@ -315,3 +315,30 @@ These are explicitly out of scope but queued as separate PRDs:
 ## Open Questions
 
 (None remaining.)
+
+## Assessment (2026-04-11)
+
+- **Value**: 4/5 — this PRD blocks DarkFactory from being usable in
+  any project that isn't a `just`-based Python repo with these exact
+  recipe names. Every non-trivial adoption hits this wall first. The
+  frontmatter `value: 8` is author-set and directionally correct.
+- **Effort**: l — it's a genuine feature cluster: Pydantic config
+  validation, `SdlcSlotTask` runner support, per-ecosystem detector
+  package, interactive wizard, migration of all built-in workflows
+  off hardcoded `just` commands.
+- **Current state**: greenfield. `src/darkfactory/toolchain/` doesn't
+  exist. `SdlcSlotTask` isn't a task type. `[sdlc-slots]` isn't in
+  config schema. `cli/init_cmd.py` exists but is scaffold-only — no
+  wizard, no detection. Built-in workflows still use hardcoded
+  `ShellTask("just lint")`-style steps.
+- **Gaps to fully implement**: every requirement (R1–R8) is new work.
+  Requires new Pydantic dependency (small), new task type, new
+  execution-context resolution logic, and a non-trivial wizard loop.
+- **Recommendation**: defer until adoption becomes concrete — when
+  another project seriously evaluates DarkFactory, this becomes
+  do-now. In the meantime, the author should consider a *much*
+  narrower carve-out: (a) add `SdlcSlotTask` to the workflow type
+  system, (b) add `[sdlc-slots]` to config, (c) teach the existing
+  workflows to read from config instead of hardcoding. That's
+  m-effort and delivers 80% of the value. The full detection engine
+  + interactive wizard can wait for real user feedback.

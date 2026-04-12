@@ -176,3 +176,44 @@ A follow-up could run a "declared vs actual impacts" check after each PRD merges
 - Prior art: `prd conflicts <ID>` CLI command in `src/darkfactory/cli.py`.
 - Originating incident: [[PRD-549-builtins-package-split]] — the epic whose nine-parallel-children design exposed this gap. AC-12 of this PRD explicitly targets re-running that design without the `_legacy.py` workaround.
 - [[PRD-543-harness-pr-creation-hardening]] — overlaps in spirit: both are "the harness needs to surface and act on information it already has."
+
+## Assessment (2026-04-11)
+
+- **Value**: 3/5 (as four phases) / 4/5 (if split). The end-state
+  is compelling but the PRD bundles four materially different-sized
+  phases. Phase 1 (scheduler) is the closest sibling of PRD-558 Option 1
+  and delivers most of the per-epic benefit. Phases 2–3 (auto-rebase +
+  agent conflict resolver) are large and interact with production git
+  state. Phase 4 (state machine + crash recovery) is its own PRD-sized
+  piece.
+- **Effort**: l-to-xl as scoped. Realistically this is a multi-sprint
+  initiative and should never land as a single PR.
+- **Current state**: greenfield. `src/darkfactory/scheduler.py` and
+  `src/darkfactory/rebase.py` don't exist. `run_epic` entry point
+  doesn't exist. The `resolve_conflict` workflow doesn't exist.
+  `workflows/` has no conflict-resolution template. PRD-220's executor
+  doesn't reason about conflicts at all.
+- **Gaps to fully implement**:
+  - **Phase 1** (scheduler): build `scheduler.py` that consumes
+    `find_conflicts()` output + `depends_on` and yields execution waves.
+    Also add `prd run --dry-run` plan printing. This overlaps substantially
+    with PRD-558 Option 1; the two should be reconciled rather than
+    built twice.
+  - **Phase 2** (auto-rebase): `rebase.py` + runner hook to call it.
+    Handles the "clean rebase → re-run checks" case. Force-push with
+    lease per AC-4. Significant git state-machine work.
+  - **Phase 3** (agent resolver): new `workflows/resolve_conflict/`
+    plus a dedicated conflict-resolution agent task type. Known-pattern
+    library risk is real; scope to "present conflict, run agent, verify
+    tests, stop on failure" without trying to auto-resolve anything
+    mechanically.
+  - **Phase 4** (state + recovery): extend event log / state file to
+    carry per-PRD execution state across crashes. Needs careful
+    semantics around mid-flight worktrees.
+- **Recommendation**: split — do NOT plan PRD-545 as written. Carve off
+  Phase 1 into a re-planned scheduler PRD that subsumes PRD-558's
+  Option 1 (one piece of work, not two). Phase 2 becomes its own PRD
+  after Phase 1 exists. Phases 3–4 defer until we have concrete
+  merge-conflict frequency data from Phases 1–2. Until then, the
+  `_legacy.py` / additive-first authoring convention handles most
+  modularization fan-outs.

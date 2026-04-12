@@ -203,3 +203,25 @@ prd discover [--source code|pr|all] [--dry-run]
 ## Open Questions
 
 (None remaining.)
+
+## Assessment (2026-04-11)
+
+- **Value**: 3/5 — the "onboarding a new project" story is real and
+  useful, but today DarkFactory has exactly one project using it
+  (itself). The marginal value on this repo is low because the
+  codebase's TODOs are already mostly captured as PRDs. Rises to 4/5
+  for a second-adopter scenario.
+- **Effort**: l — two scanners (code comments, PR comments), clustering,
+  interactive triage loop, config schema, `source_ref` field, AI
+  classification pass for PR comments. This is multiple modules plus
+  a real CLI subsurface.
+- **Current state**: greenfield. No `discover.py`, no `scanners/`,
+  no `cmd_discover`, no `source_ref` field on the PRD dataclass.
+- **Gaps to fully implement**: every requirement (R1–R8) is new work.
+- **Recommendation**: defer — good PRD quality, but not a good bet for
+  the single-user era. When a second adopter seriously engages, this
+  PRD rises to a do-next in the onboarding batch alongside PRD-608
+  and PRD-564. Until then, the author's self-assigned `value: 5`
+  frontmatter overstates the current-moment usefulness — the real
+  current value is 3 and the PRD is primarily a capture of "what we'd
+  need to smooth onboarding later."

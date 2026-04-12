@@ -112,3 +112,20 @@ Three reasons:
 - [[PRD-545-harness-driven-rebase-and-conflict-resolution]] — the per-epic scheduler this PRD generalizes to global scope. Hard dependency.
 - [[PRD-546-impact-declaration-drift-detection]] — the source of truth for "effective impacts" that this PRD's registry consults. Soft dependency; both can ship in either order, but they're better together.
 - `src/darkfactory/impacts.py` and `src/darkfactory/containment.py` — the underlying primitives.
+
+## Assessment (2026-04-11)
+
+- **Value**: 2/5 today — the "two epics running simultaneously" scenario
+  this guards against doesn't happen in the current single-developer
+  usage pattern. It's a real concern for a team setting, but this is not
+  a team product today. Rises to 4/5 in a multi-developer world.
+- **Effort**: l — new `registry.py` module, atomic file locking, state
+  persistence, stale-entry GC, a `prd queue` subcommand, plus hooks
+  into every `runner.run_epic` / `runner.run_prd` entry.
+- **Current state**: greenfield. Nothing from this PRD exists.
+- **Gaps to fully implement**: all of it — new module, new CLI command,
+  new file format, new atomic-write discipline, new runner hooks.
+- **Recommendation**: defer — do not schedule until (a) PRD-545 Phase 1
+  lands and (b) there's actual concurrent usage driving the need.
+  Keep as a reference design for when the team case becomes real.
+  Hard dep on PRD-545 makes this a natural follow-up, not a standalone.

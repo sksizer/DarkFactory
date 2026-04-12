@@ -89,3 +89,19 @@ These could be standalone workflow steps rather than substitutes for missing slo
 ## Acceptance Criteria
 
 (To be defined after value is validated.)
+
+## Assessment (2026-04-11)
+
+- **Value**: 2/5 — the PRD author explicitly flags this as "not yet
+  validated as valuable." The concrete example ("no linter configured
+  → agent reviews code") is strictly worse than "no linter configured
+  → be honest about it." Token cost dominates value.
+- **Effort**: m — new `agent_substitute` flag on `SdlcSlotTask`, new
+  workflow prompt bundle, new fallback path in the runner.
+- **Current state**: greenfield. Blocked on PRD-608 which is itself
+  deferred.
+- **Gaps**: all of it.
+- **Recommendation**: defer — drop if PRD-608 ships in a reduced scope
+  that doesn't include substitution. Do not invest design effort
+  here without first proving value on a single real adopter who
+  wants it.

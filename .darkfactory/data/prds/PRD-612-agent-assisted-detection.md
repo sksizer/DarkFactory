@@ -96,3 +96,15 @@ reasoning: "pyrightconfig.json exists but no explicit typecheck script found"
 ## Acceptance Criteria
 
 (To be defined after PRD-608 is implemented.)
+
+## Assessment (2026-04-11)
+
+- **Value**: 2/5 — useful only when the deterministic detection
+  engine from PRD-608 misses something. PRD-608 isn't scheduled;
+  this is speculative scaffolding for speculative scaffolding.
+- **Effort**: s — relatively small given PRD-608's detector registry.
+- **Current state**: greenfield.
+- **Gaps**: all of it.
+- **Recommendation**: defer — only schedule if PRD-608 lands AND a
+  real project produces an unresolved-slot case that static
+  detection can't handle.

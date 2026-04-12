@@ -299,3 +299,35 @@ The runner parses the `created:` line into `ctx.run_summary["created_children"]`
 - **Decoupling**: PRD-227's template work is its own non-trivial epic; binding planning to it would block both
 - **Validation**: shipping the convention-based version first surfaces what the hard enforcement actually needs to constrain (we may discover the agent never tries to touch source files in practice, in which case the hardening is more belt-and-suspenders than load-bearing)
 - **Reusability**: the `verify_path_scope`, `set_blocks`, and `update_frontmatter_block_at` primitives this PRD adds are useful beyond planning — other future workflows can adopt them
+
+## Assessment (2026-04-11)
+
+- **Value**: 3/5 — this is the hardening pass for PRD-228's planning
+  workflow. The honor-system holes it closes (Edit leak, tool-allowlist
+  bypass, manual close sequence) are real but not currently causing
+  incidents. Value rises to 4/5 in a multi-contributor setting.
+- **Effort**: m — three non-trivial primitives
+  (`verify_path_scope`, `set_blocks`, `update_frontmatter_block_at`),
+  plus `forbidden_path_globs` template field addition, plus migration
+  of `workflows/planning/workflow.py` onto the template.
+- **Current state**: blocked by design. Depends on PRD-227 (workflow
+  template machinery). PRD-227's children appear to be in `done` status
+  — check whether `PLANNING_TEMPLATE` actually exists in
+  `templates_builtin.py`. If yes, this PRD is unblocked.
+- **Gaps to fully implement**:
+  - Add `forbidden_path_globs` field to `WorkflowTemplate`.
+  - Implement `verify_path_scope` builtin (expand `git status
+    --porcelain` + glob match against template field).
+  - Implement `set_blocks` builtin with `from_run_summary_field`
+    param, plus `update_frontmatter_block_at` helper in
+    `model/_persistence.py`.
+  - Migrate `workflows/planning/workflow.py` to compose from
+    `PLANNING_TEMPLATE`.
+  - Update `prompts/task.md` to emit `created: PRD-X, ...` tail.
+  - Parse that tail into `ctx.run_summary["created_children"]`.
+  - Tests (positive + negative for each new primitive).
+- **Recommendation**: do-next AFTER PRD-554 (soft prompt hardening)
+  lands. PRD-554 is cheaper and gets most of the real-world reliability
+  win. This PRD adds the architectural guarantees on top. Bundle with
+  PRD-567.5 (planning template alignment) since both modify the
+  same workflow and template field.

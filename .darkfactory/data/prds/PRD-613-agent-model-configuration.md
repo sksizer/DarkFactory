@@ -142,3 +142,29 @@ With multiple providers at different price points, cost tracking becomes more va
 ## Acceptance Criteria
 
 (To be defined. Phase 1 — wiring up existing config — could be a quick win.)
+
+## Assessment (2026-04-11)
+
+- **Value**: 3/5 for Phase 1 (wire up existing config) / 2/5 for
+  Phases 2–3 (multi-provider). Phase 1 closes a real debt — the
+  scaffolding in `config.py` + `resolve_config()` currently does
+  nothing at runtime because `runner._pick_model` reads hardcoded
+  `CAPABILITY_MODELS` from `invoke.py`. Phases 2–3 are speculative
+  (no real pain around "I need a non-Claude model today").
+- **Effort**: Phase 1 = xs–s. Phases 2+3 = l.
+- **Current state**: scaffolded. Config infrastructure exists and is
+  unwired. The PRD's "phased specification" accurately describes the
+  gap.
+- **Gaps to fully implement Phase 1**:
+  - Import `config.model` in `runner._pick_model` or `invoke.py`.
+  - Replace the hardcoded `CAPABILITY_MODELS` lookup with a lookup
+    against `config.model.<tier>`.
+  - Fall back to hardcoded defaults if config is absent.
+  - Support `--model` CLI override (already there — verify).
+  - Tests for config override, default fallback, CLI override
+    precedence.
+- **Recommendation**: split — carve off Phase 1 as a standalone xs/s
+  PRD and do-next it. Defer phases 2–3 indefinitely, revisit only
+  if a real non-Claude use case appears. As written, the PRD wastes
+  the Phase 1 quick win by bundling it with the multi-provider
+  infrastructure investigation.

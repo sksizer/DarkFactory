@@ -97,3 +97,23 @@ Smaller fan-out than PRD-549 (4 real children instead of 9), less parallel oppor
 - [[PRD-556-modularize-cli]] — sibling modularization of the other large module.
 - [[PRD-552-merge-upstream-task]] — likely future dispatcher consumer.
 - Current `src/darkfactory/runner.py` — 465 lines.
+
+## Assessment (2026-04-11)
+
+- **Value**: 2/5 — `runner.py` at ~465 lines is moderately sized but
+  not painful. The diff-noise argument that justified PRD-549 (builtins
+  at 582 LOC with 9 public functions) and PRD-556 (cli.py at 1423 LOC
+  with 15 handlers) doesn't hold at this size. Modularizing for
+  modularization's sake is not a load-bearing win.
+- **Effort**: m as scoped — four real children (builtin, agent, shell,
+  loop). Tooling is established so the cost per move is small.
+- **Current state**: greenfield. `runner.py` is still a monolith. No
+  `runner/` package directory.
+- **Gaps to fully implement**: everything in the PRD body.
+- **Recommendation**: defer — revisit only if (a) PRD-552's
+  merge-upstream task lands and adds a fourth dispatcher, pushing the
+  file past ~600 LOC, or (b) the retry-agent path gets non-trivially
+  more complex and its isolation testability matters. In the meantime,
+  land the `_run_shell_once` extraction (PRD-600.3.1 / PRD-621) as a
+  one-commit cleanup that delivers the duplication win without
+  committing to a full package refactor.

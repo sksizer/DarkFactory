@@ -61,3 +61,24 @@ PR #146 (documentation site) has ~30 review comments identifying inaccuracies be
 - [ ] All CLI output examples match `prd plan`/`prd run` output
 - [ ] All config examples match `src/darkfactory/` config handling
 - [ ] Sentinel format uses colon form (`PRD_EXECUTE_OK:`)
+
+## Assessment (2026-04-11)
+
+- **Value**: 3/5 — doc accuracy matters if anyone is reading the
+  docs site. Today most usage is author-driven and reads code
+  directly, so the felt pain is low. Rises to 5/5 when another
+  adopter engages via the docs.
+- **Effort**: m — ~30 review comments worth of concrete fixes, each
+  small but requiring cross-reference to the current API. Well
+  scoped; no design work needed, just corrections.
+- **Current state**: status is `review` meaning the work is in
+  progress on a branch. Expected to close soon.
+- **Gaps to fully implement**:
+  - Address each of the five categories listed in the PRD body
+    (field names, paths, behavioral inaccuracies, CLI examples,
+    sentinel format).
+  - Every AC has a clear target file in `site/src/content/docs/`.
+- **Recommendation**: do-now — land the existing review PR. If the
+  branch has gone stale, reassemble against current main and close
+  it out. The docs site is a low-traffic but high-leverage adoption
+  surface; inaccurate docs are an explicit credibility hit.

@@ -187,3 +187,35 @@ Without this skill, every new PRD is a coin flip between "ready for execution" a
 - `src/darkfactory/workflows/planning/` — existing planning workflow, pattern reference for the new workflow
 - `src/darkfactory/workflows/default/` — default workflow, structural reference
 
+## Assessment (2026-04-11)
+
+- **Value**: 3/5 — the "blank page paralysis" problem is real, but
+  the project's existing PRD-616 (`prd discuss`) command already
+  covers most of the same territory for interactive discussion. This
+  PRD's additional value is (a) the `/prd-refine` rubric check and
+  (b) the `prd-authoring` workflow for programmatic refinement.
+- **Effort**: m — the slash-command side is small (markdown files).
+  The `prd-authoring` workflow + `prd init`-side bundling + package
+  data wiring is where the real work is. The rubric content is easy
+  to write; enforcing it via AC-8 (matching formatting / section
+  ordering) requires tests against existing PRD files.
+- **Current state**: partially scaffolded for the adjacent work
+  (PRD-616's `cli/discuss.py` already exists). No `/prd-create` or
+  `/prd-refine` skill files. No `prd-authoring` workflow.
+- **Gaps to fully implement**:
+  - Author `/prd-create` and `/prd-refine` skill files (markdown).
+  - Bundle them as package data under
+    `src/darkfactory/data/commands/`.
+  - Extend `prd init` (or `init_cmd.py`) to copy them into
+    `.claude/commands/`.
+  - Create `workflows/prd-authoring/` with role/task/verify prompts.
+  - Rubric as a shared markdown file both the skill and workflow
+    consume.
+  - Tests for idempotent re-init, generated-PRD shape.
+- **Recommendation**: defer — `prd discuss` (PRD-616) already landed
+  and is conceptually the same thing. Before building this PRD,
+  evaluate whether extending `prd discuss` with a rubric pass covers
+  enough of R2/R3 to make the standalone `/prd-refine` unnecessary.
+  If yes, this PRD shrinks to "add a rubric + quality gate to the
+  existing discuss flow," which is s-effort and could be a
+  do-next. The current PRD as written overlaps its predecessor.
