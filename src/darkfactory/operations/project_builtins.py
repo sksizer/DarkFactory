@@ -96,8 +96,6 @@ def project_load_prds_by_status(ctx: ProjectContext, *, status: str) -> None:
     )
 
 
-
-
 def _is_merged_standard(repo_root: str, branch: str) -> bool:
     """Return True if ``branch`` (local or remote) is listed in ``git branch --merged main``."""
     cwd = Path(repo_root)

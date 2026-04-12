@@ -49,8 +49,7 @@ def _find_violations() -> list[str]:
                     imported_pkg = segments[0]
                     if imported_pkg != file_pkg:
                         violations.append(
-                            f"{rel}:{node.lineno}: "
-                            f"cross-package private import: {mod}"
+                            f"{rel}:{node.lineno}: cross-package private import: {mod}"
                         )
                     break
 

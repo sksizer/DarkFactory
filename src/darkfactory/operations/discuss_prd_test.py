@@ -48,7 +48,9 @@ def test_discuss_prd_composes_prompt(tmp_path: Path) -> None:
         captured_prompts.append(prompt)
         return 0
 
-    with patch("darkfactory.operations.discuss_prd.spawn_claude", side_effect=mock_spawn):
+    with patch(
+        "darkfactory.operations.discuss_prd.spawn_claude", side_effect=mock_spawn
+    ):
         with patch("darkfactory.operations.discuss_prd.time.sleep"):
             discuss_prd(ctx, phase="discuss", prompt_file="prompts/discuss.md")
 
@@ -101,7 +103,9 @@ def test_discuss_prd_forwards_effort_level(tmp_path: Path) -> None:
         captured.append(effort_level)
         return 0
 
-    with patch("darkfactory.operations.discuss_prd.spawn_claude", side_effect=mock_spawn):
+    with patch(
+        "darkfactory.operations.discuss_prd.spawn_claude", side_effect=mock_spawn
+    ):
         with patch("darkfactory.operations.discuss_prd.time.sleep"):
             discuss_prd(
                 ctx,

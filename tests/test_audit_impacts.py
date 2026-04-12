@@ -288,7 +288,9 @@ def test_operation_via_runner_clean(tmp_path: Path) -> None:
         dry_run=False,
     )
 
-    from darkfactory.operations.project_builtins import SYSTEM_BUILTINS as runner_builtins
+    from darkfactory.operations.project_builtins import (
+        SYSTEM_BUILTINS as runner_builtins,
+    )
 
     assert "audit_impacts_check" in runner_builtins
 

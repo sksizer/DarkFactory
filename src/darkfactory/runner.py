@@ -546,7 +546,6 @@ def _run_shell(
     )
 
 
-
 def _run_interactive(task: InteractiveTask, ctx: Any) -> TaskStep:
     """Launch an interactive Claude Code session via spawn_claude."""
     if ctx.dry_run:

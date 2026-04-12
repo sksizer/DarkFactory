@@ -2,7 +2,7 @@
 id: PRD-632
 title: Reorganize workflow and operation definitions into prd/ and project/ namespaces
 kind: task
-status: in-progress
+status: review
 priority: medium
 effort: l
 capability: complex

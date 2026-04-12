@@ -245,9 +245,7 @@ def test_load_skips_operations_missing_attribute(
 def test_load_skips_operations_with_wrong_type(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    _write_operation(
-        tmp_path, "wrong", body="operation = 'not a ProjectOperation'\n"
-    )
+    _write_operation(tmp_path, "wrong", body="operation = 'not a ProjectOperation'\n")
     with caplog.at_level(logging.WARNING, logger="darkfactory.loader"):
         result = load_operations(tmp_path, include_builtins=False, include_user=False)
     assert result == {}

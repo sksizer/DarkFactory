@@ -43,7 +43,9 @@ def test_user_accepts_commit(tmp_path: Path) -> None:
     _, prds = setup_repo_with_prd(tmp_path)
     ctx = make_project_ctx(tmp_path, prds=prds, target_prd="PRD-070")
 
-    with patch("darkfactory.operations.commit_prd_changes.prompt_user", return_value="y"):
+    with patch(
+        "darkfactory.operations.commit_prd_changes.prompt_user", return_value="y"
+    ):
         with patch("darkfactory.operations.commit_prd_changes.diff_show"):
             commit_prd_changes(ctx)
 
@@ -61,7 +63,9 @@ def test_user_skips_commit(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -
     _, prds = setup_repo_with_prd(tmp_path)
     ctx = make_project_ctx(tmp_path, prds=prds, target_prd="PRD-070")
 
-    with patch("darkfactory.operations.commit_prd_changes.prompt_user", return_value="n"):
+    with patch(
+        "darkfactory.operations.commit_prd_changes.prompt_user", return_value="n"
+    ):
         with patch("darkfactory.operations.commit_prd_changes.diff_show"):
             commit_prd_changes(ctx)
 
@@ -73,7 +77,9 @@ def test_user_default_skips(tmp_path: Path, capsys: pytest.CaptureFixture[str]) 
     _, prds = setup_repo_with_prd(tmp_path)
     ctx = make_project_ctx(tmp_path, prds=prds, target_prd="PRD-070")
 
-    with patch("darkfactory.operations.commit_prd_changes.prompt_user", return_value=""):
+    with patch(
+        "darkfactory.operations.commit_prd_changes.prompt_user", return_value=""
+    ):
         with patch("darkfactory.operations.commit_prd_changes.diff_show"):
             commit_prd_changes(ctx)
 
@@ -110,7 +116,9 @@ def test_other_dirty_files_noted(
 
     ctx = make_project_ctx(tmp_path, prds=prds, target_prd="PRD-070")
 
-    with patch("darkfactory.operations.commit_prd_changes.prompt_user", return_value="y"):
+    with patch(
+        "darkfactory.operations.commit_prd_changes.prompt_user", return_value="y"
+    ):
         with patch("darkfactory.operations.commit_prd_changes.diff_show"):
             commit_prd_changes(ctx)
 
@@ -133,7 +141,9 @@ def test_commit_only_target_prd_file(tmp_path: Path) -> None:
 
     ctx = make_project_ctx(tmp_path, prds=prds, target_prd="PRD-070")
 
-    with patch("darkfactory.operations.commit_prd_changes.prompt_user", return_value="y"):
+    with patch(
+        "darkfactory.operations.commit_prd_changes.prompt_user", return_value="y"
+    ):
         with patch("darkfactory.operations.commit_prd_changes.diff_show"):
             commit_prd_changes(ctx)
 
