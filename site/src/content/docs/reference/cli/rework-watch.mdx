@@ -1,0 +1,92 @@
+---
+title: "prd rework-watch"
+description: "Polling daemon that auto-triggers rework when new PR review comments appear"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd rework-watch [--daemon | --status | --pause | --resume | --stop]
+                 [--interval SECONDS] [--max-reworks N]
+```
+
+## Description
+
+Watches all open PRs whose head branch matches `prd/PRD-*` and automatically runs `prd rework PRD-X --execute` whenever new review comments appear. This closes the feedback loop without manual polling — reviewers leave comments, the daemon picks them up, and rework runs.
+
+By default the command runs in the **foreground** and blocks until interrupted with `Ctrl-C`. Use `--daemon` to fork it to the background.
+
+## Modes
+
+The mode flags are mutually exclusive. Omitting all of them runs in foreground.
+
+| Flag | Description |
+|------|-------------|
+| *(none)* | Run poll loop in foreground (blocks) |
+| `--daemon` | Fork to background, write PID file, return immediately |
+| `--status` | Print whether the daemon is running/paused/stopped and exit |
+| `--pause` | Create a pause file — daemon skips poll cycles until resumed |
+| `--resume` | Remove the pause file — daemon resumes polling |
+| `--stop` | Send `SIGTERM` to the background daemon and exit |
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--interval SECONDS` | `60` | Poll interval between PR checks |
+| `--max-reworks N` | `3` | Maximum rework cycles per PR per hour (rate limit) |
+
+## State files
+
+All state is persisted under `.darkfactory/state/`:
+
+| File | Purpose |
+|------|---------|
+| `rework-watch.json` | Tracks seen comment IDs and rework timestamps per PR |
+| `rework-watch.pid` | PID of the background daemon |
+| `rework-watch.pause` | Presence of this file pauses the daemon |
+
+## Examples
+
+```bash frame="terminal" title="Run in foreground"
+$ prd rework-watch
+# polls every 60s; Ctrl-C to stop
+```
+
+```bash frame="terminal" title="Start as background daemon"
+$ prd rework-watch --daemon
+rework-watch: daemon started (PID 12345)
+```
+
+```bash frame="terminal" title="Check daemon status"
+$ prd rework-watch --status
+rework-watch: running (PID 12345)
+```
+
+```bash frame="terminal" title="Pause, resume, and stop"
+$ prd rework-watch --pause
+rework-watch: pause file created
+
+$ prd rework-watch --resume
+rework-watch: pause file removed
+
+$ prd rework-watch --stop
+rework-watch: sent SIGTERM to PID 12345
+```
+
+```bash frame="terminal" title="Faster polling, tighter rate limit"
+$ prd rework-watch --daemon --interval 30 --max-reworks 5
+rework-watch: daemon started (PID 12346)
+```
+
+## Behavior details
+
+- **Startup check** — on start, the daemon verifies that a worktree exists for every open PRD PR. If any are missing it exits with an error rather than triggering a rework against a non-existent worktree.
+- **Rate limiting** — each PR is limited to `--max-reworks` rework cycles per rolling 60-minute window to prevent runaway loops on noisy review threads.
+- **Concurrency guard** — if a PRD's worktree lock is already held (e.g. a manual `prd rework --execute` is running), the daemon skips that PR for the current cycle.
+- **Comment tracking** — seen comment IDs are persisted to `rework-watch.json` after every cycle. If rework fails (non-zero exit), IDs are not updated so the comments are retried next cycle.
+
+## Related
+
+- [`prd rework`](/reference/cli/rework/) -- Manual rework for a single PRD
+- [`guides/rework`](/guides/rework/) -- Rework workflow and prompt anatomy

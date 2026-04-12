@@ -1,0 +1,62 @@
+---
+title: "prd discuss"
+description: "Run an interactive Claude Code discussion chain for a PRD"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd discuss PRD-ID
+```
+
+## Description
+
+Runs a multi-phase interactive discussion chain for a PRD using Claude Code. Three phases execute in sequence — context gathering, collaborative discussion, and critical review — each launching Claude Code interactively. When all phases complete, any PRD edits are automatically committed.
+
+This is a system-level operation and always executes immediately (no dry-run mode).
+
+### Phases
+
+| Phase | What happens |
+|-------|-------------|
+| **gather** | Loads PRD content, dependencies, and related context into the session |
+| **discuss** | Interactive Claude Code session for open-ended refinement of the PRD |
+| **critique** | Second Claude Code session applying a critical review lens |
+| **commit** | Commits any edits made to the PRD file during the session |
+
+Both discussion phases run Opus with `--effort max` (highest adaptive-reasoning budget) since refinement and critique benefit from deeper deliberation.
+
+Use `/exit` or `Ctrl-D` within each interactive phase to advance to the next.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `PRD-ID` | Yes | The PRD to discuss (e.g. `PRD-070`) |
+
+## Examples
+
+```bash frame="terminal" title="Discuss a PRD interactively"
+$ prd discuss PRD-070
+Gathering context for PRD-070...
+[Phase 1/2: discuss]  Claude Code launching...
+> /exit
+[Phase 2/2: critique]  Claude Code launching...
+> /exit
+Committing PRD edits...
+```
+
+```bash frame="terminal" title="Create a new PRD and immediately start a discussion"
+$ prd new "Improve rate limiting" --discuss
+Created .darkfactory/data/prds/PRD-083-improve-rate-limiting.md
+Gathering context for PRD-083...
+[Phase 1/2: discuss]  Claude Code launching...
+```
+
+The `--discuss` flag on `prd new` chains directly into the discuss operation after the file is created.
+
+## Related
+
+- [`prd new`](/reference/cli/new/) -- `--discuss` flag launches discuss immediately after creation
+- [`prd run`](/reference/cli/run/) -- Execute the PRD workflow once the PRD is ready
+- [`guides/writing-prds`](/guides/writing-prds/) -- PRD authoring best practices
