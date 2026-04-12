@@ -45,3 +45,23 @@ During the PRD-556.x modularization reviews, several pre-existing issues were id
 - [ ] No unbounded `events` accumulation in run.py (removed or consumed)
 - [ ] assign_cmd.py comment matches actual output format
 - [ ] Consistent `is not None` check for workflow in assign_cmd.py
+
+## Assessment (2026-04-11)
+
+- **Value**: 3/5 — the unbounded `events` accumulation in `cmd_run`
+  is a real (if slow-growing) memory leak; the `assign_cmd.py`
+  inconsistencies are comment/behavior drift. Both are polish, not
+  correctness, but they're cheap to fix.
+- **Effort**: xs — three focused edits in two files.
+- **Current state**: greenfield on the fixes. Blocked status should
+  unblock immediately — PRD-556 is essentially done (see its
+  assessment) and nothing else holds this up.
+- **Gaps to fully implement**:
+  - Remove the unused `events` list from `cmd_run` in `cli/run.py`
+    (or wire it into a post-run summary if the intent was to emit
+    a batch report).
+  - Fix the comment in `cli/assign_cmd.py` to match the "explicit"
+    column output.
+  - Standardize to `is not None` for the workflow truthiness check.
+- **Recommendation**: do-now — unblock, pair with PRD-556.18 as the
+  modularization close-out PR. Half-hour of work including tests.

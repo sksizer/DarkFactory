@@ -67,3 +67,34 @@ The clearest value of DarkFactory is fanning out independent work. Epics like PR
 - [[PRD-220-graph-execution]] — the sequential foundation.
 - [[PRD-546-impact-declaration-drift-detection]] — same file-set computation.
 - [[PRD-549-builtins-package-split]] — the intended first real stress test.
+
+## Assessment (2026-04-11)
+
+- **Value**: 3/5 — the headline pitch ("nine independent refactors in
+  parallel") is real, but the top 3–5 candidate epics for fan-out are
+  either done (PRD-549, PRD-556 children) or blocked on other work.
+  Sequential execution is sufficient for current throughput given a
+  one-developer usage pattern. Value jumps to 5/5 in a multi-developer
+  context or once an 18-way epic with strict timing lands.
+- **Effort**: m — the technical plan is already crisp (strategy pattern,
+  `ThreadPoolExecutor`, `pick_batch`). The hard parts are test design
+  (reproducible parallel output for assertions) and honest dry-run
+  batch-grouping output, not the executor itself.
+- **Current state**: greenfield. `runner.py` / `graph_execution.py` are
+  single-threaded throughout. No `--parallel` flag on `prd run`.
+- **Gaps to fully implement**:
+  - `pick_batch(ready, prds, repo_root, max_jobs)` pure function in
+    `impacts.py` or a new `scheduler.py`.
+  - Parallel executor wrapping the existing run loop with
+    `ThreadPoolExecutor`.
+  - `--parallel` / `--parallel-jobs` flags on `prd run`, mutually
+    exclusive with `--rooted`-only paths if any.
+  - `batch_id` added to `RunEvent` / event log for correlation.
+  - Dry-run printing of batch groupings.
+  - Tests for: parallel success, one-failure-doesn't-cancel-siblings,
+    overlap-serialization, filters, exclusions.
+- **Recommendation**: defer — do not schedule until either (a) PRD-558
+  Option 1 sibling serialization lands (so parallel executor has the
+  overlap-awareness plumbing it needs), or (b) a concrete multi-dev
+  usage pattern forces the throughput case. In the meantime, the
+  sequential drain-ready-queue from PRD-563 covers the 95% case.

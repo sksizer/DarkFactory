@@ -39,3 +39,23 @@ Additionally, no tests verify that emitted transcripts are valid JSONL.
 - [ ] Every line in emitted `.jsonl` transcripts is valid JSON
 - [ ] Non-JSON stdout lines are wrapped in a `darkfactory_stdout_text` JSON envelope
 - [ ] Test exists verifying JSONL validity including dry-run case
+
+## Assessment (2026-04-11)
+
+- **Value**: 3/5 — closes an actual JSONL contract violation. The
+  transcript file is the input to `analyze_transcript` and any
+  other tooling that reads it; a bad line breaks every downstream
+  consumer. Low-frequency but high-impact when it hits.
+- **Effort**: s — validate each stdout line with `json.loads`, wrap
+  non-JSON lines in `{"type": "darkfactory_stdout_text", ...}`,
+  add one test that exercises the dry-run path.
+- **Current state**: greenfield. `runner.py`'s `_write_transcript`
+  appends raw stdout. Blocked status is again spurious — probably
+  waiting for PRD-559.4/5 to flip.
+- **Gaps to fully implement**:
+  - `_write_transcript`: `try: json.loads(line); except json.JSONDecodeError:
+     wrap_in_envelope(line)`.
+  - Add a dry-run path test that asserts every line parses.
+- **Recommendation**: do-now — bundle with PRD-603 as a single
+  "transcript hygiene" PR. Both are blocked for the same bogus reason
+  and ship together naturally.

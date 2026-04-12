@@ -546,3 +546,46 @@ The adversarial reviewer verified claims against actual source code and identifi
 - [[PRD-552-merge-upstream-task]] -- Multi-dep stacking prerequisite
 - [[PRD-559-transcript-analysis-step]] -- Transcript analysis (builtins extension)
 - [[PRD-566-unified-event-log]] -- Event system consolidation
+
+## Assessment (2026-04-11)
+
+This epic is a high-signal snapshot of the codebase at 2026-04-09 plus a
+prioritised backlog of 24 children under 4 sub-epics. The review itself
+is the value; the backlog is the deliverable.
+
+- **Value of the epic as a planning document**: 5/5 — the single
+  highest-ROI planning artifact in the backlog. Its Phase 1 list is
+  correct, its Phase 5 deferrals are correct, and its Rust-migration
+  section has saved weeks of speculative work.
+- **Value of the children as a whole**: 3/5 — distribution is bimodal.
+  The 600.1 safety children and ~6 of the 600.3 operational children
+  are high-value quick wins. The 600.2 tooling children are
+  quality-of-life. 600.4 is defensive and should remain deferred.
+- **Effort for the full epic**: l (as a project) — realistically 2–3
+  focused sprints. Effort for the recommended do-now subset (below):
+  m across maybe 8 child PRDs.
+- **Current state**: partially landed. PRD-600.2.7 (delete dead cli stub)
+  is already done (survey confirms `src/darkfactory/cli.py` is gone).
+  PRD-600.2.4 (single-source version) is landed via PRD-622's
+  `[tool.hatch.version]` configuration — supersede. Nothing else in
+  the 600.x tree has landed.
+- **Recommendation**: treat PRD-600 as a reference document, not an
+  execution target. Plan the recommended subset instead:
+  - **Phase 1 (safety)** — all four 600.1 children (keep 600.1.2, the
+    shell-escape PRD — see its assessment; the earlier "moot" claim
+    was a research miss).
+  - **Phase 2 (tooling)** — 600.2.1 (ruff rules), 600.2.2 (pytest-cov),
+    600.2.3 (`--version`), 600.2.5 (3.13 matrix), 600.2.6 (style.py
+    tests). Skip 600.2.4 (already done) and 600.2.7 (already done).
+  - **Phase 3 (operational)** — 600.3.1 (`_run_shell_once` extraction —
+    overlaps heavily with PRD-621 and should probably land there),
+    600.3.2 (`validate --json`), 600.3.3 (`tree --json`), 600.3.5
+    (`cleanup --yes`), 600.3.6 (help epilogs), 600.3.7 (`prd show`),
+    600.3.8 (loud workflow loading failures), 600.3.9 (reconcile
+    pagination).
+  - **Phase 4 (frontend optionality)** — defer entirely until a real
+    frontend consumer appears. PRD-600.4.4 (HarnessError hierarchy)
+    can land opportunistically alongside the first command that needs
+    structured errors.
+  - **Close the epic** once the do-now subset lands; don't let it
+    become a roadmap black hole.

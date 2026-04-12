@@ -58,3 +58,30 @@ PR #143 and #144 review comments identified several robustness gaps in the trans
 - [ ] Missing transcript logs at WARNING level
 - [ ] Edit→Write on same file is flagged as repeated edit
 - [ ] Summary uses repo-relative path
+
+## Assessment (2026-04-11)
+
+- **Value**: 3/5 — the failure modes this PRD closes (unhandled I/O
+  errors aborting a workflow, missed Edit→Write cross-detection)
+  directly affect every workflow run that has `analyze_transcript`
+  wired in, which today includes the planning workflow. Real
+  ergonomic win for non-happy-path cases.
+- **Effort**: s — seven focused fixes inside `analyze_transcript.py`
+  plus a detector bug. No new abstractions.
+- **Current state**: blocked status is spurious — nothing explicitly
+  blocks it in the DAG. Probably just waiting for PRD-559.x to be
+  flipped to done, which they should be (see their assessments).
+- **Gaps to fully implement**:
+  - Wrap `parse_transcript()` + `git add` in try/except with warning
+    logs.
+  - Add TOML error handling to `_load_analysis_config()`.
+  - Promote missing-transcript log from INFO to WARNING.
+  - Use repo-relative path in summary output.
+  - Fix `detect_repeated_edit` to track by file path (not tool+path
+    tuple).
+  - Add Edit→Write / Write→Edit cross-detection tests.
+  - Clean up unused `from typing import Any` import.
+- **Recommendation**: do-now — unblock by flipping PRD-559.4/5 to
+  `done`, then land this as a focused "analyze_transcript hardening"
+  PR. All seven items fit in one PR. Low effort, high payoff per
+  run.

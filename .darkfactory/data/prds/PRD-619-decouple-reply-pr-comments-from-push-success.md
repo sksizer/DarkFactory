@@ -131,3 +131,29 @@ parallel graph execution).
   order.
 - PRD-551: parallel graph execution — the full DAG-based
   approach that would subsume this fix.
+
+## Assessment (2026-04-11)
+
+- **Value**: 4/5 — the concrete failure is "agent analysis work
+  silently discarded when push fails for an unrelated reason." Every
+  rework session is exposed. A transient network hiccup throws away
+  minutes of expensive agent work.
+- **Effort**: xs — Option A is a new `continue_on_upstream_failure`
+  flag on the task type + ~10 lines in the runner's halt-on-failure
+  loop. Probably 1 hour of work including tests.
+- **Current state**: greenfield. `runner.py:242-245` is a linear halt
+  loop with no way to flag a task as "run anyway."
+- **Gaps to fully implement**:
+  - Add `continue_on_upstream_failure: bool = False` to `BuiltIn` /
+    task dataclasses in `workflow.py`.
+  - Runner: track a `failure_seen` flag; still execute tasks flagged
+    with `continue_on_upstream_failure=True` regardless; report
+    aggregate failure at the end.
+  - Update `workflows/rework/workflow.py` to set the flag on
+    `reply_pr_comments`.
+  - Event log: ensure both tasks emit independent
+    `task_start`/`task_finish` events.
+- **Recommendation**: do-now — pairs naturally with PRD-543 as a
+  single "rework reliability" PR. Don't wait for Option B
+  (finally-block workflow syntax) — Option A is sufficient for the
+  real case.

@@ -84,3 +84,20 @@ The existing retry mechanism is limited:
 ## Open Questions
 
 (Everything above is open — this is a braindump for future discussion.)
+
+## Assessment (2026-04-11)
+
+- **Value**: 2/5 — the PRD author self-flags this as "rough draft /
+  braindump" with no AC list. The concrete pain is handled today by
+  PRD-220's single-retry path; there's no incident driving the
+  expansion beyond "what if."
+- **Effort**: l (conjectural — no AC list means no real scope).
+- **Current state**: greenfield. PRD-220's retry path exists; nothing
+  from this PRD's expansion exists.
+- **Gaps to fully implement**: design work itself is unfinished. The
+  PRD is essentially an "ideas" document, not an implementation plan.
+- **Recommendation**: defer — keep as idea capture, do not schedule
+  until (a) PRD-608 lands so this PRD's `depends_on: PRD-608` becomes
+  meaningful and (b) a real failure pattern emerges that PRD-220's
+  single-retry doesn't handle. Consider downgrading to `kind: discuss`
+  or "feature idea" to make clear this isn't an execution target.

@@ -130,3 +130,4 @@ One package per commit — 4 atomic commits. Each commit: create package, move c
 - `src/darkfactory/runner.py:557-576` — shell runner (duplicated)
 - `src/darkfactory/system_runner.py:356-373` — shell runner (duplicate)
 
+  

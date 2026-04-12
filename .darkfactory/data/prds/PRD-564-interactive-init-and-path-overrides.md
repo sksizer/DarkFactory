@@ -219,3 +219,35 @@ Call-sites inside `cli/` that currently call `load_all(args.data_dir)` must be a
 ## Dependencies
 
 - **PRD-222** (general-purpose-tool epic) and **PRD-622** (data model refactor) are both prerequisites. PRD-622 already delivered the base `PathsConfig`, the `.darkfactory/data/` layout, and the `ensure_data_layout()` migration hook. This PRD extends that foundation with interactive prompting and user-configurable overrides.
+
+## Assessment (2026-04-11)
+
+- **Value**: 3/5 — the projects-want-PRDs-at-top-level case is real
+  for multi-adopter usage but hypothetical today. The `prd init`
+  interactive layer also carries a "good first impression" effect
+  that doesn't show up in direct utility metrics.
+- **Effort**: m — new interactive prompts in `init.py`, new `[paths]`
+  section in `config.toml`, extending `PathsConfig` (already exists)
+  with resolve-relative-to-project-root helpers, call-site updates
+  to use `config.paths.resolved_prds()`. State survey confirms
+  `cli/init_cmd.py` exists but is scaffold-only.
+- **Current state**: scaffolded. `PathsConfig` is already used
+  throughout (post PRD-622). The resolver primitive is in place.
+  The interactive prompting layer and `[paths]` materialization in
+  the generated `config.toml` aren't.
+- **Gaps to fully implement**:
+  - `init.py` — add `prompt_choices()` with `isatty()` check.
+  - `init_cmd.py` — wire the prompts and `--prds` / `--workflows`
+    flags into the argparse parser.
+  - `config.py` — `PathsConfig.resolved_prds()` /
+    `resolved_workflows()` relative-to-project-root helpers (if
+    not already there).
+  - Env var support (`DARKFACTORY_PATHS_PRDS` etc.).
+  - Re-init behavior: detect existing `[paths]`, prompt with them
+    as defaults, warn on orphaned files at the old location.
+  - Tests for TTY / non-TTY paths.
+- **Recommendation**: defer — do-next when a second-adopter scenario
+  is imminent. The current dogfooding usage works fine with the
+  default `.darkfactory/data/prds/` layout. Keep this as the first
+  onboarding PRD to land once we're seriously recruiting adopters.
+  Note: both PRD-222 and PRD-622 dependencies are already satisfied.

@@ -145,3 +145,18 @@ Same pattern as PRD-549:
 - [[PRD-552-merge-upstream-task]] — same.
 - [[PRD-557-modularize-runner]] — sibling modularization.
 - Current `src/darkfactory/cli.py` — 1423 lines, 14 subcommand implementations.
+
+## Assessment (2026-04-11)
+
+- **Value**: 4/5 — large readability and diff-noise win every feature touch.
+- **Effort remaining**: xs — only PRD-556.18 (final cleanup) is left.
+- **Current state**: drift / essentially done. The state survey confirms
+  `src/darkfactory/cli.py` (the monolith) is absent and every command has
+  its own submodule with a colocated `*_test.py` under `src/darkfactory/cli/`.
+  `cli/__init__.py` is re-export only. Status `in-progress` is stale.
+- **Gaps to fully implement**:
+  - Close PRD-556.18 (dead-reference grep + duplicate-test cleanup).
+  - Flip this epic to `done` once 556.18 merges.
+- **Recommendation**: supersede at the epic level after 556.18 lands — do
+  *not* plan new work under this epic. The diff noise the epic was created
+  to solve is already gone.

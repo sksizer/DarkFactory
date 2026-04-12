@@ -63,3 +63,26 @@ Explicit permission gives us:
 
 - [[PRD-220-graph-execution]] — consumer; relies on this for `--max-runs` honesty.
 - `src/darkfactory/workflows/planning/workflow.py` — the one legitimate creator of child PRDs today.
+
+## Assessment (2026-04-11)
+
+- **Value**: 2/5 — defensive hardening against a scenario
+  ("a bugfix task accidentally generates three new PRDs") that
+  hasn't happened. Today the planning workflow is the only writer
+  of `prds/` files and its tool allowlist is already scoped to
+  `prds/`. The blast radius is theoretical.
+- **Effort**: s — new `can_create_prds` flag on the task type, post-run
+  diff of `prds/`, workflow loader validation. Mechanical.
+- **Current state**: greenfield. The flag doesn't exist; nothing
+  inspects `prds/` diff after a run.
+- **Gaps to fully implement**:
+  - Add field to `workflow.Task` base / relevant subtypes.
+  - Workflow loader: strip `Write(prds/**)` unless flag is true.
+  - Runner post-check: diff `prds/`, revert new files if flag is false.
+  - Update `workflows/planning/workflow.py` to set the flag true.
+  - Tests for both directions.
+- **Recommendation**: defer — low value given no incident and the
+  current single-writer reality. If it becomes a real concern,
+  revisit as a cheap follow-up to PRD-567.4 (containment hardening)
+  which already wants to own the "verify what files the agent
+  touched" primitive.

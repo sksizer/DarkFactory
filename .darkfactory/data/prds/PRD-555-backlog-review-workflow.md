@@ -168,3 +168,29 @@ Plus, for PRDs where the fix is unambiguous (file renames, trivial path updates)
 - [[PRD-546-impact-declaration-drift-detection]] — shares file-level drift logic.
 - [[PRD-550-upstream-impact-propagation]] — shares stale-PRD state.
 - [[PRD-554-planning-workflow-prompt-hardening]] — the planning workflow is the upstream producer of the same PRDs we're reviewing; same quality concerns, opposite direction.
+
+## Assessment (2026-04-11)
+
+- **Value**: 3/5 — roughly the same job this very assessment pass did
+  manually. If the backlog hits 100+ PRDs this becomes essential; at
+  today's 87 it's borderline. The automation payoff depends on running
+  it more than a handful of times per year.
+- **Effort**: m — new workflow directory (`workflows/backlog_review/`),
+  new CLI subcommand, a classifier helper, structured report output.
+  The pure `verdict_classifier` function is small; the orchestration
+  (reading each PRD, running git queries, agent invocations) is where
+  the work is.
+- **Current state**: greenfield. No `workflows/backlog_review/`, no
+  `prd review-backlog` subcommand.
+- **Gaps to fully implement**:
+  - Create the workflow module with role/task/verify prompts.
+  - Add `cli/review_backlog.py` subcommand.
+  - Verdict classifier as a pure function with tests on fixture PRDs.
+  - Auto-fix edits for unambiguous `impacts:` path renames (scoped to
+    frontmatter updates via `update_frontmatter_field_at` from PRD-214).
+  - Report output to `.backlog-review/YYYY-MM-DD.md`.
+- **Recommendation**: defer — revisit after PRD-561/PRD-562 (the PRD
+  authoring skills) to see whether they cover enough of the same
+  territory. If a manual cadence like "one of the 2026-04-11-style
+  assessment passes every 2 months" is acceptable, this PRD is
+  net-negative-ROI.

@@ -145,3 +145,31 @@ Each improvement below is a prompt edit + (where applicable) a verification step
 - [[PRD-546-impact-declaration-drift-detection]] — needs accurate `impacts:`.
 - [[PRD-550-upstream-impact-propagation]] — same.
 - [[PRD-549-builtins-package-split]] — worked example and source of the 2026-04-08 failed-run incident.
+
+## Assessment (2026-04-11)
+
+- **Value**: 4/5 — the incident this PRD fixes (600-second agent timeout
+  while looping on an unobtainable permission) wasn't a one-off. Every
+  future planning run benefits from the tool-allowlist enumeration alone.
+- **Effort**: s — it's a prompt file edit plus a post-run verification
+  shell task. No new abstractions, no runner changes.
+- **Current state**: greenfield on the specific fixes. The planning
+  workflow in `workflows/planning/` exists but the `decomposition-guide.md`,
+  `role.md`, and `task.md` files don't yet enumerate the permissions,
+  forbid alphabetic IDs, or enforce the structured summary format.
+- **Gaps to fully implement**:
+  - Prompt edits in `workflows/planning/prompts/decomposition-guide.md`
+    (impacts, IDs, effort/capability, `workflow: null`, recursion depth).
+  - `role.md` — enumerate allowed + disallowed tools verbatim, with
+    the "emit `PRD_EXECUTE_FAILED` rather than probe" instruction.
+  - `task.md` — structured summary format (children, deps, overlaps,
+    parent-blocks status). Remove dead `_template.md` reference, or
+    add a real template file.
+  - Add the post-decomposition verification shell task
+    (`uv run prd children {prd_id}` count-match).
+  - Snapshot tests for the prompt directives.
+- **Recommendation**: do-now — bundle with PRD-567.2 (agent permission
+  hygiene) as a single "planning loop reliability" PR. PRD-229 is the
+  hard-enforcement successor to this PRD and depends on the PRD-227
+  template system; prefer shipping this soft-enforcement version first
+  regardless of whether 229 ever lands.

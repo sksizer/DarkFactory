@@ -115,3 +115,30 @@ Critically, the child PRDs 549.3a–i, once they exist, will also have `impacts:
 - [[PRD-546-impact-declaration-drift-detection]] — computes the actual-vs-declared file set; reuse its pipeline.
 - [[PRD-547-cross-epic-scheduler-coordination]] — related coordination problem across epics.
 - [[PRD-549-builtins-package-split]] — concrete example of a PRD vulnerable to upstream churn.
+
+## Assessment (2026-04-11)
+
+- **Value**: 3/5 — the "stale downstream PRD" problem is real (every
+  modularization epic creates N of these), but today the cost of missing
+  them is "planner re-reads and notices," not "executor blows up." The
+  mechanism is largely a backlog-hygiene aid.
+- **Effort**: m — reuses the file-overlap computation PRD-546 needs.
+  If PRD-546 lands, this is ~half effort; standalone it's a new module
+  plus frontmatter-field plumbing plus post-merge hook wiring.
+- **Current state**: greenfield. No `upstream_changes:` frontmatter
+  field, no `needs-refresh` status, no post-merge hook that walks
+  downstream PRDs.
+- **Gaps to fully implement**:
+  - Add `upstream_changes:` as an optional frontmatter list on the PRD
+    dataclass.
+  - Post-merge / post-run hook that consumes the changed-file set and
+    scans downstream PRDs.
+  - Dashboard / `prd status` rendering of the flag.
+  - Sibling-suppression rule (don't flag siblings of the merged PRD on
+    every merge under the same epic).
+- **Recommendation**: merge-into PRD-546 (or its successor in the
+  scheduling cluster re-plan). The file-overlap computation is shared;
+  shipping them as two separate PRDs duplicates work. Alternative: keep
+  PRD-546 focused on scheduling input and treat PRD-550 as the
+  human-facing display layer of the same data pipeline. Either way,
+  don't build the pipeline twice.

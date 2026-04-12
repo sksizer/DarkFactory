@@ -123,3 +123,23 @@ The skill is a single markdown file at `.claude/skills/prd-triage/SKILL.md` foll
 - CLI commands useful for triage: `prd status`, `prd next`, `prd validate`, `prd tree`, `prd undecomposed`
 - Example well-formed draft: `.darkfactory/data/prds/PRD-226-status-derived-from-events.md`
 - Example stub draft needing work: `.darkfactory/data/prds/PRD-300-.md`
+
+## Assessment (2026-04-11)
+
+- **Value**: 3/5 — exactly the job this 2026-04-11 value/effort pass
+  just did manually. The automated version would save a couple of
+  hours per quarter if used that often. It would NOT (per the PRD's
+  own AC-6) actually do implementation, so the "highest bottleneck"
+  framing overstates the value slightly.
+- **Effort**: s — the entire PRD is a single SKILL.md markdown file
+  (per PRD's technical approach). No Python code.
+- **Current state**: greenfield. No `.claude/skills/prd-triage/SKILL.md`.
+- **Gaps to fully implement**:
+  - Write the skill file with the numbered workflow steps.
+  - Bundle it as package data alongside PRD-561's slash commands
+    (or keep it global in `~/.claude/skills/`).
+- **Recommendation**: do-next — low effort, quick payoff every time it
+  runs, orthogonal to all other work. Pair with PRD-561 since both
+  want the same `prd init` → `.claude/` bundling infrastructure.
+  The PRD-562 skill file itself should reference this very assessment
+  as the baseline "here's what the triage output looks like."

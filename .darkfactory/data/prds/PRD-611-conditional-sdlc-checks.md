@@ -115,3 +115,16 @@ Each conditional rule requires a glob match against the full changeset. For repo
 ## Acceptance Criteria
 
 (To be defined after design solidifies.)
+
+## Assessment (2026-04-11)
+
+- **Value**: 2/5 — scoped to multi-ecosystem (Python + Vue, etc.)
+  projects, which DarkFactory has zero of today. In a single-language
+  repo, the base `lint`/`test`/`typecheck` slots are sufficient.
+- **Effort**: m — Pydantic schema extension, glob matching against
+  changeset, additive command merging in `ExecutionContext`.
+- **Current state**: greenfield. Blocked on PRD-608.
+- **Gaps**: all of it.
+- **Recommendation**: defer — do not design further until a real
+  heterogeneous-repo adopter exists. The "wait to see real usage
+  patterns" open question is the right call.

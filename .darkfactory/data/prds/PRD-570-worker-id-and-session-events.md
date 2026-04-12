@@ -97,3 +97,29 @@ Change from `s-YYYYMMDD-HHMMSS-XXXX` to `w-YYYYMMDD-HHMMSS-XXXX` to make the pre
 
 - [[PRD-566-unified-event-log]] — original design that specified session_start/session_finish events
 - [[PRD-551-parallel-graph-execution]] — future parallel workers make worker_id semantics clearer
+
+## Assessment (2026-04-11)
+
+- **Value**: 3/5 — the rename alone is a naming cleanup worth
+  ~1 point. The real value is the `worker_start` / `worker_finish`
+  lifecycle events, which close a PRD-566 gap and make tools that
+  reason about whole runs (dashboards, batch summaries) actually
+  work. Also becomes load-bearing when/if PRD-551 lands.
+- **Effort**: s — mechanical rename plus two new event types with
+  straightforward payloads. State survey confirms `event_log.py`
+  currently uses `session_id` and does not emit lifecycle events.
+- **Current state**: greenfield on the additions. The rename is a
+  pure refactor.
+- **Gaps to fully implement**:
+  - Rename `session_id` → `worker_id` across `event_log.py`,
+    `graph_execution.py`, `runner.py`, `cli/run.py`.
+  - Flip the ID format prefix from `s-…` to `w-…`.
+  - Emit `worker_start` in `cli/run.py` at each of the 3 execution
+    paths (single, queue, graph) with strategy/target/filters.
+  - Emit `worker_finish` with completed/failed/skipped counts.
+  - Test for envelope field name, new event types, backwards
+    compat (existing `session_id` files still parseable).
+- **Recommendation**: do-next — small, focused, and it closes a real
+  design debt (PRD-566 said these events existed; they don't).
+  Pair with PRD-567.6 (structured failure context) since both touch
+  the event log envelope and can share a single migration PR.

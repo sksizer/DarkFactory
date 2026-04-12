@@ -119,3 +119,33 @@ A pre-merge variant (run during the PR's CI pass) is worth a follow-up but is no
 - [[PRD-545-harness-driven-rebase-and-conflict-resolution]] — the consumer of this data; the scheduler's parallelism guarantees are only as good as the impacts declarations they're built on.
 - `src/darkfactory/impacts.py` — current static conflict detector. Drift detection complements it: impacts.py predicts conflicts from declared globs; this PRD validates the declared globs against reality after the fact.
 - `src/darkfactory/containment.py` — `effective_impacts` aggregation needs to be aware of drift records when computing scheduling impact sets.
+
+## Assessment (2026-04-11)
+
+- **Value**: 3/5 — drift detection is a quality signal, not a blocker.
+  Its biggest payoff is as input to PRD-545's scheduler (Phase 1), and
+  that scheduler isn't scheduled yet. Standalone, the value is "surface
+  when PRDs lied about their impacts" — useful but not urgent.
+- **Effort**: m — one focused module (`src/darkfactory/drift.py`),
+  a CLI subcommand (`prd check-drift`), per-PRD record persistence, and
+  integration with the existing post-merge hook. Most of the primitive
+  pieces already exist (impacts globs, `git show --name-only`, etc.).
+- **Current state**: greenfield. `src/darkfactory/drift.py` doesn't
+  exist. `.darkfactory/drift/` isn't created. `prd check-drift` isn't
+  a subcommand.
+- **Gaps to fully implement**:
+  - Implement `compute_drift(prd, merge_sha, repo_root, ignore_globs)`
+    with the `DriftReport` dataclass.
+  - Add `prd check-drift` CLI subcommand (`cli/check_drift.py`).
+  - Persist records under `.darkfactory/drift/` or `.darkfactory/data/drift/`
+    — decide placement alongside PRD-622's layout.
+  - Wire into the post-merge detection path in `checks.py` /
+    `cli/reconcile.py` so drift fires automatically.
+  - Implement the `warn` policy only in v1 — defer `block-future-runs`
+    and `auto-update` until real drift data is available.
+- **Recommendation**: defer — do not schedule until PRD-545 Phase 1 is
+  on a concrete timeline. The scheduler integration is the load-bearing
+  consumer; without it, the drift records are a dashboard curiosity.
+  When it does land, reuse its file-overlap plumbing rather than
+  duplicating. Open question: record placement under `.darkfactory/`
+  still needs resolving per the earlier PR #173 assessment notes.

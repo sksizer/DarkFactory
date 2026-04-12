@@ -290,3 +290,25 @@ if args.discuss:
 - Architectural fit: `src/darkfactory/system.py` (SystemOperation), `src/darkfactory/system_runner.py` (chain dispatcher), `src/darkfactory/cli/new.py:115` (existing pattern for handing the terminal to a subprocess and waiting).
 - PRD-615 introduces `_resolve_prd_or_exit` in `cli/_shared.py`, which `cli/discuss.py` should use once it lands (otherwise inline the same check). PRD-615 also introduces the `git_ops.py` wrapper that `commit_prd_changes` should use for its `git diff` / `git add` / `git commit` calls.
 - Existing commit builtin shape: `src/darkfactory/builtins/commit.py` (workflow-scoped). `commit_prd_changes` is a sibling system-scoped variant tailored for discussion chains — narrower paths, interactive confirmation, no PRD frontmatter mutation, no push, no PR.
+
+## Assessment (2026-04-11)
+
+- **Value**: n/a (already landed).
+- **Effort**: n/a
+- **Current state**: drift / done. State survey confirms
+  `src/darkfactory/cli/discuss.py` exists and `prd discuss` is
+  wired in the parser. The `commands/discuss/` subpackage, the
+  three new builtins (`gather_prd_context`, `discuss_prd`,
+  `commit_prd_changes`), and the prompt files all appear to
+  have landed. Frontmatter `kind: done` is a data-entry error
+  (not a valid kind) but likely indicates the author
+  intended to mark it done. Status is still `review`.
+- **Gaps to fully implement**:
+  - Verify every AC against the shipped code. Most likely all
+    15 are met.
+  - Fix the `kind: done` frontmatter — `kind` should be
+    `feature` (not `done`) and `status` should flip to `done`
+    after verification.
+- **Recommendation**: verify-then-close — ten-minute
+  verification pass, then flip status and fix kind. Include
+  in the supersede sweep with PRD-556, PRD-563, etc.

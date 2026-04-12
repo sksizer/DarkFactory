@@ -177,3 +177,28 @@ These are the expected files to be modified across child tasks:
 - [[PRD-549-split-builtins-into-package-with-colocated-tests]] — the epic whose cleanup task (549.12) exposed the deletion permission gap
 - [[PRD-551-parallel-graph-execution]] — parallel execution benefits from higher single-run reliability
 - [[PRD-563-drain-ready-queue-execution-mode]] — batch mode that makes reliability critical
+
+## Assessment (2026-04-11)
+
+- **Value**: 5/5 — this is the single most-felt pain cluster. The data
+  the epic cites is real: 45% of PRD-level failures came from stale
+  worktree state and ~76K tokens per batch wasted on permission denials.
+  Every batch run benefits.
+- **Effort**: l for the full epic. The biggest chunks are 567.1
+  (auto-recovery + pre-run cleanup) and 567.4 (containment hardening).
+  567.2 and 567.3 are s; 567.5 and 567.6 are xs–s.
+- **Current state**: greenfield across all sub-features. None of the
+  six sub-epics have any code landed. State survey confirms:
+  - `ensure_worktree.py` still raises on merged-PR stale branches.
+  - `invoke.py` does not have `--disallowed-tools` for `git commit`.
+  - `task/workflow.py` permissions list is unchanged.
+  - `event_log.py` emits only exit codes, not stderr.
+  - Planning workflow is still a flat task list, not a template.
+- **Gaps to fully implement**: see each sub-epic. The critical path is
+  567.1 → 567.2 → 567.3 (in that order of impact).
+- **Recommendation**: do-next — split into two PRs. The first covers
+  567.1 (auto-recovery + pre-run cleanup) + 567.2 (permission hygiene)
+  as a single "batch reliability" PR, since both fix incidents that
+  every batch run hits. The second covers 567.3 (deletion permissions)
+  + 567.4 (containment) for correctness. 567.5 and 567.6 are opportunistic
+  pairings with whichever PR touches the planning workflow or event log.

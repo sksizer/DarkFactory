@@ -80,3 +80,23 @@ PRD-220 asks: "if D has `depends_on: [A, B]`, what branch does D's worktree base
 - [[PRD-220-graph-execution]] — blocked by this for multi-dep cases.
 - [[PRD-545-harness-driven-rebase-and-conflict-resolution]] — overlapping conflict-resolution concern.
 - [[PRD-549-builtins-package-split]] — sibling children all touching `builtins.py` is the exact scenario this task is designed for.
+
+## Assessment (2026-04-11)
+
+- **Value**: 2/5 — the target scenario ("PRD D has depends_on: [A, B, C]
+  and needs to be based on the merge of all three") has never actually
+  appeared in practice. Every real multi-dep PRD in the current backlog
+  has at most one non-trivial dependency; the others are "also on main."
+  A pre-emptive merge-upstream task would ride idle 95% of the time.
+- **Effort**: m — new builtin (`merge_upstream.py`), agent conflict
+  prompt, graph executor hook, fixture-based conflict tests. Overlaps
+  heavily with PRD-545's Phase 2/3 — if both were built, `merge_upstream`
+  would largely be a thin wrapper over PRD-545's machinery.
+- **Current state**: greenfield. No `merge_upstream.py` in builtins,
+  no workflow integration.
+- **Gaps to fully implement**: all of it.
+- **Recommendation**: defer until an actual 3-dep PRD surfaces. When
+  one does, consider whether PRD-545's scheduler machinery covers it
+  and this PRD becomes redundant. The `blocks: [PRD-220-graph-execution]`
+  edge is aspirational — PRD-220 shipped without this and is working.
+  Clear the `blocks` edge.
