@@ -18,9 +18,7 @@ from darkfactory.utils._result import Ok, Timeout
 from darkfactory.utils.github._types import GhCheckResult, GhErr, GhResult
 
 
-def gh_run(
-    *args: str, cwd: Path, timeout: int | None = None
-) -> GhCheckResult:
+def gh_run(*args: str, cwd: Path, timeout: int | None = None) -> GhCheckResult:
     """Run ``gh *args`` from ``cwd``; never raises.
 
     Returns ``Ok(None, stdout=...)`` on exit 0, ``GhErr`` on non-zero,

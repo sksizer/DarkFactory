@@ -86,9 +86,7 @@ def create_pr(ctx: ExecutionContext) -> None:
             case Ok(value=url):
                 ctx.pr_url = url or None
             case GhErr(returncode=code, stderr=err):
-                detail = (
-                    f"gh pr create failed (exit {code}):\n{err}"
-                )
+                detail = f"gh pr create failed (exit {code}):\n{err}"
                 _log.error(detail)
                 raise RuntimeError(detail)
     finally:

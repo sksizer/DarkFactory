@@ -19,7 +19,10 @@ def test_spawn_claude_passes_plain_argv_without_effort(tmp_path: Path) -> None:
 
         return R()
 
-    with patch("darkfactory.utils.claude_code._interactive.subprocess.run", side_effect=fake_run):
+    with patch(
+        "darkfactory.utils.claude_code._interactive.subprocess.run",
+        side_effect=fake_run,
+    ):
         exit_code = spawn_claude("hello", tmp_path)
 
     assert exit_code == 0
@@ -37,7 +40,10 @@ def test_spawn_claude_passes_effort_max_as_cli_flag(tmp_path: Path) -> None:
 
         return R()
 
-    with patch("darkfactory.utils.claude_code._interactive.subprocess.run", side_effect=fake_run):
+    with patch(
+        "darkfactory.utils.claude_code._interactive.subprocess.run",
+        side_effect=fake_run,
+    ):
         spawn_claude("hello", tmp_path, effort_level="max")
 
     assert captured == [["claude", "--effort", "max", "hello"]]
@@ -54,7 +60,10 @@ def test_spawn_claude_forwards_low_effort(tmp_path: Path) -> None:
 
         return R()
 
-    with patch("darkfactory.utils.claude_code._interactive.subprocess.run", side_effect=fake_run):
+    with patch(
+        "darkfactory.utils.claude_code._interactive.subprocess.run",
+        side_effect=fake_run,
+    ):
         spawn_claude("hello", tmp_path, effort_level="low")
 
     assert captured == [["claude", "--effort", "low", "hello"]]

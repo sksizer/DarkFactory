@@ -173,7 +173,9 @@ def _fetch_all_pr_states(repo_root: Path) -> dict[str, str]:
 
 def _has_unpushed_commits(worktree_path: Path, branch: str) -> bool:
     """Return True if branch has local commits not yet pushed to origin."""
-    match git_run("rev-list", "--count", f"origin/{branch}..{branch}", cwd=worktree_path):
+    match git_run(
+        "rev-list", "--count", f"origin/{branch}..{branch}", cwd=worktree_path
+    ):
         case Ok(stdout=raw):
             try:
                 return int(raw.strip() or "0") > 0

@@ -333,9 +333,7 @@ def test_shell_failure_triggers_agent_retry(tmp_path: Path) -> None:
 
     with (
         patch("darkfactory.runner.invoke_claude") as mock_invoke,
-        patch(
-            "darkfactory.runner.run_shell", side_effect=shell_results
-        ) as mock_shell,
+        patch("darkfactory.runner.run_shell", side_effect=shell_results) as mock_shell,
     ):
         mock_invoke.return_value = InvokeResult(
             stdout="PRD_EXECUTE_OK: PRD-070\n",

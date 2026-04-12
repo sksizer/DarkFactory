@@ -18,9 +18,7 @@ from darkfactory.utils.git._types import (
 )
 
 
-def git_run(
-    *args: str, cwd: Path, timeout: int | None = None
-) -> CheckResult:
+def git_run(*args: str, cwd: Path, timeout: int | None = None) -> CheckResult:
     """Run ``git *args`` from ``cwd``; never raises.
 
     Returns ``Ok(None, stdout=...)`` on exit 0, ``GitErr`` on non-zero.
