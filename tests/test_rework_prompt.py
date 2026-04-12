@@ -208,7 +208,7 @@ def test_rework_feedback_inserted_via_extras(tmp_path: Path) -> None:
     # Minimal fake ExecutionContext attributes via a simple object
     from types import SimpleNamespace
 
-    from darkfactory.phase_state import PhaseState
+    from darkfactory.engine import PhaseState
 
     prd = SimpleNamespace(
         id="PRD-225",

@@ -9,7 +9,7 @@ import pytest
 
 from conftest import make_system_ctx, make_system_op
 from darkfactory.builtins.discuss_prd import discuss_prd
-from darkfactory.phase_state import PrdContext
+from darkfactory.engine import PrdContext
 from darkfactory.system import SystemContext
 from darkfactory.utils.claude_code import EffortLevel
 from darkfactory.utils.tui import print_phase_banner

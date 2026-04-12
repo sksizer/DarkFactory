@@ -19,7 +19,7 @@ from darkfactory.builtins.system_builtins import (
     system_load_review_prds,
 )
 from darkfactory.model import PRD, parse_prd
-from darkfactory.phase_state import CandidateList
+from darkfactory.engine import CandidateList
 from darkfactory.system import SystemContext, SystemOperation
 
 from tests.conftest import write_prd

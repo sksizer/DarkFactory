@@ -17,7 +17,7 @@ import logging
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
-from darkfactory.phase_state import ReworkState
+from darkfactory.engine import ReworkState
 from darkfactory.pr_comments import CommentFilters
 from darkfactory.rework_context import ReworkError, discover_rework_context
 from darkfactory.workflow import ExecutionContext
@@ -80,7 +80,7 @@ def resolve_rework_context(ctx: ExecutionContext) -> None:
             pr_number=discovered.pr_number,
             review_threads=discovered.review_threads,
             reply_to_comments=rework.reply_to_comments,
-            comment_filters=rework.comment_filters,
+            comment_filters=discovered.comment_filters,
         )
     )
 

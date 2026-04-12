@@ -192,7 +192,7 @@ def _make_rework_workflow(tmp_path: Path) -> Workflow:
 def test_run_workflow_applies_context_overrides(tmp_path: Path) -> None:
     """context_overrides values appear on the ExecutionContext for every task."""
     from darkfactory.invoke import InvokeResult
-    from darkfactory.phase_state import ReworkState
+    from darkfactory.engine import ReworkState
 
     prd = _make_prd(tmp_path)
     worktree = tmp_path / "worktree"
@@ -266,7 +266,7 @@ def test_run_workflow_rejects_unknown_override_key(tmp_path: Path) -> None:
 
 def test_run_workflow_commit_message_uses_prd_id(tmp_path: Path) -> None:
     """The commit message for rework is formatted with the PRD id."""
-    from darkfactory.phase_state import ReworkState
+    from darkfactory.engine import ReworkState
 
     prd = _make_prd(tmp_path, "PRD-007")
     worktree = tmp_path / "worktree"

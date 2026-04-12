@@ -14,7 +14,7 @@ from darkfactory.builtins.system_builtins import (
 from darkfactory.loader import load_operations
 from darkfactory.model import PRD, parse_prd
 from darkfactory.system import SystemContext, SystemOperation
-from darkfactory.system_runner import run_system_operation
+from darkfactory.runner import run_system_operation
 
 from tests.conftest import write_prd
 
@@ -288,7 +288,7 @@ def test_operation_via_runner_clean(tmp_path: Path) -> None:
         dry_run=False,
     )
 
-    from darkfactory.system_runner import SYSTEM_BUILTINS as runner_builtins
+    from darkfactory.builtins.system_builtins import SYSTEM_BUILTINS as runner_builtins
 
     assert "audit_impacts_check" in runner_builtins
 

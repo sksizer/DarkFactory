@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Callable
 
 from darkfactory import containment, model as model_module
-from darkfactory.phase_state import CandidateList
+from darkfactory.engine import CandidateList
 from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.model import compute_branch_name
 from darkfactory.system import SystemContext

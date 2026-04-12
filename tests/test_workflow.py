@@ -177,7 +177,7 @@ def test_execution_context_defaults(tmp_data_dir: Path) -> None:
     assert ctx.pr_url is None
     assert ctx.dry_run is True
     assert isinstance(ctx.logger, logging.Logger)
-    from darkfactory.phase_state import PhaseState
+    from darkfactory.engine import PhaseState
 
     assert isinstance(ctx.state, PhaseState)
 

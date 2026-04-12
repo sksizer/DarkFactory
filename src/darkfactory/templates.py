@@ -151,14 +151,6 @@ def compose_prompt(
             else ""
         ),
     }
-    from .phase_state import ReworkState
-
-    if execution_context.state.has(ReworkState):
-        rework = execution_context.state.get(ReworkState)
-        if rework.review_threads is not None:
-            from .rework_prompt import render_rework_feedback
-
-            context["REWORK_FEEDBACK"] = render_rework_feedback(rework.review_threads)
     if extras:
         context.update(extras)
 

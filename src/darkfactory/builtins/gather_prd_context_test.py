@@ -9,7 +9,7 @@ import pytest
 from conftest import write_prd
 from darkfactory.builtins.gather_prd_context import gather_prd_context
 from darkfactory.model import PRD, load_all
-from darkfactory.phase_state import PrdContext
+from darkfactory.engine import PrdContext
 from darkfactory.system import SystemContext, SystemOperation
 
 

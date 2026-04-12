@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from darkfactory.builtins.reply_pr_comments import reply_pr_comments
-from darkfactory.phase_state import AgentResult, PhaseState, ReworkState
+from darkfactory.engine import AgentResult, PhaseState, ReworkState
 from darkfactory.pr_comments import ReviewThread
 
 

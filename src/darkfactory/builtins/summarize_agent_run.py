@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from darkfactory.builtins._registry import builtin
-from darkfactory.phase_state import AgentResult
+from darkfactory.engine import AgentResult
 from darkfactory.workflow import ExecutionContext
 
 

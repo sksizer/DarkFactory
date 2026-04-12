@@ -33,7 +33,7 @@ from .builtins import BUILTINS
 from .event_log import EventWriter, emit_task_event
 from .invoke import InvokeResult, capability_to_model, invoke_claude
 from .model import compute_branch_name
-from .phase_state import AgentResult, PhaseState
+from .engine import AgentResult, PhaseState
 from .templates import compose_prompt
 from .timeouts import resolve_timeout
 from .utils.claude_code import spawn_claude
@@ -553,7 +553,7 @@ def _run_interactive(task: InteractiveTask, ctx: Any) -> TaskStep:
         )
 
     # Load and compose prompt from the prompt_file.
-    from .phase_state import PrdContext
+    from .engine import PrdContext
 
     prompt = ""
     if task.prompt_file:
@@ -579,9 +579,7 @@ def _run_interactive(task: InteractiveTask, ctx: Any) -> TaskStep:
     from .utils.tui import print_phase_banner
 
     print_phase_banner(task.name)
-    import time as _time
-
-    _time.sleep(1)
+    time.sleep(1)
 
     exit_code = spawn_claude(prompt, ctx.cwd, effort_level=task.effort_level)
 
@@ -655,8 +653,26 @@ def _release_worktree_lock(ctx: ExecutionContext) -> None:
 def _workflow_compose_prompt(
     task: AgentTask, ctx: ExecutionContext, extras: dict[str, object] | None = None
 ) -> str:
-    """Compose prompt for workflow AgentTask."""
-    return compose_prompt(ctx.workflow, task.prompts, ctx, extras=extras)
+    """Compose prompt for workflow AgentTask.
+
+    Injects ``REWORK_FEEDBACK`` from ReworkState when present, so the
+    generic ``compose_prompt`` doesn't need rework-specific knowledge.
+    """
+    from .engine import ReworkState
+
+    rework_extras: dict[str, object] = {}
+    if ctx.state.has(ReworkState):
+        rework = ctx.state.get(ReworkState)
+        if rework.review_threads is not None:
+            from .rework_prompt import render_rework_feedback
+
+            rework_extras["REWORK_FEEDBACK"] = render_rework_feedback(
+                rework.review_threads
+            )
+    if extras:
+        rework_extras.update(extras)
+
+    return compose_prompt(ctx.workflow, task.prompts, ctx, extras=rework_extras or None)
 
 
 def _workflow_pick_model(task: AgentTask, override: str | None = None) -> str:
@@ -788,17 +804,26 @@ def run_system_operation(
     ctx: Any,
     model_override: str | None = None,
     *,
+    session_id: str | None = None,
     cli_timeout_minutes: int | None = None,
     config_timeouts: dict[str, object] | None = None,
     styler: "Styler | None" = None,
 ) -> RunResult:
     """Execute a system operation via the unified dispatch engine.
 
-    Replaces the former ``system_runner.run_system_operation``.
+    When ``session_id`` is provided and the context is not dry-run, an
+    :class:`EventWriter` is created automatically so system operations
+    produce event logs just like workflow runs.
     """
     from .builtins.system_builtins import SYSTEM_BUILTINS
 
     writer: EventWriter | None = getattr(ctx, "event_writer", None)
+    owns_writer = False
+
+    if writer is None and session_id and not ctx.dry_run:
+        writer = EventWriter(ctx.repo_root, session_id, operation.name)
+        ctx.event_writer = writer
+        owns_writer = True
 
     if writer:
         writer.emit(
@@ -807,29 +832,33 @@ def run_system_operation(
             workflow=operation.name,
         )
 
-    result = run_tasks(
-        tasks=operation.tasks,
-        ctx=ctx,
-        builtins=SYSTEM_BUILTINS,
-        compose_prompt_fn=_system_compose_prompt,
-        pick_model_fn=_pick_system_model,
-        model_override=model_override,
-        cli_timeout_minutes=cli_timeout_minutes,
-        config_timeouts=config_timeouts,
-        styler=styler,
-    )
-
-    if writer:
-        writer.emit(
-            "workflow",
-            "workflow_finish",
-            success=result.success,
-            failure_reason=result.failure_reason,
-            steps=[
-                {"name": s.name, "kind": s.kind, "success": s.success}
-                for s in result.steps
-            ],
+    try:
+        result = run_tasks(
+            tasks=operation.tasks,
+            ctx=ctx,
+            builtins=SYSTEM_BUILTINS,
+            compose_prompt_fn=_system_compose_prompt,
+            pick_model_fn=_pick_system_model,
+            model_override=model_override,
+            cli_timeout_minutes=cli_timeout_minutes,
+            config_timeouts=config_timeouts,
+            styler=styler,
         )
+    finally:
+        if writer:
+            _result = locals().get("result", RunResult(success=False))
+            writer.emit(
+                "workflow",
+                "workflow_finish",
+                success=_result.success,
+                failure_reason=_result.failure_reason,
+                steps=[
+                    {"name": s.name, "kind": s.kind, "success": s.success}
+                    for s in _result.steps
+                ],
+            )
+            if owns_writer:
+                writer.close()
 
     result.pr_url = ctx.pr_url
     return result

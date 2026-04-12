@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from darkfactory.loader import load_operations
-from darkfactory.phase_state import PhaseState
+from darkfactory.engine import PhaseState
 from darkfactory.system import SystemContext, SystemOperation
 from darkfactory.workflow import BuiltIn
 

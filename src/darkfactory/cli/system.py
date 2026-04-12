@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 
+from darkfactory.event_log import generate_session_id
 from darkfactory.loader import load_operations
 from darkfactory.runner import run_system_operation
 from darkfactory.style import Element, Styler
@@ -168,7 +169,13 @@ def cmd_system_run(args: argparse.Namespace) -> int:
     )
 
     try:
-        result = run_system_operation(operation, ctx, model_override=model_override)
+        result = run_system_operation(
+            operation,
+            ctx,
+            model_override=model_override,
+            session_id=generate_session_id() if not dry_run else None,
+            styler=styler,
+        )
     finally:
         if lock is not None:
             try:

@@ -18,7 +18,7 @@ separate target repository (no pumice test/lint shell steps). It differs from
 
 from __future__ import annotations
 
-from .phase_state import AgentResult
+from .engine import AgentResult
 from .templates import WorkflowTemplate
 from .workflow import AgentTask, BuiltIn, ShellTask
 

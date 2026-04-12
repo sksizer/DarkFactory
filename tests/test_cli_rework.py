@@ -265,7 +265,7 @@ def test_rework_execute_with_comments_invokes_workflow(
     # Rework-specific state is now passed via phase_state_init
     phase_init = kwargs["phase_state_init"]
     assert len(phase_init) == 1
-    from darkfactory.phase_state import ReworkState
+    from darkfactory.engine import ReworkState
 
     rework_state = phase_init[0]
     assert isinstance(rework_state, ReworkState)

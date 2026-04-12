@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from darkfactory.builtins.system_builtins import _register
 from darkfactory.model import PRD
-from darkfactory.phase_state import PrdContext
+from darkfactory.engine import PrdContext
 from darkfactory.system import SystemContext
 
 

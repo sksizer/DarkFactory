@@ -7,7 +7,7 @@ import logging
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
-from darkfactory.phase_state import ReworkState
+from darkfactory.engine import ReworkState
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -54,13 +54,18 @@ def fetch_pr_comments(ctx: ExecutionContext) -> None:
     from darkfactory.pr_comments import CommentFilters
     from darkfactory.pr_comments import fetch_pr_comments as _fetch
 
-    threads = _fetch(rework.pr_number, filters=CommentFilters())
+    effective_filters = (
+        rework.comment_filters
+        if rework.comment_filters is not None
+        else CommentFilters()
+    )
+    threads = _fetch(rework.pr_number, filters=effective_filters)
     ctx.state.put(
         ReworkState(
             pr_number=rework.pr_number,
             review_threads=threads,
             reply_to_comments=rework.reply_to_comments,
-            comment_filters=rework.comment_filters,
+            comment_filters=effective_filters,
         )
     )
     _log.info(

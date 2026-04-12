@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 
 from darkfactory.builtins.system_builtins import _register
-from darkfactory.phase_state import PrdContext
+from darkfactory.engine import PrdContext
 from darkfactory.system import SystemContext
 from darkfactory.utils.claude_code import EffortLevel, spawn_claude
 from darkfactory.utils.tui import print_phase_banner

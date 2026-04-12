@@ -9,7 +9,7 @@ from darkfactory.builtins.summarize_agent_run import (
     _format_tool_counts,
     summarize_agent_run,
 )
-from darkfactory.phase_state import AgentResult, PhaseState
+from darkfactory.engine import AgentResult, PhaseState
 
 
 def _make_ctx(*, agent_result: AgentResult | None = None) -> MagicMock:

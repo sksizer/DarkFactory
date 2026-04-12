@@ -16,7 +16,7 @@ from pathlib import Path
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
-from darkfactory.phase_state import AgentResult, ReworkState
+from darkfactory.engine import AgentResult, ReworkState
 from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.workflow import ExecutionContext
 

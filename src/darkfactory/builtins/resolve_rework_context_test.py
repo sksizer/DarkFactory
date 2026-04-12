@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from darkfactory.builtins.resolve_rework_context import resolve_rework_context
-from darkfactory.phase_state import ReworkState
+from darkfactory.engine import ReworkState
 from darkfactory.pr_comments import CommentFilters, ReviewThread
 from darkfactory.model import PRD
 from darkfactory.rework_context import ReworkContext, ReworkError

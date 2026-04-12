@@ -126,7 +126,7 @@ def test_chain_executes_in_order(tmp_path: Path) -> None:
                 "darkfactory.builtins.commit_prd_changes.diff_quiet",
                 return_value=Ok(None),
             ):
-                from darkfactory.system_runner import run_system_operation
+                from darkfactory.runner import run_system_operation
 
                 result = run_system_operation(op, ctx)
 
@@ -172,7 +172,7 @@ def test_nonzero_exit_does_not_abort_chain(tmp_path: Path) -> None:
                 "darkfactory.builtins.commit_prd_changes.diff_quiet",
                 return_value=Ok(None),
             ):
-                from darkfactory.system_runner import run_system_operation
+                from darkfactory.runner import run_system_operation
 
                 result = run_system_operation(op, ctx)
 
@@ -182,7 +182,7 @@ def test_nonzero_exit_does_not_abort_chain(tmp_path: Path) -> None:
 
 def test_builtins_registered() -> None:
     """AC-4, AC-5, AC-12: All three builtins are registered in SYSTEM_BUILTINS."""
-    from darkfactory.system_runner import SYSTEM_BUILTINS
+    from darkfactory.builtins.system_builtins import SYSTEM_BUILTINS
 
     assert "gather_prd_context" in SYSTEM_BUILTINS
     assert "discuss_prd" in SYSTEM_BUILTINS

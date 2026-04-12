@@ -14,7 +14,7 @@ from unittest.mock import patch
 import pytest
 
 from darkfactory.builtins.fetch_pr_comments import fetch_pr_comments as builtin_fn
-from darkfactory.phase_state import ReworkState
+from darkfactory.engine import ReworkState
 from darkfactory.pr_comments import ReviewThread
 from darkfactory.model import PRD
 from darkfactory.workflow import ExecutionContext, Workflow
