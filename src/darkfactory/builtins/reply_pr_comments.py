@@ -65,7 +65,7 @@ def reply_pr_comments(ctx: ExecutionContext) -> None:
         _log.info("reply_pr_comments: no agent output to parse, skipping")
         return
 
-    from darkfactory.pr_comments import parse_agent_replies, post_comment_replies
+    from darkfactory.utils.github.pr.comments import parse_agent_replies, post_comment_replies
 
     replies = parse_agent_replies(agent_output)
     if not replies:

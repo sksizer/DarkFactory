@@ -17,7 +17,7 @@ from unittest.mock import patch
 import pytest
 
 from darkfactory.cli import main
-from darkfactory.pr_comments import CommentFilters, ReviewThread
+from darkfactory.utils.github.pr.comments import CommentFilters, ReviewThread
 from darkfactory.rework_context import ReworkContext, ReworkError
 
 from .conftest import write_prd

@@ -1,7 +1,7 @@
 """Render ReviewThread objects into a structured markdown feedback section.
 
 The ``render_rework_feedback`` function converts a list of
-:class:`~darkfactory.pr_comments.ReviewThread` objects into the markdown
+:class:`~darkfactory.utils.github.pr.comments.ReviewThread` objects into the markdown
 section that gets inserted as ``{{REWORK_FEEDBACK}}`` in the rework
 ``task.md`` template via :func:`~darkfactory.templates.compose_prompt`.
 
@@ -13,7 +13,7 @@ horizontal rule separator.
 
 from __future__ import annotations
 
-from .pr_comments import ReviewThread
+from darkfactory.utils.github.pr.comments import ReviewThread
 
 
 def render_rework_feedback(threads: list[ReviewThread]) -> str:

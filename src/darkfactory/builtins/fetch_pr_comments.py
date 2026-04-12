@@ -51,8 +51,8 @@ def fetch_pr_comments(ctx: ExecutionContext) -> None:
             "this builtin can fetch PR review threads"
         )
 
-    from darkfactory.pr_comments import CommentFilters
-    from darkfactory.pr_comments import fetch_pr_comments as _fetch
+    from darkfactory.utils.github.pr.comments import CommentFilters
+    from darkfactory.utils.github.pr.comments import fetch_pr_comments as _fetch
 
     effective_filters = (
         rework.comment_filters

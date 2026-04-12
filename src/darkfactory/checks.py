@@ -16,7 +16,7 @@ from typing import Protocol
 from darkfactory.utils._result import Ok
 from darkfactory.utils.git import GitErr, git_run
 from darkfactory.utils.github._types import GhErr
-from darkfactory.utils.github.pull_request import (
+from darkfactory.utils.github.pr import (
     fetch_all_pr_states,
     get_resume_pr_state,
 )
@@ -159,7 +159,7 @@ class RemoveStatus:
 
 def _get_pr_state(branch: str, repo_root: Path) -> str:
     """Get the PR state for a branch. Returns MERGED, CLOSED, OPEN, or UNKNOWN."""
-    from darkfactory.utils.github.pull_request import get_pr_state
+    from darkfactory.utils.github.pr import get_pr_state
 
     match get_pr_state(branch, repo_root, timeout=10):
         case Ok(value=state):

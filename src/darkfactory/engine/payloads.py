@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from darkfactory.pr_comments import CommentFilters, ReviewThread
+    from darkfactory.utils.github.pr.comments import CommentFilters, ReviewThread
 
 
 @dataclass(frozen=True)

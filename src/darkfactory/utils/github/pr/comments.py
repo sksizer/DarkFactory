@@ -304,7 +304,7 @@ def parse_agent_replies(agent_output: str) -> list[CommentReply]:
         ```
 
     Returns a list of :class:`CommentReply` objects.  Malformed or
-    missing blocks return an empty list — callers log a warning rather
+    missing blocks return an empty list --- callers log a warning rather
     than failing.
     """
     match = _REPLY_NOTES_RE.search(agent_output)
@@ -361,7 +361,7 @@ def post_comment_replies(
     so reviewers can easily distinguish bot replies from human ones.
 
     Returns a list of ``(thread_id, success)`` pairs.  Failures are
-    logged as warnings but do not raise — the caller decides whether to
+    logged as warnings but do not raise --- the caller decides whether to
     surface them.  Replies whose ``thread_id`` isn't found in ``threads``,
     or whose target has no ``reply_target_id`` (review summaries and
     issue-level comments), are logged and marked as failed: the REST
@@ -378,13 +378,13 @@ def post_comment_replies(
         if target_id is None:
             if reply.thread_id not in target_by_thread_id:
                 _log.warning(
-                    "post_comment_replies: unknown thread_id %s — skipping",
+                    "post_comment_replies: unknown thread_id %s --- skipping",
                     reply.thread_id,
                 )
             else:
                 _log.warning(
                     "post_comment_replies: thread %s has no reply target "
-                    "(review summary or issue comment) — skipping",
+                    "(review summary or issue comment) --- skipping",
                     reply.thread_id,
                 )
             results.append((reply.thread_id, False))
@@ -444,11 +444,11 @@ def _apply_filters(
 
     Filters applied in order:
 
-    1. ``single_comment_id`` — return exactly the thread with that ID, or []
-    2. ``include_resolved`` — exclude resolved threads unless True
-    3. ``reviewer`` — keep only threads from the specified author
-    4. ``bot_usernames`` — drop comments authored by the bot
-    5. ``since_commit`` — drop threads posted before the commit timestamp
+    1. ``single_comment_id`` --- return exactly the thread with that ID, or []
+    2. ``include_resolved`` --- exclude resolved threads unless True
+    3. ``reviewer`` --- keep only threads from the specified author
+    4. ``bot_usernames`` --- drop comments authored by the bot
+    5. ``since_commit`` --- drop threads posted before the commit timestamp
     """
     # 1. Single comment shortcut
     if filters.single_comment_id is not None:

@@ -17,7 +17,7 @@ from unittest.mock import patch
 import pytest
 
 from darkfactory.loader import load_workflows
-from darkfactory.pr_comments import ReviewThread
+from darkfactory.utils.github.pr.comments import ReviewThread
 from darkfactory.runner import run_workflow
 from darkfactory.workflow import (
     AgentTask,

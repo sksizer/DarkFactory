@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import patch
 
-from darkfactory.pr_comments import (
+from darkfactory.utils.github.pr.comments import (
     CommentFilters,
     ReviewComment,
     ReviewThread,
@@ -287,7 +287,7 @@ def test_filter_since_commit_excludes_older_comments() -> None:
     ]
     # Commit timestamp: 2026-04-07 — only the new thread should survive
     with patch(
-        "darkfactory.pr_comments._resolve_commit_timestamp",
+        "darkfactory.utils.github.pr.comments._resolve_commit_timestamp",
         return_value="2026-04-07T00:00:00Z",
     ):
         result = _apply_filters(threads, CommentFilters(since_commit="abc123"))
@@ -319,7 +319,7 @@ def test_filter_single_comment_id_no_match_returns_empty() -> None:
 def test_fetch_pr_comments_calls_gh_and_returns_threads() -> None:
     """fetch_pr_comments shells out to gh and returns filtered ReviewThread objects."""
     with patch(
-        "darkfactory.pr_comments._gh_fetch", return_value=FIXTURE_RAW
+        "darkfactory.utils.github.pr.comments._gh_fetch", return_value=FIXTURE_RAW
     ) as mock_fetch:
         result = fetch_pr_comments(42)
 
@@ -333,7 +333,7 @@ def test_fetch_pr_comments_calls_gh_and_returns_threads() -> None:
 
 def test_fetch_pr_comments_passes_filters_through() -> None:
     filters = CommentFilters(include_resolved=True)
-    with patch("darkfactory.pr_comments._gh_fetch", return_value=FIXTURE_RAW):
+    with patch("darkfactory.utils.github.pr.comments._gh_fetch", return_value=FIXTURE_RAW):
         result = fetch_pr_comments(42, filters=filters)
 
     ids = {t.thread_id for t in result}
@@ -342,7 +342,7 @@ def test_fetch_pr_comments_passes_filters_through() -> None:
 
 def test_fetch_pr_comments_empty_pr() -> None:
     with patch(
-        "darkfactory.pr_comments._gh_fetch",
+        "darkfactory.utils.github.pr.comments._gh_fetch",
         return_value={"reviewThreads": [], "reviews": [], "comments": []},
     ):
         result = fetch_pr_comments(99)

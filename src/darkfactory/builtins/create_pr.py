@@ -12,7 +12,7 @@ from darkfactory.builtins._shared import _log_dry_run, _scan_for_forbidden_attri
 from darkfactory.event_log import emit_builtin_effect
 from darkfactory.utils._result import Ok
 from darkfactory.utils.github._types import GhErr
-from darkfactory.utils.github.pull_request import create_pr as gh_create_pr
+from darkfactory.utils.github.pr import create_pr as gh_create_pr
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)

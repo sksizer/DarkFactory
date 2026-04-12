@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-from darkfactory.pr_comments import ReviewComment, ReviewThread
+from darkfactory.utils.github.pr.comments import ReviewComment, ReviewThread
 from darkfactory.rework_prompt import render_rework_feedback
 from darkfactory.templates import compose_prompt, substitute_placeholders
 from darkfactory.workflow import ExecutionContext, Workflow

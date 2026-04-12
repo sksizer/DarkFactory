@@ -9,17 +9,12 @@ from darkfactory.utils.github._cli import (
     gh_json as gh_json,
     gh_run as gh_run,
 )
-from darkfactory.utils.github._comments import (
-    graphql_fetch as graphql_fetch,
-    post_reply as post_reply,
-    repo_nwo as repo_nwo,
-)
 from darkfactory.utils.github._types import (
     GhCheckResult as GhCheckResult,
     GhErr as GhErr,
     GhResult as GhResult,
 )
-from darkfactory.utils.github.pull_request import (
+from darkfactory.utils.github.pr import (
     PrInfo as PrInfo,
     close_pr as close_pr,
     create_pr as create_pr,
@@ -27,4 +22,13 @@ from darkfactory.utils.github.pull_request import (
     get_pr_state as get_pr_state,
     get_resume_pr_state as get_resume_pr_state,
     list_open_prs as list_open_prs,
+)
+from darkfactory.utils.github.pr.comments import (
+    CommentFilters as CommentFilters,
+    CommentReply as CommentReply,
+    ReviewComment as ReviewComment,
+    ReviewThread as ReviewThread,
+    fetch_pr_comments as fetch_pr_comments,
+    parse_agent_replies as parse_agent_replies,
+    post_comment_replies as post_comment_replies,
 )

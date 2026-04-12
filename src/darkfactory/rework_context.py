@@ -23,8 +23,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from darkfactory.pr_comments import CommentFilters, ReviewThread
-from darkfactory.pr_comments import fetch_pr_comments as _fetch_pr_comments
+from darkfactory.utils.github.pr.comments import CommentFilters, ReviewThread
+from darkfactory.utils.github.pr.comments import fetch_pr_comments as _fetch_pr_comments
 from darkfactory.model import PRD, compute_branch_name
 from darkfactory.rework_guard import ReworkGuard
 from darkfactory.utils.git.worktree import find_worktree_for_prd

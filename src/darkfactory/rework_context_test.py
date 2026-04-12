@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from darkfactory.pr_comments import CommentFilters, ReviewThread
+from darkfactory.utils.github.pr.comments import CommentFilters, ReviewThread
 from darkfactory.model import PRD
 from darkfactory.rework_context import (
     ReworkContext,

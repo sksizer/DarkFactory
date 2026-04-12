@@ -15,7 +15,7 @@ import pytest
 
 from darkfactory.builtins.fetch_pr_comments import fetch_pr_comments as builtin_fn
 from darkfactory.engine import ReworkState
-from darkfactory.pr_comments import ReviewThread
+from darkfactory.utils.github.pr.comments import ReviewThread
 from darkfactory.model import PRD
 from darkfactory.workflow import ExecutionContext, Workflow
 
@@ -90,7 +90,7 @@ def test_noop_when_preloaded(tmp_path: Path) -> None:
     threads = [_thread()]
     ctx = _make_ctx(tmp_path, review_threads=threads)
 
-    with patch("darkfactory.pr_comments.fetch_pr_comments") as mock_fetch:
+    with patch("darkfactory.utils.github.pr.comments.fetch_pr_comments") as mock_fetch:
         builtin_fn(ctx)
         mock_fetch.assert_not_called()
 
@@ -110,7 +110,7 @@ def test_fetches_when_pr_number_set(tmp_path: Path) -> None:
 
     fetched = [_thread()]
     with patch(
-        "darkfactory.pr_comments.fetch_pr_comments", return_value=fetched
+        "darkfactory.utils.github.pr.comments.fetch_pr_comments", return_value=fetched
     ) as mock_fetch:
         builtin_fn(ctx)
         assert mock_fetch.call_count == 1
