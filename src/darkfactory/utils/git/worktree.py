@@ -13,8 +13,6 @@ from pathlib import Path
 from darkfactory.checks import StaleWorktree
 from darkfactory.git_ops import git_check, git_run
 
-# Re-export for backwards compatibility — cleanup.py imports checks directly
-# but the type is used here too.
 __all__ = [
     "find_worktree_for_prd",
     "find_stale_worktree_for_prd",

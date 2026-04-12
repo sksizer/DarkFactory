@@ -11,7 +11,7 @@ from darkfactory import checks
 from darkfactory.checks import StaleWorktree, find_stale_worktrees, is_safe_to_remove
 from darkfactory.cli._shared import _find_repo_root
 from darkfactory.git_ops import git_check, git_run
-from darkfactory.worktree_utils import (
+from darkfactory.utils.git.worktree import (
     find_orphaned_branches,
     find_stale_worktree_for_prd,
     remove_worktree,

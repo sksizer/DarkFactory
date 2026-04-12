@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -16,10 +15,11 @@ from darkfactory.event_log import EventWriter, generate_session_id
 from darkfactory.git_ops import git_check, git_run
 from darkfactory.model import TERMINAL_STATUSES, load_one, save, set_status
 from darkfactory.rework_guard import ReworkGuard
-from darkfactory.worktree_utils import (
+from darkfactory.utils.git.worktree import (
     find_orphaned_branches,
     find_stale_worktree_for_prd,
 )
+from darkfactory.utils.github import close_pr, list_open_prs
 
 
 @dataclass
@@ -76,33 +76,12 @@ def _discover_artifacts(
         pass
 
     # Open PRs — search across all matching branches
-    try:
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "list",
-                "--state",
-                "open",
-                "--limit",
-                "100",
-                "--json",
-                "number,headRefName",
-            ],
-            capture_output=True,
-            text=True,
-            cwd=repo_root,
-        )
-        if result.returncode == 0:
-            prs: list[dict[str, object]] = json.loads(result.stdout)
-            for pr in prs:
-                head = str(pr.get("headRefName", ""))
-                if head.startswith(f"prd/{prd_id}-"):
-                    pr_number = pr["number"]
-                    if isinstance(pr_number, (int, str)):
-                        summary.open_pr_numbers.append(int(pr_number))
-    except (subprocess.CalledProcessError, FileNotFoundError, json.JSONDecodeError):
-        pass
+    prefix = f"prd/{prd_id}-"
+    summary.open_pr_numbers = [
+        pr.number
+        for pr in list_open_prs(repo_root)
+        if pr.head_ref_name.startswith(prefix)
+    ]
 
     # Rework guard
     guard = ReworkGuard(repo_root)
@@ -166,24 +145,10 @@ def _execute_reset(
 
     # 6a. Close all open PRs
     for pr_num in summary.open_pr_numbers:
-        try:
-            subprocess.run(
-                [
-                    "gh",
-                    "pr",
-                    "close",
-                    str(pr_num),
-                    "--comment",
-                    "Closed by `prd reset`.",
-                ],
-                capture_output=True,
-                text=True,
-                check=True,
-                cwd=repo_root,
-            )
+        if close_pr(pr_num, repo_root, comment="Closed by `prd reset`."):
             cleaned.append(f"closed PR #{pr_num}")
             print(f"  Closed PR #{pr_num}")
-        except subprocess.CalledProcessError:
+        else:
             skipped.append(f"PR #{pr_num} (close failed)")
             print(f"  Skipped PR #{pr_num} (close failed)")
 
