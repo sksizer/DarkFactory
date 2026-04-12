@@ -17,15 +17,14 @@ prd [global-flags] <command> [command-flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--directory` | `-C` | `.` | Project root containing `.darkfactory/` |
-| `--prd-dir` | | `.darkfactory/prds/` | Path to PRD directory |
+| `--directory` | `-C` | auto-walk | Project root containing `.darkfactory/` (also overrides `DARKFACTORY_DIR`) |
 | `--workflows-dir` | | `.darkfactory/workflows/` | Path to workflows directory |
 | `--operations-dir` | | `.darkfactory/operations/` | Path to system operations directory |
 | `--json` | | `false` | Emit JSON output where supported |
 | `--verbose` | `-v` | `false` | Enable debug logging |
 | `--theme` | | `dark` | Color theme: `dark` or `light` |
 | `--no-color` | | `false` | Disable all color output |
-| `--icon-set` | | `nerdfont` | Icon set: `nerdfont`, `ascii`, or `emoji` |
+| `--icon-set` | | auto-detected | Icon set: `nerdfont`, `ascii`, or `emoji` |
 
 ## Subcommands
 
@@ -33,6 +32,8 @@ prd [global-flags] <command> [command-flags]
 
 - **[`prd init`](/reference/cli/init/)** -- Scaffold a new `.darkfactory/` directory.
 - **[`prd new`](/reference/cli/new/)** -- Create a new PRD from a template.
+- **[`prd discuss`](/reference/cli/discuss/)** -- Open an interactive Claude Code discussion for a PRD.
+- **[`prd archive`](/reference/cli/archive/)** -- Move a completed PRD to the archive.
 
 ### Analysis & Validation
 
@@ -50,6 +51,7 @@ prd [global-flags] <command> [command-flags]
 - **[`prd plan`](/reference/cli/plan/)** -- Show the execution plan for a PRD (dry run).
 - **[`prd run`](/reference/cli/run/)** -- Execute a workflow against one or more PRDs.
 - **[`prd rework`](/reference/cli/rework/)** -- Address PR review feedback.
+- **[`prd rework-watch`](/reference/cli/rework-watch/)** -- Polling daemon that auto-triggers rework when new PR comments appear.
 
 ### Maintenance
 
