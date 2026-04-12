@@ -6,6 +6,7 @@ import argparse
 
 from darkfactory.event_log import generate_session_id
 from darkfactory.loader import load_workflows
+from darkfactory.phase_state import ReworkState
 from darkfactory.pr_comments import CommentFilters
 from darkfactory.rework_context import (
     ReworkContext,
@@ -34,9 +35,8 @@ def cmd_rework(args: argparse.Namespace) -> int:
 
     Without ``--execute``, prints a dry-run summary and exits.
     With ``--execute`` and any unresolved threads, invokes the rework
-    workflow, seeding the ExecutionContext with the already-discovered
-    state via ``context_overrides`` so the builtin at position 0 is a
-    no-op and the workflow proceeds directly to fast-forward/rebase.
+    workflow, seeding the ExecutionContext's PhaseState with the
+    already-discovered state so the builtin at position 0 is a no-op.
     """
     prds = _load(args.data_dir)
     prd = _resolve_prd_or_exit(args.prd_id, prds)
@@ -78,6 +78,14 @@ def cmd_rework(args: argparse.Namespace) -> int:
 
     base_ref = _resolve_base_ref(None, repo_root)
     session = generate_session_id()
+
+    rework_state = ReworkState(
+        pr_number=discovered.pr_number,
+        review_threads=discovered.review_threads,
+        comment_filters=discovered.comment_filters,
+        reply_to_comments=discovered.reply_to_comments,
+    )
+
     result = run_workflow(
         prd,
         rework_wf,
@@ -88,11 +96,8 @@ def cmd_rework(args: argparse.Namespace) -> int:
         context_overrides={
             "worktree_path": discovered.worktree_path,
             "cwd": discovered.worktree_path,
-            "pr_number": discovered.pr_number,
-            "review_threads": discovered.review_threads,
-            "comment_filters": discovered.comment_filters,
-            "reply_to_comments": discovered.reply_to_comments,
         },
+        phase_state_init=[rework_state],
     )
     return 0 if result.success else 1
 

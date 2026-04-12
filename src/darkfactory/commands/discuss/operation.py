@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from darkfactory.system import SystemOperation
-from darkfactory.workflow import BuiltIn
+from darkfactory.workflow import BuiltIn, InteractiveTask
 
 discuss_operation = SystemOperation(
     name="discuss",
@@ -17,21 +17,15 @@ discuss_operation = SystemOperation(
         # budget — refinement and critique are reasoning-heavy tasks where
         # more deliberation directly improves output quality. ``max`` is
         # Opus 4.6 only, so discuss sessions run on Opus.
-        BuiltIn(
-            "discuss_prd",
-            kwargs={
-                "phase": "discuss",
-                "prompt_file": "prompts/discuss.md",
-                "effort_level": "max",
-            },
+        InteractiveTask(
+            name="discuss",
+            prompt_file="prompts/discuss.md",
+            effort_level="max",
         ),
-        BuiltIn(
-            "discuss_prd",
-            kwargs={
-                "phase": "critique",
-                "prompt_file": "prompts/critique.md",
-                "effort_level": "max",
-            },
+        InteractiveTask(
+            name="critique",
+            prompt_file="prompts/critique.md",
+            effort_level="max",
         ),
         BuiltIn(
             "commit_prd_changes",

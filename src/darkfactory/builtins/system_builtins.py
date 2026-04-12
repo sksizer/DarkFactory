@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Callable
 
 from darkfactory import containment, model as model_module
+from darkfactory.phase_state import CandidateList
 from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.model import compute_branch_name
 from darkfactory.system import SystemContext
@@ -79,14 +80,14 @@ def system_load_review_prds(ctx: SystemContext) -> None:
 
 @_register("system_load_prds_by_status")
 def system_load_prds_by_status(ctx: SystemContext, *, status: str) -> None:
-    """Filter ``ctx.prds`` by ``status`` and store matching ids in shared state.
+    """Filter ``ctx.prds`` by ``status`` and store matching ids in PhaseState.
 
-    The result is stored at ``ctx._shared_state['candidates']`` as a list of
-    PRD id strings.  Downstream tasks (e.g. :func:`system_check_merged`) read
-    this key to know which PRDs to examine.
+    The result is stored as a :class:`CandidateList` in ``ctx.state``.
+    Downstream tasks (e.g. :func:`system_check_merged`) read this to know
+    which PRDs to examine.
     """
     candidates = [prd_id for prd_id, prd in ctx.prds.items() if prd.status == status]
-    ctx._shared_state["candidates"] = candidates
+    ctx.state.put(CandidateList(prd_ids=candidates))
     ctx.logger.info(
         "system_load_prds_by_status: found %d PRD(s) with status=%r",
         len(candidates),
@@ -135,7 +136,7 @@ def _is_merged_squash(repo_root: str, branch: str) -> bool:
 def system_check_merged(ctx: SystemContext) -> None:
     """Check which candidate PRDs have had their branch merged to main.
 
-    Reads ``ctx._shared_state['candidates']`` (populated by
+    Reads ``CandidateList`` from ``ctx.state`` (populated by
     :func:`system_load_prds_by_status`).  For each candidate, checks:
 
     1. Standard merge commit — branch appears in ``git branch --merged main``.
@@ -144,7 +145,8 @@ def system_check_merged(ctx: SystemContext) -> None:
     Populates ``ctx.targets`` with the ids of confirmed-merged PRDs and
     appends human-readable lines to ``ctx.report``.
     """
-    candidates: list[str] = ctx._shared_state.get("candidates", [])
+    cl = ctx.state.get(CandidateList, CandidateList())
+    candidates: list[str] = cl.prd_ids
     repo_root = str(ctx.repo_root)
     confirmed: list[str] = []
 

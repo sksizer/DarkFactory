@@ -8,8 +8,8 @@ from pathlib import Path
 
 from darkfactory.cli._shared import _find_repo_root, _load, _resolve_prd_or_exit
 from darkfactory.commands.discuss import discuss_operation
+from darkfactory.runner import run_system_operation
 from darkfactory.system import SystemContext
-from darkfactory.system_runner import run_system_operation
 from darkfactory.utils.system import check_prerequisites
 
 

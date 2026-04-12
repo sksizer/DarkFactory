@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 from darkfactory.builtins.system_builtins import _register
+from darkfactory.phase_state import PrdContext
 from darkfactory.system import SystemContext
 from darkfactory.utils.claude_code import EffortLevel, spawn_claude
 from darkfactory.utils.tui import print_phase_banner
@@ -20,10 +21,12 @@ def discuss_prd(
     effort_level: EffortLevel | None = None,
 ) -> None:
     """Launch an interactive Claude Code session for a discussion phase."""
-    prd_context = ctx._shared_state.get("prd_context", "")
+    prd_context = ""
+    if ctx.state.has(PrdContext):
+        prd_context = ctx.state.get(PrdContext).body
     if not prd_context:
         ctx.logger.warning(
-            "discuss_prd: no PRD context in shared state, proceeding with empty context"
+            "discuss_prd: no PRD context in state, proceeding with empty context"
         )
 
     op_dir = ctx.operation.operation_dir
