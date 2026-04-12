@@ -14,7 +14,7 @@ from filelock import FileLock, Timeout
 from darkfactory.cli._shared import _find_repo_root
 from darkfactory.event_log import EventWriter, generate_session_id
 from darkfactory.git_ops import git_check, git_run
-from darkfactory.model import TERMINAL_STATUSES, load_one, set_status
+from darkfactory.model import TERMINAL_STATUSES, load_one, save, set_status
 from darkfactory.rework_guard import ReworkGuard
 from darkfactory.worktree_utils import (
     find_orphaned_branches,
@@ -84,11 +84,14 @@ def _discover_artifacts(
                 "list",
                 "--state",
                 "open",
+                "--limit",
+                "100",
                 "--json",
                 "number,headRefName",
             ],
             capture_output=True,
             text=True,
+            cwd=repo_root,
         )
         if result.returncode == 0:
             prs: list[dict[str, object]] = json.loads(result.stdout)
@@ -98,7 +101,7 @@ def _discover_artifacts(
                     pr_number = pr["number"]
                     if isinstance(pr_number, (int, str)):
                         summary.open_pr_numbers.append(int(pr_number))
-    except (subprocess.CalledProcessError, json.JSONDecodeError):
+    except (subprocess.CalledProcessError, FileNotFoundError, json.JSONDecodeError):
         pass
 
     # Rework guard
@@ -176,6 +179,7 @@ def _execute_reset(
                 capture_output=True,
                 text=True,
                 check=True,
+                cwd=repo_root,
             )
             cleaned.append(f"closed PR #{pr_num}")
             print(f"  Closed PR #{pr_num}")
@@ -203,14 +207,9 @@ def _execute_reset(
         # Still prune to clean stale metadata
         git_check("worktree", "prune", cwd=repo_root)
 
-    # 6c. Release and remove lock file
-    if summary.lock_file and summary.lock_file.exists():
-        try:
-            summary.lock_file.unlink()
-            cleaned.append(f"removed lock file {summary.lock_file}")
-            print(f"  Removed lock file {summary.lock_file}")
-        except OSError:
-            skipped.append(f"lock file {summary.lock_file}")
+    # 6c. Lock file is left in place — filelock semantics require the file
+    # to exist for a clean release.  The caller's finally block handles
+    # lock.release().
 
     # 6d. Delete local branches
     for branch in summary.local_branches:
@@ -241,16 +240,21 @@ def _execute_reset(
         cleaned.append("cleared rework guard")
         print("  Cleared rework guard")
 
-    # 6g. Reset status to ready (only for active states)
-    if summary.current_status not in ("draft", "ready"):
-        try:
-            prd = load_one(data_dir, summary.prd_id)
+    # 6g. Reset status to ready and stamp updated timestamp (AC-9)
+    try:
+        prd = load_one(data_dir, summary.prd_id)
+        if summary.current_status not in ("draft", "ready"):
             set_status(prd, "ready")
             cleaned.append(f"status {summary.current_status} -> ready")
             print(f"  Status: {summary.current_status} -> ready")
-        except (KeyError, OSError) as exc:
-            skipped.append(f"status reset ({exc})")
-            print(f"  Skipped status reset ({exc})")
+        else:
+            # Status stays the same, but stamp updated per AC-9
+            save(prd)
+            cleaned.append("stamped updated timestamp")
+            print("  Stamped updated timestamp")
+    except (KeyError, OSError) as exc:
+        skipped.append(f"status reset ({exc})")
+        print(f"  Skipped status reset ({exc})")
 
     return cleaned, skipped
 
@@ -343,11 +347,6 @@ def cmd_reset(args: argparse.Namespace) -> int:
             f"{len(skipped)} skipped."
         )
     finally:
-        # Release the lock we acquired; the lock file itself may have been
-        # deleted by _execute_reset (step 6c), which is fine.
-        try:
-            lock.release()
-        except OSError:
-            pass
+        lock.release()
 
     return 0

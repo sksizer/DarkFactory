@@ -14,6 +14,7 @@ from darkfactory.cli.reset import (
     _execute_reset,
     cmd_reset,
 )
+from darkfactory.model import load_one
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -401,19 +402,12 @@ def test_workflow_preserved_after_reset(tmp_path: Path) -> None:
         current_status="in-progress",
     )
 
-    # set_status only changes status, not workflow — verify it's called correctly
-    with (
-        patch("darkfactory.cli.reset.load_one") as mock_load,
-        patch("darkfactory.cli.reset.set_status") as mock_set_status,
-        patch("darkfactory.cli.reset.git_check", return_value=True),
-    ):
-        mock_prd = MagicMock()
-        mock_prd.workflow = "task"
-        mock_load.return_value = mock_prd
-
+    with patch("darkfactory.cli.reset.git_check", return_value=True):
         cleaned, skipped = _execute_reset(summary, tmp_path, tmp_path)
 
-    mock_set_status.assert_called_once_with(mock_prd, "ready")
+    prd = load_one(tmp_path, "PRD-99")
+    assert prd.workflow == "task"
+    assert prd.status == "ready"
 
 
 # ---------------------------------------------------------------------------
@@ -422,24 +416,20 @@ def test_workflow_preserved_after_reset(tmp_path: Path) -> None:
 
 
 def test_updated_timestamp_set(tmp_path: Path) -> None:
-    """AC-9: set_status calls save() which stamps updated."""
+    """AC-9: reset stamps the updated field to today's date."""
+    _make_prd_file(tmp_path, status="review")
     summary = _ArtifactSummary(
         prd_id="PRD-99",
         current_status="review",
     )
 
-    with (
-        patch("darkfactory.cli.reset.load_one") as mock_load,
-        patch("darkfactory.cli.reset.set_status") as mock_set_status,
-        patch("darkfactory.cli.reset.git_check", return_value=True),
-    ):
-        mock_prd = MagicMock()
-        mock_load.return_value = mock_prd
-
+    with patch("darkfactory.cli.reset.git_check", return_value=True):
         cleaned, skipped = _execute_reset(summary, tmp_path, tmp_path)
 
-    # set_status -> save() stamps updated automatically
-    mock_set_status.assert_called_once_with(mock_prd, "ready")
+    prd = load_one(tmp_path, "PRD-99")
+    from datetime import date
+
+    assert prd.updated == date.today().isoformat()
     assert any("status" in c for c in cleaned)
 
 

@@ -73,19 +73,61 @@ def find_worktree_for_prd(prd_id: str, repo_root: Path) -> Path | None:
     return None
 
 
+def _find_worktree_path_and_branch_for_prd(
+    prd_id: str, repo_root: Path
+) -> tuple[Path, str] | None:
+    """Find a matching worktree path and branch from Git porcelain output.
+
+    Uses ``git worktree list --porcelain`` so the authoritative branch name is
+    preserved even when the worktree directory name does not match the branch
+    suffix.
+    """
+    try:
+        result = git_run("worktree", "list", "--porcelain", cwd=repo_root)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+    worktree_path: Path | None = None
+    branch: str | None = None
+
+    for line in result.stdout.splitlines() + [""]:
+        if not line:
+            if (
+                worktree_path is not None
+                and branch is not None
+                and re.fullmatch(rf"prd/{re.escape(prd_id)}-[^/]+", branch)
+            ):
+                return worktree_path, branch
+            worktree_path = None
+            branch = None
+            continue
+
+        if line.startswith("worktree "):
+            worktree_path = Path(line.removeprefix("worktree ").strip())
+        elif line.startswith("branch refs/heads/"):
+            branch = line.removeprefix("branch refs/heads/").strip()
+
+    return None
+
+
 def find_stale_worktree_for_prd(prd_id: str, repo_root: Path) -> StaleWorktree | None:
     """Find the worktree entry for *prd_id*, wrapped with PR state.
 
-    Delegates path discovery to :func:`find_worktree_for_prd`, then wraps
-    the result in a :class:`StaleWorktree` with PR state for cleanup/reset
-    operations.
+    Prefers authoritative branch information from
+    ``git worktree list --porcelain`` and falls back to
+    :func:`find_worktree_for_prd` for convention-based path discovery.
     """
     from darkfactory import checks
 
-    entry = find_worktree_for_prd(prd_id, repo_root)
-    if entry is None:
-        return None
-    branch = f"prd/{entry.name}"
+    match = _find_worktree_path_and_branch_for_prd(prd_id, repo_root)
+    if match is not None:
+        entry, branch = match
+    else:
+        entry = find_worktree_for_prd(prd_id, repo_root)
+        if entry is None:
+            return None
+        branch = f"prd/{entry.name}"
+
     pr_state = checks._get_pr_state(branch, repo_root)
     return StaleWorktree(
         prd_id=prd_id,
@@ -112,4 +154,4 @@ def find_orphaned_branches(prd_id: str, repo_root: Path) -> list[str]:
 def remove_worktree(worktree: StaleWorktree, repo_root: Path) -> None:
     """Remove a worktree directory and delete the local branch."""
     git_run("worktree", "remove", "--force", str(worktree.worktree_path), cwd=repo_root)
-    git_check("branch", "-D", worktree.branch.removeprefix("prd/"), cwd=repo_root)
+    git_check("branch", "-D", worktree.branch, cwd=repo_root)
