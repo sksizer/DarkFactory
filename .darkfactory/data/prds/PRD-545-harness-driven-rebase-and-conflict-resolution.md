@@ -13,14 +13,14 @@ blocks:
 impacts:
   - src/darkfactory/runner.py
   - src/darkfactory/impacts.py
-  - src/darkfactory/builtins.py
-  - src/darkfactory/cli.py
+  - src/darkfactory/builtins/**
+  - src/darkfactory/cli/**
 workflow:
 assignee:
 reviewers: []
 target_version:
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-11'
 tags:
   - harness
   - scheduler
@@ -173,6 +173,6 @@ A follow-up could run a "declared vs actual impacts" check after each PRD merges
 
 - Prior art: `src/darkfactory/impacts.py` — the static conflict detector this PRD builds on.
 - Prior art: `src/darkfactory/containment.py` — parent/child relationships.
-- Prior art: `prd conflicts <ID>` CLI command in `src/darkfactory/cli.py`.
+- Prior art: `prd conflicts <ID>` CLI command in `src/darkfactory/cli/conflicts.py`.
 - Originating incident: [[PRD-549-builtins-package-split]] — the epic whose nine-parallel-children design exposed this gap. AC-12 of this PRD explicitly targets re-running that design without the `_legacy.py` workaround.
 - [[PRD-543-harness-pr-creation-hardening]] — overlaps in spirit: both are "the harness needs to surface and act on information it already has."

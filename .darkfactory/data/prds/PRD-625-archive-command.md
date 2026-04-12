@@ -2,7 +2,7 @@
 id: PRD-625
 title: Archive Command
 kind: task
-status: ready
+status: superseded
 priority: medium
 effort: s
 capability: simple
@@ -14,11 +14,23 @@ assignee:
 reviewers: []
 target_version:
 created: 2026-04-11
-updated: 2026-04-11
+updated: '2026-04-11'
 tags: []
 ---
 
 # Archive Command
+
+## Superseded by
+
+PRD-622 delivered the full scope of this PRD as part of the data model refactor:
+
+- The `prd archive PRD-NNN` CLI command exists (`src/darkfactory/cli/archive.py`) with guardrails requiring terminal status (`done`, `superseded`, `cancelled`) and transitive dependency checks (stricter than the original `in-progress` check proposed here).
+- The `data/archive/` folder was introduced alongside `data/prds/` under `.darkfactory/data/`.
+- `archive()` is implemented in `src/darkfactory/model/_persistence.py` and moves the file, stamps `app_version`, and writes via the deterministic serializer.
+- `load_all(data_dir, *, include_archived=False)` discovers PRDs across both folders when requested.
+- Callsites resolving frontmatter references use appropriate `include_archived` values.
+
+PRD-622 also introduces `archived` as a new terminal status: it is added to `TERMINAL_STATUSES` in `src/darkfactory/model/_persistence.py:49`, and `archive()` flips the PRD's `status:` to `archived` on write. This matches PRD-625's original intent (the Summary section below already specifies `sets its status to archived`). The one approach difference is the guardrail: PRD-622 requires terminal status (`done`, `superseded`, `cancelled`) plus a transitive dependency check via BFS across the parent/children/depends_on/blocks axes, rather than simply blocking when an in-progress PRD is encountered.
 
 ## Summary
 

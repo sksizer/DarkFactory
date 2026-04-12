@@ -29,7 +29,7 @@ impacts:
 workflow:
 target_version:
 created: 2026-04-11
-updated: 2026-04-11
+updated: '2026-04-11'
 tags:
   - harness
   - cli
@@ -225,7 +225,7 @@ prd discuss PRD-616
 
 ### Commit step at the end of the chain
 
-The discuss chain ends with a commit phase because the PRD store is git: a discussion that ends with PRD edits sitting uncommitted in the working tree is a half-finished operation. Forcing the user to remember `git add .darkfactory/prds/PRD-XXX-...md && git commit` after every discuss session is the kind of friction that erodes the value of the harness — better to make the commit prompt the natural last step.
+The discuss chain ends with a commit phase because the PRD store is git: a discussion that ends with PRD edits sitting uncommitted in the working tree is a half-finished operation. Forcing the user to remember `git add .darkfactory/data/prds/PRD-XXX-...md && git commit` after every discuss session is the kind of friction that erodes the value of the harness — better to make the commit prompt the natural last step.
 
 The builtin commits **only** the target PRD file by default. If the user (or Claude during the session) modified other files, those are surfaced as a note but left in the working tree. The reasoning: surprise commits are worse than incomplete commits — a user can always run `git add -A && git commit` themselves if they want everything in, but they can't easily *undo* a commit that swept up an unrelated file.
 

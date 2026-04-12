@@ -13,14 +13,14 @@ depends_on:
   - "[[PRD-549-builtins-package-split]]"
 blocks: []
 impacts:
-  - workflows/planning/workflow.py
-  - src/darkfactory/builtins.py
+  - src/darkfactory/workflows/planning/workflow.py
+  - src/darkfactory/builtins/**
   - src/darkfactory/templates.py
-  - tests/test_planning_workflow.py
+  - src/darkfactory/model/_persistence.py
 workflow: null
 target_version: null
 created: 2026-04-08
-updated: '2026-04-08'
+updated: '2026-04-11'
 tags:
   - harness
   - workflow
@@ -35,7 +35,7 @@ tags:
 PRD-228 ships the initial planning workflow using only existing primitives, with constraints enforced by **convention** (tool allowlist + prompt instructions). This PRD upgrades that workflow to use **hard enforcement** once PRD-227's template machinery is in place. Three concrete changes:
 
 1. **Migrate the planning workflow to compose from `PLANNING_TEMPLATE`** (PRD-227 bundle), so its open/close invariants are guaranteed by the template instead of by convention.
-2. **Add `forbidden_path_globs` enforcement to the template machinery** so the planning template can guarantee "this workflow's diff stays inside `prds/`" — the agent literally cannot ship code changes through this workflow.
+2. **Add `forbidden_path_globs` enforcement to the template machinery** so the planning template can guarantee "this workflow's diff stays inside `.darkfactory/data/prds/`" — the agent literally cannot ship code changes through this workflow.
 3. **Add a `set_blocks` BuiltIn** so the planning workflow can update the parent epic's `blocks:` field without giving the agent `Edit` access (closing the one honor-system leak in PRD-228).
 
 After this lands, the planning workflow has the full template-enforced invariant set: state honesty (PRD-224), composition order (PRD-227), and path scoping (this PRD). Misuse becomes architecturally impossible, not just discouraged.
@@ -44,8 +44,8 @@ After this lands, the planning workflow has the full template-enforced invariant
 
 PRD-228's planning workflow has three known holes that can't be closed without infrastructure that doesn't exist yet:
 
-1. **Tool allowlist is honor-system.** The allowlist scopes `Bash(git add prds/:*)` but a determined agent could still try `Bash(git add src/foo.py)` and the harness would block it per-call. There's no workflow-level guarantee that the cumulative diff stays in `prds/`.
-2. **`Edit` access for the parent epic's `blocks:` field.** PRD-228 added `Edit` to the allowlist as a pragmatic exception so the agent could update the parent. That's a leak — `Edit` lets the agent modify any file it can read, not just `prds/PRD-X.md`.
+1. **Tool allowlist is honor-system.** The allowlist scopes `Bash(git add .darkfactory/data/prds/:*)` but a determined agent could still try `Bash(git add src/foo.py)` and the harness would block it per-call. There's no workflow-level guarantee that the cumulative diff stays in `.darkfactory/data/prds/`.
+2. **`Edit` access for the parent epic's `blocks:` field.** PRD-228 added `Edit` to the allowlist as a pragmatic exception so the agent could update the parent. That's a leak — `Edit` lets the agent modify any file it can read, not just `.darkfactory/data/prds/PRD-X.md`.
 3. **Open/close convention, not enforcement.** The workflow body in PRD-228 lists the closing tasks (commit, push, create_pr) explicitly. A user editing `workflow.py` could remove `validate-children` or skip `set_status(review)` and break the lifecycle. PRD-227 templates make those positions structural.
 
 These are all real risks but they're acceptable for PRD-228 because the alternative is "no planning workflow at all." This PRD closes them once the supporting infrastructure exists.
@@ -54,7 +54,7 @@ These are all real risks but they're acceptable for PRD-228 because the alternat
 
 ### 1. Migrate to `PLANNING_TEMPLATE`
 
-PRD-227 ships `PLANNING_TEMPLATE` as a bundled template. This PRD updates `workflows/planning/workflow.py` to compose from it:
+PRD-227 ships `PLANNING_TEMPLATE` as a bundled template. This PRD updates `src/darkfactory/workflows/planning/workflow.py` to compose from it:
 
 ```python
 from darkfactory.templates_builtin import PLANNING_TEMPLATE
@@ -78,9 +78,9 @@ planning_workflow = PLANNING_TEMPLATE.compose(
                 # No Edit — the parent PRD's blocks field is updated by
                 # the set_blocks BuiltIn after the agent finishes (see #3)
                 "Bash(uv run prd validate*)",
-                "Bash(git add prds/:*)",
+                "Bash(git add .darkfactory/data/prds/:*)",
                 "Bash(git status:*)",
-                "Bash(git diff prds/:*)",
+                "Bash(git diff .darkfactory/data/prds/:*)",
             ],
             model="opus",
             model_from_capability=False,
@@ -240,7 +240,7 @@ def set_blocks(
     update_frontmatter_block_at(parent_path, "blocks", blocks_yaml)
 ```
 
-This needs a companion `update_frontmatter_block_at` function in `prd.py` (multi-line variant of `update_frontmatter_field_at`). PRD-216's `normalize_list_field_at` is close to what's needed; this is a related but slightly different operation (replacing the whole list, not just sorting it).
+This needs a companion `update_frontmatter_block_at` function in `src/darkfactory/model/_persistence.py` (multi-line variant of `update_frontmatter_field_at`). PRD-216's `normalize_list_field_at` is close to what's needed; this is a related but slightly different operation (replacing the whole list, not just sorting it).
 
 ### 4. Update planning agent prompts
 
@@ -267,9 +267,9 @@ The runner parses the `created:` line into `ctx.run_summary["created_children"]`
 - [ ] AC-1: `WorkflowTemplate` has a `forbidden_path_globs` field
 - [ ] AC-2: `verify_path_scope` BuiltIn exists; raises on forbidden-path changes; no-op when forbidden_path_globs is empty
 - [ ] AC-3: `set_blocks` BuiltIn updates the parent PRD's `blocks:` field byte-preserving
-- [ ] AC-4: `update_frontmatter_block_at` (or equivalent) exists in `prd.py`
+- [ ] AC-4: `update_frontmatter_block_at` (or equivalent) exists in `src/darkfactory/model/_persistence.py`
 - [ ] AC-5: `PLANNING_TEMPLATE` includes `verify_path_scope` in its close list and lists `forbidden_path_globs` for src/tests/workflows/.github
-- [ ] AC-6: `workflows/planning/workflow.py` is composed from `PLANNING_TEMPLATE` instead of declaring a flat task list
+- [ ] AC-6: `src/darkfactory/workflows/planning/workflow.py` is composed from `PLANNING_TEMPLATE` instead of declaring a flat task list
 - [ ] AC-7: Agent allowlist no longer includes `Edit`
 - [ ] AC-8: Agent prompts updated to emit `created: PRD-X, PRD-Y, ...` after sentinel; harness parses it into `run_summary`
 - [ ] AC-9: Manual end-to-end: re-run planning on a previously-decomposed epic (or a new one); workflow completes; verify no `Edit` was used and `blocks:` was updated by the BuiltIn

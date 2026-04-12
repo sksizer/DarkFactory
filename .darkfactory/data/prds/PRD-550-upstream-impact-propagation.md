@@ -12,15 +12,15 @@ depends_on:
 blocks: []
 impacts:
   - src/darkfactory/impacts.py
-  - src/darkfactory/prd.py
-  - src/darkfactory/cli.py
-  - prds/README.md
+  - src/darkfactory/model/**
+  - src/darkfactory/cli/**
+  - .darkfactory/data/prds/README.md
 workflow:
 assignee:
 reviewers: []
 target_version:
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-11'
 tags:
   - harness
   - planning

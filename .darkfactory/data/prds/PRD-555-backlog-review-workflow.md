@@ -10,18 +10,20 @@ parent:
 depends_on: []
 blocks: []
 impacts:
-  - workflows/backlog_review/workflow.py
-  - workflows/backlog_review/prompts/role.md
-  - workflows/backlog_review/prompts/task.md
-  - workflows/backlog_review/prompts/verify.md
-  - src/darkfactory/cli.py
+  - src/darkfactory/workflows/backlog_review/workflow.py
+  - src/darkfactory/workflows/backlog_review/prompts/role.md
+  - src/darkfactory/workflows/backlog_review/prompts/task.md
+  - src/darkfactory/workflows/backlog_review/prompts/verify.md
+  - src/darkfactory/cli/review_backlog.py
+  - src/darkfactory/cli/review_backlog_test.py
+  - src/darkfactory/cli/_parser.py
   - tests/test_backlog_review_workflow.py
 workflow:
 assignee:
 reviewers: []
 target_version:
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-11'
 tags:
   - workflows
   - hygiene
@@ -52,10 +54,10 @@ Today the only mechanism for this is "read every PRD by hand periodically." That
 
 ### Workflow shape
 
-Sibling of `workflows/planning/` — same directory convention, same `workflow.py` + `prompts/` structure.
+Sibling of `src/darkfactory/workflows/planning/` — same directory convention, same `workflow.py` + `prompts/` structure.
 
 ```
-workflows/backlog_review/
+src/darkfactory/workflows/backlog_review/
 ├── __init__.py
 ├── workflow.py
 └── prompts/
@@ -63,6 +65,8 @@ workflows/backlog_review/
     ├── task.md       # one template, re-used per PRD
     └── verify.md
 ```
+
+The new CLI subcommand lives at `src/darkfactory/cli/review_backlog.py` with a peer `review_backlog_test.py`, registered via `cli/_parser.py` (the CLI has been modularized per PRD-556 — there is no monolithic `cli.py` anymore).
 
 ### Entry point
 
@@ -125,9 +129,9 @@ Plus, for PRDs where the fix is unambiguous (file renames, trivial path updates)
 ### Agent tool allowlist
 
 - Read, Glob, Grep — broad read access to both PRDs and code.
-- Write — scoped to `prds/**` for auto-fix edits.
+- Write — scoped to `.darkfactory/data/prds/**` for auto-fix edits.
 - Bash — `uv run prd validate`, `git log`, `git show`, `git blame` (read-only git).
-- No Write outside `prds/`, no push, no PR creation.
+- No Write outside `.darkfactory/data/prds/`, no push, no PR creation.
 
 ### Failure modes
 
@@ -140,7 +144,7 @@ Plus, for PRDs where the fix is unambiguous (file renames, trivial path updates)
 
 ## Acceptance criteria
 
-- [ ] AC-1: `workflows/backlog_review/` exists with the canonical workflow + prompts structure.
+- [ ] AC-1: `src/darkfactory/workflows/backlog_review/` exists with the canonical workflow + prompts structure.
 - [ ] AC-2: `prd review-backlog` (or equivalent CLI entry point) runs the workflow over all draft/ready/in-progress PRDs.
 - [ ] AC-3: For each PRD the workflow produces a per-PRD verdict from the documented set (`clean`, `stale-impacts`, `stale-body`, `likely-obsolete`, `missing-deps`, `broken-refs`).
 - [ ] AC-4: `impacts:` fixes where a file was cleanly renamed are applied automatically and committed.

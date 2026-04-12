@@ -2,7 +2,7 @@
 id: PRD-600
 title: "Architectural Review and Code Quality Roadmap"
 kind: epic
-status: draft
+status: superseded
 priority: high
 effort: xl
 capability: complex
@@ -19,7 +19,7 @@ assignee:
 reviewers: []
 target_version:
 created: 2026-04-09
-updated: '2026-04-09'
+updated: '2026-04-11'
 tags:
   - architecture
   - code-quality
@@ -28,6 +28,14 @@ tags:
 ---
 
 # Architectural Review and Code Quality Roadmap
+
+> **Snapshot note (2026-04-11):** This review was written against the repo state on 2026-04-09. Several structural findings in the analysis below have since been partially or fully addressed:
+> - **CLI god module** (Hotspot 1, risk 4): `cli/__init__.py` has been decomposed to ~11 lines; all 15 command handlers have been extracted into `src/darkfactory/cli/<name>.py` modules (reconcile, run, plan, rework, new, etc.), including peer tests. See PRD-556.
+> - **`prd.py` monolith** (489 LOC, referenced throughout sections 2–6): replaced by the `src/darkfactory/model/` package (`model/_prd.py`, `model/_persistence.py`, `model/__init__.py` re-exports) as part of PRD-622. All `from darkfactory.prd import ...` references should now read `from darkfactory.model import ...`.
+> - **Directory layout**: `.darkfactory/prds/` is now `.darkfactory/data/prds/` with an added `.darkfactory/data/archive/` for terminal PRDs. The `archive` command and deterministic frontmatter serialization were delivered by PRD-622.
+> - **Version single-sourcing** (section 3, row 5): `[tool.hatch.version]` now reads from `src/darkfactory/__init__.py:__version__` — so PRD-600.2.4 is effectively done.
+>
+> The high/critical safety findings (reconcile crash recovery, shell-escape, setattr side channel, ruff in CI) are still open and tracked by PRD-600.1.x.
 
 ## 1. Executive Architectural Assessment
 
