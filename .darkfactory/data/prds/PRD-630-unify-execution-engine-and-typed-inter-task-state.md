@@ -2,32 +2,23 @@
 id: PRD-630
 title: Unify execution engine and introduce typed inter-task state
 kind: epic
-status: in-progress
+status: review
 priority: high
 effort: l
 capability: complex
 parent: null
 depends_on: []
-blocks: []
-impacts:
-  - src/darkfactory/workflow.py
-  - src/darkfactory/system.py
-  - src/darkfactory/runner.py
-  - src/darkfactory/system_runner.py
-  - src/darkfactory/templates.py
-  - src/darkfactory/templates_builtin.py
-  - src/darkfactory/loader.py
-  - src/darkfactory/invoke.py
-  - src/darkfactory/builtins/__init__.py
-  - src/darkfactory/builtins/_registry.py
-  - src/darkfactory/builtins/system_builtins.py
-  - src/darkfactory/builtins/gather_prd_context.py
-  - src/darkfactory/builtins/discuss_prd.py
-  - src/darkfactory/builtins/resolve_rework_context.py
-  - src/darkfactory/commands/discuss/operation.py
-  - src/darkfactory/cli/run.py
-  - src/darkfactory/cli/discuss.py
-  - src/darkfactory/cli/system.py
+blocks:
+  - "[[PRD-630.1-phase-state-module]]"
+  - "[[PRD-630.2-data-bundles]]"
+  - "[[PRD-630.3-interactive-task-type]]"
+  - "[[PRD-630.4-wire-phase-state-into-contexts]]"
+  - "[[PRD-630.5-unified-dispatch-engine]]"
+  - "[[PRD-630.6-post-agent-results-via-phase-state]]"
+  - "[[PRD-630.7-template-data-flow-contracts]]"
+  - "[[PRD-630.8-migrate-discuss-to-interactive-task]]"
+  - "[[PRD-630.9-delete-system-runner-cleanup]]"
+impacts: []
 workflow: null
 assignee: null
 reviewers: []
