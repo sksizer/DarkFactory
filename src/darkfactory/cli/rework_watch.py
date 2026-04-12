@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from darkfactory.utils.git import GitErr, Ok, git_run
+from darkfactory.utils.git import GitErr, Ok, Timeout, git_run
 
 _log = logging.getLogger(__name__)
 
@@ -181,7 +181,7 @@ def _worktree_exists(prd_id: str, repo_root: Path) -> bool:
                     if re.match(rf"^prd/{re.escape(prd_id)}-", branch):
                         return True
             return False
-        case GitErr():
+        case GitErr() | Timeout():
             return False
 
 

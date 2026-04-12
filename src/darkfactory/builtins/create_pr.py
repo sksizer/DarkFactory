@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import logging
 import re
-import subprocess
 import tempfile
 from pathlib import Path
 
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run, _scan_for_forbidden_attribution
 from darkfactory.event_log import emit_builtin_effect
+from darkfactory.utils._result import Ok
+from darkfactory.utils.github._types import GhErr
+from darkfactory.utils.github.pull_request import create_pr as gh_create_pr
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -80,37 +82,15 @@ def create_pr(ctx: ExecutionContext) -> None:
         body_path = body_file.name
 
     try:
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "create",
-                "--base",
-                ctx.base_ref,
-                "--title",
-                title,
-                "--body-file",
-                body_path,
-            ],
-            cwd=str(ctx.cwd),
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except subprocess.CalledProcessError as exc:
-        detail = (
-            f"gh pr create failed (exit {exc.returncode}):"
-            f"\nstdout: {exc.stdout}"
-            f"\nstderr: {exc.stderr}"
-        )
-        _log.error(detail)
-        raise RuntimeError(detail) from exc
+        match gh_create_pr(ctx.base_ref, title, body_path, ctx.cwd):
+            case Ok(value=url):
+                ctx.pr_url = url or None
+            case GhErr(returncode=code, stderr=err):
+                detail = f"gh pr create failed (exit {code}):\n{err}"
+                _log.error(detail)
+                raise RuntimeError(detail)
     finally:
         Path(body_path).unlink(missing_ok=True)
-
-    # gh prints the PR URL to stdout on success.
-    url_line = result.stdout.strip().splitlines()[-1] if result.stdout.strip() else ""
-    ctx.pr_url = url_line or None
 
     emit_builtin_effect(
         ctx,

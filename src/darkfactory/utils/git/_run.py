@@ -1,11 +1,8 @@
-"""Git subprocess primitives — single gateway for all git calls.
+"""Git subprocess primitive — single gateway for all git calls.
 
-Two thin wrappers over ``subprocess.run(["git", ...])``:
-
-- :func:`git_run` — runs git, never raises; returns ``Ok(None, stdout=...)``
-  on exit 0, ``GitErr`` on non-zero exit.
-- :func:`git_probe` — timeout-bounded variant; returns ``Ok(None)``,
-  ``GitErr``, or ``GitTimeout``.
+:func:`git_run` runs git, never raises; returns ``Ok(None, stdout=...)``
+on exit 0, ``GitErr`` on non-zero exit, ``Timeout`` when a timeout is
+specified and exceeded.
 """
 
 from __future__ import annotations
@@ -13,35 +10,20 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from darkfactory.utils._result import Timeout
 from darkfactory.utils.git._types import (
     CheckResult,
     GitErr,
-    GitTimeout,
     Ok,
-    ProbeResult,
 )
 
 
-def git_run(*args: str, cwd: Path) -> CheckResult:
+def git_run(*args: str, cwd: Path, timeout: int | None = None) -> CheckResult:
     """Run ``git *args`` from ``cwd``; never raises.
 
     Returns ``Ok(None, stdout=...)`` on exit 0, ``GitErr`` on non-zero.
-    """
-    result = subprocess.run(
-        ["git", *args],
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        return GitErr(result.returncode, result.stdout, result.stderr, ["git", *args])
-    return Ok(None, stdout=result.stdout)
-
-
-def git_probe(*args: str, cwd: Path, timeout: int = 10) -> ProbeResult:
-    """Run ``git *args`` from ``cwd`` with a timeout; never raises.
-
-    Returns ``Ok(None)``, ``GitErr``, or ``GitTimeout``.
+    When *timeout* is not ``None``, returns ``Timeout`` if the process
+    exceeds the given number of seconds.
     """
     try:
         result = subprocess.run(
@@ -52,7 +34,7 @@ def git_probe(*args: str, cwd: Path, timeout: int = 10) -> ProbeResult:
             timeout=timeout,
         )
     except subprocess.TimeoutExpired:
-        return GitTimeout(["git", *args], timeout)
+        return Timeout(["git", *args], timeout or 0)
     except Exception as exc:
         return GitErr(-1, "", str(exc), ["git", *args])
     if result.returncode != 0:

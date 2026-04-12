@@ -1,70 +1,30 @@
-"""GitHub CLI (gh) utilities — typed wrappers around gh subprocess calls."""
+"""GitHub CLI (gh) utilities — typed wrappers around gh subprocess calls.
+
+Re-exports all public symbols from submodules.
+"""
 
 from __future__ import annotations
 
-import json
-import subprocess
-from dataclasses import dataclass
-from pathlib import Path
-
-
-@dataclass(frozen=True)
-class PrInfo:
-    """Minimal PR descriptor returned by gh pr list."""
-
-    number: int
-    head_ref_name: str
-
-
-def list_open_prs(repo_root: Path, *, limit: int = 100) -> list[PrInfo]:
-    """Return open PRs as typed :class:`PrInfo` records.
-
-    Returns an empty list if ``gh`` is unavailable or returns a non-zero
-    exit code.
-    """
-    result = subprocess.run(
-        [
-            "gh",
-            "pr",
-            "list",
-            "--state",
-            "open",
-            "--limit",
-            str(limit),
-            "--json",
-            "number,headRefName",
-        ],
-        capture_output=True,
-        text=True,
-        cwd=repo_root,
-    )
-    if result.returncode != 0:
-        return []
-    try:
-        prs: list[dict[str, object]] = json.loads(result.stdout)
-        return [
-            PrInfo(
-                number=int(str(pr["number"])),
-                head_ref_name=str(pr["headRefName"]),
-            )
-            for pr in prs
-        ]
-    except (json.JSONDecodeError, KeyError):
-        return []
-
-
-def close_pr(pr_number: int, repo_root: Path, *, comment: str = "") -> bool:
-    """Close a PR by number.  Returns ``True`` on success.
-
-    Optionally posts *comment* on the PR before closing.
-    """
-    cmd = ["gh", "pr", "close", str(pr_number)]
-    if comment:
-        cmd += ["--comment", comment]
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        cwd=repo_root,
-    )
-    return result.returncode == 0
+from darkfactory.utils.github._cli import (
+    gh_json as gh_json,
+    gh_run as gh_run,
+)
+from darkfactory.utils.github._comments import (
+    graphql_fetch as graphql_fetch,
+    post_reply as post_reply,
+    repo_nwo as repo_nwo,
+)
+from darkfactory.utils.github._types import (
+    GhCheckResult as GhCheckResult,
+    GhErr as GhErr,
+    GhResult as GhResult,
+)
+from darkfactory.utils.github.pull_request import (
+    PrInfo as PrInfo,
+    close_pr as close_pr,
+    create_pr as create_pr,
+    fetch_all_pr_states as fetch_all_pr_states,
+    get_pr_state as get_pr_state,
+    get_resume_pr_state as get_resume_pr_state,
+    list_open_prs as list_open_prs,
+)

@@ -23,7 +23,6 @@ builtin registries, prompt composers, and model pickers.
 from __future__ import annotations
 
 import logging
-import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -31,7 +30,8 @@ from typing import TYPE_CHECKING, Any, Callable, Protocol, TypeVar
 
 from .builtins import BUILTINS
 from .event_log import EventWriter, emit_task_event
-from .invoke import InvokeResult, capability_to_model, invoke_claude
+from .utils.claude_code import InvokeResult, capability_to_model, invoke_claude
+from .utils.shell import run_shell
 from .model import compute_branch_name
 from .engine import AgentResult, PhaseState
 from .templates import compose_prompt
@@ -434,7 +434,7 @@ def _run_shell(
         ctx.logger.info("[dry-run] %s", cmd)
         return TaskStep(name=task.name, kind="shell", success=True, detail="dry-run")
 
-    first_result = _run_shell_once(cmd, ctx, task.env)
+    first_result = run_shell(cmd, ctx.cwd, task.env)
 
     # Emit shell output events via the event writer.
     writer: EventWriter | None = getattr(ctx, "event_writer", None)
@@ -524,7 +524,7 @@ def _run_shell(
         )
 
     # Re-run the shell task once more after the agent fix
-    second_result = _run_shell_once(cmd, ctx, task.env)
+    second_result = run_shell(cmd, ctx.cwd, task.env)
     if second_result.returncode == 0:
         return TaskStep(
             name=task.name,
@@ -542,6 +542,7 @@ def _run_shell(
             f"{(second_result.stdout + second_result.stderr).strip()[:500]}"
         ),
     )
+
 
 
 def _run_interactive(task: InteractiveTask, ctx: Any) -> TaskStep:
@@ -591,28 +592,6 @@ def _run_interactive(task: InteractiveTask, ctx: Any) -> TaskStep:
         )
 
     return TaskStep(name=task.name, kind="interactive", success=True)
-
-
-def _run_shell_once(
-    cmd: str,
-    ctx: Any,
-    env: dict[str, str],
-) -> subprocess.CompletedProcess[str]:
-    """Run a shell command once and return the completed-process result."""
-    import os
-
-    full_env = dict(os.environ)
-    full_env.update(env)
-
-    return subprocess.run(
-        cmd,
-        shell=True,
-        cwd=str(ctx.cwd),
-        capture_output=True,
-        text=True,
-        env=full_env,
-        check=False,
-    )
 
 
 # ---------- workflow-specific entry point ----------

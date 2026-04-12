@@ -5,12 +5,14 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from filelock import FileLock, Timeout
+from filelock import FileLock
+from filelock import Timeout as LockTimeout
 
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.checks import is_resume_safe
-from darkfactory.utils.git import GitErr, GitTimeout, Ok, git_probe, git_run
+from darkfactory.utils._result import Timeout
+from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -36,7 +38,7 @@ def _branch_exists_local(repo_root: Path, branch: str) -> bool:
     ):
         case Ok():
             return True
-        case GitErr():
+        case GitErr() | Timeout():
             return False
 
 
@@ -46,16 +48,17 @@ def _branch_exists_remote(repo_root: Path, branch: str) -> bool:
     Best-effort: returns False (and logs a warning) on timeout or any
     subprocess error so the caller can fall back to the local check.
     """
-    match git_probe(
+    match git_run(
         "ls-remote",
         "--exit-code",
         "origin",
         f"refs/heads/{branch}",
         cwd=repo_root,
+        timeout=10,
     ):
         case Ok():
             return True
-        case GitTimeout(timeout=t):
+        case Timeout(timeout=t):
             _log.warning("ls-remote timed out after %ds", t)
             return False
         case GitErr():
@@ -97,7 +100,7 @@ def ensure_worktree(ctx: ExecutionContext) -> None:
     lock = FileLock(str(lock_path))
     try:
         lock.acquire(timeout=0)  # non-blocking
-    except Timeout:
+    except LockTimeout:
         raise RuntimeError(
             f"{ctx.prd.id} is already being worked on by another `prd run` "
             f"process (lock held on {lock_path}). If that process died, "
@@ -145,6 +148,8 @@ def ensure_worktree(ctx: ExecutionContext) -> None:
             pass
         case GitErr(returncode=code, stderr=err):
             raise RuntimeError(f"git worktree add failed (exit {code}):\n{err}")
+        case Timeout(timeout=t):
+            raise RuntimeError(f"git worktree add timed out after {t}s")
 
     ctx.worktree_path = worktree_path
     ctx.cwd = worktree_path

@@ -191,7 +191,7 @@ def _make_rework_workflow(tmp_path: Path) -> Workflow:
 
 def test_run_workflow_applies_context_overrides(tmp_path: Path) -> None:
     """context_overrides values appear on the ExecutionContext for every task."""
-    from darkfactory.invoke import InvokeResult
+    from darkfactory.utils.claude_code import InvokeResult
     from darkfactory.engine import ReworkState
 
     prd = _make_prd(tmp_path)
@@ -278,7 +278,7 @@ def test_run_workflow_commit_message_uses_prd_id(tmp_path: Path) -> None:
     def _fake_commit(ctx: ExecutionContext, *, message: str) -> None:
         commit_messages.append(ctx.format_string(message))
 
-    from darkfactory.invoke import InvokeResult
+    from darkfactory.utils.claude_code import InvokeResult
 
     fake_invoke = InvokeResult(
         stdout="PRD_EXECUTE_OK: PRD-007\n",

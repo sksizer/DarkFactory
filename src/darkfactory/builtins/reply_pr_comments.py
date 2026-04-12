@@ -17,7 +17,7 @@ from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
 from darkfactory.engine import AgentResult, ReworkState
-from darkfactory.utils.git import GitErr, Ok, git_run
+from darkfactory.utils.git import GitErr, Ok, Timeout, git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -30,6 +30,9 @@ def _get_head_sha(cwd: str) -> str | None:
             return output.strip()
         case GitErr() as err:
             _log.warning("reply_pr_comments: could not resolve HEAD SHA: %s", err)
+            return None
+        case Timeout():
+            _log.warning("reply_pr_comments: rev-parse timed out")
             return None
 
 
