@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-11
 **Trigger:** PRD-622 (Data Model Refactor) merged to main as PR #171
-**Method:** 9 parallel general-purpose subagents, each handling ~10 PRDs against the shared context brief at `.planning/impact-assessment-context.md`
+**Method:** 9 parallel general-purpose subagents, each handling ~10 PRDs against the shared context brief at `context.md` (in this directory)
 
 ## Scope
 
