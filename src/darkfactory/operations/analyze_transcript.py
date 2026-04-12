@@ -30,6 +30,7 @@ from darkfactory.operations.analyze_transcript_detectors import (
     DETECTORS,
     Finding,
 )
+from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.utils.secrets import redact
 from darkfactory.workflow import ExecutionContext
 
@@ -342,11 +343,13 @@ def analyze_transcript(ctx: ExecutionContext) -> None:
             "yes",
         )
         if commit_analysis:
-            subprocess.run(
-                ["git", "add", "-f", "--", str(analysis_path)],
-                cwd=str(ctx.cwd),
-                check=True,
-            )
+            match git_run("add", "-f", "--", str(analysis_path), cwd=ctx.cwd):
+                case Ok():
+                    pass
+                case GitErr(returncode=code, stderr=err):
+                    raise RuntimeError(
+                        f"git add -f failed (exit {code}):\n{err}"
+                    )
             ctx.logger.info(
                 "analyze_transcript: staged %s", analysis_path.relative_to(ctx.cwd)
             )

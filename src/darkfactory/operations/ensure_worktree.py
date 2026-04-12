@@ -12,7 +12,13 @@ from darkfactory.operations._registry import builtin
 from darkfactory.operations._shared import _log_dry_run
 from darkfactory.checks import is_resume_safe
 from darkfactory.utils import Timeout
-from darkfactory.utils.git import GitErr, Ok, git_run
+from darkfactory.utils.git import (
+    GitErr,
+    Ok,
+    branch_exists_local,
+    branch_exists_remote,
+    git_run,
+)
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -25,44 +31,6 @@ def _worktree_target(ctx: ExecutionContext) -> Path:
     subprocess invocation.
     """
     return ctx.repo_root / ".worktrees" / f"{ctx.prd.id}-{ctx.prd.slug}"
-
-
-def _branch_exists_local(repo_root: Path, branch: str) -> bool:
-    """Return True if ``branch`` exists in the local repo's refs."""
-    match git_run(
-        "rev-parse",
-        "--verify",
-        "--quiet",
-        f"refs/heads/{branch}",
-        cwd=repo_root,
-    ):
-        case Ok():
-            return True
-        case GitErr() | Timeout():
-            return False
-
-
-def _branch_exists_remote(repo_root: Path, branch: str) -> bool:
-    """Return True if ``branch`` exists on origin.
-
-    Best-effort: returns False (and logs a warning) on timeout or any
-    subprocess error so the caller can fall back to the local check.
-    """
-    match git_run(
-        "ls-remote",
-        "--exit-code",
-        "origin",
-        f"refs/heads/{branch}",
-        cwd=repo_root,
-        timeout=10,
-    ):
-        case Ok():
-            return True
-        case Timeout(timeout=t):
-            _log.warning("ls-remote timed out after %ds", t)
-            return False
-        case GitErr():
-            return False
 
 
 @builtin("ensure_worktree")
@@ -122,8 +90,8 @@ def ensure_worktree(ctx: ExecutionContext) -> None:
         ctx.cwd = worktree_path
         return
 
-    local_exists = _branch_exists_local(ctx.repo_root, branch)
-    remote_exists = _branch_exists_remote(ctx.repo_root, branch)
+    local_exists = branch_exists_local(ctx.repo_root, branch)
+    remote_exists = branch_exists_remote(ctx.repo_root, branch)
     if local_exists or remote_exists:
         # Release the lock before raising so the error state is clean.
         lock.release()

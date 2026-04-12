@@ -294,20 +294,9 @@ def test_analysis_file_written_not_staged_by_default(tmp_path: Path) -> None:
     _make_transcript_file(tmp_path)
     ctx = _make_ctx(tmp_path)
 
-    staged: list[list[str]] = []
-
-    def _fake_run(args: list[str], **kwargs: object) -> MagicMock:
-        if args[:2] == ["git", "add"]:
-            staged.append(args)
-        r = MagicMock()
-        r.returncode = 0
-        r.stdout = ""
-        return r
-
     with patch(
-        "darkfactory.operations.analyze_transcript.subprocess.run",
-        side_effect=_fake_run,
-    ):
+        "darkfactory.operations.analyze_transcript.git_run",
+    ) as mock_git:
         analyze_transcript(ctx)
 
     # An analysis file should exist
@@ -315,8 +304,8 @@ def test_analysis_file_written_not_staged_by_default(tmp_path: Path) -> None:
     analysis_files = list(td.glob("*.analysis.md"))
     assert len(analysis_files) == 1
 
-    # git add should NOT have been called (default: no commit)
-    assert not staged
+    # git_run should NOT have been called (default: no commit)
+    mock_git.assert_not_called()
 
 
 def test_analysis_file_staged_when_config_commit_true(tmp_path: Path) -> None:
@@ -329,24 +318,18 @@ def test_analysis_file_staged_when_config_commit_true(tmp_path: Path) -> None:
     config_dir.mkdir(parents=True, exist_ok=True)
     (config_dir / "config.toml").write_text('[analysis]\ncommit = "true"\n')
 
-    staged: list[list[str]] = []
-
-    def _fake_run(args: list[str], **kwargs: object) -> MagicMock:
-        if args[:2] == ["git", "add"]:
-            staged.append(args)
-        r = MagicMock()
-        r.returncode = 0
-        r.stdout = ""
-        return r
+    from darkfactory.utils import Ok as _Ok
 
     with patch(
-        "darkfactory.operations.analyze_transcript.subprocess.run",
-        side_effect=_fake_run,
-    ):
+        "darkfactory.operations.analyze_transcript.git_run",
+        return_value=_Ok(None),
+    ) as mock_git:
         analyze_transcript(ctx)
 
-    # git add should have been called
-    assert len(staged) >= 1
+    # git_run should have been called for staging
+    mock_git.assert_called_once()
+    call_args = mock_git.call_args
+    assert call_args[0][0] == "add"
 
 
 def test_run_summary_augmented(tmp_path: Path) -> None:

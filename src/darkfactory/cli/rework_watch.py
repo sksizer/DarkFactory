@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any
 
 from darkfactory.utils.git import GitErr, Ok, Timeout, git_run
+from darkfactory.utils.github import GhErr, gh_json
 
 _log = logging.getLogger(__name__)
 
@@ -145,29 +146,20 @@ def fetch_open_prd_prs(repo_root: Path) -> list[dict[str, Any]]:
     Each dict has keys ``number`` (int) and ``headRefName`` (str).
     Returns an empty list if ``gh`` is unavailable or fails.
     """
-    try:
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "list",
-                "--state",
-                "open",
-                "--json",
-                "number,headRefName",
-            ],
-            capture_output=True,
-            text=True,
-            cwd=repo_root,
-        )
-        if result.returncode != 0:
-            _log.warning("gh pr list failed: %s", result.stderr.strip())
+    match gh_json(
+        "pr", "list",
+        "--state", "open",
+        "--json", "number,headRefName",
+        cwd=repo_root,
+    ):
+        case Ok(value=prs):
+            return [p for p in prs if re.match(r"^prd/PRD-", p.get("headRefName", ""))]
+        case GhErr(stderr=err):
+            _log.warning("gh pr list failed: %s", err.strip())
             return []
-        prs: list[dict[str, Any]] = json.loads(result.stdout)
-        return [p for p in prs if re.match(r"^prd/PRD-", p.get("headRefName", ""))]
-    except (FileNotFoundError, json.JSONDecodeError) as exc:
-        _log.warning("Could not fetch open PRs: %s", exc)
-        return []
+        case Timeout():
+            _log.warning("gh pr list timed out")
+            return []
 
 
 def _worktree_exists(prd_id: str, repo_root: Path) -> bool:
@@ -199,25 +191,18 @@ def check_missing_worktrees(prs: list[dict[str, Any]], repo_root: Path) -> list[
 # ── Comment comparison ───────────────────────────────────────────────────────
 
 
-def _fetch_comment_ids(pr_number: int) -> set[str]:
+def _fetch_comment_ids(pr_number: int, repo_root: Path) -> set[str]:
     """Return the set of all comment/thread IDs for ``pr_number``."""
-    try:
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "view",
-                str(pr_number),
-                "--json",
-                "comments,reviews,reviewThreads",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        raw: dict[str, Any] = json.loads(result.stdout)
-    except (FileNotFoundError, subprocess.CalledProcessError, json.JSONDecodeError):
-        return set()
+    match gh_json(
+        "pr", "view",
+        str(pr_number),
+        "--json", "comments,reviews,reviewThreads",
+        cwd=repo_root,
+    ):
+        case Ok(value=raw):
+            pass
+        case GhErr() | Timeout():
+            return set()
 
     ids: set[str] = set()
     for idx, rt in enumerate(raw.get("reviewThreads") or []):
@@ -238,13 +223,14 @@ def _fetch_comment_ids(pr_number: int) -> set[str]:
 def _has_new_unresolved_comments(
     pr_number: int,
     pr_state: PRWatchState,
+    repo_root: Path,
 ) -> tuple[bool, set[str]]:
     """Return ``(has_new, all_current_ids)`` for the PR.
 
     Fetches current comment IDs and checks for any not in ``last_seen``.
     Also checks for unresolved threads via pr_comments module.
     """
-    current_ids = _fetch_comment_ids(pr_number)
+    current_ids = _fetch_comment_ids(pr_number, repo_root)
     new_ids = current_ids - pr_state.last_seen_comment_ids
     return bool(new_ids), current_ids
 
@@ -418,7 +404,7 @@ def run_poll_loop(
                 state.prs[pr_key] = PRWatchState()
             pr_state = state.prs[pr_key]
 
-            has_new, current_ids = _has_new_unresolved_comments(pr_number, pr_state)
+            has_new, current_ids = _has_new_unresolved_comments(pr_number, pr_state, repo_root)
 
             if has_new:
                 if is_rate_limited(pr_state, max_reworks_per_hour, now):

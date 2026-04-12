@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-import json
 import os
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
+
+from darkfactory.utils import Ok as _Ok
+from darkfactory.utils.git import GitErr as _GitErr
+from darkfactory.utils.github import GhErr as _GhErr
 
 from darkfactory.cli.rework_watch import (
     PRWatchState,
@@ -135,8 +138,8 @@ def test_worktree_exists_returns_true(tmp_path: Path) -> None:
         "branch refs/heads/prd/PRD-225.6-rework-watch\n"
         "\n"
     )
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0, stdout=porcelain_output)
+    with patch("darkfactory.cli.rework_watch.git_run") as mock_run:
+        mock_run.return_value = _Ok(None, stdout=porcelain_output)
         assert _worktree_exists("PRD-225.6", tmp_path) is True
 
 
@@ -144,14 +147,14 @@ def test_worktree_exists_returns_false_when_not_found(tmp_path: Path) -> None:
     porcelain_output = (
         "worktree /some/path\nHEAD abc123\nbranch refs/heads/prd/PRD-999-other\n\n"
     )
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0, stdout=porcelain_output)
+    with patch("darkfactory.cli.rework_watch.git_run") as mock_run:
+        mock_run.return_value = _Ok(None, stdout=porcelain_output)
         assert _worktree_exists("PRD-225.6", tmp_path) is False
 
 
 def test_worktree_exists_returns_false_on_git_error(tmp_path: Path) -> None:
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=1, stdout="")
+    with patch("darkfactory.cli.rework_watch.git_run") as mock_run:
+        mock_run.return_value = _GitErr(1, "", "", ["git", "worktree", "list", "--porcelain"])
         assert _worktree_exists("PRD-1", tmp_path) is False
 
 
@@ -182,22 +185,19 @@ def test_check_missing_worktrees_detects_missing(tmp_path: Path) -> None:
 
 
 def test_fetch_open_prd_prs_filters_non_prd_branches(tmp_path: Path) -> None:
-    raw = json.dumps(
-        [
+    with patch("darkfactory.cli.rework_watch.gh_json") as mock_gh:
+        mock_gh.return_value = _Ok([
             {"number": 1, "headRefName": "prd/PRD-1-feat"},
             {"number": 2, "headRefName": "feature/other"},
-        ]
-    )
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0, stdout=raw)
+        ])
         result = fetch_open_prd_prs(tmp_path)
     assert len(result) == 1
     assert result[0]["number"] == 1
 
 
 def test_fetch_open_prd_prs_returns_empty_on_failure(tmp_path: Path) -> None:
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="err")
+    with patch("darkfactory.cli.rework_watch.gh_json") as mock_gh:
+        mock_gh.return_value = _GhErr(1, "", "error", ["gh"])
         result = fetch_open_prd_prs(tmp_path)
     assert result == []
 
@@ -207,37 +207,31 @@ def test_fetch_open_prd_prs_returns_empty_on_failure(tmp_path: Path) -> None:
 
 def test_has_new_comments_detects_new(tmp_path: Path) -> None:
     pr_state = PRWatchState(last_seen_comment_ids={"id1"})
-    raw = json.dumps(
-        {
+    with patch("darkfactory.cli.rework_watch.gh_json") as mock_gh:
+        mock_gh.return_value = _Ok({
             "reviewThreads": [
                 {"comments": [{"id": "id1"}], "isResolved": False},
                 {"comments": [{"id": "id2"}], "isResolved": False},
             ],
             "reviews": [],
             "comments": [],
-        }
-    )
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0, stdout=raw)
-        has_new, current_ids = _has_new_unresolved_comments(1, pr_state)
+        })
+        has_new, current_ids = _has_new_unresolved_comments(1, pr_state, tmp_path)
     assert has_new is True
     assert "id2" in current_ids
 
 
 def test_has_new_comments_no_new(tmp_path: Path) -> None:
     pr_state = PRWatchState(last_seen_comment_ids={"id1"})
-    raw = json.dumps(
-        {
+    with patch("darkfactory.cli.rework_watch.gh_json") as mock_gh:
+        mock_gh.return_value = _Ok({
             "reviewThreads": [
                 {"comments": [{"id": "id1"}], "isResolved": False},
             ],
             "reviews": [],
             "comments": [],
-        }
-    )
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0, stdout=raw)
-        has_new, current_ids = _has_new_unresolved_comments(1, pr_state)
+        })
+        has_new, current_ids = _has_new_unresolved_comments(1, pr_state, tmp_path)
     assert has_new is False
 
 

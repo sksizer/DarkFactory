@@ -10,11 +10,10 @@ import pytest
 
 from darkfactory.operations._test_helpers import make_builtin_ctx
 from darkfactory.operations.ensure_worktree import (
-    _branch_exists_local,
-    _branch_exists_remote,
     _worktree_target,
     ensure_worktree,
 )
+from darkfactory.utils.git import branch_exists_local, branch_exists_remote
 
 
 # ---------- helpers ----------
@@ -122,11 +121,11 @@ def test_branch_exists_local_raises(tmp_path: Path) -> None:
     with (
         patch("darkfactory.operations.ensure_worktree.FileLock") as mock_lock_cls,
         patch(
-            "darkfactory.operations.ensure_worktree._branch_exists_local",
+            "darkfactory.operations.ensure_worktree.branch_exists_local",
             return_value=True,
         ),
         patch(
-            "darkfactory.operations.ensure_worktree._branch_exists_remote",
+            "darkfactory.operations.ensure_worktree.branch_exists_remote",
             return_value=False,
         ),
     ):
@@ -144,11 +143,11 @@ def test_branch_exists_remote_raises(tmp_path: Path) -> None:
     with (
         patch("darkfactory.operations.ensure_worktree.FileLock") as mock_lock_cls,
         patch(
-            "darkfactory.operations.ensure_worktree._branch_exists_local",
+            "darkfactory.operations.ensure_worktree.branch_exists_local",
             return_value=False,
         ),
         patch(
-            "darkfactory.operations.ensure_worktree._branch_exists_remote",
+            "darkfactory.operations.ensure_worktree.branch_exists_remote",
             return_value=True,
         ),
     ):
@@ -169,11 +168,11 @@ def test_successful_creation_calls_git_worktree_add(tmp_path: Path) -> None:
     with (
         patch("darkfactory.operations.ensure_worktree.FileLock") as mock_lock_cls,
         patch(
-            "darkfactory.operations.ensure_worktree._branch_exists_local",
+            "darkfactory.operations.ensure_worktree.branch_exists_local",
             return_value=False,
         ),
         patch(
-            "darkfactory.operations.ensure_worktree._branch_exists_remote",
+            "darkfactory.operations.ensure_worktree.branch_exists_remote",
             return_value=False,
         ),
         patch(
@@ -202,11 +201,11 @@ def test_successful_creation_sets_ctx(tmp_path: Path) -> None:
     with (
         patch("darkfactory.operations.ensure_worktree.FileLock") as mock_lock_cls,
         patch(
-            "darkfactory.operations.ensure_worktree._branch_exists_local",
+            "darkfactory.operations.ensure_worktree.branch_exists_local",
             return_value=False,
         ),
         patch(
-            "darkfactory.operations.ensure_worktree._branch_exists_remote",
+            "darkfactory.operations.ensure_worktree.branch_exists_remote",
             return_value=False,
         ),
         patch(
@@ -233,11 +232,11 @@ def test_lock_acquired_on_success(tmp_path: Path) -> None:
     with (
         patch("darkfactory.operations.ensure_worktree.FileLock") as mock_lock_cls,
         patch(
-            "darkfactory.operations.ensure_worktree._branch_exists_local",
+            "darkfactory.operations.ensure_worktree.branch_exists_local",
             return_value=False,
         ),
         patch(
-            "darkfactory.operations.ensure_worktree._branch_exists_remote",
+            "darkfactory.operations.ensure_worktree.branch_exists_remote",
             return_value=False,
         ),
         patch(
@@ -275,13 +274,13 @@ def test_lock_timeout_raises_runtime_error(tmp_path: Path) -> None:
 def test_branch_exists_local_true_on_zero_returncode() -> None:
     with patch("darkfactory.utils.git._run.subprocess.run") as mock_run:
         mock_run.return_value = subprocess.CompletedProcess([], returncode=0)
-        assert _branch_exists_local(Path("/repo"), "my-branch") is True
+        assert branch_exists_local(Path("/repo"), "my-branch") is True
 
 
 def test_branch_exists_local_false_on_nonzero_returncode() -> None:
     with patch("darkfactory.utils.git._run.subprocess.run") as mock_run:
         mock_run.return_value = subprocess.CompletedProcess([], returncode=1)
-        assert _branch_exists_local(Path("/repo"), "my-branch") is False
+        assert branch_exists_local(Path("/repo"), "my-branch") is False
 
 
 # ---------- _branch_exists_remote ----------
@@ -290,7 +289,7 @@ def test_branch_exists_local_false_on_nonzero_returncode() -> None:
 def test_branch_exists_remote_true_on_zero_returncode() -> None:
     with patch("darkfactory.utils.git._run.subprocess.run") as mock_run:
         mock_run.return_value = subprocess.CompletedProcess([], returncode=0)
-        assert _branch_exists_remote(Path("/repo"), "my-branch") is True
+        assert branch_exists_remote(Path("/repo"), "my-branch") is True
 
 
 def test_branch_exists_remote_false_on_timeout() -> None:
@@ -298,10 +297,10 @@ def test_branch_exists_remote_false_on_timeout() -> None:
         mock_run.side_effect = __import__("subprocess").TimeoutExpired(
             cmd=["git"], timeout=10
         )
-        assert _branch_exists_remote(Path("/repo"), "my-branch") is False
+        assert branch_exists_remote(Path("/repo"), "my-branch") is False
 
 
 def test_branch_exists_remote_false_on_exception() -> None:
     with patch("darkfactory.utils.git._run.subprocess.run") as mock_run:
         mock_run.side_effect = OSError("network error")
-        assert _branch_exists_remote(Path("/repo"), "my-branch") is False
+        assert branch_exists_remote(Path("/repo"), "my-branch") is False

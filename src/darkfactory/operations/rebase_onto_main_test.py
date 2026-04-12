@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
-from subprocess import CompletedProcess
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,7 +12,7 @@ from darkfactory.operations.rebase_onto_main import (
     _fetch_origin_main,
     rebase_onto_main,
 )
-from darkfactory.utils.git import GitErr as _GitErr, Ok as _Ok
+from darkfactory.utils.git import GitErr as _GitErr, Ok as _Ok, Timeout as _Timeout
 
 _BRANCH = "prd/PRD-001-test-thing"
 
@@ -28,38 +26,36 @@ def _make_ctx(tmp_path: Path, *, event_writer: object = None) -> MagicMock:
     return ctx
 
 
-def _ok(stdout: str = "", stderr: str = "") -> CompletedProcess[str]:
-    return CompletedProcess([], returncode=0, stdout=stdout, stderr=stderr)
+def _ok(stdout: str = "") -> _Ok[None]:
+    return _Ok(None, stdout=stdout)
 
 
-def _fail(
-    returncode: int = 1, stdout: str = "", stderr: str = ""
-) -> CompletedProcess[str]:
-    return CompletedProcess([], returncode=returncode, stdout=stdout, stderr=stderr)
+def _fail(returncode: int = 1, stdout: str = "", stderr: str = "") -> _GitErr:
+    return _GitErr(returncode, stdout, stderr, ["git"])
 
 
 # ---------- _fetch_origin_main ----------
 
 
 def test_fetch_main_succeeds_on_zero_exit(tmp_path: Path) -> None:
-    with patch("darkfactory.operations.rebase_onto_main.subprocess.run") as mock_run:
+    with patch("darkfactory.operations.rebase_onto_main.git_run") as mock_run:
         mock_run.return_value = _ok()
         _fetch_origin_main(tmp_path, timeout=30)  # should not raise
     mock_run.assert_called_once()
-    args = mock_run.call_args[0][0]
-    assert args == ["git", "fetch", "origin", "main"]
+    assert mock_run.call_args.args == ("fetch", "origin", "main")
+    assert mock_run.call_args.kwargs["cwd"] == tmp_path
 
 
 def test_fetch_main_raises_on_nonzero_exit(tmp_path: Path) -> None:
-    with patch("darkfactory.operations.rebase_onto_main.subprocess.run") as mock_run:
+    with patch("darkfactory.operations.rebase_onto_main.git_run") as mock_run:
         mock_run.return_value = _fail(128, stderr="fatal: repository not found")
         with pytest.raises(RuntimeError, match="git fetch origin main failed"):
             _fetch_origin_main(tmp_path, timeout=30)
 
 
 def test_fetch_main_raises_on_timeout(tmp_path: Path) -> None:
-    with patch("darkfactory.operations.rebase_onto_main.subprocess.run") as mock_run:
-        mock_run.side_effect = subprocess.TimeoutExpired(cmd=["git"], timeout=30)
+    with patch("darkfactory.operations.rebase_onto_main.git_run") as mock_run:
+        mock_run.return_value = _Timeout(["git", "fetch", "origin", "main"], 30)
         with pytest.raises(RuntimeError, match="timed out"):
             _fetch_origin_main(tmp_path, timeout=30)
 
@@ -75,15 +71,16 @@ def test_rebase_emits_rebased_effect(tmp_path: Path) -> None:
         patch("darkfactory.operations.rebase_onto_main._fetch_origin_main"),
         patch(
             "darkfactory.operations.rebase_onto_main.git_run",
-            return_value=_GitErr(1, "", "", ["git"]),
+            side_effect=[
+                _GitErr(1, "", "", ["git"]),  # merge-base -> not ancestor
+                _ok(),                         # rebase -> success
+            ],
         ),
         patch(
             "darkfactory.operations.rebase_onto_main._get_sha",
             side_effect=["old000", "main000", "new000"],
         ),
-        patch("darkfactory.operations.rebase_onto_main.subprocess.run") as mock_sub,
     ):
-        mock_sub.return_value = _ok()
         rebase_onto_main(ctx)
 
     writer.emit.assert_called_once()
@@ -101,20 +98,20 @@ def test_rebase_calls_git_rebase_origin_main(tmp_path: Path) -> None:
         patch("darkfactory.operations.rebase_onto_main._fetch_origin_main"),
         patch(
             "darkfactory.operations.rebase_onto_main.git_run",
-            return_value=_GitErr(1, "", "", ["git"]),
-        ),
+            side_effect=[
+                _GitErr(1, "", "", ["git"]),  # merge-base -> not ancestor
+                _ok(),                         # rebase -> success
+            ],
+        ) as mock_git,
         patch(
             "darkfactory.operations.rebase_onto_main._get_sha",
             side_effect=["old000", "main000", "new000"],
         ),
-        patch("darkfactory.operations.rebase_onto_main.subprocess.run") as mock_sub,
     ):
-        mock_sub.return_value = _ok()
         rebase_onto_main(ctx)
 
-    mock_sub.assert_called_once()
-    args = mock_sub.call_args[0][0]
-    assert args == ["git", "rebase", "origin/main"]
+    assert mock_git.call_count == 2
+    assert mock_git.call_args_list[1].args == ("rebase", "origin/main")
 
 
 # ---------- no-op: already up-to-date ----------
@@ -128,14 +125,11 @@ def test_no_op_emits_up_to_date(tmp_path: Path) -> None:
         patch("darkfactory.operations.rebase_onto_main._fetch_origin_main"),
         patch(
             "darkfactory.operations.rebase_onto_main.git_run",
-            return_value=_Ok(None),
+            return_value=_Ok(None),  # merge-base -> is ancestor
         ),
-        patch("darkfactory.operations.rebase_onto_main.subprocess.run") as mock_sub,
     ):
         rebase_onto_main(ctx)
 
-    # rebase should NOT be called
-    mock_sub.assert_not_called()
     writer.emit.assert_called_once()
     _, kwargs = writer.emit.call_args
     assert kwargs.get("result") == "up_to_date"
@@ -147,34 +141,31 @@ def test_no_op_emits_up_to_date(tmp_path: Path) -> None:
 def test_conflict_aborts_rebase_and_raises(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
 
-    rebase_call = _fail(1, stderr="CONFLICT (content): Merge conflict in foo.py")
-    abort_call = _ok()
-
     with (
         patch("darkfactory.operations.rebase_onto_main._fetch_origin_main"),
         patch(
             "darkfactory.operations.rebase_onto_main.git_run",
-            return_value=_GitErr(1, "", "", ["git"]),
-        ),
+            side_effect=[
+                _GitErr(1, "", "", ["git"]),  # merge-base -> not ancestor
+                _fail(1, stderr="CONFLICT"),  # rebase -> conflict
+                _ok(),                         # rebase --abort -> success
+            ],
+        ) as mock_git,
         patch(
             "darkfactory.operations.rebase_onto_main._get_sha",
             side_effect=["old000", "main000"],
         ),
-        patch("darkfactory.operations.rebase_onto_main.subprocess.run") as mock_sub,
         patch(
             "darkfactory.operations.rebase_onto_main._get_conflicting_files",
             return_value=["foo.py", "bar.py"],
         ),
     ):
-        mock_sub.side_effect = [rebase_call, abort_call]
-
         with pytest.raises(RuntimeError, match="conflicts in"):
             rebase_onto_main(ctx)
 
     # Verify abort was called
-    assert mock_sub.call_count == 2
-    abort_args = mock_sub.call_args_list[1][0][0]
-    assert abort_args == ["git", "rebase", "--abort"]
+    assert mock_git.call_count == 3
+    assert mock_git.call_args_list[2].args == ("rebase", "--abort")
 
 
 def test_conflict_error_lists_conflicting_files(tmp_path: Path) -> None:
@@ -184,20 +175,21 @@ def test_conflict_error_lists_conflicting_files(tmp_path: Path) -> None:
         patch("darkfactory.operations.rebase_onto_main._fetch_origin_main"),
         patch(
             "darkfactory.operations.rebase_onto_main.git_run",
-            return_value=_GitErr(1, "", "", ["git"]),
+            side_effect=[
+                _GitErr(1, "", "", ["git"]),  # merge-base -> not ancestor
+                _fail(1),                      # rebase -> fails
+                _ok(),                         # rebase --abort -> success
+            ],
         ),
         patch(
             "darkfactory.operations.rebase_onto_main._get_sha",
             side_effect=["old000", "main000"],
         ),
-        patch("darkfactory.operations.rebase_onto_main.subprocess.run") as mock_sub,
         patch(
             "darkfactory.operations.rebase_onto_main._get_conflicting_files",
             return_value=["src/foo.py", "src/bar.py"],
         ),
     ):
-        mock_sub.side_effect = [_fail(1), _ok()]  # rebase fails, abort succeeds
-
         with pytest.raises(RuntimeError, match="src/foo.py"):
             rebase_onto_main(ctx)
 

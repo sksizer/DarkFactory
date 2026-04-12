@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from darkfactory.utils._result import Timeout as Timeout
 from darkfactory.utils.git._operations import (
+    branch_exists_local as branch_exists_local,
+    branch_exists_remote as branch_exists_remote,
     diff_quiet as diff_quiet,
     diff_show as diff_show,
     resolve_commit_timestamp as resolve_commit_timestamp,

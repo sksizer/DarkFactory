@@ -8,13 +8,12 @@ cleanly and fails loudly with the list of conflicting files.
 from __future__ import annotations
 
 import logging
-import subprocess
 from pathlib import Path
 
 from darkfactory.operations._registry import builtin
 from darkfactory.operations._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
-from darkfactory.utils.git import GitErr, Ok, git_run
+from darkfactory.utils.git import GitErr, Ok, Timeout, git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -27,47 +26,38 @@ def _fetch_origin_main(cwd: Path, timeout: int) -> None:
 
     Raises :class:`RuntimeError` on timeout or non-zero exit.
     """
-    try:
-        result = subprocess.run(
-            ["git", "fetch", "origin", "main"],
-            cwd=str(cwd),
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-    except subprocess.TimeoutExpired:
-        raise RuntimeError(
-            f"git fetch origin main timed out after {timeout}s — "
-            "check network connectivity or increase fetch_timeout"
-        )
-
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"git fetch origin main failed (exit {result.returncode}):\n{result.stderr}"
-        )
+    match git_run("fetch", "origin", "main", cwd=cwd, timeout=timeout):
+        case Ok():
+            pass
+        case Timeout():
+            raise RuntimeError(
+                f"git fetch origin main timed out after {timeout}s — "
+                "check network connectivity or increase fetch_timeout"
+            )
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(
+                f"git fetch origin main failed (exit {code}):\n{err}"
+            )
 
 
 def _get_sha(cwd: Path, ref: str) -> str:
     """Return the full SHA for ``ref``."""
-    result = subprocess.run(
-        ["git", "rev-parse", ref],
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return result.stdout.strip()
+    match git_run("rev-parse", ref, cwd=cwd):
+        case Ok(stdout=raw):
+            return raw.strip()
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(f"git rev-parse {ref} failed (exit {code}):\n{err}")
+        case Timeout():
+            raise RuntimeError(f"git rev-parse {ref} timed out")
 
 
 def _get_conflicting_files(cwd: Path) -> list[str]:
     """Return a list of files with unresolved merge conflicts."""
-    result = subprocess.run(
-        ["git", "diff", "--name-only", "--diff-filter=U"],
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-    )
-    return result.stdout.strip().splitlines()
+    match git_run("diff", "--name-only", "--diff-filter=U", cwd=cwd):
+        case Ok(stdout=raw):
+            return raw.strip().splitlines()
+        case GitErr() | Timeout():
+            return []
 
 
 @builtin("rebase_onto_main")
@@ -120,31 +110,22 @@ def rebase_onto_main(
     old_sha = _get_sha(cwd, "HEAD")
     main_sha = _get_sha(cwd, "origin/main")
 
-    rebase_result = subprocess.run(
-        ["git", "rebase", "origin/main"],
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-    )
+    match git_run("rebase", "origin/main", cwd=cwd):
+        case Ok():
+            pass
+        case GitErr() | Timeout():
+            conflicting = _get_conflicting_files(cwd)
+            git_run("rebase", "--abort", cwd=cwd)  # fire-and-forget
 
-    if rebase_result.returncode != 0:
-        conflicting = _get_conflicting_files(cwd)
-
-        # Abort to restore clean pre-rebase state.
-        subprocess.run(
-            ["git", "rebase", "--abort"],
-            cwd=str(cwd),
-            capture_output=True,
-            text=True,
-        )
-
-        files_str = (
-            ", ".join(conflicting) if conflicting else "(unknown — check git status)"
-        )
-        raise RuntimeError(
-            f"git rebase origin/main produced conflicts in: {files_str}. "
-            "Resolve conflicts manually and re-run."
-        )
+            files_str = (
+                ", ".join(conflicting)
+                if conflicting
+                else "(unknown — check git status)"
+            )
+            raise RuntimeError(
+                f"git rebase origin/main produced conflicts in: {files_str}. "
+                "Resolve conflicts manually and re-run."
+            )
 
     new_sha = _get_sha(cwd, "HEAD")
 

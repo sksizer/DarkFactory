@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 from subprocess import CompletedProcess
 from unittest.mock import MagicMock, patch
@@ -10,6 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from darkfactory.operations._test_helpers import make_builtin_ctx
+from darkfactory.utils.git import GitErr as _GitErr, Ok as _Ok, Timeout as _Timeout
 from darkfactory.operations.fast_forward_branch import (
     _check_divergence,
     _fetch_origin_branch,
@@ -28,28 +28,26 @@ def _make_ctx(tmp_path: Path, *, event_writer: object = None) -> MagicMock:
     return ctx
 
 
-def _ok(stdout: str = "", stderr: str = "") -> CompletedProcess[str]:
-    return CompletedProcess([], returncode=0, stdout=stdout, stderr=stderr)
+def _ok(stdout: str = "") -> _Ok[None]:
+    return _Ok(None, stdout=stdout)
 
 
-def _fail(
-    returncode: int = 1, stdout: str = "", stderr: str = ""
-) -> CompletedProcess[str]:
-    return CompletedProcess([], returncode=returncode, stdout=stdout, stderr=stderr)
+def _fail(returncode: int = 1, stdout: str = "", stderr: str = "") -> _GitErr:
+    return _GitErr(returncode, stdout, stderr, ["git"])
 
 
 # ---------- _fetch_origin_branch ----------
 
 
 def test_fetch_returns_true_on_success(tmp_path: Path) -> None:
-    with patch("darkfactory.operations.fast_forward_branch.subprocess.run") as mock_run:
+    with patch("darkfactory.operations.fast_forward_branch.git_run") as mock_run:
         mock_run.return_value = _ok()
         result = _fetch_origin_branch(tmp_path, _BRANCH, timeout=30)
     assert result is True
 
 
 def test_fetch_returns_false_on_missing_remote_ref(tmp_path: Path) -> None:
-    with patch("darkfactory.operations.fast_forward_branch.subprocess.run") as mock_run:
+    with patch("darkfactory.operations.fast_forward_branch.git_run") as mock_run:
         mock_run.return_value = _fail(
             128, stderr="fatal: couldn't find remote ref prd/PRD-001-test-thing"
         )
@@ -58,15 +56,15 @@ def test_fetch_returns_false_on_missing_remote_ref(tmp_path: Path) -> None:
 
 
 def test_fetch_raises_on_other_failure(tmp_path: Path) -> None:
-    with patch("darkfactory.operations.fast_forward_branch.subprocess.run") as mock_run:
+    with patch("darkfactory.operations.fast_forward_branch.git_run") as mock_run:
         mock_run.return_value = _fail(128, stderr="fatal: repository not found")
         with pytest.raises(RuntimeError, match="git fetch origin.*failed"):
             _fetch_origin_branch(tmp_path, _BRANCH, timeout=30)
 
 
 def test_fetch_raises_on_timeout(tmp_path: Path) -> None:
-    with patch("darkfactory.operations.fast_forward_branch.subprocess.run") as mock_run:
-        mock_run.side_effect = subprocess.TimeoutExpired(cmd=["git"], timeout=30)
+    with patch("darkfactory.operations.fast_forward_branch.git_run") as mock_run:
+        mock_run.return_value = _Timeout(["git", "fetch", "origin", _BRANCH], 30)
         with pytest.raises(RuntimeError, match="timed out"):
             _fetch_origin_branch(tmp_path, _BRANCH, timeout=30)
 
@@ -75,14 +73,14 @@ def test_fetch_raises_on_timeout(tmp_path: Path) -> None:
 
 
 def test_check_divergence_returns_none_when_ref_missing(tmp_path: Path) -> None:
-    with patch("darkfactory.operations.fast_forward_branch.subprocess.run") as mock_run:
+    with patch("darkfactory.operations.fast_forward_branch.git_run") as mock_run:
         mock_run.return_value = _fail(128)  # rev-parse --verify fails
         result = _check_divergence(tmp_path, _BRANCH)
     assert result is None
 
 
 def test_check_divergence_returns_counts(tmp_path: Path) -> None:
-    with patch("darkfactory.operations.fast_forward_branch.subprocess.run") as mock_run:
+    with patch("darkfactory.operations.fast_forward_branch.git_run") as mock_run:
         mock_run.side_effect = [
             _ok("abc123\n"),  # rev-parse --verify
             _ok("0\t3\n"),  # rev-list --left-right --count
@@ -112,7 +110,7 @@ def test_fast_forward_calls_git_merge(tmp_path: Path) -> None:
         ),
         patch("darkfactory.utils.git._run.subprocess.run") as mock_git,
     ):
-        mock_git.return_value = _ok()
+        mock_git.return_value = CompletedProcess([], returncode=0, stdout="", stderr="")
         fast_forward_branch(ctx)
 
     mock_git.assert_called_once()
@@ -137,7 +135,7 @@ def test_fast_forward_emits_builtin_effect(tmp_path: Path) -> None:
             "darkfactory.operations.fast_forward_branch._get_head_sha",
             side_effect=["aaa00001", "bbb00002"],
         ),
-        patch("darkfactory.utils.git._run.subprocess.run", return_value=_ok()),
+        patch("darkfactory.utils.git._run.subprocess.run", return_value=CompletedProcess([], returncode=0, stdout="", stderr="")),
     ):
         fast_forward_branch(ctx)
 

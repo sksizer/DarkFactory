@@ -7,6 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from darkfactory.utils import Ok as _Ok
+from darkfactory.utils.github import GhErr as _GhErr
 from darkfactory.utils.github.pr.comments import CommentFilters, ReviewThread
 from darkfactory.model import PRD
 from darkfactory.rework.context import (
@@ -62,33 +64,36 @@ def _thread(thread_id: str = "t-1") -> ReviewThread:
 
 
 def test_find_open_pr_returns_number_on_match(tmp_path: Path) -> None:
-    with patch("darkfactory.rework.context.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0, stdout='[{"number": 42}]')
+    with patch("darkfactory.rework.context.gh_json", return_value=_Ok([{"number": 42}])):
         assert find_open_pr("prd/PRD-001-my-feature", tmp_path) == 42
 
 
 def test_find_open_pr_returns_none_when_no_prs(tmp_path: Path) -> None:
-    with patch("darkfactory.rework.context.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0, stdout="[]")
+    with patch("darkfactory.rework.context.gh_json", return_value=_Ok([])):
         assert find_open_pr("prd/PRD-001-my-feature", tmp_path) is None
 
 
 def test_find_open_pr_returns_none_on_gh_failure(tmp_path: Path) -> None:
-    with patch("darkfactory.rework.context.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="err")
+    with patch(
+        "darkfactory.rework.context.gh_json",
+        return_value=_GhErr(1, "", "error", ["gh", "pr", "list"]),
+    ):
         assert find_open_pr("prd/PRD-001-my-feature", tmp_path) is None
 
 
 def test_find_open_pr_returns_none_on_missing_gh(tmp_path: Path) -> None:
     with patch(
-        "darkfactory.rework.context.subprocess.run", side_effect=FileNotFoundError
+        "darkfactory.rework.context.gh_json",
+        return_value=_GhErr(-1, "", "FileNotFoundError", ["gh", "pr", "list"]),
     ):
         assert find_open_pr("prd/PRD-001-my-feature", tmp_path) is None
 
 
 def test_find_open_pr_returns_none_on_invalid_json(tmp_path: Path) -> None:
-    with patch("darkfactory.rework.context.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0, stdout="NOT JSON")
+    with patch(
+        "darkfactory.rework.context.gh_json",
+        return_value=_GhErr(-1, "NOT JSON", "invalid JSON in stdout", ["gh", "pr", "list"]),
+    ):
         assert find_open_pr("prd/PRD-001-my-feature", tmp_path) is None
 
 

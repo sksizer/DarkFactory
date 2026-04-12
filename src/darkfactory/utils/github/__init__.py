@@ -5,6 +5,10 @@ Re-exports public symbols needed by application code outside this package.
 
 from __future__ import annotations
 
+from darkfactory.utils.github._cli import (
+    gh_json as gh_json,
+    gh_run as gh_run,
+)
 from darkfactory.utils.github._types import (
     GhCheckResult as GhCheckResult,
     GhErr as GhErr,

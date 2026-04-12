@@ -8,13 +8,12 @@ from __future__ import annotations
 
 import logging
 import re
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
 from darkfactory.utils import Ok
-from darkfactory.utils.git import GitErr, git_run
+from darkfactory.utils.git import GitErr, branch_exists_remote, git_run
 from darkfactory.utils.github import GhErr
 from darkfactory.utils.github.pr import (
     fetch_all_pr_states,
@@ -42,19 +41,14 @@ class GitStateAdapter(Protocol):
 
 
 class SubprocessGitState:
-    """Real implementation that shells out to git."""
+    """Real implementation that delegates to ``branch_exists_remote``."""
 
     def __init__(self, repo_root: str | None = None) -> None:
         self._cwd = repo_root
 
     def remote_branch_exists(self, branch: str) -> bool:
-        result = subprocess.run(
-            ["git", "ls-remote", "--heads", "origin", branch],
-            capture_output=True,
-            text=True,
-            cwd=self._cwd,
-        )
-        return bool(result.stdout.strip())
+        cwd = Path(self._cwd) if self._cwd else Path.cwd()
+        return branch_exists_remote(cwd, branch)
 
 
 @dataclass
