@@ -123,9 +123,10 @@ def find_stale_worktree_for_prd(prd_id: str, repo_root: Path) -> StaleWorktree |
     if match is not None:
         entry, branch = match
     else:
-        entry = find_worktree_for_prd(prd_id, repo_root)
-        if entry is None:
+        fallback = find_worktree_for_prd(prd_id, repo_root)
+        if fallback is None:
             return None
+        entry = fallback
         branch = f"prd/{entry.name}"
 
     pr_state = checks._get_pr_state(branch, repo_root)
