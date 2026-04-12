@@ -2,7 +2,7 @@
 id: PRD-632
 title: Reorganize workflow and operation definitions into prd/ and project/ namespaces
 kind: task
-status: draft
+status: ready
 priority: medium
 effort: l
 capability: complex
@@ -30,7 +30,7 @@ impacts:
   - tests/test_system_runner.py
   - tests/test_system_builtins.py
   - .darkfactory/operations/
-workflow: null
+workflow: task
 assignee: null
 reviewers: []
 target_version: null
@@ -153,7 +153,7 @@ Mostly `git mv` operations. The `verify-merges` operation is an exception: its `
 
 ### Loader refactor
 
-`load_operations()` currently takes a single `operations_dir`. Expand it to accept optional layers, or add a wrapper `discover_operations()` that scans both built-in and project layers (matching the `load_workflows()` pattern).
+`load_operations()` currently takes a single `operations_dir`. Expand it to accept optional layers, or add a wrapper `discover_operations()` that scans built-in, user, and project layers (matching the `load_workflows()` pattern).
 
 ```python
 def builtin_operations_dir() -> Path:
@@ -194,7 +194,7 @@ No field changes on the dataclasses — just the class names and the module they
 
 ### Call site updates
 
-- `cli/system.py` → `cli/project.py` — rename module, update `load_operations()` call to pass both layers.
+- `cli/system.py` → `cli/project.py` — rename module, update `load_operations()` call to pass all three layers.
 - `cli/main.py` derives `operations_dir` from implicit path — update to read from config `[paths]` first, then fall back to default.
 - `cli/discuss.py` — update `SystemContext` → `ProjectContext` import and usage.
 - `definitions/__init__.py` — add `get_builtin_operations()` alongside existing `get_builtin_workflows()`.
@@ -243,8 +243,8 @@ This is a real loadable operation visible in `prd project list`. Users delete or
 - [ ] AC-1: `src/darkfactory/workflow/definitions/prd/` contains all 6 PRD workflows, discoverable by `load_workflows()`.
 - [ ] AC-2: `src/darkfactory/workflow/definitions/project/` contains the 3 built-in project operations (plan, audit-impacts, verify-merges), discoverable by `load_operations()`.
 - [ ] AC-3: `.darkfactory/operations/` is scaffolded by `prd init` and seeded with a `hello/` operation visible in `prd project list`.
-- [ ] AC-4: Name collision between built-in and project operations raises `ValueError`.
-- [ ] AC-5: `prd project list` shows both built-in and project operations.
+- [ ] AC-4: Name collision across any operation layers (built-in, user, project) raises `ValueError`.
+- [ ] AC-5: `prd project list` shows operations from all three layers (built-in, user, project).
 - [ ] AC-6: `prd project run plan --target PRD-X` works with the operation at its new location.
 - [ ] AC-7: All existing tests pass. `uv run pytest && uv run ruff check && uv run mypy src tests` clean.
 - [ ] AC-8: The import hygiene test (`test_import_hygiene.py`) passes — no new cross-package private imports.
