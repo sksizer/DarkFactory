@@ -6,7 +6,7 @@ import logging
 
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run, _scan_for_forbidden_attribution
-from darkfactory.git_ops import git_run
+from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -33,15 +33,19 @@ def lint_attribution(ctx: ExecutionContext) -> None:
         ctx.run_summary or "", source=f"run summary for {ctx.prd.id}"
     )
 
-    result = git_run(
+    match git_run(
         "log",
         f"{ctx.base_ref}..HEAD",
         "--format=%H%x00%B%x1e",
         cwd=ctx.cwd,
-    )
+    ):
+        case Ok(stdout=output):
+            pass
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(f"git log failed (exit {code}):\n{err}")
     # Record separator \x1e between commits; field separator \x00 between
     # sha and body. Keeps us robust against newlines in commit messages.
-    for entry in result.stdout.split("\x1e"):
+    for entry in output.split("\x1e"):
         entry = entry.strip()
         if not entry:
             continue

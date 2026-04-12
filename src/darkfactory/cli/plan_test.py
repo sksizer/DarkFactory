@@ -141,8 +141,10 @@ def test_resolve_base_ref_main_found(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delenv("DARKFACTORY_BASE_REF", raising=False)
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0)
+    with patch("darkfactory.utils.git._run.subprocess.run") as mock_run:
+        mock_run.return_value = subprocess.CompletedProcess(
+            [], returncode=0, stdout="", stderr=""
+        )
         result = _resolve_base_ref(None, tmp_path)
     assert result == "main"
 
@@ -152,15 +154,16 @@ def test_resolve_base_ref_master_fallback(
 ) -> None:
     monkeypatch.delenv("DARKFACTORY_BASE_REF", raising=False)
 
-    def side_effect(cmd: list[str], **kwargs: object) -> MagicMock:
-        # cmd contains refs/heads/main or refs/heads/master as an element
+    def side_effect(
+        cmd: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
         if any("refs/heads/main" in c for c in cmd):
-            return MagicMock(returncode=1)
+            return subprocess.CompletedProcess(cmd, returncode=1, stdout="", stderr="")
         if any("refs/heads/master" in c for c in cmd):
-            return MagicMock(returncode=0)
-        return MagicMock(returncode=1)
+            return subprocess.CompletedProcess(cmd, returncode=0, stdout="", stderr="")
+        return subprocess.CompletedProcess(cmd, returncode=1, stdout="", stderr="")
 
-    with patch("subprocess.run", side_effect=side_effect):
+    with patch("darkfactory.utils.git._run.subprocess.run", side_effect=side_effect):
         result = _resolve_base_ref(None, tmp_path)
     assert result == "master"
 
@@ -172,18 +175,20 @@ def test_resolve_base_ref_origin_head_fallback(
 
     call_count = 0
 
-    def side_effect(cmd: list[str], **kwargs: object) -> MagicMock:
+    def side_effect(
+        cmd: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
         nonlocal call_count
         call_count += 1
-        # First two calls are rev-parse for main/master — both fail.
         if "rev-parse" in cmd:
-            return MagicMock(returncode=1)
-        # Third call is symbolic-ref — succeeds.
+            return subprocess.CompletedProcess(cmd, returncode=1, stdout="", stderr="")
         if "symbolic-ref" in cmd:
-            return MagicMock(returncode=0, stdout="refs/remotes/origin/develop\n")
-        return MagicMock(returncode=1)
+            return subprocess.CompletedProcess(
+                cmd, returncode=0, stdout="refs/remotes/origin/develop\n", stderr=""
+            )
+        return subprocess.CompletedProcess(cmd, returncode=1, stdout="", stderr="")
 
-    with patch("subprocess.run", side_effect=side_effect):
+    with patch("darkfactory.utils.git._run.subprocess.run", side_effect=side_effect):
         result = _resolve_base_ref(None, tmp_path)
     assert result == "develop"
 
@@ -193,12 +198,12 @@ def test_resolve_base_ref_last_resort(
 ) -> None:
     monkeypatch.delenv("DARKFACTORY_BASE_REF", raising=False)
 
-    def side_effect(cmd: list[str], **kwargs: object) -> MagicMock:
-        if "rev-parse" in cmd:
-            return MagicMock(returncode=1)
-        raise subprocess.CalledProcessError(1, cmd)
+    def side_effect(
+        cmd: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(cmd, returncode=1, stdout="", stderr="")
 
-    with patch("subprocess.run", side_effect=side_effect):
+    with patch("darkfactory.utils.git._run.subprocess.run", side_effect=side_effect):
         result = _resolve_base_ref(None, tmp_path)
     assert result == "main"
 

@@ -7,7 +7,7 @@ import shutil
 
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run
-from darkfactory.git_ops import git_run
+from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.timestamps import now_filename_safe
 from darkfactory.workflow import ExecutionContext
 
@@ -56,5 +56,9 @@ def commit_transcript(ctx: ExecutionContext) -> None:
     # the runner overwrites the source file anyway.
     shutil.copy2(str(src), str(dest))
 
-    git_run("add", str(dest), cwd=ctx.cwd)
+    match git_run("add", str(dest), cwd=ctx.cwd):
+        case Ok():
+            pass
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(f"git add failed (exit {code}):\n{err}")
     ctx.logger.info("commit_transcript: staged %s", dest.relative_to(ctx.cwd))

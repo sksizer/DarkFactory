@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,7 +11,7 @@ from filelock import FileLock, Timeout
 
 from darkfactory.cli._shared import _find_repo_root
 from darkfactory.event_log import EventWriter, generate_session_id
-from darkfactory.git_ops import git_check, git_run
+from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.model import TERMINAL_STATUSES, load_one, save, set_status
 from darkfactory.rework_guard import ReworkGuard
 from darkfactory.utils.git.branch import find_local_branches, find_remote_branches
@@ -141,23 +140,23 @@ def _execute_reset(
 
     # 6b. Remove worktree
     if summary.worktree_path:
-        try:
-            git_run(
-                "worktree",
-                "remove",
-                "--force",
-                str(summary.worktree_path),
-                cwd=repo_root,
-            )
-            git_check("worktree", "prune", cwd=repo_root)
-            cleaned.append(f"removed worktree {summary.worktree_path}")
-            print(f"  Removed worktree {summary.worktree_path}")
-        except subprocess.CalledProcessError:
-            skipped.append(f"worktree {summary.worktree_path} (remove failed)")
-            print("  Skipped worktree removal (failed)")
+        match git_run(
+            "worktree",
+            "remove",
+            "--force",
+            str(summary.worktree_path),
+            cwd=repo_root,
+        ):
+            case Ok():
+                git_run("worktree", "prune", cwd=repo_root)
+                cleaned.append(f"removed worktree {summary.worktree_path}")
+                print(f"  Removed worktree {summary.worktree_path}")
+            case GitErr():
+                skipped.append(f"worktree {summary.worktree_path} (remove failed)")
+                print("  Skipped worktree removal (failed)")
     else:
         # Still prune to clean stale metadata
-        git_check("worktree", "prune", cwd=repo_root)
+        git_run("worktree", "prune", cwd=repo_root)
 
     # 6c. Lock file is left in place — filelock semantics require the file
     # to exist for a clean release.  The caller's finally block handles
@@ -165,25 +164,25 @@ def _execute_reset(
 
     # 6d. Delete local branches
     for branch in summary.local_branches:
-        try:
-            git_run("branch", "-D", branch, cwd=repo_root)
-            cleaned.append(f"deleted local branch {branch}")
-            print(f"  Deleted local branch {branch}")
-        except subprocess.CalledProcessError:
-            skipped.append(f"local branch {branch}")
-            print(f"  Skipped local branch {branch} (delete failed)")
+        match git_run("branch", "-D", branch, cwd=repo_root):
+            case Ok():
+                cleaned.append(f"deleted local branch {branch}")
+                print(f"  Deleted local branch {branch}")
+            case GitErr():
+                skipped.append(f"local branch {branch}")
+                print(f"  Skipped local branch {branch} (delete failed)")
 
     # 6e. Delete remote branches
     for remote_branch in summary.remote_branches:
         # remote_branch looks like "origin/prd/PRD-XXX-slug"
         ref = remote_branch.removeprefix("origin/")
-        try:
-            git_run("push", "origin", "--delete", ref, cwd=repo_root)
-            cleaned.append(f"deleted remote branch {ref}")
-            print(f"  Deleted remote branch {ref}")
-        except subprocess.CalledProcessError:
-            skipped.append(f"remote branch {ref}")
-            print(f"  Skipped remote branch {ref} (delete failed)")
+        match git_run("push", "origin", "--delete", ref, cwd=repo_root):
+            case Ok():
+                cleaned.append(f"deleted remote branch {ref}")
+                print(f"  Deleted remote branch {ref}")
+            case GitErr():
+                skipped.append(f"remote branch {ref}")
+                print(f"  Skipped remote branch {ref} (delete failed)")
 
     # 6f. Remove rework guard entry
     if summary.has_rework_guard:

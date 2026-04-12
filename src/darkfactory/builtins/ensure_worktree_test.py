@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -51,7 +52,7 @@ def test_dry_run_sets_worktree_path_and_cwd(tmp_path: Path) -> None:
 
 def test_dry_run_no_subprocess_calls(tmp_path: Path) -> None:
     ctx = _make_ensure_worktree_ctx(tmp_path, dry_run=True)
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._run.subprocess.run") as mock_run:
         ensure_worktree(ctx)
     mock_run.assert_not_called()
 
@@ -175,7 +176,12 @@ def test_successful_creation_calls_git_worktree_add(tmp_path: Path) -> None:
             "darkfactory.builtins.ensure_worktree._branch_exists_remote",
             return_value=False,
         ),
-        patch("darkfactory.git_ops.subprocess.run") as mock_run,
+        patch(
+            "darkfactory.utils.git._run.subprocess.run",
+            return_value=subprocess.CompletedProcess(
+                [], returncode=0, stdout="", stderr=""
+            ),
+        ) as mock_run,
     ):
         mock_lock = MagicMock()
         mock_lock_cls.return_value = mock_lock
@@ -203,7 +209,12 @@ def test_successful_creation_sets_ctx(tmp_path: Path) -> None:
             "darkfactory.builtins.ensure_worktree._branch_exists_remote",
             return_value=False,
         ),
-        patch("darkfactory.git_ops.subprocess.run"),
+        patch(
+            "darkfactory.utils.git._run.subprocess.run",
+            return_value=subprocess.CompletedProcess(
+                [], returncode=0, stdout="", stderr=""
+            ),
+        ),
     ):
         mock_lock = MagicMock()
         mock_lock_cls.return_value = mock_lock
@@ -229,7 +240,12 @@ def test_lock_acquired_on_success(tmp_path: Path) -> None:
             "darkfactory.builtins.ensure_worktree._branch_exists_remote",
             return_value=False,
         ),
-        patch("darkfactory.git_ops.subprocess.run"),
+        patch(
+            "darkfactory.utils.git._run.subprocess.run",
+            return_value=subprocess.CompletedProcess(
+                [], returncode=0, stdout="", stderr=""
+            ),
+        ),
     ):
         mock_lock = MagicMock()
         mock_lock_cls.return_value = mock_lock
@@ -257,17 +273,13 @@ def test_lock_timeout_raises_runtime_error(tmp_path: Path) -> None:
 
 
 def test_branch_exists_local_true_on_zero_returncode() -> None:
-    import subprocess
-
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._run.subprocess.run") as mock_run:
         mock_run.return_value = subprocess.CompletedProcess([], returncode=0)
         assert _branch_exists_local(Path("/repo"), "my-branch") is True
 
 
 def test_branch_exists_local_false_on_nonzero_returncode() -> None:
-    import subprocess
-
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._run.subprocess.run") as mock_run:
         mock_run.return_value = subprocess.CompletedProcess([], returncode=1)
         assert _branch_exists_local(Path("/repo"), "my-branch") is False
 
@@ -276,15 +288,13 @@ def test_branch_exists_local_false_on_nonzero_returncode() -> None:
 
 
 def test_branch_exists_remote_true_on_zero_returncode() -> None:
-    import subprocess
-
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._run.subprocess.run") as mock_run:
         mock_run.return_value = subprocess.CompletedProcess([], returncode=0)
         assert _branch_exists_remote(Path("/repo"), "my-branch") is True
 
 
 def test_branch_exists_remote_false_on_timeout() -> None:
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._run.subprocess.run") as mock_run:
         mock_run.side_effect = __import__("subprocess").TimeoutExpired(
             cmd=["git"], timeout=10
         )
@@ -292,6 +302,6 @@ def test_branch_exists_remote_false_on_timeout() -> None:
 
 
 def test_branch_exists_remote_false_on_exception() -> None:
-    with patch("darkfactory.git_ops.subprocess.run") as mock_run:
+    with patch("darkfactory.utils.git._run.subprocess.run") as mock_run:
         mock_run.side_effect = OSError("network error")
         assert _branch_exists_remote(Path("/repo"), "my-branch") is False

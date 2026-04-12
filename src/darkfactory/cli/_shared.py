@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
 from darkfactory import containment, graph
-from darkfactory.git_ops import git_check, git_run
 from darkfactory.model import PRD, load_all, parse_id_sort_key
+from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.workflow import Workflow
 
 # Priority/effort orderings used for sorting actionable lists.
@@ -109,26 +108,29 @@ def _resolve_base_ref(explicit: str | None, repo_root: Path) -> str:
         return env_override
 
     for candidate in ("main", "master"):
-        if git_check(
+        match git_run(
             "rev-parse",
             "--verify",
             "--quiet",
             f"refs/heads/{candidate}",
             cwd=repo_root,
         ):
-            return candidate
+            case Ok():
+                return candidate
+            case GitErr():
+                pass
 
     # Try remote's default branch (e.g. for fresh clones with no local main)
-    try:
-        result = git_run(
-            "symbolic-ref",
-            "refs/remotes/origin/HEAD",
-            cwd=repo_root,
-        )
-        # Output looks like "refs/remotes/origin/main"
-        return result.stdout.strip().rsplit("/", 1)[-1]
-    except subprocess.CalledProcessError:
-        pass
+    match git_run(
+        "symbolic-ref",
+        "refs/remotes/origin/HEAD",
+        cwd=repo_root,
+    ):
+        case Ok(stdout=output):
+            # Output looks like "refs/remotes/origin/main"
+            return output.strip().rsplit("/", 1)[-1]
+        case GitErr():
+            pass
 
     return "main"
 

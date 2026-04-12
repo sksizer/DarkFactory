@@ -14,7 +14,7 @@ from pathlib import Path
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
-from darkfactory.git_ops import git_check
+from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -100,13 +100,17 @@ def rebase_onto_main(
 
     _fetch_origin_main(cwd, fetch_timeout)
 
-    already_up_to_date = git_check(
+    match git_run(
         "merge-base",
         "--is-ancestor",
         "origin/main",
         "HEAD",
         cwd=cwd,
-    )
+    ):
+        case Ok():
+            already_up_to_date = True
+        case GitErr():
+            already_up_to_date = False
 
     if already_up_to_date:
         _log.info("rebase_onto_main: branch already contains origin/main — no-op")

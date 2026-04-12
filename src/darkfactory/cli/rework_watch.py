@@ -25,10 +25,11 @@ import subprocess
 import sys
 import time
 
-from darkfactory.git_ops import git_run
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from darkfactory.utils.git import GitErr, Ok, git_run
 
 _log = logging.getLogger(__name__)
 
@@ -171,18 +172,17 @@ def fetch_open_prd_prs(repo_root: Path) -> list[dict[str, Any]]:
 
 def _worktree_exists(prd_id: str, repo_root: Path) -> bool:
     """Return True if a git worktree for ``prd_id`` is registered."""
-    try:
-        result = git_run("worktree", "list", "--porcelain", cwd=repo_root)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return False
-
-    for line in result.stdout.splitlines():
-        if line.startswith("branch "):
-            branch_ref = line[len("branch ") :]
-            branch = branch_ref.removeprefix("refs/heads/")
-            if re.match(rf"^prd/{re.escape(prd_id)}-", branch):
-                return True
-    return False
+    match git_run("worktree", "list", "--porcelain", cwd=repo_root):
+        case Ok(stdout=output):
+            for line in output.splitlines():
+                if line.startswith("branch "):
+                    branch_ref = line[len("branch ") :]
+                    branch = branch_ref.removeprefix("refs/heads/")
+                    if re.match(rf"^prd/{re.escape(prd_id)}-", branch):
+                        return True
+            return False
+        case GitErr():
+            return False
 
 
 def check_missing_worktrees(prs: list[dict[str, Any]], repo_root: Path) -> list[str]:

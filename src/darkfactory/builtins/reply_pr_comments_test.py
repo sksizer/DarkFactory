@@ -123,7 +123,7 @@ def test_posts_replies_on_success(tmp_path: Path) -> None:
 
     with (
         patch(
-            "darkfactory.git_ops.subprocess.run",
+            "darkfactory.utils.git._run.subprocess.run",
             return_value=sha_result,
         ),
         patch(
@@ -149,7 +149,7 @@ def test_failure_does_not_raise(tmp_path: Path) -> None:
 
     with (
         patch(
-            "darkfactory.git_ops.subprocess.run",
+            "darkfactory.utils.git._run.subprocess.run",
             return_value=sha_result,
         ),
         patch(

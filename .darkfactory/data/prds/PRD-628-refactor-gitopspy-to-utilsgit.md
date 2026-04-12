@@ -2,7 +2,7 @@
 id: PRD-628
 title: Refactor git_ops.py to utils/git
 kind: task
-status: ready
+status: review
 priority: medium
 effort: m
 capability: complex
@@ -16,7 +16,7 @@ assignee:
 reviewers: []
 target_version:
 created: 2026-04-11
-updated: 2026-04-11
+updated: '2026-04-12'
 tags: []
 ---
 

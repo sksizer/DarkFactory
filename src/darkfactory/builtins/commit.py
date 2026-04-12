@@ -5,7 +5,7 @@ from __future__ import annotations
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run, _scan_for_forbidden_attribution
 from darkfactory.event_log import emit_builtin_effect
-from darkfactory.git_ops import git_check, git_run
+from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.workflow import ExecutionContext
 
 
@@ -28,26 +28,35 @@ def commit(ctx: ExecutionContext, *, message: str) -> None:
         return
 
     # Stage everything
-    git_run("add", "-A", cwd=ctx.cwd)
+    match git_run("add", "-A", cwd=ctx.cwd):
+        case Ok():
+            pass
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(f"git add -A failed (exit {code}):\n{err}")
 
     # Check if there's anything to commit
-    if git_check("diff", "--cached", "--quiet", cwd=ctx.cwd):
-        # No staged changes — skip gracefully.
-        ctx.logger.info("commit skipped: no changes to commit")
-        return
+    match git_run("diff", "--cached", "--quiet", cwd=ctx.cwd):
+        case Ok():
+            # No staged changes — skip gracefully.
+            ctx.logger.info("commit skipped: no changes to commit")
+            return
+        case GitErr():
+            pass  # There are staged changes — proceed to commit.
 
     # Commit
-    commit_result = git_run("commit", "-m", formatted, cwd=ctx.cwd)
-
-    # Extract the short SHA from git commit output.
-    sha = ""
-    for line in commit_result.stdout.splitlines():
-        if line.strip():
-            # git commit output starts with "[branch sha] message"
-            parts = line.strip().split()
-            if len(parts) >= 2:
-                sha = parts[1].rstrip("]")
-            break
-    emit_builtin_effect(
-        ctx, "commit", "commit", detail={"sha": sha, "message": formatted}
-    )
+    match git_run("commit", "-m", formatted, cwd=ctx.cwd):
+        case Ok(stdout=output):
+            # Extract the short SHA from git commit output.
+            sha = ""
+            for line in output.splitlines():
+                if line.strip():
+                    # git commit output starts with "[branch sha] message"
+                    parts = line.strip().split()
+                    if len(parts) >= 2:
+                        sha = parts[1].rstrip("]")
+                    break
+            emit_builtin_effect(
+                ctx, "commit", "commit", detail={"sha": sha, "message": formatted}
+            )
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(f"git commit failed (exit {code}):\n{err}")

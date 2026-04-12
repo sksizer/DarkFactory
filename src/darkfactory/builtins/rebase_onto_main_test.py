@@ -14,6 +14,7 @@ from darkfactory.builtins.rebase_onto_main import (
     _fetch_origin_main,
     rebase_onto_main,
 )
+from darkfactory.utils.git._types import GitErr as _GitErr, Ok as _Ok
 
 _BRANCH = "prd/PRD-001-test-thing"
 
@@ -72,10 +73,9 @@ def test_rebase_emits_rebased_effect(tmp_path: Path) -> None:
 
     with (
         patch("darkfactory.builtins.rebase_onto_main._fetch_origin_main"),
-        # Patch git_check directly to avoid subprocess conflict with rebase calls.
         patch(
-            "darkfactory.builtins.rebase_onto_main.git_check",
-            return_value=False,  # not ancestor → rebase needed
+            "darkfactory.builtins.rebase_onto_main.git_run",
+            return_value=_GitErr(1, "", "", ["git"]),
         ),
         patch(
             "darkfactory.builtins.rebase_onto_main._get_sha",
@@ -100,8 +100,8 @@ def test_rebase_calls_git_rebase_origin_main(tmp_path: Path) -> None:
     with (
         patch("darkfactory.builtins.rebase_onto_main._fetch_origin_main"),
         patch(
-            "darkfactory.builtins.rebase_onto_main.git_check",
-            return_value=False,
+            "darkfactory.builtins.rebase_onto_main.git_run",
+            return_value=_GitErr(1, "", "", ["git"]),
         ),
         patch(
             "darkfactory.builtins.rebase_onto_main._get_sha",
@@ -126,10 +126,9 @@ def test_no_op_emits_up_to_date(tmp_path: Path) -> None:
 
     with (
         patch("darkfactory.builtins.rebase_onto_main._fetch_origin_main"),
-        # Patch git_check directly — already ancestor means no rebase needed.
         patch(
-            "darkfactory.builtins.rebase_onto_main.git_check",
-            return_value=True,
+            "darkfactory.builtins.rebase_onto_main.git_run",
+            return_value=_Ok(None),
         ),
         patch("darkfactory.builtins.rebase_onto_main.subprocess.run") as mock_sub,
     ):
@@ -154,8 +153,8 @@ def test_conflict_aborts_rebase_and_raises(tmp_path: Path) -> None:
     with (
         patch("darkfactory.builtins.rebase_onto_main._fetch_origin_main"),
         patch(
-            "darkfactory.builtins.rebase_onto_main.git_check",
-            return_value=False,
+            "darkfactory.builtins.rebase_onto_main.git_run",
+            return_value=_GitErr(1, "", "", ["git"]),
         ),
         patch(
             "darkfactory.builtins.rebase_onto_main._get_sha",
@@ -184,8 +183,8 @@ def test_conflict_error_lists_conflicting_files(tmp_path: Path) -> None:
     with (
         patch("darkfactory.builtins.rebase_onto_main._fetch_origin_main"),
         patch(
-            "darkfactory.builtins.rebase_onto_main.git_check",
-            return_value=False,
+            "darkfactory.builtins.rebase_onto_main.git_run",
+            return_value=_GitErr(1, "", "", ["git"]),
         ),
         patch(
             "darkfactory.builtins.rebase_onto_main._get_sha",
@@ -239,10 +238,9 @@ def test_none_event_writer_no_emission(tmp_path: Path) -> None:
 
     with (
         patch("darkfactory.builtins.rebase_onto_main._fetch_origin_main"),
-        # git_check returns True → already up-to-date, no rebase needed
         patch(
-            "darkfactory.builtins.rebase_onto_main.git_check",
-            return_value=True,
+            "darkfactory.builtins.rebase_onto_main.git_run",
+            return_value=_Ok(None),
         ),
     ):
         # Should not raise even with no event writer

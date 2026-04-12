@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import Any
 
 from darkfactory.cli._shared import _find_repo_root
-from darkfactory.git_ops import git_check, git_run
 from darkfactory.model import update_frontmatter_field_at
+from darkfactory.utils.git import GitErr, Ok, git_run
 
 
 def _get_merged_prd_prs() -> list[dict[str, Any]]:
@@ -81,7 +81,11 @@ def _merge_commit_is_ancestor(pr: dict[str, Any], repo_root: Path) -> bool:
     sha = merge_commit.get("oid")
     if not sha:
         return False  # can't verify — treat as suspicious
-    return git_check("merge-base", "--is-ancestor", sha, "HEAD", cwd=repo_root)
+    match git_run("merge-base", "--is-ancestor", sha, "HEAD", cwd=repo_root):
+        case Ok():
+            return True
+        case GitErr():
+            return False
 
 
 def _build_reconcile_commit_msg(
@@ -104,9 +108,17 @@ def _commit_to_main(
 ) -> None:
     """Stage changed PRD files and commit directly to main."""
     files = [str(c[0]) for c in candidates]
-    git_run("add", *files, cwd=repo_root)
+    match git_run("add", *files, cwd=repo_root):
+        case Ok():
+            pass
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(f"git add failed (exit {code}):\n{err}")
     msg = _build_reconcile_commit_msg(candidates)
-    git_run("commit", "-m", msg, cwd=repo_root)
+    match git_run("commit", "-m", msg, cwd=repo_root):
+        case Ok():
+            pass
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(f"git commit failed (exit {code}):\n{err}")
 
 
 def _create_reconcile_pr(
@@ -116,13 +128,29 @@ def _create_reconcile_pr(
     """Create a PR with the reconciled status changes."""
     branch = f"prd/reconcile-status-{date.today().strftime('%Y%m%d')}"
     # Delete stale branch from a previous run, if any.
-    git_check("branch", "-D", branch, cwd=repo_root)
-    git_run("checkout", "-b", branch, cwd=repo_root)
+    git_run("branch", "-D", branch, cwd=repo_root)
+    match git_run("checkout", "-b", branch, cwd=repo_root):
+        case Ok():
+            pass
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(f"git checkout failed (exit {code}):\n{err}")
     files = [str(c[0]) for c in candidates]
-    git_run("add", *files, cwd=repo_root)
+    match git_run("add", *files, cwd=repo_root):
+        case Ok():
+            pass
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(f"git add failed (exit {code}):\n{err}")
     msg = _build_reconcile_commit_msg(candidates)
-    git_run("commit", "-m", msg, cwd=repo_root)
-    git_run("push", "-u", "origin", branch, cwd=repo_root)
+    match git_run("commit", "-m", msg, cwd=repo_root):
+        case Ok():
+            pass
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(f"git commit failed (exit {code}):\n{err}")
+    match git_run("push", "-u", "origin", branch, cwd=repo_root):
+        case Ok():
+            pass
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(f"git push failed (exit {code}):\n{err}")
     subprocess.run(
         [
             "gh",

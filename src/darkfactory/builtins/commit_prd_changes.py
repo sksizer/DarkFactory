@@ -7,6 +7,8 @@ import sys
 from darkfactory.builtins.system_builtins import _register
 from darkfactory.system import SystemContext
 from darkfactory.utils.git import (
+    GitErr,
+    Ok,
     diff_quiet,
     diff_show,
     run_add,
@@ -34,10 +36,12 @@ def commit_prd_changes(
     elif "{target_prd}" in message:
         message = ctx.format_string(message)
 
-    is_clean = diff_quiet(paths, ctx.cwd)
-    if is_clean:
-        print("No PRD changes to commit.", file=sys.stderr)
-        return
+    match diff_quiet(paths, ctx.cwd):
+        case Ok():
+            print("No PRD changes to commit.", file=sys.stderr)
+            return
+        case GitErr():
+            pass  # There are changes — proceed.
 
     bar = "\u2500" * 37
     print(f"{bar}", file=sys.stderr)
@@ -46,7 +50,11 @@ def commit_prd_changes(
 
     diff_show(paths, ctx.cwd)
 
-    other_dirty = status_other_dirty(paths, ctx.cwd)
+    match status_other_dirty(paths, ctx.cwd):
+        case Ok(value=other_dirty):
+            pass
+        case GitErr():
+            other_dirty = []
     if other_dirty:
         n = len(other_dirty)
         print(
@@ -61,14 +69,30 @@ def commit_prd_changes(
     choice = prompt_user("Commit these changes? [y/N/e(dit message)] ").strip().lower()
 
     if choice == "y":
-        run_add(paths, ctx.cwd)
-        run_commit(message, ctx.cwd)
+        match run_add(paths, ctx.cwd):
+            case Ok():
+                pass
+            case GitErr(returncode=code, stderr=err):
+                raise RuntimeError(f"git add failed (exit {code}):\n{err}")
+        match run_commit(message, ctx.cwd):
+            case Ok():
+                pass
+            case GitErr(returncode=code, stderr=err):
+                raise RuntimeError(f"git commit failed (exit {code}):\n{err}")
         ctx.logger.info("commit_prd_changes: committed %s", ", ".join(paths))
     elif choice == "e":
         new_message = prompt_user("Enter new commit message: ").strip()
         if new_message:
-            run_add(paths, ctx.cwd)
-            run_commit(new_message, ctx.cwd)
+            match run_add(paths, ctx.cwd):
+                case Ok():
+                    pass
+                case GitErr(returncode=code, stderr=err):
+                    raise RuntimeError(f"git add failed (exit {code}):\n{err}")
+            match run_commit(new_message, ctx.cwd):
+                case Ok():
+                    pass
+                case GitErr(returncode=code, stderr=err):
+                    raise RuntimeError(f"git commit failed (exit {code}):\n{err}")
             ctx.logger.info("commit_prd_changes: committed with custom message")
         else:
             print(

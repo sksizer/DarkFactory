@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import logging
-import subprocess
 
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
-from darkfactory.git_ops import git_run
+from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -25,15 +24,12 @@ def push_branch(ctx: ExecutionContext) -> None:
     if _log_dry_run(ctx, " ".join(["git", "push", "-u", "origin", ctx.branch_name])):
         return
 
-    try:
-        git_run("push", "-u", "origin", ctx.branch_name, cwd=ctx.cwd)
-    except subprocess.CalledProcessError as exc:
-        detail = (
-            f"git push failed (exit {exc.returncode}):"
-            f"\nstdout: {exc.stdout}"
-            f"\nstderr: {exc.stderr}"
-        )
-        _log.error(detail)
-        raise RuntimeError(detail) from exc
+    match git_run("push", "-u", "origin", ctx.branch_name, cwd=ctx.cwd):
+        case Ok():
+            pass
+        case GitErr(returncode=code, stdout=out, stderr=err):
+            detail = f"git push failed (exit {code}):\nstdout: {out}\nstderr: {err}"
+            _log.error(detail)
+            raise RuntimeError(detail)
 
     emit_builtin_effect(ctx, "push_branch", "push", detail={"branch": ctx.branch_name})

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
-from darkfactory.git_ops import git_run
+from darkfactory.utils.git._run import git_run
+from darkfactory.utils.git._types import GitErr, Ok
 
 __all__ = [
     "find_local_branches",
@@ -19,13 +19,15 @@ def find_local_branches(prd_id: str, repo_root: Path) -> list[str]:
     Strips the leading ``* `` marker that git emits for the current branch.
     Returns an empty list when none match.
     """
-    result = git_run("branch", "--list", f"prd/{prd_id}-*", cwd=repo_root)
-    branches: list[str] = []
-    for line in result.stdout.splitlines():
-        branch = line.strip().lstrip("* ")
-        if branch:
-            branches.append(branch)
-    return branches
+    match git_run("branch", "--list", f"prd/{prd_id}-*", cwd=repo_root):
+        case Ok(stdout=output):
+            return [
+                line.strip().lstrip("* ")
+                for line in output.splitlines()
+                if line.strip()
+            ]
+        case GitErr():
+            return []
 
 
 def find_remote_branches(prd_id: str, repo_root: Path) -> list[str]:
@@ -35,15 +37,8 @@ def find_remote_branches(prd_id: str, repo_root: Path) -> list[str]:
     (e.g. ``origin/prd/PRD-42-add-retry-logic``).
     Returns an empty list when none match or on git failure.
     """
-    try:
-        result = git_run(
-            "branch", "-r", "--list", f"origin/prd/{prd_id}-*", cwd=repo_root
-        )
-    except subprocess.CalledProcessError:
-        return []
-    branches: list[str] = []
-    for line in result.stdout.splitlines():
-        branch = line.strip()
-        if branch:
-            branches.append(branch)
-    return branches
+    match git_run("branch", "-r", "--list", f"origin/prd/{prd_id}-*", cwd=repo_root):
+        case Ok(stdout=output):
+            return [line.strip() for line in output.splitlines() if line.strip()]
+        case GitErr():
+            return []

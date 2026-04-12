@@ -11,13 +11,12 @@ Failures are logged as warnings and do not fail the rework run.
 from __future__ import annotations
 
 import logging
-import subprocess
 from pathlib import Path
 
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
-from darkfactory.git_ops import git_run
+from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -25,12 +24,12 @@ _log = logging.getLogger(__name__)
 
 def _get_head_sha(cwd: str) -> str | None:
     """Return the short SHA of HEAD, or None on failure."""
-    try:
-        result = git_run("rev-parse", "--short", "HEAD", cwd=Path(cwd))
-        return result.stdout.strip()
-    except subprocess.CalledProcessError as exc:
-        _log.warning("reply_pr_comments: could not resolve HEAD SHA: %s", exc)
-        return None
+    match git_run("rev-parse", "--short", "HEAD", cwd=Path(cwd)):
+        case Ok(stdout=output):
+            return output.strip()
+        case GitErr() as err:
+            _log.warning("reply_pr_comments: could not resolve HEAD SHA: %s", err)
+            return None
 
 
 @builtin("reply_pr_comments")

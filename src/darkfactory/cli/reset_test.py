@@ -15,6 +15,7 @@ from darkfactory.cli.reset import (
     cmd_reset,
 )
 from darkfactory.model import load_one
+from darkfactory.utils.git._types import Ok
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -291,13 +292,11 @@ def test_execute_reset_partial_artifacts(tmp_path: Path) -> None:
     with (
         patch("subprocess.run"),
         patch("darkfactory.cli.reset.git_run") as mock_git_run,
-        patch("darkfactory.cli.reset.git_check") as mock_git_check,
         patch("darkfactory.cli.reset.ReworkGuard") as mock_guard_cls,
         patch("darkfactory.cli.reset.load_one") as mock_load,
         patch("darkfactory.cli.reset.set_status"),
     ):
-        mock_git_run.return_value = MagicMock(returncode=0, stdout="")
-        mock_git_check.return_value = True
+        mock_git_run.return_value = Ok(None)
         mock_guard = MagicMock()
         mock_guard_cls.return_value = mock_guard
         mock_prd = MagicMock()
@@ -369,19 +368,19 @@ def test_execute_reset_closes_prs(tmp_path: Path) -> None:
 
     with (
         patch("subprocess.run") as mock_subprocess,
-        patch("darkfactory.cli.reset.git_check") as mock_git_check,
     ):
         mock_subprocess.return_value = MagicMock(returncode=0)
-        mock_git_check.return_value = True
 
         cleaned, skipped = _execute_reset(summary, tmp_path, tmp_path)
 
-    assert mock_subprocess.call_count == 2
     # Both PRs should be in cleaned
     assert any("#10" in c for c in cleaned)
     assert any("#20" in c for c in cleaned)
+    # Filter to gh pr close calls only (git commands also go through subprocess now)
+    gh_calls = [c for c in mock_subprocess.call_args_list if c[0][0][0] == "gh"]
+    assert len(gh_calls) == 2
     # Verify comment content
-    first_call = mock_subprocess.call_args_list[0]
+    first_call = gh_calls[0]
     cmd_list = first_call[0][0]
     assert "close" in cmd_list
     assert "--comment" in cmd_list
@@ -402,8 +401,7 @@ def test_workflow_preserved_after_reset(tmp_path: Path) -> None:
         current_status="in-progress",
     )
 
-    with patch("darkfactory.cli.reset.git_check", return_value=True):
-        cleaned, skipped = _execute_reset(summary, tmp_path, tmp_path)
+    cleaned, skipped = _execute_reset(summary, tmp_path, tmp_path)
 
     prd = load_one(tmp_path, "PRD-99")
     assert prd.workflow == "task"
@@ -423,8 +421,7 @@ def test_updated_timestamp_set(tmp_path: Path) -> None:
         current_status="review",
     )
 
-    with patch("darkfactory.cli.reset.git_check", return_value=True):
-        cleaned, skipped = _execute_reset(summary, tmp_path, tmp_path)
+    cleaned, skipped = _execute_reset(summary, tmp_path, tmp_path)
 
     prd = load_one(tmp_path, "PRD-99")
     from datetime import date
