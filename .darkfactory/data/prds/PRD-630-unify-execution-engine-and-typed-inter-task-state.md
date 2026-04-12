@@ -2,11 +2,11 @@
 id: PRD-630
 title: Unify execution engine and introduce typed inter-task state
 kind: epic
-status: review
+status: done
 priority: high
 effort: l
 capability: complex
-parent: null
+parent:
 depends_on: []
 blocks: []
 impacts:
@@ -28,12 +28,12 @@ impacts:
   - src/darkfactory/cli/run.py
   - src/darkfactory/cli/discuss.py
   - src/darkfactory/cli/system.py
-workflow: null
-assignee: null
+workflow:
+assignee:
 reviewers: []
-target_version: null
-created: '2026-04-11'
-updated: '2026-04-12'
+target_version:
+created: 2026-04-11
+updated: 2026-04-12
 tags:
   - refactor
   - architecture
