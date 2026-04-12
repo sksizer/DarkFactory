@@ -267,6 +267,416 @@ PRD-632's out-of-scope note says: *"Renaming `operation.py` → `workflow.py` or
 
 - OPEN: Branch naming for project operations — `project/{op-name}` or another prefix? Must avoid collision with `prd/` branches.
 
+## Discussion Items (Review Required)
+
+### DI-1: Operations package reorganization is orthogonal — extract to separate PRD
+
+Part 4 (operations package reorganization) and AC-10 add significant diff churn without contributing to the core goal of type unification or enabling project-mode PRs. The reorganization has no dependency on the type changes and no other task depends on it.
+
+**Current structure:**
+
+```
+operations/
+  __init__.py
+  _registry.py
+  _shared.py
+  ensure_worktree.py
+  commit.py
+  push_branch.py
+  create_pr.py
+  set_status.py
+  project_builtins.py
+  gather_prd_context.py
+  discuss_prd.py
+  ...
+```
+
+**Proposed structure (Part 4):**
+
+```
+operations/
+  git/           — ensure_worktree, commit, push_branch, rebase, fast_forward, cleanup
+  pr/            — create_pr, fetch_pr_comments, reply_pr_comments, lint_attribution
+  status/        — set_status, rework_guard, resolve_rework_context
+  reporting/     — commit_events, commit_transcript, analyze_transcript, summarize_agent_run
+  project/       — project_builtins, gather_prd_context, discuss_prd, commit_prd_changes
+```
+
+This is a pure code-organization change that can land before or after PRD-631. Bundling it increases review burden and blast radius without unblocking any functionality.
+
+**Recommendation:** Remove Part 4 and AC-10 from this PRD. File as a separate PRD.
+
+---
+
+### DI-2: Two registries or one? — the split rationale disappears after unification
+
+The PRD says git operations get "registered in both `BUILTINS` and `PROJECT_BUILTINS`." But today the split exists because the registries enforce different function signatures:
+
+```python
+# operations/_registry.py — workflow builtins take ExecutionContext
+BUILTINS: dict[str, BuiltInFunc] = {}
+
+@builtin("ensure_worktree")
+def ensure_worktree(ctx: ExecutionContext) -> None: ...
+
+# operations/project_builtins.py — project builtins take ProjectContext
+SYSTEM_BUILTINS: dict[str, Callable[..., None]] = {}
+
+@_register("set_status_bulk")
+def set_status_bulk(ctx: ProjectContext, *, status: str) -> None: ...
+```
+
+After unification, both take `RunContext`. The type-based reason for the split disappears. The runner already dispatches by passing the appropriate registry:
+
+```python
+# runner.py:711 — workflow mode
+result = run_tasks(
+    tasks=workflow.tasks,
+    ctx=ctx,
+    builtins=BUILTINS,                          # <-- workflow registry
+    ...
+)
+
+# runner.py:809 — project mode
+result = run_tasks(
+    tasks=operation.tasks,
+    ctx=ctx,
+    builtins=SYSTEM_BUILTINS,                   # <-- project registry
+    ...
+)
+```
+
+**Questions to resolve:**
+
+1. **Unify into a single `BUILTINS`?** — simplest approach, but means project-only operations (e.g. `set_status_bulk`, `system_check_merged`) become visible in PRD workflow mode. Workflows don't reference them, but they're discoverable.
+
+2. **Keep two registries as an allow-list?** — if the split is intentional scoping (project operations shouldn't be callable from PRD workflows), keep two registries but document this as the reason. The git operations would be registered in both explicitly.
+
+3. **Single registry + runner-level allow-list?** — one registry, but the runner filters available operations by mode at dispatch time. More flexible, single source of truth for implementations.
+
+**This needs a decision before implementation.** The PRD currently says "registered in both registries" without addressing whether two registries should continue to exist.
+
+---
+
+### DI-3: `cwd` mutation vs immutable `WorktreeState` — clarify the contract
+
+The PRD introduces `WorktreeState` as an immutable PhaseState payload, but `RunContext.cwd` must still be mutated. Today `ensure_worktree` does both:
+
+```python
+# operations/ensure_worktree.py:154-155 — mutates ctx directly
+ctx.worktree_path = worktree_path
+ctx.cwd = worktree_path
+```
+
+Shell tasks depend on `ctx.cwd` for their working directory:
+
+```python
+# runner.py:426 — shell tasks resolve cwd from ctx
+cmd = ctx.format_string(task.cmd)
+...
+first_result = run_shell(cmd, ctx.cwd, task.env)
+```
+
+After the change, `ensure_worktree` would need to both put an immutable `WorktreeState` AND mutate `ctx.cwd`:
+
+```python
+# Post-PRD-631 ensure_worktree (inferred, not specified in PRD)
+def ensure_worktree(ctx: RunContext) -> None:
+    # ... create worktree ...
+    
+    # Put immutable payload — the inter-operation contract
+    ctx.state.put(WorktreeState(
+        branch=branch,
+        base_ref=base_ref,
+        worktree_path=worktree_path,
+    ))
+    
+    # Also mutate ctx.cwd — the runner-level side effect
+    ctx.cwd = worktree_path    # <-- still needed for shell tasks
+```
+
+**The PRD should be explicit about this dual responsibility.** Currently it says `WorktreeState` replaces the old state threading but doesn't mention that `ctx.cwd` mutation is still required. Implementers may think `WorktreeState` replaces the `ctx.cwd` assignment.
+
+Additionally: the current `ExecutionContext` has a `worktree_path` field. The PRD's `RunContext` shared fields table includes `cwd` but not `worktree_path`. Should `RunContext` keep `worktree_path` as a field, or should all downstream consumers read `ctx.state.get(WorktreeState).worktree_path` instead? The lock path logic also reads `ctx.prd.id`:
+
+```python
+# operations/ensure_worktree.py:97 — lock keyed on PRD id
+lock_path = ctx.repo_root / ".worktrees" / f"{ctx.prd.id}.lock"
+```
+
+In project mode there's no single PRD. What is the lock key?
+
+---
+
+### DI-4: `workflow_dir` vs `operation_dir` — confirm naming survives unification
+
+PRD-632 adds `operation_dir` to `ProjectOperation`. The existing `Workflow` has `workflow_dir`. Both serve the same purpose (resolve relative paths for prompts/tasks), but the runner uses them differently:
+
+```python
+# runner.py:755 — project mode reads operation_dir
+def _project_compose_prompt(task: AgentTask, ctx: Any, ...) -> str:
+    op_dir = ctx.operation.operation_dir
+    if op_dir is None:
+        raise ValueError(...)
+    raw = load_prompt_files(op_dir, task.prompts)
+    ...
+
+# workflow/_core.py — workflow mode uses workflow_dir via compose_prompt
+def compose_prompt(workflow: Workflow, prompts: list[str], ctx: ...) -> str:
+    # Uses workflow.workflow_dir to resolve prompt paths
+    ...
+```
+
+After absorbing `ProjectOperation` into `Workflow`, the unified type has only `workflow_dir`. The PRD's proposed `Workflow` dataclass confirms this:
+
+```python
+@dataclass
+class Workflow:
+    name: str
+    description: str
+    tasks: list[Task]
+    workflow_dir: Path | None = None   # <-- this is the surviving name
+    ...
+```
+
+But `_project_compose_prompt` reads `ctx.operation.operation_dir`. After unification, the prompt composer needs to read from the `Workflow` stored in the `ProjectRun` payload:
+
+```python
+# What _project_compose_prompt needs to become:
+def _project_compose_prompt(task: AgentTask, ctx: RunContext, ...) -> str:
+    workflow = ctx.state.get(ProjectRun).workflow
+    op_dir = workflow.workflow_dir                # <-- was operation_dir
+    if op_dir is None:
+        raise ValueError(...)
+    raw = load_prompt_files(op_dir, task.prompts)
+    ...
+```
+
+**Confirm:** `workflow_dir` is the surviving field name and serves both purposes. The loader sets it when discovering both `definitions/prd/*/workflow.py` and `definitions/project/*/workflow.py`.
+
+---
+
+### DI-5: `PrRequest` population — who puts it and when?
+
+The PRD moves `pr_title` and `pr_body` from `ProjectOperation` to a `PrRequest` PhaseState payload. Today these are static templates on the definition:
+
+```python
+# definitions/project/plan/operation.py:18-29
+operation = ProjectOperation(
+    name="plan",
+    ...
+    creates_pr=True,
+    pr_title="chore(prd): decompose {target_prd}",      # <-- static template
+    pr_body="Auto-generated by ...\n\n{target_prd}.",    # <-- static template
+    tasks=[
+        BuiltIn("ensure_worktree"),
+        AgentTask(name="decompose", ...),
+        ShellTask(name="validate", ...),
+        BuiltIn("commit", kwargs={"message": "..."}),
+        BuiltIn("push_branch"),
+        BuiltIn("create_pr"),                             # <-- consumes title/body
+    ],
+)
+```
+
+After the change, `Workflow` has no `pr_title`/`pr_body` fields. The PRD says "task that initiates PR creation" puts `PrRequest`, but doesn't specify the mechanism. Three options:
+
+**Option A: `create_pr` takes kwargs** — title/body passed as task kwargs, formatted at dispatch time:
+
+```python
+# definitions/project/plan/workflow.py — Option A
+workflow = Workflow(
+    name="plan",
+    tasks=[
+        ...
+        BuiltIn("create_pr", kwargs={
+            "title": "chore(prd): decompose {target_prd}",
+            "body": "Auto-generated by ...",
+        }),
+    ],
+)
+```
+
+The `create_pr` operation would build a `PrRequest` from kwargs when present, or fall back to the current PRD-based title generation for workflow mode. Simple, no new tasks. But now `create_pr` has two code paths.
+
+**Option B: Dedicated `prepare_pr` builtin** — a new task that reads metadata and puts `PrRequest`:
+
+```python
+# definitions/project/plan/workflow.py — Option B
+workflow = Workflow(
+    name="plan",
+    tasks=[
+        ...
+        BuiltIn("prepare_pr", kwargs={
+            "title": "chore(prd): decompose {target_prd}",
+            "body": "Auto-generated by ...",
+        }),
+        BuiltIn("create_pr"),  # reads PrRequest from state
+    ],
+)
+```
+
+Clean separation, but adds a task that exists only to move data into PhaseState.
+
+**Option C: Runner seeds `PrRequest`** — the runner constructs `PrRequest` at context creation time from some source:
+
+```python
+# runner.py — Option C
+def run_project_workflow(...):
+    ctx.state.put(PrRequest(
+        title="chore(prd): decompose {target_prd}",
+        body="Auto-generated by ...",
+    ))
+    result = run_tasks(...)
+```
+
+But this requires the runner to know operation-specific metadata, coupling it back to the definition. Where does the runner read the title template from if not the `Workflow`?
+
+**For PRD-mode workflows**, `create_pr` currently constructs the title and body from `ctx.prd`:
+
+```python
+# operations/create_pr.py:63-64 — current PRD-mode title generation
+title = f"{ctx.prd.id}: {ctx.prd.title}"
+body = _pr_body(ctx)
+```
+
+Does this also become a `PrRequest` payload put by the runner? Or does `create_pr` keep this PRD-aware logic and only use `PrRequest` when present?
+
+**This needs a decision.** The mechanism determines how workflow definitions express PR metadata after `pr_title`/`pr_body` are removed from the type.
+
+---
+
+### DI-6: Convenience properties that crash by mode — document the access contract
+
+The PRD proposes convenience properties that raise on mode mismatch:
+
+```python
+@property
+def prd(self) -> PRD:
+    return self.state.get(PrdWorkflowRun).prd    # KeyError in project mode
+
+@property
+def workflow(self) -> Workflow:
+    if self.state.has(PrdWorkflowRun):
+        return self.state.get(PrdWorkflowRun).workflow
+    return self.state.get(ProjectRun).workflow    # KeyError if neither
+```
+
+This is good fail-fast behavior. But consider the `plan` operation, which runs in project mode and targets a specific PRD. Its tasks reference both project-mode data AND PRD-specific data:
+
+```python
+# definitions/project/plan/operation.py — runs in project mode
+operation = ProjectOperation(
+    ...
+    accepts_target=True,
+    tasks=[
+        BuiltIn("ensure_worktree"),          # needs branch name — from where?
+        BuiltIn("commit", kwargs={
+            "message": "chore(prd): {target_prd} decomposition"
+        }),                                   # needs cwd — from WorktreeState
+        BuiltIn("create_pr"),                # needs title/body — from where?
+    ],
+)
+```
+
+When `ensure_worktree` runs in project mode, it can't do `ctx.prd` to compute the worktree path. The PRD says it reads from `ProjectRun`:
+
+```python
+# Inferred ensure_worktree in project mode
+def ensure_worktree(ctx: RunContext) -> None:
+    if ctx.state.has(PrdWorkflowRun):
+        prd_run = ctx.state.get(PrdWorkflowRun)
+        branch = prd_run.branch_name
+        worktree_name = f"{prd_run.prd.id}-{prd_run.prd.slug}"
+    elif ctx.state.has(ProjectRun):
+        proj_run = ctx.state.get(ProjectRun)
+        # What's the worktree name? What's the branch?
+        branch = f"project/{proj_run.workflow.name}"
+        if proj_run.target_prd:
+            branch = f"project/{proj_run.workflow.name}/{proj_run.target_prd}"
+        worktree_name = branch.replace("/", "-")
+    else:
+        raise KeyError("no run payload — ensure_worktree requires PrdWorkflowRun or ProjectRun")
+    
+    worktree_path = ctx.repo_root / ".worktrees" / worktree_name
+    # ... rest of logic ...
+```
+
+This mode-branching inside `ensure_worktree` is the kind of thing the PRD wants to avoid — operations shouldn't need to know which mode they're in. But the branch name and worktree path must come from somewhere mode-specific.
+
+**Alternative:** Have the runner (or a `prepare_worktree_config` builtin) put a `WorktreeRequest` payload *before* `ensure_worktree` runs, containing branch name and worktree path. Then `ensure_worktree` is truly mode-agnostic:
+
+```python
+@dataclass(frozen=True)
+class WorktreeRequest:
+    branch: str
+    base_ref: str
+    worktree_name: str
+
+def ensure_worktree(ctx: RunContext) -> None:
+    req = ctx.state.get(WorktreeRequest)
+    worktree_path = ctx.repo_root / ".worktrees" / req.worktree_name
+    # ... no mode-branching needed ...
+```
+
+**Is this additional payload worth the indirection, or is mode-branching in `ensure_worktree` acceptable?**
+
+---
+
+### DI-7: `format_string()` placeholder collision between payloads
+
+The PRD says `format_string()` resolves from multiple payload sources:
+
+```
+- PrdWorkflowRun if present: {branch}, {base_ref}, {worktree}
+- WorktreeState if present:  {branch}, {base_ref}, {worktree}
+```
+
+Both `PrdWorkflowRun` and `WorktreeState` define `{branch}`. In PRD workflow mode, `PrdWorkflowRun` is put at context construction (before `ensure_worktree`) and `WorktreeState` is put by `ensure_worktree` later. If both are present, which wins?
+
+```python
+# Scenario: PRD workflow mode, after ensure_worktree has run
+ctx.state.get(PrdWorkflowRun).branch_name  # "prd/PRD-070-add-feature"
+ctx.state.get(WorktreeState).branch        # "prd/PRD-070-add-feature" (same)
+
+# These HAPPEN to be the same today, but the PRD doesn't guarantee it.
+# In project mode, WorktreeState.branch comes from a different source.
+```
+
+The PRD says "unknown placeholders pass through unchanged" but doesn't specify precedence for colliding placeholders.
+
+**Recommendation:** Define explicit precedence (e.g. `WorktreeState` > `PrdWorkflowRun` for git-related placeholders) or eliminate the overlap by giving the fields different names (e.g. `{wt_branch}` vs `{run_branch}`).
+
+---
+
+### DI-8: Migration strategy — clean rename vs type alias
+
+The PRD says:
+
+> `ExecutionContext` becomes a type alias for `RunContext` temporarily, then is removed.
+
+A type alias creates a state where both names compile, which invites new code using the old name during the transition. With `mypy --strict`, a mechanical rename across all 23+ files that import `ExecutionContext` will catch any misses at compile time.
+
+```python
+# Option A: type alias (PRD's proposal)
+# workflow/_core.py
+RunContext = ...
+ExecutionContext = RunContext  # temporary alias
+
+# This compiles, which is the problem — nothing forces migration:
+from darkfactory.workflow import ExecutionContext  # still works
+
+# Option B: clean cut (recommendation)
+# workflow/_core.py
+RunContext = ...
+# ExecutionContext is simply gone
+
+# This fails at import time — forces immediate update:
+from darkfactory.workflow import ExecutionContext  # ImportError
+```
+
+**Recommendation:** Do a clean rename in a single commit as part of the decomposition task. No alias. `mypy --strict` catches all breakage. This matches the project's "hard failures over silent degradation" principle.
+
 ## References
 
 - PRD-632 — prerequisite: reorganizes definitions, renames CLI to `prd project`
