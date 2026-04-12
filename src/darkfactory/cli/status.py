@@ -5,7 +5,8 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 
-from darkfactory import containment, graph
+from darkfactory import graph
+from darkfactory.graph import containment
 from darkfactory.checks import find_stale_worktrees
 from darkfactory.cli._shared import (
     _action_sort_key,

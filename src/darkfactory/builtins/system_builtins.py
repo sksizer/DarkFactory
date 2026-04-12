@@ -11,7 +11,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
-from darkfactory import containment, model as model_module
+from darkfactory import model as model_module
+from darkfactory.graph import containment
 from darkfactory.engine import CandidateList
 from darkfactory.utils.git import GitErr, Ok, Timeout, git_run
 from darkfactory.model import compute_branch_name
@@ -95,7 +96,6 @@ def system_load_prds_by_status(ctx: SystemContext, *, status: str) -> None:
     )
 
 
-_branch_name = compute_branch_name
 
 
 def _is_merged_standard(repo_root: str, branch: str) -> bool:
@@ -156,7 +156,7 @@ def system_check_merged(ctx: SystemContext) -> None:
             ctx.report.append(f"{prd_id}: not found in loaded PRDs — skipped")
             continue
 
-        branch = _branch_name(prd)
+        branch = compute_branch_name(prd)
 
         if ctx.dry_run:
             ctx.logger.info(

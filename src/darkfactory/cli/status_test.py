@@ -53,7 +53,7 @@ def test_cmd_status_json_output(
     with (
         patch("darkfactory.cli.status._load", return_value=prds),
         patch("darkfactory.graph.is_actionable", return_value=True),
-        patch("darkfactory.containment.is_runnable", return_value=True),
+        patch("darkfactory.graph._containment.is_runnable", return_value=True),
     ):
         rc = cmd_status(args)
 
@@ -96,7 +96,7 @@ def test_cmd_status_text_output(
     with (
         patch("darkfactory.cli.status._load", return_value=prds),
         patch("darkfactory.graph.is_actionable", return_value=True),
-        patch("darkfactory.containment.is_runnable", return_value=True),
+        patch("darkfactory.graph._containment.is_runnable", return_value=True),
         patch(
             "darkfactory.cli.status._find_repo_root", side_effect=SystemExit("no git")
         ),
@@ -119,7 +119,7 @@ def test_cmd_status_text_no_runnable(
     with (
         patch("darkfactory.cli.status._load", return_value=prds),
         patch("darkfactory.graph.is_actionable", return_value=False),
-        patch("darkfactory.containment.is_runnable", return_value=False),
+        patch("darkfactory.graph._containment.is_runnable", return_value=False),
         patch(
             "darkfactory.cli.status._find_repo_root", side_effect=SystemExit("no git")
         ),
@@ -142,7 +142,7 @@ def test_cmd_status_text_shows_next_runnable(
     with (
         patch("darkfactory.cli.status._load", return_value=prds),
         patch("darkfactory.graph.is_actionable", return_value=True),
-        patch("darkfactory.containment.is_runnable", return_value=True),
+        patch("darkfactory.graph._containment.is_runnable", return_value=True),
         patch(
             "darkfactory.cli.status._find_repo_root", side_effect=SystemExit("no git")
         ),

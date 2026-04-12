@@ -447,16 +447,6 @@ def normalize_list_field_at(
     return True
 
 
-# ---- Write helpers (kept for backwards compat) ------------------------------
-
-
-def write_frontmatter(prd: PRD, new_fm: dict[str, Any]) -> None:
-    """Rewrite the frontmatter block of a PRD file in place."""
-    new_text = f"---\n{dump_frontmatter(new_fm)}---\n{prd.body}"
-    prd.path.write_text(new_text, encoding="utf-8")
-    prd.raw_frontmatter = new_fm
-
-
 # ---- Archive ----------------------------------------------------------------
 
 

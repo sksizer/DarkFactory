@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import argparse
 
-from darkfactory import containment, graph
+from darkfactory import graph
+from darkfactory.graph import containment
 from darkfactory.cli._shared import (
     _action_sort_key,
     _emit_json,

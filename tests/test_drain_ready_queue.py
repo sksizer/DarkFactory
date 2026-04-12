@@ -15,7 +15,7 @@ from typing import Callable
 
 import pytest
 
-from darkfactory.graph_execution import (
+from darkfactory.graph import (
     ExecutionReport,
     QueueFilters,
     QueueStrategy,

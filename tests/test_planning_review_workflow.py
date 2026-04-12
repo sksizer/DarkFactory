@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from darkfactory.cli import main
-from darkfactory.containment import is_partially_decomposed
+from darkfactory.graph._containment import is_partially_decomposed
 from darkfactory.loader import load_workflows
 from darkfactory.model import load_all
 

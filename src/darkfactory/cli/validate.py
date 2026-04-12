@@ -5,7 +5,8 @@ from __future__ import annotations
 import argparse
 import sys
 
-from darkfactory import checks, containment, graph, impacts
+from darkfactory import checks, graph
+from darkfactory.graph import containment, impacts
 from darkfactory.cli._shared import _find_repo_root, _load
 
 

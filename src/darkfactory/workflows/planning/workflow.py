@@ -13,7 +13,7 @@ the sentinel line.
 
 from __future__ import annotations
 
-from darkfactory.containment import is_fully_decomposed
+from darkfactory.graph._containment import is_fully_decomposed
 from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Workflow
 
 

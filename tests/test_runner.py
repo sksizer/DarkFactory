@@ -14,9 +14,8 @@ from unittest.mock import patch
 
 
 from darkfactory.utils.claude_code import InvokeResult
-from darkfactory.model import PRD, load_all
+from darkfactory.model import PRD, compute_branch_name, load_all
 from darkfactory.runner import (
-    _compute_branch_name,
     _pick_model,
     run_workflow,
 )
@@ -67,9 +66,9 @@ def _make_prd(
 # ---------- helpers (unit) ----------
 
 
-def test_compute_branch_name(tmp_path: Path) -> None:
+def testcompute_branch_name(tmp_path: Path) -> None:
     prd = _make_prd(tmp_path)
-    assert _compute_branch_name(prd) == "prd/PRD-070-test-task"
+    assert compute_branch_name(prd) == "prd/PRD-070-test-task"
 
 
 def test_pick_model_explicit_override(tmp_path: Path) -> None:

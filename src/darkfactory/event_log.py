@@ -45,8 +45,6 @@ def generate_session_id() -> str:
     return f"s-{now.strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(2)}"
 
 
-_now_iso = now_iso_utc
-
 
 class EventWriter:
     """Per-PRD JSONL event writer with flat correlation fields.
@@ -79,7 +77,7 @@ class EventWriter:
     def emit(self, scope: str, type: str, **fields: object) -> None:
         """Append one event line with envelope fields auto-populated."""
         record: dict[str, object] = {
-            "ts": _now_iso(),
+            "ts": now_iso_utc(),
             "session_id": self.session_id,
             "prd_id": self.prd_id,
             "scope": scope,

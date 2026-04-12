@@ -17,7 +17,6 @@ from darkfactory.model._persistence import (
     set_status_at as set_status_at,
     set_workflow as set_workflow,
     update_frontmatter_field_at as update_frontmatter_field_at,
-    write_frontmatter as write_frontmatter,
 )
 from darkfactory.model._prd import (
     CANONICAL_SORTS as CANONICAL_SORTS,

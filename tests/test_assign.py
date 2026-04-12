@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from darkfactory.assign import assign_all, assign_workflow
+from darkfactory.graph import assign_all, assign_workflow
 from darkfactory.model import load_all
 from darkfactory.workflow import BuiltIn, Workflow
 

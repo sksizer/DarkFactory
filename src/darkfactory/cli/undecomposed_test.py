@@ -42,7 +42,7 @@ def test_cmd_undecomposed_with_candidates(
 
     with (
         patch("darkfactory.cli.undecomposed._load", return_value=prds),
-        patch("darkfactory.containment.is_fully_decomposed", return_value=False),
+        patch("darkfactory.graph._containment.is_fully_decomposed", return_value=False),
     ):
         rc = cmd_undecomposed(args)
 

@@ -42,7 +42,7 @@ def test_cmd_orphans_with_roots(
 
     with (
         patch("darkfactory.cli.orphans._load", return_value=prds),
-        patch("darkfactory.containment.roots", return_value=[root1, root2]),
+        patch("darkfactory.graph._containment.roots", return_value=[root1, root2]),
     ):
         rc = cmd_orphans(args)
 
@@ -62,7 +62,7 @@ def test_cmd_orphans_no_roots(
 
     with (
         patch("darkfactory.cli.orphans._load", return_value=prds),
-        patch("darkfactory.containment.roots", return_value=[]),
+        patch("darkfactory.graph._containment.roots", return_value=[]),
     ):
         rc = cmd_orphans(args)
 

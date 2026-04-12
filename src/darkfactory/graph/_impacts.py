@@ -41,8 +41,8 @@ import fnmatch
 import subprocess
 from pathlib import Path
 
-from . import containment
-from .model import PRD, parse_id_sort_key
+from . import _containment as containment
+from ..model import PRD, parse_id_sort_key
 
 
 def tracked_files(repo_root: Path) -> list[str]:

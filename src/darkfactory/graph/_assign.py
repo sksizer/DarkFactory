@@ -28,8 +28,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from .model import PRD
-from .workflow import Workflow
+from ..model import PRD
+from ..workflow import Workflow
 
 
 def assign_workflow(

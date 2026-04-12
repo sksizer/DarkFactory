@@ -12,7 +12,7 @@ cases because its predicate is more specific.
 
 from __future__ import annotations
 
-from darkfactory.containment import is_partially_decomposed
+from darkfactory.graph._containment import is_partially_decomposed
 from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Workflow
 
 

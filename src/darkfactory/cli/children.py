@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from darkfactory import containment
+from darkfactory.graph import containment
 from darkfactory.cli._shared import _format_prd_line, _load, _resolve_prd_or_exit
 
 

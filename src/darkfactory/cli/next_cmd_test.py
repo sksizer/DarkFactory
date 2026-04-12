@@ -59,7 +59,7 @@ def test_cmd_next_no_actionable_prints_message(
     with (
         patch("darkfactory.cli.next_cmd._load", return_value={}),
         patch("darkfactory.graph.is_actionable", return_value=False),
-        patch("darkfactory.containment.is_runnable", return_value=True),
+        patch("darkfactory.graph._containment.is_runnable", return_value=True),
     ):
         result = cmd_next(args)
     assert result == 0
@@ -77,7 +77,7 @@ def test_cmd_next_filters_by_capability(
     with (
         patch("darkfactory.cli.next_cmd._load", return_value=prds),
         patch("darkfactory.graph.is_actionable", return_value=True),
-        patch("darkfactory.containment.is_runnable", return_value=True),
+        patch("darkfactory.graph._containment.is_runnable", return_value=True),
     ):
         result = cmd_next(args)
     assert result == 0
@@ -94,7 +94,7 @@ def test_cmd_next_respects_limit(
     with (
         patch("darkfactory.cli.next_cmd._load", return_value=prds),
         patch("darkfactory.graph.is_actionable", return_value=True),
-        patch("darkfactory.containment.is_runnable", return_value=True),
+        patch("darkfactory.graph._containment.is_runnable", return_value=True),
     ):
         result = cmd_next(args)
     assert result == 0
@@ -112,7 +112,7 @@ def test_cmd_next_json_output(
     with (
         patch("darkfactory.cli.next_cmd._load", return_value=prds),
         patch("darkfactory.graph.is_actionable", return_value=True),
-        patch("darkfactory.containment.is_runnable", return_value=True),
+        patch("darkfactory.graph._containment.is_runnable", return_value=True),
     ):
         result = cmd_next(args)
     assert result == 0
@@ -137,7 +137,7 @@ def test_cmd_next_excludes_non_runnable(
     with (
         patch("darkfactory.cli.next_cmd._load", return_value=prds),
         patch("darkfactory.graph.is_actionable", return_value=True),
-        patch("darkfactory.containment.is_runnable", side_effect=fake_runnable),
+        patch("darkfactory.graph._containment.is_runnable", side_effect=fake_runnable),
     ):
         result = cmd_next(args)
     assert result == 0
@@ -164,7 +164,7 @@ def test_cmd_next_is_actionable_filters_prds(
     with (
         patch("darkfactory.cli.next_cmd._load", return_value=prds),
         patch("darkfactory.graph.is_actionable", side_effect=fake_actionable),
-        patch("darkfactory.containment.is_runnable", return_value=True),
+        patch("darkfactory.graph._containment.is_runnable", return_value=True),
     ):
         result = cmd_next(args)
     assert result == 0
@@ -181,7 +181,7 @@ def test_cmd_next_json_empty(
     with (
         patch("darkfactory.cli.next_cmd._load", return_value={}),
         patch("darkfactory.graph.is_actionable", return_value=False),
-        patch("darkfactory.containment.is_runnable", return_value=True),
+        patch("darkfactory.graph._containment.is_runnable", return_value=True),
     ):
         result = cmd_next(args)
     assert result == 0

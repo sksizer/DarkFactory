@@ -28,15 +28,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Protocol
 
 if TYPE_CHECKING:
-    from .style import Styler
+    from ..style import Styler
 
-from . import assign, containment, graph
-from .event_log import EventWriter
-from .model import PRD, load_all, set_status_at
-from .runner import RunResult, _compute_branch_name, run_workflow
-from .workflow import Workflow
+from . import _assign as assign, _containment as containment, _dag as graph
+from ..event_log import EventWriter
+from ..model import PRD, compute_branch_name, load_all, set_status_at
+from ..runner import RunResult, run_workflow
+from ..workflow import Workflow
 
-logger = logging.getLogger("darkfactory.graph_execution")
+logger = logging.getLogger("darkfactory.graph.execution")
 
 
 # ---- Event stream ---------------------------------------------------------
@@ -254,7 +254,7 @@ def deps_satisfied(prd: PRD, prds: dict[str, PRD]) -> bool:
 
 
 def _prd_sort_key(prd: PRD) -> tuple[int, tuple[int, ...]]:
-    from .model import parse_id_sort_key
+    from ..model import parse_id_sort_key
 
     return (PRIORITY_RANK.get(prd.priority, 2), parse_id_sort_key(prd.id))
 
@@ -426,7 +426,7 @@ def plan_execution(
             continue
         slice_ids.append(pid)
         # Simulate the stacked-branch base for the next iteration.
-        completed_this_run[pid] = _compute_branch_name(prd)
+        completed_this_run[pid] = compute_branch_name(prd)
 
     return ExecutionSlice(
         full_dag=order,
@@ -614,7 +614,7 @@ def execute_graph(
         )
 
         if result.success:
-            completed_this_run[picked.id] = _compute_branch_name(picked)
+            completed_this_run[picked.id] = compute_branch_name(picked)
             report.completed.append(picked.id)
             emit(
                 RunEvent(

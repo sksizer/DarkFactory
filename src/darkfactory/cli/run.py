@@ -8,13 +8,14 @@ import sys
 from collections.abc import Mapping
 from pathlib import Path
 
-from darkfactory import assign, containment
 from darkfactory.config import load_section
 from darkfactory.event_log import generate_session_id
-from darkfactory.graph_execution import (
+from darkfactory.graph import (
     QueueFilters,
     QueueStrategy,
     RunEvent,
+    assign,
+    containment,
     deps_satisfied,
     execute_graph,
     plan_execution,

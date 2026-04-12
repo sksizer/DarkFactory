@@ -7,7 +7,8 @@ import os
 import sys
 from pathlib import Path
 
-from darkfactory import containment, graph
+from darkfactory import graph
+from darkfactory.graph import containment
 from darkfactory.model import PRD, load_all, parse_id_sort_key
 from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.workflow import Workflow

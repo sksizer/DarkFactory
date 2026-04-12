@@ -255,7 +255,7 @@ def test_check_runnable_epic_not_leaf() -> None:
     prds = {"PRD-001": prd}
     with (
         patch("darkfactory.graph.is_actionable", return_value=True),
-        patch("darkfactory.containment.is_runnable", return_value=False),
+        patch("darkfactory.graph._containment.is_runnable", return_value=False),
     ):
         result = _check_runnable(prd, prds)  # type: ignore[arg-type]
     assert result is not None
@@ -267,7 +267,7 @@ def test_check_runnable_ok() -> None:
     prds = {"PRD-001": prd}
     with (
         patch("darkfactory.graph.is_actionable", return_value=True),
-        patch("darkfactory.containment.is_runnable", return_value=True),
+        patch("darkfactory.graph._containment.is_runnable", return_value=True),
     ):
         result = _check_runnable(prd, prds)  # type: ignore[arg-type]
     assert result is None
@@ -314,9 +314,9 @@ def test_cmd_plan_text_output(
             "darkfactory.cli.plan._load_workflows_or_fail",
             return_value={"prd-task": workflow},
         ),
-        patch("darkfactory.assign.assign_workflow", return_value=workflow),
+        patch("darkfactory.graph._assign.assign_workflow", return_value=workflow),
         patch(
-            "darkfactory.cli.plan._compute_branch_name",
+            "darkfactory.cli.plan.compute_branch_name",
             return_value="prd/PRD-001-my-task",
         ),
         patch("darkfactory.cli.plan._find_repo_root", return_value=tmp_path),
@@ -347,9 +347,9 @@ def test_cmd_plan_text_shows_runnable_warning(
             "darkfactory.cli.plan._load_workflows_or_fail",
             return_value={"prd-task": workflow},
         ),
-        patch("darkfactory.assign.assign_workflow", return_value=workflow),
+        patch("darkfactory.graph._assign.assign_workflow", return_value=workflow),
         patch(
-            "darkfactory.cli.plan._compute_branch_name", return_value="prd/PRD-001-done"
+            "darkfactory.cli.plan.compute_branch_name", return_value="prd/PRD-001-done"
         ),
         patch("darkfactory.cli.plan._find_repo_root", return_value=tmp_path),
         patch("darkfactory.cli.plan._resolve_base_ref", return_value="main"),
@@ -380,9 +380,9 @@ def test_cmd_plan_json_output(
             "darkfactory.cli.plan._load_workflows_or_fail",
             return_value={"prd-task": workflow},
         ),
-        patch("darkfactory.assign.assign_workflow", return_value=workflow),
+        patch("darkfactory.graph._assign.assign_workflow", return_value=workflow),
         patch(
-            "darkfactory.cli.plan._compute_branch_name",
+            "darkfactory.cli.plan.compute_branch_name",
             return_value="prd/PRD-001-my-task",
         ),
         patch("darkfactory.cli.plan._find_repo_root", return_value=tmp_path),

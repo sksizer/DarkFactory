@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from .model import PRD, parse_id_sort_key
+from ..model import PRD, parse_id_sort_key
 
 
 def children(prd_id: str, prds: Mapping[str, PRD]) -> list[PRD]:

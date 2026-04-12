@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Mapping
 
-from darkfactory import containment
+from darkfactory.graph import containment
 from darkfactory.cli._shared import _load, _resolve_prd_or_exit
 from darkfactory.model import PRD
 from darkfactory.style import Element, Styler

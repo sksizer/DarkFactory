@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from darkfactory import assign
+from darkfactory.graph import assign
 from darkfactory.cli._shared import _emit_json, _load, _load_workflows_or_fail
 from darkfactory.model import parse_id_sort_key, set_workflow
 

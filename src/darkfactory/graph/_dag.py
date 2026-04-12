@@ -7,7 +7,7 @@ detection uses Tarjan's strongly-connected-components algorithm.
 
 from __future__ import annotations
 
-from .model import PRD, parse_id_sort_key
+from ..model import PRD, parse_id_sort_key
 
 # Adjacency: ``id -> set of ids that depend on it``.
 # This is the "downstream" direction: edge ``A -> B`` means "B depends on A,

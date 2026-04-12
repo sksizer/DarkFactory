@@ -8,8 +8,8 @@ The engine is the glue between every other module in the harness:
 - For each :class:`~darkfactory.workflow.AgentTask`, it composes the
   prompt via the provided ``compose_prompt`` callback, picks the
   model, invokes Claude Code via :func:`~darkfactory.invoke.invoke_claude`,
-  and stores an :class:`~darkfactory.phase_state.AgentResult` in
-  the context's :class:`~darkfactory.phase_state.PhaseState`.
+  and stores an :class:`~darkfactory.engine.AgentResult` in
+  the context's :class:`~darkfactory.engine.PhaseState`.
 - For each :class:`~darkfactory.workflow.ShellTask`, it runs the
   formatted command and handles the configured ``on_failure`` policy.
 - For each :class:`~darkfactory.workflow.InteractiveTask`, it launches
@@ -76,11 +76,6 @@ class RunResult:
     pr_url: str | None = None
     steps: list[TaskStep] = field(default_factory=list)
     failure_reason: str | None = None
-
-
-# Backward-compatible alias so graph_execution.py and CLI modules that
-# import _compute_branch_name from runner keep working.
-_compute_branch_name = compute_branch_name
 
 
 # ---------- context protocol ----------
@@ -676,7 +671,7 @@ def run_workflow(
     phase_state_init: list[object] | None = None,
 ) -> RunResult:
     """Execute a workflow against a single PRD and return the result."""
-    branch_name = _compute_branch_name(prd)
+    branch_name = compute_branch_name(prd)
 
     writer: EventWriter | None = None
     if not dry_run and session_id:

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from darkfactory.cli.run import _is_graph_target, _print_run_event
-from darkfactory.graph_execution import RunEvent
+from darkfactory.graph import RunEvent
 
 
 # ---------- helpers ----------

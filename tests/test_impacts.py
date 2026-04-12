@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from darkfactory import impacts
+from darkfactory.graph import impacts
 from darkfactory.model import load_all
 
 from .conftest import write_prd

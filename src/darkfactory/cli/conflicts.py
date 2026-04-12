@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from darkfactory import containment, impacts
+from darkfactory.graph import containment, impacts
 from darkfactory.cli._shared import (
     _emit_json,
     _find_repo_root,

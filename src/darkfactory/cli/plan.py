@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from darkfactory import assign
+from darkfactory.graph import assign
 from darkfactory.cli._shared import (
     _check_runnable,
     _emit_json,
@@ -15,8 +15,8 @@ from darkfactory.cli._shared import (
     _resolve_prd_or_exit,
 )
 from darkfactory.utils.claude_code import capability_to_model
-from darkfactory.model import PRD
-from darkfactory.runner import _compute_branch_name, _pick_model
+from darkfactory.model import PRD, compute_branch_name
+from darkfactory.runner import _pick_model
 from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Task
 
 
@@ -65,7 +65,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
         except KeyError as exc:
             raise SystemExit(str(exc))
 
-    branch = _compute_branch_name(prd)
+    branch = compute_branch_name(prd)
     repo_root = _find_repo_root(args.data_dir)
     base_ref = _resolve_base_ref(args.base, repo_root)
 

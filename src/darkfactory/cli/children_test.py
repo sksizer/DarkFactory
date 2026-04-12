@@ -44,7 +44,7 @@ def test_cmd_children_with_children(
 
     with (
         patch("darkfactory.cli.children._load", return_value=prds),
-        patch("darkfactory.containment.children", return_value=[child1, child2]),
+        patch("darkfactory.graph._containment.children", return_value=[child1, child2]),
     ):
         rc = cmd_children(args)
 
@@ -65,7 +65,7 @@ def test_cmd_children_no_children(
 
     with (
         patch("darkfactory.cli.children._load", return_value=prds),
-        patch("darkfactory.containment.children", return_value=[]),
+        patch("darkfactory.graph._containment.children", return_value=[]),
     ):
         rc = cmd_children(args)
 
