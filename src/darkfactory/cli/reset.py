@@ -196,7 +196,7 @@ def _execute_reset(
             print(f"  Removed worktree {summary.worktree_path}")
         except subprocess.CalledProcessError:
             skipped.append(f"worktree {summary.worktree_path} (remove failed)")
-            print(f"  Skipped worktree removal (failed)")
+            print("  Skipped worktree removal (failed)")
     else:
         # Still prune to clean stale metadata
         git_check("worktree", "prune", cwd=repo_root)
@@ -336,8 +336,10 @@ def cmd_reset(args: argparse.Namespace) -> int:
             writer.close()
 
         # Summary
-        print(f"\nReset complete: {len(cleaned)} artifact(s) cleaned, "
-              f"{len(skipped)} skipped.")
+        print(
+            f"\nReset complete: {len(cleaned)} artifact(s) cleaned, "
+            f"{len(skipped)} skipped."
+        )
     finally:
         # Release the lock we acquired; the lock file itself may have been
         # deleted by _execute_reset (step 6c), which is fine.

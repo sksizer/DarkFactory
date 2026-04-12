@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -12,9 +11,7 @@ from filelock import Timeout
 
 from darkfactory.cli.reset import (
     _ArtifactSummary,
-    _discover_artifacts,
     _execute_reset,
-    _print_summary,
     cmd_reset,
 )
 
@@ -265,7 +262,9 @@ def test_lock_held_aborts(tmp_path: Path) -> None:
         patch("darkfactory.cli.reset.FileLock") as mock_lock_cls,
     ):
         mock_lock = MagicMock()
-        mock_lock.acquire.side_effect = Timeout(str(tmp_path / ".worktrees" / "PRD-99.lock"))
+        mock_lock.acquire.side_effect = Timeout(
+            str(tmp_path / ".worktrees" / "PRD-99.lock")
+        )
         mock_lock_cls.return_value = mock_lock
 
         result = cmd_reset(args)
@@ -289,12 +288,12 @@ def test_execute_reset_partial_artifacts(tmp_path: Path) -> None:
     )
 
     with (
-        patch("subprocess.run") as mock_subprocess,
+        patch("subprocess.run"),
         patch("darkfactory.cli.reset.git_run") as mock_git_run,
         patch("darkfactory.cli.reset.git_check") as mock_git_check,
         patch("darkfactory.cli.reset.ReworkGuard") as mock_guard_cls,
         patch("darkfactory.cli.reset.load_one") as mock_load,
-        patch("darkfactory.cli.reset.set_status") as mock_set_status,
+        patch("darkfactory.cli.reset.set_status"),
     ):
         mock_git_run.return_value = MagicMock(returncode=0, stdout="")
         mock_git_check.return_value = True
@@ -449,7 +448,9 @@ def test_updated_timestamp_set(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_draft_status_warns_but_probes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_draft_status_warns_but_probes(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     _make_prd_file(tmp_path, status="draft")
     args = _make_args(tmp_path)
 
