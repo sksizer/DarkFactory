@@ -246,6 +246,7 @@ def test_role_md_contains_sentinel_contract() -> None:
         / "darkfactory"
         / "workflow"
         / "definitions"
+        / "prd"
         / "rework"
         / "prompts"
         / "role.md"

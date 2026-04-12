@@ -1,20 +1,20 @@
-"""System builtin: discuss_prd — launch interactive Claude Code session for a discussion phase."""
+"""Project builtin: discuss_prd — launch interactive Claude Code session for a discussion phase."""
 
 from __future__ import annotations
 
 import time
 from pathlib import Path
 
-from darkfactory.operations.system_builtins import _register
+from darkfactory.operations.project_builtins import _register
 from darkfactory.engine import PrdContext
-from darkfactory.system import SystemContext
+from darkfactory.project import ProjectContext
 from darkfactory.utils.claude_code import EffortLevel, spawn_claude
 from darkfactory.utils.tui import print_phase_banner
 
 
 @_register("discuss_prd")
 def discuss_prd(
-    ctx: SystemContext,
+    ctx: ProjectContext,
     *,
     phase: str,
     prompt_file: str,

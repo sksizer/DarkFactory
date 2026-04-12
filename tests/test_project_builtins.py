@@ -1,4 +1,4 @@
-"""Tests for system_builtins — set_status_bulk, system_load_prds_by_status, system_check_merged."""
+"""Tests for project_builtins — set_status_bulk, project_load_prds_by_status, system_check_merged."""
 
 from __future__ import annotations
 
@@ -10,17 +10,17 @@ from unittest.mock import patch
 import pytest
 from typing import Any
 
-from darkfactory.operations.system_builtins import (
+from darkfactory.operations.project_builtins import (
     SYSTEM_BUILTINS,
     set_status_bulk,
     system_check_merged,
-    system_load_prds_by_status,
+    project_load_prds_by_status,
     system_mark_done,
-    system_load_review_prds,
+    project_load_review_prds,
 )
 from darkfactory.model import PRD, parse_prd
 from darkfactory.engine import CandidateList
-from darkfactory.system import SystemContext, SystemOperation
+from darkfactory.project import ProjectContext, ProjectOperation
 
 from tests.conftest import write_prd
 
@@ -28,8 +28,8 @@ from tests.conftest import write_prd
 # ---------- helpers ----------
 
 
-def _make_op() -> SystemOperation:
-    return SystemOperation(name="test-op", description="test", tasks=[])
+def _make_op() -> ProjectOperation:
+    return ProjectOperation(name="test-op", description="test", tasks=[])
 
 
 def _make_ctx(
@@ -39,8 +39,8 @@ def _make_ctx(
     dry_run: bool = False,
     targets: list[str] | None = None,
     shared_state: dict[str, object] | None = None,
-) -> SystemContext:
-    ctx = SystemContext(
+) -> ProjectContext:
+    ctx = ProjectContext(
         repo_root=tmp_path,
         prds=prds or {},
         operation=_make_op(),
@@ -67,8 +67,8 @@ def _write_and_parse(tmp_path: Path, prd_id: str, slug: str, **kwargs: Any) -> P
 def test_all_expected_builtins_registered() -> None:
     expected = {
         "set_status_bulk",
-        "system_load_review_prds",
-        "system_load_prds_by_status",
+        "project_load_review_prds",
+        "project_load_prds_by_status",
         "system_check_merged",
         "system_mark_done",
     }
@@ -90,7 +90,7 @@ def test_set_status_bulk_updates_multiple_prds(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, prds, targets=["PRD-1", "PRD-2"])
 
     with patch(
-        "darkfactory.operations.system_builtins.model_module.set_status"
+        "darkfactory.operations.project_builtins.model_module.set_status"
     ) as mock_set:
         set_status_bulk(ctx, status="done")
 
@@ -106,7 +106,7 @@ def test_set_status_bulk_updates_correct_status_value(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, {"PRD-10": prd}, targets=["PRD-10"])
 
     with patch(
-        "darkfactory.operations.system_builtins.model_module.set_status"
+        "darkfactory.operations.project_builtins.model_module.set_status"
     ) as mock_set:
         set_status_bulk(ctx, status="done")
 
@@ -121,7 +121,7 @@ def test_set_status_bulk_dry_run_skips_writes(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, {"PRD-20": prd}, dry_run=True, targets=["PRD-20"])
 
     with patch(
-        "darkfactory.operations.system_builtins.model_module.set_status"
+        "darkfactory.operations.project_builtins.model_module.set_status"
     ) as mock_set:
         set_status_bulk(ctx, status="done")
 
@@ -134,7 +134,7 @@ def test_set_status_bulk_dry_run_logs(
     prd = _write_and_parse(tmp_path, "PRD-21", "epsilon", status="review")
     ctx = _make_ctx(tmp_path, {"PRD-21": prd}, dry_run=True, targets=["PRD-21"])
 
-    with caplog.at_level(logging.INFO, logger="darkfactory.system"):
+    with caplog.at_level(logging.INFO, logger="darkfactory.project"):
         set_status_bulk(ctx, status="done")
 
     assert any("dry-run" in rec.message for rec in caplog.records)
@@ -148,7 +148,7 @@ def test_set_status_bulk_skips_already_done_prds(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, {"PRD-30": prd}, targets=["PRD-30"])
 
     with patch(
-        "darkfactory.operations.system_builtins.model_module.set_status"
+        "darkfactory.operations.project_builtins.model_module.set_status"
     ) as mock_set:
         set_status_bulk(ctx, status="done")
 
@@ -163,7 +163,7 @@ def test_set_status_bulk_partial_idempotency(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, prds, targets=["PRD-31", "PRD-32"])
 
     with patch(
-        "darkfactory.operations.system_builtins.model_module.set_status"
+        "darkfactory.operations.project_builtins.model_module.set_status"
     ) as mock_set:
         set_status_bulk(ctx, status="done")
 
@@ -177,53 +177,53 @@ def test_set_status_bulk_missing_prd_id_warns(
 ) -> None:
     ctx = _make_ctx(tmp_path, {}, targets=["PRD-999"])
 
-    with caplog.at_level(logging.WARNING, logger="darkfactory.system"):
+    with caplog.at_level(logging.WARNING, logger="darkfactory.project"):
         set_status_bulk(ctx, status="done")
 
     assert any("PRD-999" in rec.message for rec in caplog.records)
 
 
-# ---------- system_load_prds_by_status ----------
+# ---------- project_load_prds_by_status ----------
 
 
-def test_system_load_prds_by_status_filters_correctly(tmp_path: Path) -> None:
+def test_project_load_prds_by_status_filters_correctly(tmp_path: Path) -> None:
     prd_review1 = _write_and_parse(tmp_path, "PRD-40", "iota", status="review")
     prd_review2 = _write_and_parse(tmp_path, "PRD-41", "kappa", status="review")
     prd_done = _write_and_parse(tmp_path, "PRD-42", "lambda", status="done")
     prds = {"PRD-40": prd_review1, "PRD-41": prd_review2, "PRD-42": prd_done}
     ctx = _make_ctx(tmp_path, prds)
 
-    system_load_prds_by_status(ctx, status="review")
+    project_load_prds_by_status(ctx, status="review")
 
     assert set(ctx.state.get(CandidateList).prd_ids) == {"PRD-40", "PRD-41"}
 
 
-def test_system_load_prds_by_status_empty_result(tmp_path: Path) -> None:
+def test_project_load_prds_by_status_empty_result(tmp_path: Path) -> None:
     prd = _write_and_parse(tmp_path, "PRD-50", "mu", status="done")
     ctx = _make_ctx(tmp_path, {"PRD-50": prd})
 
-    system_load_prds_by_status(ctx, status="ready")
+    project_load_prds_by_status(ctx, status="ready")
 
     assert ctx.state.get(CandidateList).prd_ids == []
 
 
-def test_system_load_prds_by_status_stores_in_shared_state(tmp_path: Path) -> None:
+def test_project_load_prds_by_status_stores_in_shared_state(tmp_path: Path) -> None:
     prd = _write_and_parse(tmp_path, "PRD-51", "nu", status="ready")
     ctx = _make_ctx(tmp_path, {"PRD-51": prd})
 
-    system_load_prds_by_status(ctx, status="ready")
+    project_load_prds_by_status(ctx, status="ready")
 
     assert ctx.state.has(CandidateList)
     assert "PRD-51" in ctx.state.get(CandidateList).prd_ids
 
 
-def test_system_load_review_prds_uses_review_status(tmp_path: Path) -> None:
+def test_project_load_review_prds_uses_review_status(tmp_path: Path) -> None:
     prd_review = _write_and_parse(tmp_path, "PRD-52", "xi", status="review")
     prd_ready = _write_and_parse(tmp_path, "PRD-53", "omicron", status="ready")
     prds = {"PRD-52": prd_review, "PRD-53": prd_ready}
     ctx = _make_ctx(tmp_path, prds)
 
-    system_load_review_prds(ctx)
+    project_load_review_prds(ctx)
 
     assert ctx.state.get(CandidateList).prd_ids == ["PRD-52"]
 
@@ -375,7 +375,7 @@ def test_system_check_merged_dry_run_logs(
         shared_state={"candidates": ["PRD-91"]},
     )
 
-    with caplog.at_level(logging.INFO, logger="darkfactory.system"):
+    with caplog.at_level(logging.INFO, logger="darkfactory.project"):
         system_check_merged(ctx)
 
     assert any("dry-run" in rec.message for rec in caplog.records)
@@ -402,7 +402,7 @@ def test_system_mark_done_calls_set_status_bulk_with_done(tmp_path: Path) -> Non
     ctx = _make_ctx(tmp_path, {"PRD-100": prd}, targets=["PRD-100"])
 
     with patch(
-        "darkfactory.operations.system_builtins.model_module.set_status"
+        "darkfactory.operations.project_builtins.model_module.set_status"
     ) as mock_set:
         system_mark_done(ctx)
 

@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from conftest import init_git_repo, make_system_ctx, setup_repo_with_prd, write_prd
+from conftest import init_git_repo, make_project_ctx, setup_repo_with_prd, write_prd
 from darkfactory.operations.commit_prd_changes import commit_prd_changes
 from darkfactory.model import load_all
 
@@ -32,7 +32,7 @@ def test_no_changes_returns_cleanly(
         capture_output=True,
     )
 
-    ctx = make_system_ctx(tmp_path, prds=prds, target_prd="PRD-070")
+    ctx = make_project_ctx(tmp_path, prds=prds, target_prd="PRD-070")
     commit_prd_changes(ctx)
 
     captured = capsys.readouterr()
@@ -41,7 +41,7 @@ def test_no_changes_returns_cleanly(
 
 def test_user_accepts_commit(tmp_path: Path) -> None:
     _, prds = setup_repo_with_prd(tmp_path)
-    ctx = make_system_ctx(tmp_path, prds=prds, target_prd="PRD-070")
+    ctx = make_project_ctx(tmp_path, prds=prds, target_prd="PRD-070")
 
     with patch("darkfactory.operations.commit_prd_changes.prompt_user", return_value="y"):
         with patch("darkfactory.operations.commit_prd_changes.diff_show"):
@@ -59,7 +59,7 @@ def test_user_accepts_commit(tmp_path: Path) -> None:
 
 def test_user_skips_commit(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     _, prds = setup_repo_with_prd(tmp_path)
-    ctx = make_system_ctx(tmp_path, prds=prds, target_prd="PRD-070")
+    ctx = make_project_ctx(tmp_path, prds=prds, target_prd="PRD-070")
 
     with patch("darkfactory.operations.commit_prd_changes.prompt_user", return_value="n"):
         with patch("darkfactory.operations.commit_prd_changes.diff_show"):
@@ -71,7 +71,7 @@ def test_user_skips_commit(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -
 
 def test_user_default_skips(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     _, prds = setup_repo_with_prd(tmp_path)
-    ctx = make_system_ctx(tmp_path, prds=prds, target_prd="PRD-070")
+    ctx = make_project_ctx(tmp_path, prds=prds, target_prd="PRD-070")
 
     with patch("darkfactory.operations.commit_prd_changes.prompt_user", return_value=""):
         with patch("darkfactory.operations.commit_prd_changes.diff_show"):
@@ -83,7 +83,7 @@ def test_user_default_skips(tmp_path: Path, capsys: pytest.CaptureFixture[str]) 
 
 def test_user_edits_message(tmp_path: Path) -> None:
     _, prds = setup_repo_with_prd(tmp_path)
-    ctx = make_system_ctx(tmp_path, prds=prds, target_prd="PRD-070")
+    ctx = make_project_ctx(tmp_path, prds=prds, target_prd="PRD-070")
 
     responses = iter(["e", "custom commit message"])
     with patch(
@@ -108,7 +108,7 @@ def test_other_dirty_files_noted(
     _, prds = setup_repo_with_prd(tmp_path)
     (tmp_path / "other.txt").write_text("unrelated change\n", encoding="utf-8")
 
-    ctx = make_system_ctx(tmp_path, prds=prds, target_prd="PRD-070")
+    ctx = make_project_ctx(tmp_path, prds=prds, target_prd="PRD-070")
 
     with patch("darkfactory.operations.commit_prd_changes.prompt_user", return_value="y"):
         with patch("darkfactory.operations.commit_prd_changes.diff_show"):
@@ -131,7 +131,7 @@ def test_commit_only_target_prd_file(tmp_path: Path) -> None:
     _, prds = setup_repo_with_prd(tmp_path)
     (tmp_path / "other.txt").write_text("unrelated\n", encoding="utf-8")
 
-    ctx = make_system_ctx(tmp_path, prds=prds, target_prd="PRD-070")
+    ctx = make_project_ctx(tmp_path, prds=prds, target_prd="PRD-070")
 
     with patch("darkfactory.operations.commit_prd_changes.prompt_user", return_value="y"):
         with patch("darkfactory.operations.commit_prd_changes.diff_show"):

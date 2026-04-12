@@ -1,11 +1,11 @@
-"""System builtin: gather_prd_context — read target PRD and related PRDs into PhaseState."""
+"""Project builtin: gather_prd_context — read target PRD and related PRDs into PhaseState."""
 
 from __future__ import annotations
 
-from darkfactory.operations.system_builtins import _register
+from darkfactory.operations.project_builtins import _register
 from darkfactory.model import PRD
 from darkfactory.engine import PrdContext
-from darkfactory.system import SystemContext
+from darkfactory.project import ProjectContext
 
 
 def _one_line_summary(prd: PRD) -> str:
@@ -22,7 +22,7 @@ def _format_prd_ref(prd: PRD) -> str:
 
 
 @_register("gather_prd_context")
-def gather_prd_context(ctx: SystemContext) -> None:
+def gather_prd_context(ctx: ProjectContext) -> None:
     """Read the target PRD file plus parent and dependencies, store context in PhaseState."""
     if not ctx.target_prd:
         raise ValueError("gather_prd_context requires ctx.target_prd to be set")

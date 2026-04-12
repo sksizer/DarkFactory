@@ -1,20 +1,13 @@
-"""Dynamic workflow discovery.
+"""Dynamic workflow and operation discovery.
 
-The harness discovers workflows at runtime by scanning a directory for
-subdirectories that contain a ``workflow.py`` module. Each matching
-module is imported and expected to expose a top-level ``workflow``
-attribute that is a :class:`~darkfactory.workflow.Workflow` instance.
+The harness discovers workflows and operations at runtime by scanning
+directories for subdirectories that contain a ``workflow.py`` or
+``operation.py`` module. Each matching module is imported and expected
+to expose a top-level attribute (``workflow`` or ``operation``).
 
-This lets workflow authors drop a new workflow into
-``tools/prd-harness/workflows/<name>/`` without editing any registry
-or manifest — the loader picks it up automatically. The authored
-``workflow.py`` can import from ``darkfactory.workflow`` and
-``darkfactory.operations`` just like any normal Python module.
-
-Import errors in one workflow.py don't block the others — we log the
-error and skip. Duplicate workflow *names* (two modules both exporting
-``workflow = Workflow(name="foo")``) are a hard error since they'd
-make the assignment logic ambiguous.
+Import errors in one module don't block the others — we log the
+error and skip. Duplicate *names* across layers are a hard
+``ValueError`` since they'd make the assignment logic ambiguous.
 """
 
 from __future__ import annotations
@@ -25,18 +18,18 @@ import os
 import sys
 from pathlib import Path
 
-from .system import SystemOperation
+from .project import ProjectOperation
 from .workflow import Workflow
 
 logger = logging.getLogger("darkfactory.loader")
 
 
 def builtin_workflows_dir() -> Path:
-    """Return the directory containing first-party (system) workflows.
+    """Return the directory containing first-party (built-in) workflows.
 
     These ship inside the installed ``darkfactory`` package at
-    ``src/darkfactory/workflows/`` and are available to every install
-    without any on-disk setup in the target project.
+    ``src/darkfactory/workflow/definitions/prd/`` and are available to
+    every install without any on-disk setup in the target project.
 
     The ``DARKFACTORY_BUILTINS_DIR`` environment variable overrides the
     default — used by the test suite to point at an empty directory so
@@ -45,7 +38,22 @@ def builtin_workflows_dir() -> Path:
     override = os.environ.get("DARKFACTORY_BUILTINS_DIR")
     if override:
         return Path(override)
-    return Path(__file__).resolve().parent / "workflow" / "definitions"
+    return Path(__file__).resolve().parent / "workflow" / "definitions" / "prd"
+
+
+def builtin_operations_dir() -> Path:
+    """Return the directory containing first-party (built-in) project operations.
+
+    These ship inside the installed ``darkfactory`` package at
+    ``src/darkfactory/workflow/definitions/project/``.
+
+    The ``DARKFACTORY_BUILTINS_OPERATIONS_DIR`` environment variable
+    overrides the default — used by the test suite.
+    """
+    override = os.environ.get("DARKFACTORY_BUILTINS_OPERATIONS_DIR")
+    if override:
+        return Path(override)
+    return Path(__file__).resolve().parent / "workflow" / "definitions" / "project"
 
 
 def load_workflows(
@@ -127,24 +135,16 @@ def load_workflows(
     return workflows
 
 
-def load_operations(operations_dir: Path) -> dict[str, SystemOperation]:
-    """Discover system operations from a directory of ``operation.py`` modules.
+def _scan_operations_layer(
+    layer_dir: Path,
+    operations: dict[str, ProjectOperation],
+) -> None:
+    """Scan a single layer directory for operation.py modules."""
+    if not layer_dir.exists() or not layer_dir.is_dir():
+        logger.debug("operations directory not found: %s", layer_dir)
+        return
 
-    Mirrors :func:`load_workflows` but scans for ``operation.py`` files and
-    expects each to export an ``operation`` attribute that is a
-    :class:`~darkfactory.system.SystemOperation` instance.
-
-    A nonexistent or non-directory ``operations_dir`` returns an empty dict.
-    Import errors in individual modules are logged at WARNING level and the
-    module is skipped.  Duplicate operation *names* raise ``ValueError``.
-    """
-    operations: dict[str, SystemOperation] = {}
-
-    if not operations_dir.exists() or not operations_dir.is_dir():
-        logger.debug("operations directory not found: %s", operations_dir)
-        return operations
-
-    for subdir in sorted(operations_dir.iterdir()):
+    for subdir in sorted(layer_dir.iterdir()):
         if (
             not subdir.is_dir()
             or subdir.name.startswith("_")
@@ -169,15 +169,52 @@ def load_operations(operations_dir: Path) -> dict[str, SystemOperation]:
             )
         operations[op.name] = op
 
+
+def load_operations(
+    operations_dir: Path | None = None,
+    *,
+    include_builtins: bool = True,
+    include_user: bool = True,
+) -> dict[str, ProjectOperation]:
+    """Discover operations across built-in, user, and project layers.
+
+    Three layers are scanned:
+
+    1. **Built-in** — bundled with the package at
+       :func:`builtin_operations_dir`. Included unless
+       ``include_builtins=False``.
+    2. **User** — ``~/.config/darkfactory/operations/`` (personal
+       operations shared across projects). Included unless
+       ``include_user=False``.
+    3. **Project** — ``operations_dir`` (typically
+       ``<project>/.darkfactory/operations/``). Optional.
+
+    Name collisions across any layers raise ``ValueError``.
+    Missing layers are silently skipped (not an error).
+    """
+    operations: dict[str, ProjectOperation] = {}
+
+    if include_builtins:
+        _scan_operations_layer(builtin_operations_dir(), operations)
+
+    if include_user:
+        from .config._paths import user_operations_dir
+
+        user_dir = user_operations_dir()
+        _scan_operations_layer(user_dir, operations)
+
+    if operations_dir is not None:
+        _scan_operations_layer(operations_dir, operations)
+
     return operations
 
 
-def _load_operation_module(operation_file: Path, subdir: Path) -> SystemOperation:
-    """Import a single operation.py and return the SystemOperation it exports.
+def _load_operation_module(operation_file: Path, subdir: Path) -> ProjectOperation:
+    """Import a single operation.py and return the ProjectOperation it exports.
 
     Raises ``ImportError`` if the file can't be compiled, ``AttributeError``
     if the module has no top-level ``operation``, and ``TypeError`` if
-    ``operation`` is not a :class:`~darkfactory.system.SystemOperation` instance.
+    ``operation`` is not a :class:`~darkfactory.project.ProjectOperation` instance.
     """
     module_name = f"_darkfactory_operation_{subdir.name}"
     spec = importlib.util.spec_from_file_location(module_name, operation_file)
@@ -198,9 +235,9 @@ def _load_operation_module(operation_file: Path, subdir: Path) -> SystemOperatio
         )
 
     op = module.operation
-    if not isinstance(op, SystemOperation):
+    if not isinstance(op, ProjectOperation):
         raise TypeError(
-            f"{operation_file}: 'operation' is not a SystemOperation instance "
+            f"{operation_file}: 'operation' is not a ProjectOperation instance "
             f"(got {type(op).__name__})"
         )
 

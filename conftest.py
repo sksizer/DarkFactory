@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from darkfactory.model import PRD
-from darkfactory.system import SystemContext, SystemOperation
+from darkfactory.project import ProjectContext, ProjectOperation
 
 
 def init_git_repo(path: Path) -> None:
@@ -108,13 +108,13 @@ def write_prd(
     return path
 
 
-def make_system_op(
+def make_project_op(
     name: str = "test-op",
     description: str = "test",
     operation_dir: Path | None = None,
-) -> SystemOperation:
-    """Create a SystemOperation for testing."""
-    return SystemOperation(
+) -> ProjectOperation:
+    """Create a ProjectOperation for testing."""
+    return ProjectOperation(
         name=name,
         description=description,
         tasks=[],
@@ -122,17 +122,17 @@ def make_system_op(
     )
 
 
-def make_system_ctx(
+def make_project_ctx(
     tmp_path: Path,
     prds: dict[str, PRD] | None = None,
     target_prd: str | None = None,
-    operation: SystemOperation | None = None,
-) -> SystemContext:
-    """Create a SystemContext for testing."""
-    return SystemContext(
+    operation: ProjectOperation | None = None,
+) -> ProjectContext:
+    """Create a ProjectContext for testing."""
+    return ProjectContext(
         repo_root=tmp_path,
         prds=prds or {},
-        operation=operation or make_system_op(),
+        operation=operation or make_project_op(),
         cwd=tmp_path,
         dry_run=False,
         target_prd=target_prd,

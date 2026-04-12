@@ -1,14 +1,14 @@
-"""verify-merges system operation.
+"""verify-merges project operation.
 
 Audit all merged PRs and verify their merge commits are ancestors of main.
 Detects silent code loss from branch merges that didn't actually integrate
 into the mainline (e.g. stale branches overwriting concurrent work).
 """
 
-from darkfactory.system import SystemOperation
+from darkfactory.project import ProjectOperation
 from darkfactory.workflow import ShellTask
 
-operation = SystemOperation(
+operation = ProjectOperation(
     name="verify-merges",
     description=(
         "Audit all merged PRs to verify their merge commits are ancestors "
@@ -19,7 +19,7 @@ operation = SystemOperation(
     tasks=[
         ShellTask(
             name="verify-merge-ancestry",
-            cmd="python .darkfactory/operations/verify-merges/check.py",
+            cmd="python check.py",
         ),
     ],
 )

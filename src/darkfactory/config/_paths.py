@@ -30,3 +30,10 @@ def user_workflows_dir() -> Path:
     d = user_config_dir() / "workflows"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def user_operations_dir() -> Path:
+    """Return user operations dir, creating if absent."""
+    d = user_config_dir() / "operations"
+    d.mkdir(parents=True, exist_ok=True)
+    return d

@@ -7,14 +7,14 @@ from typing import Any
 
 import pytest
 
-from darkfactory.operations.system_builtins import (
+from darkfactory.operations.project_builtins import (
     SYSTEM_BUILTINS,
     audit_impacts_check,
 )
 from darkfactory.loader import load_operations
 from darkfactory.model import PRD, parse_prd
-from darkfactory.system import SystemContext, SystemOperation
-from darkfactory.runner import run_system_operation
+from darkfactory.project import ProjectContext, ProjectOperation
+from darkfactory.runner import run_project_operation
 
 from tests.conftest import write_prd
 
@@ -22,8 +22,8 @@ from tests.conftest import write_prd
 # ---------- helpers ----------
 
 
-def _make_op() -> SystemOperation:
-    return SystemOperation(name="test-op", description="test", tasks=[])
+def _make_op() -> ProjectOperation:
+    return ProjectOperation(name="test-op", description="test", tasks=[])
 
 
 def _make_ctx(
@@ -31,8 +31,8 @@ def _make_ctx(
     prds: dict[str, PRD] | None = None,
     *,
     dry_run: bool = False,
-) -> SystemContext:
-    return SystemContext(
+) -> ProjectContext:
+    return ProjectContext(
         repo_root=tmp_path,
         prds=prds or {},
         operation=_make_op(),
@@ -250,12 +250,12 @@ def test_audit_impacts_report_includes_status(tmp_path: Path) -> None:
 
 def test_operation_loads_correctly(tmp_path: Path) -> None:
     """audit-impacts operation is discoverable via load_operations."""
-    # The real operation.py lives in .darkfactory/operations/audit-impacts/
+    # The real operation.py lives in src/darkfactory/workflow/definitions/project/
     # Locate it relative to this test file.
     repo_root = Path(__file__).resolve().parents[1]
-    ops_dir = repo_root / ".darkfactory" / "operations"
+    ops_dir = repo_root / "src" / "darkfactory" / "workflow" / "definitions" / "project"
 
-    operations = load_operations(ops_dir)
+    operations = load_operations(ops_dir, include_builtins=False, include_user=False)
     assert "audit-impacts" in operations
 
     op = operations["audit-impacts"]
@@ -272,7 +272,7 @@ def test_operation_via_runner_clean(tmp_path: Path) -> None:
 
     from darkfactory.workflow import BuiltIn
 
-    op = SystemOperation(
+    op = ProjectOperation(
         name="audit-impacts",
         description="test",
         tasks=[BuiltIn("audit_impacts_check")],
@@ -280,7 +280,7 @@ def test_operation_via_runner_clean(tmp_path: Path) -> None:
     prd = _write_and_parse(
         tmp_path, "PRD-020", "ok", status="done", impacts=["src/foo.py"]
     )
-    ctx = SystemContext(
+    ctx = ProjectContext(
         repo_root=tmp_path,
         prds={"PRD-020": prd},
         operation=op,
@@ -288,11 +288,11 @@ def test_operation_via_runner_clean(tmp_path: Path) -> None:
         dry_run=False,
     )
 
-    from darkfactory.operations.system_builtins import SYSTEM_BUILTINS as runner_builtins
+    from darkfactory.operations.project_builtins import SYSTEM_BUILTINS as runner_builtins
 
     assert "audit_impacts_check" in runner_builtins
 
-    result = run_system_operation(op, ctx)
+    result = run_project_operation(op, ctx)
     assert result.success is True
     assert any("0 error(s)" in line for line in ctx.report)
 
@@ -301,7 +301,7 @@ def test_operation_via_runner_missing(tmp_path: Path) -> None:
     """Operation returns failure when completed PRDs have missing impact paths."""
     from darkfactory.workflow import BuiltIn
 
-    op = SystemOperation(
+    op = ProjectOperation(
         name="audit-impacts",
         description="test",
         tasks=[BuiltIn("audit_impacts_check")],
@@ -309,7 +309,7 @@ def test_operation_via_runner_missing(tmp_path: Path) -> None:
     prd = _write_and_parse(
         tmp_path, "PRD-021", "missing", status="done", impacts=["ghost.py"]
     )
-    ctx = SystemContext(
+    ctx = ProjectContext(
         repo_root=tmp_path,
         prds={"PRD-021": prd},
         operation=op,
@@ -317,7 +317,7 @@ def test_operation_via_runner_missing(tmp_path: Path) -> None:
         dry_run=False,
     )
 
-    result = run_system_operation(op, ctx)
+    result = run_project_operation(op, ctx)
     assert result.success is False
     assert "1 error(s)" in "\n".join(ctx.report)
 
@@ -326,7 +326,7 @@ def test_operation_via_runner_warning_only(tmp_path: Path) -> None:
     """Operation returns success when only incomplete PRDs have missing impacts."""
     from darkfactory.workflow import BuiltIn
 
-    op = SystemOperation(
+    op = ProjectOperation(
         name="audit-impacts",
         description="test",
         tasks=[BuiltIn("audit_impacts_check")],
@@ -334,7 +334,7 @@ def test_operation_via_runner_warning_only(tmp_path: Path) -> None:
     prd = _write_and_parse(
         tmp_path, "PRD-022", "ready-warn", status="ready", impacts=["future.py"]
     )
-    ctx = SystemContext(
+    ctx = ProjectContext(
         repo_root=tmp_path,
         prds={"PRD-022": prd},
         operation=op,
@@ -342,6 +342,6 @@ def test_operation_via_runner_warning_only(tmp_path: Path) -> None:
         dry_run=False,
     )
 
-    result = run_system_operation(op, ctx)
+    result = run_project_operation(op, ctx)
     assert result.success is True
     assert "1 warning(s)" in "\n".join(ctx.report)

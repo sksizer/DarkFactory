@@ -11,6 +11,10 @@ simple = 1.0
 moderate = 1.25
 complex = 1.5
 
+[paths]
+workflows = ".darkfactory/workflows"
+operations = ".darkfactory/operations"
+
 [analysis]
 # min_severity = "warning"
 # model_default = "haiku"

@@ -73,7 +73,7 @@ def test_discuss_launches_chain(tmp_path: Path) -> None:
 
     with patch("darkfactory.utils.system.shutil") as mock_shutil:
         mock_shutil.which.return_value = "/usr/bin/claude"
-        with patch("darkfactory.cli.discuss.run_system_operation") as mock_run:
+        with patch("darkfactory.cli.discuss.run_project_operation") as mock_run:
             from darkfactory.runner import RunResult
 
             mock_run.return_value = RunResult(success=True)

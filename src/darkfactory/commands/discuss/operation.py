@@ -1,11 +1,11 @@
-"""Discuss operation definition — the SystemOperation for ``prd discuss``."""
+"""Discuss operation definition — the ProjectOperation for ``prd discuss``."""
 
 from __future__ import annotations
 
-from darkfactory.system import SystemOperation
+from darkfactory.project import ProjectOperation
 from darkfactory.workflow import BuiltIn, InteractiveTask
 
-discuss_operation = SystemOperation(
+discuss_operation = ProjectOperation(
     name="discuss",
     description="Interactive PRD discussion chain — gather, discuss, critique, commit.",
     requires_clean_main=False,

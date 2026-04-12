@@ -82,7 +82,7 @@ class RunResult:
 
 
 class RunContext(Protocol):
-    """Minimal protocol that both ExecutionContext and SystemContext satisfy."""
+    """Minimal protocol that both ExecutionContext and ProjectContext satisfy."""
 
     cwd: Path
     dry_run: bool
@@ -179,7 +179,7 @@ def run_tasks(
 
     Parameters:
         tasks: Ordered task list to execute.
-        ctx: Execution context (ExecutionContext or SystemContext).
+        ctx: Execution context (ExecutionContext or ProjectContext).
         builtins: Registry mapping builtin names to callables.
         compose_prompt_fn: Callback ``(task, ctx, extras) -> str``.
         pick_model_fn: Callback ``(task, override) -> model_name``.
@@ -429,7 +429,14 @@ def _run_shell(
         ctx.logger.info("[dry-run] %s", cmd)
         return TaskStep(name=task.name, kind="shell", success=True, detail="dry-run")
 
-    first_result = run_shell(cmd, ctx.cwd, task.env)
+    # For project operations, shell tasks run with operation_dir as cwd
+    # so relative paths to sibling scripts work correctly.
+    shell_cwd = ctx.cwd
+    op = getattr(ctx, "operation", None)
+    if op is not None and getattr(op, "operation_dir", None) is not None:
+        shell_cwd = op.operation_dir
+
+    first_result = run_shell(cmd, shell_cwd, task.env)
 
     # Emit shell output events via the event writer.
     writer: EventWriter | None = getattr(ctx, "event_writer", None)
@@ -519,7 +526,7 @@ def _run_shell(
         )
 
     # Re-run the shell task once more after the agent fix
-    second_result = run_shell(cmd, ctx.cwd, task.env)
+    second_result = run_shell(cmd, shell_cwd, task.env)
     if second_result.returncode == 0:
         return TaskStep(
             name=task.name,
@@ -744,13 +751,13 @@ def run_workflow(
     return result
 
 
-# ---------- system operation entry point ----------
+# ---------- project operation entry point ----------
 
 
-def _system_compose_prompt(
+def _project_compose_prompt(
     task: AgentTask, ctx: Any, extras: dict[str, object] | None = None
 ) -> str:
-    """Load prompt files and substitute system-op placeholders."""
+    """Load prompt files and substitute project-op placeholders."""
     from darkfactory.workflow import load_prompt_files, substitute_placeholders
 
     op_dir = ctx.operation.operation_dir
@@ -773,7 +780,7 @@ def _system_compose_prompt(
     return substitute_placeholders(raw, context)
 
 
-def run_system_operation(
+def run_project_operation(
     operation: Any,
     ctx: Any,
     model_override: str | None = None,
@@ -783,13 +790,13 @@ def run_system_operation(
     config_timeouts: dict[str, object] | None = None,
     styler: "Styler | None" = None,
 ) -> RunResult:
-    """Execute a system operation via the unified dispatch engine.
+    """Execute a project operation via the unified dispatch engine.
 
     When ``session_id`` is provided and the context is not dry-run, an
-    :class:`EventWriter` is created automatically so system operations
+    :class:`EventWriter` is created automatically so project operations
     produce event logs just like workflow runs.
     """
-    from .operations.system_builtins import SYSTEM_BUILTINS
+    from .operations.project_builtins import SYSTEM_BUILTINS
 
     writer: EventWriter | None = getattr(ctx, "event_writer", None)
     owns_writer = False
@@ -811,7 +818,7 @@ def run_system_operation(
             tasks=operation.tasks,
             ctx=ctx,
             builtins=SYSTEM_BUILTINS,
-            compose_prompt_fn=_system_compose_prompt,
+            compose_prompt_fn=_project_compose_prompt,
             pick_model_fn=_pick_system_model,
             model_override=model_override,
             cli_timeout_minutes=cli_timeout_minutes,
