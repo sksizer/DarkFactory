@@ -1,4 +1,4 @@
-"""SystemOperation and SystemContext — system-level operation abstractions.
+"""ProjectOperation and ProjectContext — project-level operation abstractions.
 
 Analogous to :class:`~darkfactory.workflow.Workflow` and
 :class:`~darkfactory.workflow.ExecutionContext` but targeting a different
@@ -25,14 +25,14 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class SystemOperation:
-    """A named system-level operation composed of ordered :class:`Task` s.
+class ProjectOperation:
+    """A named project-level operation composed of ordered :class:`Task` s.
 
-    Authored in ``.darkfactory/operations/<name>/operation.py`` modules that
+    Authored in ``definitions/project/<name>/operation.py`` modules that
     export a top-level ``operation`` attribute.  The loader discovers them and
     sets :attr:`operation_dir` so relative paths inside tasks resolve correctly.
 
-    Unlike a :class:`~darkfactory.workflow.Workflow`, a ``SystemOperation``
+    Unlike a :class:`~darkfactory.workflow.Workflow`, a ``ProjectOperation``
     targets the repository as a whole rather than a single PRD.  It may be
     read-only (no PR) or write a single batched PR that collects many changes.
     """
@@ -49,11 +49,11 @@ class SystemOperation:
 
 
 @dataclass
-class SystemContext:
-    """State threaded through every task during a system operation run.
+class ProjectContext:
+    """State threaded through every task during a project operation run.
 
     Analogous to :class:`~darkfactory.workflow.ExecutionContext` but scoped to
-    system operations rather than single-PRD workflows.
+    project operations rather than single-PRD workflows.
 
     :attr:`dry_run` tells builtins and shell tasks to log what they *would* do
     without actually performing side effects.
@@ -62,7 +62,7 @@ class SystemContext:
     (e.g. PRD IDs for bulk operations).
 
     :attr:`target_prd` is the single PRD ID for operations that
-    :attr:`~SystemOperation.accepts_target`.
+    :attr:`~ProjectOperation.accepts_target`.
 
     :attr:`report` accumulates human-readable output lines produced by tasks
     during the run.
@@ -73,11 +73,11 @@ class SystemContext:
 
     repo_root: Path
     prds: dict[str, "PRD"]
-    operation: SystemOperation
+    operation: ProjectOperation
     cwd: Path
     dry_run: bool = True
     logger: logging.Logger = field(
-        default_factory=lambda: logging.getLogger("darkfactory.system")
+        default_factory=lambda: logging.getLogger("darkfactory.project")
     )
     targets: list[str] = field(default_factory=list)
     report: list[str] = field(default_factory=list)

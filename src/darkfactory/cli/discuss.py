@@ -8,8 +8,8 @@ from pathlib import Path
 
 from darkfactory.cli._shared import _find_repo_root, _load, _resolve_prd_or_exit
 from darkfactory.commands.discuss import discuss_operation
-from darkfactory.runner import run_system_operation
-from darkfactory.system import SystemContext
+from darkfactory.runner import run_project_operation
+from darkfactory.project import ProjectContext
 from darkfactory.utils.system import check_prerequisites
 
 
@@ -31,7 +31,7 @@ def launch_discuss_for_prd(prd_id: str, args: argparse.Namespace) -> int:
     op = discuss_operation
     op.operation_dir = pkg_dir
 
-    ctx = SystemContext(
+    ctx = ProjectContext(
         repo_root=repo_root,
         prds=prds,
         operation=op,
@@ -40,7 +40,7 @@ def launch_discuss_for_prd(prd_id: str, args: argparse.Namespace) -> int:
         target_prd=prd_id,
     )
 
-    result = run_system_operation(op, ctx)
+    result = run_project_operation(op, ctx)
     if not result.success:
         print(f"discuss chain failed: {result.failure_reason}", file=sys.stderr)
         return 1

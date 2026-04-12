@@ -15,8 +15,8 @@ import subprocess
 import sys
 
 
-def _run(cmd: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, capture_output=True, text=True, check=False, **kwargs)
+def _run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(cmd, capture_output=True, text=True, check=False)
 
 
 def _is_ancestor(sha: str, branch: str = "main") -> bool:

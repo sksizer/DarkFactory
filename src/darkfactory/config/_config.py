@@ -49,6 +49,8 @@ class PathsConfig:
     data_dir: Path | None = None
     prds_dir: Path | None = None
     archive_dir: Path | None = None
+    workflows_dir: Path | None = None
+    operations_dir: Path | None = None
 
 
 @dataclass
@@ -166,6 +168,14 @@ def resolve_config(
         proj_data = _load_toml(proj_file)
         _merge_section(config.model, proj_data.get("model", {}))
         _merge_section(config.style, proj_data.get("style", {}))
+
+        # Resolve [paths].workflows and [paths].operations relative to repo root.
+        repo_root = project_dir.parent
+        paths_section = proj_data.get("paths", {})
+        wf_rel = paths_section.get("workflows", ".darkfactory/workflows")
+        ops_rel = paths_section.get("operations", ".darkfactory/operations")
+        config.paths.workflows_dir = repo_root / wf_rel
+        config.paths.operations_dir = repo_root / ops_rel
 
     # Layer 3: env vars
     env_dict: dict[str, str] = env if env is not None else dict(os.environ)

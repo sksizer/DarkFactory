@@ -244,7 +244,8 @@ def test_warning_findings_use_model_default(tmp_path: Path) -> None:
         return r
 
     with patch(
-        "darkfactory.operations.analyze_transcript.subprocess.run", side_effect=_fake_run
+        "darkfactory.operations.analyze_transcript.subprocess.run",
+        side_effect=_fake_run,
     ):
         analyze_transcript(ctx)
 
@@ -278,7 +279,8 @@ def test_error_findings_use_model_severe(tmp_path: Path) -> None:
         return r
 
     with patch(
-        "darkfactory.operations.analyze_transcript.subprocess.run", side_effect=_fake_run
+        "darkfactory.operations.analyze_transcript.subprocess.run",
+        side_effect=_fake_run,
     ):
         analyze_transcript(ctx)
 
@@ -303,7 +305,8 @@ def test_analysis_file_written_not_staged_by_default(tmp_path: Path) -> None:
         return r
 
     with patch(
-        "darkfactory.operations.analyze_transcript.subprocess.run", side_effect=_fake_run
+        "darkfactory.operations.analyze_transcript.subprocess.run",
+        side_effect=_fake_run,
     ):
         analyze_transcript(ctx)
 
@@ -337,7 +340,8 @@ def test_analysis_file_staged_when_config_commit_true(tmp_path: Path) -> None:
         return r
 
     with patch(
-        "darkfactory.operations.analyze_transcript.subprocess.run", side_effect=_fake_run
+        "darkfactory.operations.analyze_transcript.subprocess.run",
+        side_effect=_fake_run,
     ):
         analyze_transcript(ctx)
 
@@ -409,7 +413,8 @@ def test_llm_failure_does_not_fail_workflow(tmp_path: Path) -> None:
         return r
 
     with patch(
-        "darkfactory.operations.analyze_transcript.subprocess.run", side_effect=_fake_run
+        "darkfactory.operations.analyze_transcript.subprocess.run",
+        side_effect=_fake_run,
     ):
         analyze_transcript(ctx)
 
@@ -459,7 +464,8 @@ def test_config_min_severity_respected(tmp_path: Path) -> None:
         return r
 
     with patch(
-        "darkfactory.operations.analyze_transcript.subprocess.run", side_effect=_fake_run
+        "darkfactory.operations.analyze_transcript.subprocess.run",
+        side_effect=_fake_run,
     ):
         analyze_transcript(ctx)
 

@@ -1,6 +1,6 @@
-"""Integration tests for the ``prd system`` CLI subcommand group.
+"""Integration tests for the ``prd project`` CLI subcommand group.
 
-Exercises the full argparse -> load_operations -> run_system_operation chain
+Exercises the full argparse -> load_operations -> run_project_operation chain
 against fixture operations directories. Agent invocations are mocked so tests
 don't spawn subprocesses.
 """
@@ -17,6 +17,14 @@ from darkfactory.cli import main
 
 
 # ---------- fixtures ----------
+
+
+@pytest.fixture(autouse=True)
+def _isolate_builtins(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Suppress built-in operations discovery so fixture ops dirs are isolated."""
+    empty = tmp_path / "_empty_builtins_ops"
+    empty.mkdir(exist_ok=True)
+    monkeypatch.setenv("DARKFACTORY_BUILTINS_OPERATIONS_DIR", str(empty))
 
 
 def _setup_project(tmp_path: Path) -> tuple[Path, Path]:
@@ -52,10 +60,10 @@ def _write_operation(
     op_file = op_dir / "operation.py"
     op_file.write_text(
         f'''"""Fixture operation {name}."""
-from darkfactory.system import SystemOperation
+from darkfactory.project import ProjectOperation
 from darkfactory.workflow import BuiltIn
 
-operation = SystemOperation(
+operation = ProjectOperation(
     name={name!r},
     description={description!r},
     {tasks_code},
@@ -72,28 +80,28 @@ def _base_args(
     tmp_path: Path,
     ops_dir: Path,
 ) -> list[str]:
-    """Build the common CLI prefix for system subcommand tests."""
+    """Build the common CLI prefix for project subcommand tests."""
     return [
         "--directory",
         str(tmp_path),
         "--operations-dir",
         str(ops_dir),
-        "system",
+        "project",
     ]
 
 
-# ---------- prd system list ----------
+# ---------- prd project list ----------
 
 
-def test_system_list_empty(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_project_list_empty(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     _prd_dir, ops_dir = _setup_project(tmp_path)
 
     exit_code = main(_base_args(tmp_path, ops_dir) + ["list"])
     assert exit_code == 0
-    assert "no system operations" in capsys.readouterr().out
+    assert "no project operations" in capsys.readouterr().out
 
 
-def test_system_list_shows_operations(
+def test_project_list_shows_operations(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _prd_dir, ops_dir = _setup_project(tmp_path)
@@ -109,7 +117,7 @@ def test_system_list_shows_operations(
     assert "Reconcile PRD statuses" in out
 
 
-def test_system_list_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_project_list_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     _prd_dir, ops_dir = _setup_project(tmp_path)
     _write_operation(ops_dir, "audit", description="Audit the repo state")
 
@@ -119,7 +127,7 @@ def test_system_list_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) ->
         "--operations-dir",
         str(ops_dir),
         "--json",
-        "system",
+        "project",
         "list",
     ]
     exit_code = main(args)
@@ -131,10 +139,10 @@ def test_system_list_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) ->
     assert payload[0]["description"] == "Audit the repo state"
 
 
-# ---------- prd system describe ----------
+# ---------- prd project describe ----------
 
 
-def test_system_describe_known_operation(
+def test_project_describe_known_operation(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _prd_dir, ops_dir = _setup_project(tmp_path)
@@ -155,7 +163,7 @@ def test_system_describe_known_operation(
     assert "accepts_target" in out
 
 
-def test_system_describe_unknown_operation(tmp_path: Path) -> None:
+def test_project_describe_unknown_operation(tmp_path: Path) -> None:
     _prd_dir, ops_dir = _setup_project(tmp_path)
 
     with pytest.raises(SystemExit) as exc:
@@ -163,7 +171,7 @@ def test_system_describe_unknown_operation(tmp_path: Path) -> None:
     assert exc.value.code != 0
 
 
-def test_system_describe_json(
+def test_project_describe_json(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _prd_dir, ops_dir = _setup_project(tmp_path)
@@ -180,7 +188,7 @@ def test_system_describe_json(
         "--operations-dir",
         str(ops_dir),
         "--json",
-        "system",
+        "project",
         "describe",
         "audit",
     ]
@@ -192,21 +200,21 @@ def test_system_describe_json(
     assert "tasks" in payload
 
 
-# ---------- prd system run (dry-run) ----------
+# ---------- prd project run (dry-run) ----------
 
 
-def test_system_run_dry_run_default(
+def test_project_run_dry_run_default(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """prd system run defaults to dry-run and prints report output."""
+    """prd project run defaults to dry-run and prints report output."""
     _prd_dir, ops_dir = _setup_project(tmp_path)
     (ops_dir / "audit").mkdir(parents=True, exist_ok=True)
     (ops_dir / "audit" / "operation.py").write_text(
         '''"""Fixture audit operation."""
-from darkfactory.system import SystemOperation
+from darkfactory.project import ProjectOperation
 from darkfactory.workflow import ShellTask
 
-operation = SystemOperation(
+operation = ProjectOperation(
     name="audit",
     description="Audit the repo",
     tasks=[ShellTask("check", cmd="echo hello")],
@@ -223,18 +231,18 @@ operation = SystemOperation(
     assert "dry-run" in out
 
 
-def test_system_run_execute_flag(
+def test_project_run_execute_flag(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """prd system run --execute dispatches with dry_run=False."""
+    """prd project run --execute dispatches with dry_run=False."""
     _prd_dir, ops_dir = _setup_project(tmp_path)
     (ops_dir / "audit").mkdir(parents=True, exist_ok=True)
     (ops_dir / "audit" / "operation.py").write_text(
         '''"""Fixture audit operation."""
-from darkfactory.system import SystemOperation
+from darkfactory.project import ProjectOperation
 from darkfactory.workflow import ShellTask
 
-operation = SystemOperation(
+operation = ProjectOperation(
     name="audit",
     description="Audit the repo",
     tasks=[ShellTask("check", cmd="true")],
@@ -255,7 +263,7 @@ operation = SystemOperation(
     assert "audit" in out
 
 
-def test_system_run_builtin_failure_exits_nonzero(
+def test_project_run_builtin_failure_exits_nonzero(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """A failing task causes exit code 1."""
@@ -263,10 +271,10 @@ def test_system_run_builtin_failure_exits_nonzero(
     (ops_dir / "bad-op").mkdir(parents=True, exist_ok=True)
     (ops_dir / "bad-op" / "operation.py").write_text(
         '''"""Fixture bad operation."""
-from darkfactory.system import SystemOperation
+from darkfactory.project import ProjectOperation
 from darkfactory.workflow import ShellTask
 
-operation = SystemOperation(
+operation = ProjectOperation(
     name="bad-op",
     description="Always fails",
     tasks=[ShellTask("fail", cmd="false")],
@@ -286,7 +294,7 @@ operation = SystemOperation(
 # ---------- AC-5: --target rejected when accepts_target=False ----------
 
 
-def test_system_run_target_rejected(tmp_path: Path) -> None:
+def test_project_run_target_rejected(tmp_path: Path) -> None:
     """--target is rejected for operations with accepts_target=False."""
     _prd_dir, ops_dir = _setup_project(tmp_path)
     _write_operation(ops_dir, "audit", accepts_target=False)
@@ -296,7 +304,7 @@ def test_system_run_target_rejected(tmp_path: Path) -> None:
     assert exc.value.code != 0
 
 
-def test_system_run_target_accepted(
+def test_project_run_target_accepted(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """--target is allowed for operations with accepts_target=True."""
@@ -304,9 +312,9 @@ def test_system_run_target_accepted(
     (ops_dir / "plan-op").mkdir(parents=True, exist_ok=True)
     (ops_dir / "plan-op" / "operation.py").write_text(
         '''"""Fixture plan operation."""
-from darkfactory.system import SystemOperation
+from darkfactory.project import ProjectOperation
 
-operation = SystemOperation(
+operation = ProjectOperation(
     name="plan-op",
     description="Plans something",
     tasks=[],
@@ -324,21 +332,21 @@ operation = SystemOperation(
 # ---------- report and targets output ----------
 
 
-def test_system_run_report_displayed(
+def test_project_run_report_displayed(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Report lines accumulated by builtins are displayed after the run."""
-    from darkfactory.operations.system_builtins import SYSTEM_BUILTINS
-    from darkfactory.system import SystemContext
+    from darkfactory.operations.project_builtins import SYSTEM_BUILTINS
+    from darkfactory.project import ProjectContext
 
     _prd_dir, ops_dir = _setup_project(tmp_path)
     (ops_dir / "reporter").mkdir(parents=True, exist_ok=True)
     (ops_dir / "reporter" / "operation.py").write_text(
         '''"""Fixture reporter operation."""
-from darkfactory.system import SystemOperation
+from darkfactory.project import ProjectOperation
 from darkfactory.workflow import BuiltIn
 
-operation = SystemOperation(
+operation = ProjectOperation(
     name="reporter",
     description="Adds to report",
     tasks=[BuiltIn("_test_report_builtin")],
@@ -346,7 +354,7 @@ operation = SystemOperation(
 '''
     )
 
-    def report_builtin(ctx: SystemContext, **kwargs: object) -> None:
+    def report_builtin(ctx: ProjectContext, **kwargs: object) -> None:
         ctx.report.append("found 3 items")
 
     SYSTEM_BUILTINS["_test_report_builtin"] = report_builtin

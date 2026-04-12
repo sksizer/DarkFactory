@@ -1,11 +1,11 @@
-"""System builtin: commit_prd_changes — interactive commit prompt for PRD edits."""
+"""Project builtin: commit_prd_changes — interactive commit prompt for PRD edits."""
 
 from __future__ import annotations
 
 import sys
 
-from darkfactory.operations.system_builtins import _register
-from darkfactory.system import SystemContext
+from darkfactory.operations.project_builtins import _register
+from darkfactory.project import ProjectContext
 from darkfactory.utils.git import (
     GitErr,
     Ok,
@@ -20,7 +20,7 @@ from darkfactory.utils.terminal import prompt_user
 
 @_register("commit_prd_changes")
 def commit_prd_changes(
-    ctx: SystemContext,
+    ctx: ProjectContext,
     *,
     message: str | None = None,
     paths: list[str] | None = None,

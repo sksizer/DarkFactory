@@ -10,19 +10,19 @@ from conftest import write_prd
 from darkfactory.operations.gather_prd_context import gather_prd_context
 from darkfactory.model import PRD, load_all
 from darkfactory.engine import PrdContext
-from darkfactory.system import SystemContext, SystemOperation
+from darkfactory.project import ProjectContext, ProjectOperation
 
 
-def _make_op() -> SystemOperation:
-    return SystemOperation(name="test-op", description="test", tasks=[])
+def _make_op() -> ProjectOperation:
+    return ProjectOperation(name="test-op", description="test", tasks=[])
 
 
 def _make_ctx(
     tmp_path: Path,
     prds: dict[str, PRD] | None = None,
     target_prd: str | None = None,
-) -> SystemContext:
-    ctx = SystemContext(
+) -> ProjectContext:
+    ctx = ProjectContext(
         repo_root=tmp_path,
         prds=prds or {},
         operation=_make_op(),

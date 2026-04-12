@@ -30,6 +30,7 @@ from ._paths import (
     WORKTREES_SUBDIR,
     user_config_dir,
     user_config_file,
+    user_operations_dir,
     user_workflows_dir,
 )
 
@@ -56,6 +57,7 @@ __all__ = [
     "WORKTREES_SUBDIR",
     "user_config_dir",
     "user_config_file",
+    "user_operations_dir",
     "user_workflows_dir",
     # _discovery
     "find_darkfactory_dir",

@@ -1,9 +1,9 @@
-"""System-operation builtins — bulk mutation and status helpers.
+"""Project-operation builtins — bulk mutation and status helpers.
 
-These builtins operate on :class:`~darkfactory.system.SystemContext` rather
+These builtins operate on :class:`~darkfactory.project.ProjectContext` rather
 than the per-PRD :class:`~darkfactory.workflow.ExecutionContext` used by
 workflow builtins.  They are registered in :data:`SYSTEM_BUILTINS`, a
-parallel registry that the system runner dispatches against.
+parallel registry that the project runner dispatches against.
 """
 
 from __future__ import annotations
@@ -16,14 +16,14 @@ from darkfactory.graph import containment
 from darkfactory.engine import CandidateList
 from darkfactory.utils.git import GitErr, Ok, Timeout, git_run
 from darkfactory.model import compute_branch_name
-from darkfactory.system import SystemContext
+from darkfactory.project import ProjectContext
 
 SYSTEM_BUILTINS: dict[str, Callable[..., None]] = {}
-"""Global registry mapping system builtin name to its implementing function.
+"""Global registry mapping project builtin name to its implementing function.
 
-Populated at import time via the :func:`_register` decorator.  The system
+Populated at import time via the :func:`_register` decorator.  The project
 runner looks up names here when dispatching a :class:`~darkfactory.workflow.BuiltIn`
-task inside a :class:`~darkfactory.system.SystemOperation`.
+task inside a :class:`~darkfactory.project.ProjectOperation`.
 """
 
 
@@ -38,7 +38,7 @@ def _register(name: str) -> Callable[[Callable[..., None]], Callable[..., None]]
 
 
 @_register("set_status_bulk")
-def set_status_bulk(ctx: SystemContext, *, status: str) -> None:
+def set_status_bulk(ctx: ProjectContext, *, status: str) -> None:
     """Update the status field of every PRD id in ``ctx.targets``.
 
     Respects ``ctx.dry_run`` — in dry-run mode the function logs what would
@@ -73,29 +73,27 @@ def set_status_bulk(ctx: SystemContext, *, status: str) -> None:
         ctx.logger.info("set_status_bulk: %s -> %s", prd_id, status)
 
 
-@_register("system_load_review_prds")
-def system_load_review_prds(ctx: SystemContext) -> None:
+@_register("project_load_review_prds")
+def project_load_review_prds(ctx: ProjectContext) -> None:
     """Convenience wrapper: load PRDs with status ``"review"`` into candidates."""
-    system_load_prds_by_status(ctx, status="review")
+    project_load_prds_by_status(ctx, status="review")
 
 
-@_register("system_load_prds_by_status")
-def system_load_prds_by_status(ctx: SystemContext, *, status: str) -> None:
+@_register("project_load_prds_by_status")
+def project_load_prds_by_status(ctx: ProjectContext, *, status: str) -> None:
     """Filter ``ctx.prds`` by ``status`` and store matching ids in PhaseState.
 
     The result is stored as a :class:`CandidateList` in ``ctx.state``.
-    Downstream tasks (e.g. :func:`system_check_merged`) read this to know
+    Downstream tasks (e.g. :func:`project_check_merged`) read this to know
     which PRDs to examine.
     """
     candidates = [prd_id for prd_id, prd in ctx.prds.items() if prd.status == status]
     ctx.state.put(CandidateList(prd_ids=candidates))
     ctx.logger.info(
-        "system_load_prds_by_status: found %d PRD(s) with status=%r",
+        "project_load_prds_by_status: found %d PRD(s) with status=%r",
         len(candidates),
         status,
     )
-
-
 
 
 def _is_merged_standard(repo_root: str, branch: str) -> bool:
@@ -133,11 +131,11 @@ def _is_merged_squash(repo_root: str, branch: str) -> bool:
 
 
 @_register("system_check_merged")
-def system_check_merged(ctx: SystemContext) -> None:
+def system_check_merged(ctx: ProjectContext) -> None:
     """Check which candidate PRDs have had their branch merged to main.
 
     Reads ``CandidateList`` from ``ctx.state`` (populated by
-    :func:`system_load_prds_by_status`).  For each candidate, checks:
+    :func:`project_load_prds_by_status`).  For each candidate, checks:
 
     1. Standard merge commit — branch appears in ``git branch --merged main``.
     2. Squash-and-merge — branch name appears in ``git log main``.
@@ -178,7 +176,7 @@ def system_check_merged(ctx: SystemContext) -> None:
 
 
 @_register("system_mark_done")
-def system_mark_done(ctx: SystemContext) -> None:
+def system_mark_done(ctx: ProjectContext) -> None:
     """Set status to ``"done"`` for all PRDs in ``ctx.targets``."""
     set_status_bulk(ctx, status="done")
 
@@ -187,7 +185,7 @@ _COMPLETED_STATUSES = {"done", "review"}
 
 
 @_register("audit_impacts_check")
-def audit_impacts_check(ctx: SystemContext) -> None:
+def audit_impacts_check(ctx: ProjectContext) -> None:
     """Walk all PRDs and verify that declared impact paths exist on disk.
 
     Severity depends on PRD status:

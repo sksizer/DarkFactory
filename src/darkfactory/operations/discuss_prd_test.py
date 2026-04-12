@@ -7,10 +7,10 @@ from unittest.mock import patch
 
 import pytest
 
-from conftest import make_system_ctx, make_system_op
+from conftest import make_project_ctx, make_project_op
 from darkfactory.operations.discuss_prd import discuss_prd
 from darkfactory.engine import PrdContext
-from darkfactory.system import SystemContext
+from darkfactory.project import ProjectContext
 from darkfactory.utils.claude_code import EffortLevel
 from darkfactory.utils.tui import print_phase_banner
 
@@ -27,9 +27,9 @@ def _make_discuss_ctx(
     tmp_path: Path,
     operation_dir: Path | None = None,
     prd_context: str = "test context",
-) -> SystemContext:
-    op = make_system_op(name="discuss", operation_dir=operation_dir)
-    ctx = make_system_ctx(tmp_path, target_prd="PRD-070", operation=op)
+) -> ProjectContext:
+    op = make_project_op(name="discuss", operation_dir=operation_dir)
+    ctx = make_project_ctx(tmp_path, target_prd="PRD-070", operation=op)
     ctx.state.put(PrdContext(summary="", body=prd_context))
     return ctx
 
@@ -48,7 +48,9 @@ def test_discuss_prd_composes_prompt(tmp_path: Path) -> None:
         captured_prompts.append(prompt)
         return 0
 
-    with patch("darkfactory.operations.discuss_prd.spawn_claude", side_effect=mock_spawn):
+    with patch(
+        "darkfactory.operations.discuss_prd.spawn_claude", side_effect=mock_spawn
+    ):
         with patch("darkfactory.operations.discuss_prd.time.sleep"):
             discuss_prd(ctx, phase="discuss", prompt_file="prompts/discuss.md")
 
@@ -101,7 +103,9 @@ def test_discuss_prd_forwards_effort_level(tmp_path: Path) -> None:
         captured.append(effort_level)
         return 0
 
-    with patch("darkfactory.operations.discuss_prd.spawn_claude", side_effect=mock_spawn):
+    with patch(
+        "darkfactory.operations.discuss_prd.spawn_claude", side_effect=mock_spawn
+    ):
         with patch("darkfactory.operations.discuss_prd.time.sleep"):
             discuss_prd(
                 ctx,

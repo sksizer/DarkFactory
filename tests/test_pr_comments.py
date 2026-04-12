@@ -333,7 +333,9 @@ def test_fetch_pr_comments_calls_gh_and_returns_threads() -> None:
 
 def test_fetch_pr_comments_passes_filters_through() -> None:
     filters = CommentFilters(include_resolved=True)
-    with patch("darkfactory.utils.github.pr.comments._gh_fetch", return_value=FIXTURE_RAW):
+    with patch(
+        "darkfactory.utils.github.pr.comments._gh_fetch", return_value=FIXTURE_RAW
+    ):
         result = fetch_pr_comments(42, filters=filters)
 
     ids = {t.thread_id for t in result}

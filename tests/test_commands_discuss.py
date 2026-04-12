@@ -11,13 +11,13 @@ from conftest import write_prd
 from darkfactory.commands.discuss import discuss_operation
 from darkfactory.commands.discuss.operation import discuss_operation as op_from_module
 from darkfactory.model import load_all
-from darkfactory.system import SystemContext, SystemOperation
+from darkfactory.project import ProjectContext, ProjectOperation
 from darkfactory.workflow import BuiltIn, InteractiveTask
 
 
 def test_discuss_operation_exported() -> None:
     """AC-3: discuss_operation is exported from commands.discuss."""
-    assert isinstance(discuss_operation, SystemOperation)
+    assert isinstance(discuss_operation, ProjectOperation)
     assert discuss_operation is op_from_module
 
 
@@ -97,7 +97,7 @@ def test_chain_executes_in_order(tmp_path: Path) -> None:
     op = discuss_operation
     op.operation_dir = pkg_dir
 
-    ctx = SystemContext(
+    ctx = ProjectContext(
         repo_root=tmp_path,
         prds=prds,
         operation=op,
@@ -126,9 +126,9 @@ def test_chain_executes_in_order(tmp_path: Path) -> None:
                 "darkfactory.operations.commit_prd_changes.diff_quiet",
                 return_value=Ok(None),
             ):
-                from darkfactory.runner import run_system_operation
+                from darkfactory.runner import run_project_operation
 
-                result = run_system_operation(op, ctx)
+                result = run_project_operation(op, ctx)
 
     assert result.success
     assert len(result.steps) == 4
@@ -157,7 +157,7 @@ def test_nonzero_exit_does_not_abort_chain(tmp_path: Path) -> None:
     op = discuss_operation
     op.operation_dir = pkg_dir
 
-    ctx = SystemContext(
+    ctx = ProjectContext(
         repo_root=tmp_path,
         prds=prds,
         operation=op,
@@ -172,9 +172,9 @@ def test_nonzero_exit_does_not_abort_chain(tmp_path: Path) -> None:
                 "darkfactory.operations.commit_prd_changes.diff_quiet",
                 return_value=Ok(None),
             ):
-                from darkfactory.runner import run_system_operation
+                from darkfactory.runner import run_project_operation
 
-                result = run_system_operation(op, ctx)
+                result = run_project_operation(op, ctx)
 
     assert result.success
     assert len(result.steps) == 4
@@ -182,7 +182,7 @@ def test_nonzero_exit_does_not_abort_chain(tmp_path: Path) -> None:
 
 def test_builtins_registered() -> None:
     """AC-4, AC-5, AC-12: All three builtins are registered in SYSTEM_BUILTINS."""
-    from darkfactory.operations.system_builtins import SYSTEM_BUILTINS
+    from darkfactory.operations.project_builtins import SYSTEM_BUILTINS
 
     assert "gather_prd_context" in SYSTEM_BUILTINS
     assert "discuss_prd" in SYSTEM_BUILTINS

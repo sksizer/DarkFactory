@@ -45,7 +45,6 @@ def generate_session_id() -> str:
     return f"s-{now.strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(2)}"
 
 
-
 class EventWriter:
     """Per-PRD JSONL event writer with flat correlation fields.
 

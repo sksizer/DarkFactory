@@ -1,4 +1,4 @@
-"""CLI commands for the ``prd system`` subcommand group."""
+"""CLI commands for the ``prd project`` subcommand group."""
 
 from __future__ import annotations
 
@@ -6,16 +6,16 @@ import argparse
 
 from darkfactory.event_log import generate_session_id
 from darkfactory.loader import load_operations
-from darkfactory.runner import run_system_operation
+from darkfactory.runner import run_project_operation
 from darkfactory.style import Element, Styler
-from darkfactory.system import SystemContext
+from darkfactory.project import ProjectContext
 from darkfactory.workflow import AgentTask, BuiltIn, InteractiveTask, ShellTask, Task
 
 from darkfactory.cli._shared import _emit_json, _find_repo_root, _load
 
 
-def _describe_system_task(task: Task) -> str:
-    """Produce a one-line description of a task for ``prd system describe``."""
+def _describe_project_task(task: Task) -> str:
+    """Produce a one-line description of a task for ``prd project describe``."""
     if isinstance(task, BuiltIn):
         kwargs_str = (
             " " + ", ".join(f"{k}={v!r}" for k, v in task.kwargs.items())
@@ -34,11 +34,11 @@ def _describe_system_task(task: Task) -> str:
     return f"unknown: {type(task).__name__}"
 
 
-def cmd_system_list(args: argparse.Namespace) -> int:
-    """List all available system operations with name and description."""
+def cmd_project_list(args: argparse.Namespace) -> int:
+    """List all available project operations with name and description."""
     operations = load_operations(args.operations_dir)
     if not operations:
-        print("(no system operations found)")
+        print("(no project operations found)")
         return 0
 
     sorted_ops = sorted(operations.values(), key=lambda op: op.name)
@@ -67,11 +67,11 @@ def cmd_system_list(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_system_describe(args: argparse.Namespace) -> int:
-    """Show detailed metadata and task list for a system operation."""
+def cmd_project_describe(args: argparse.Namespace) -> int:
+    """Show detailed metadata and task list for a project operation."""
     operations = load_operations(args.operations_dir)
     if args.name not in operations:
-        raise SystemExit(f"unknown system operation: {args.name!r}")
+        raise SystemExit(f"unknown project operation: {args.name!r}")
 
     op = operations[args.name]
 
@@ -85,7 +85,7 @@ def cmd_system_describe(args: argparse.Namespace) -> int:
                 "pr_title": op.pr_title,
                 "pr_body": op.pr_body,
                 "accepts_target": op.accepts_target,
-                "tasks": [_describe_system_task(t) for t in op.tasks],
+                "tasks": [_describe_project_task(t) for t in op.tasks],
             }
         )
 
@@ -104,15 +104,15 @@ def cmd_system_describe(args: argparse.Namespace) -> int:
     print()
     print(f"  tasks ({len(op.tasks)}):")
     for i, task in enumerate(op.tasks, start=1):
-        print(f"    {i:>2}. {_describe_system_task(task)}")
+        print(f"    {i:>2}. {_describe_project_task(task)}")
     return 0
 
 
-def cmd_system_run(args: argparse.Namespace) -> int:
-    """Run a system operation. Dry-run by default; opt in with --execute."""
+def cmd_project_run(args: argparse.Namespace) -> int:
+    """Run a project operation. Dry-run by default; opt in with --execute."""
     operations = load_operations(args.operations_dir)
     if args.name not in operations:
-        raise SystemExit(f"unknown system operation: {args.name!r}")
+        raise SystemExit(f"unknown project operation: {args.name!r}")
 
     operation = operations[args.name]
 
@@ -144,14 +144,14 @@ def cmd_system_run(args: argparse.Namespace) -> int:
             lock.acquire(timeout=0)
         except Exception as exc:  # noqa: BLE001
             raise SystemExit(
-                f"cannot acquire system operation lock: {exc}\n"
-                "Another system operation may be running. Delete "
+                f"cannot acquire project operation lock: {exc}\n"
+                "Another project operation may be running. Delete "
                 f"{repo_root / '.harness-system.lock'} if the previous run is dead."
             ) from None
 
     prds = _load(args.data_dir) if (args.data_dir / "prds").exists() else {}
 
-    ctx = SystemContext(
+    ctx = ProjectContext(
         repo_root=repo_root,
         prds=prds,
         operation=operation,
@@ -164,12 +164,12 @@ def cmd_system_run(args: argparse.Namespace) -> int:
     print(
         styler.render(
             Element.RUN_HEADER,
-            f"# {header_label}: system operation {operation.name!r}",
+            f"# {header_label}: project operation {operation.name!r}",
         )
     )
 
     try:
-        result = run_system_operation(
+        result = run_project_operation(
             operation,
             ctx,
             model_override=model_override,

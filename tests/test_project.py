@@ -1,4 +1,4 @@
-"""Tests for SystemOperation, SystemContext, and load_operations."""
+"""Tests for ProjectOperation, ProjectContext, and load_operations."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import pytest
 
 from darkfactory.loader import load_operations
 from darkfactory.engine import PhaseState
-from darkfactory.system import SystemContext, SystemOperation
+from darkfactory.project import ProjectContext, ProjectOperation
 from darkfactory.workflow import BuiltIn
 
 
@@ -29,10 +29,10 @@ def _write_operation(
 
     if body is None:
         body = f'''"""Fixture operation."""
-from darkfactory.system import SystemOperation
+from darkfactory.project import ProjectOperation
 from darkfactory.workflow import BuiltIn
 
-operation = SystemOperation(
+operation = ProjectOperation(
     name={name!r},
     description="Fixture for tests",
     tasks=[BuiltIn("some_builtin")],
@@ -48,13 +48,13 @@ def _make_ctx(
     op_name: str = "test-op",
     targets: list[str] | None = None,
     target_prd: str | None = None,
-) -> SystemContext:
-    op = SystemOperation(
+) -> ProjectContext:
+    op = ProjectOperation(
         name=op_name,
         description="test",
         tasks=[],
     )
-    return SystemContext(
+    return ProjectContext(
         repo_root=tmp_path,
         prds={},
         operation=op,
@@ -64,11 +64,11 @@ def _make_ctx(
     )
 
 
-# ---------- SystemOperation ----------
+# ---------- ProjectOperation ----------
 
 
-def test_system_operation_defaults(tmp_path: Path) -> None:
-    op = SystemOperation(name="audit", description="desc", tasks=[])
+def test_project_operation_defaults(tmp_path: Path) -> None:
+    op = ProjectOperation(name="audit", description="desc", tasks=[])
     assert op.requires_clean_main is True
     assert op.creates_pr is False
     assert op.pr_title is None
@@ -77,9 +77,9 @@ def test_system_operation_defaults(tmp_path: Path) -> None:
     assert op.operation_dir is None
 
 
-def test_system_operation_with_tasks(tmp_path: Path) -> None:
+def test_project_operation_with_tasks(tmp_path: Path) -> None:
     task = BuiltIn("my_builtin")
-    op = SystemOperation(
+    op = ProjectOperation(
         name="bulk",
         description="bulk op",
         tasks=[task],
@@ -95,10 +95,10 @@ def test_system_operation_with_tasks(tmp_path: Path) -> None:
     assert op.accepts_target is True
 
 
-# ---------- SystemContext ----------
+# ---------- ProjectContext ----------
 
 
-def test_system_context_defaults(tmp_path: Path) -> None:
+def test_project_context_defaults(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
     assert ctx.dry_run is True
     assert ctx.targets == []
@@ -108,12 +108,12 @@ def test_system_context_defaults(tmp_path: Path) -> None:
     assert isinstance(ctx.state, PhaseState)
 
 
-def test_system_context_logger_default(tmp_path: Path) -> None:
+def test_project_context_logger_default(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
-    assert ctx.logger.name == "darkfactory.system"
+    assert ctx.logger.name == "darkfactory.project"
 
 
-# ---------- SystemContext.format_string ----------
+# ---------- ProjectContext.format_string ----------
 
 
 def test_format_string_operation_name(tmp_path: Path) -> None:
@@ -154,18 +154,20 @@ def test_format_string_unknown_key_raises(tmp_path: Path) -> None:
 
 
 def test_load_operations_missing_directory(tmp_path: Path) -> None:
-    result = load_operations(tmp_path / "does-not-exist")
+    result = load_operations(
+        tmp_path / "does-not-exist", include_builtins=False, include_user=False
+    )
     assert result == {}
 
 
 def test_load_operations_empty_directory(tmp_path: Path) -> None:
-    result = load_operations(tmp_path)
+    result = load_operations(tmp_path, include_builtins=False, include_user=False)
     assert result == {}
 
 
 def test_load_operations_skips_files_at_top_level(tmp_path: Path) -> None:
     (tmp_path / "stray.py").write_text("# not an operation")
-    result = load_operations(tmp_path)
+    result = load_operations(tmp_path, include_builtins=False, include_user=False)
     assert result == {}
 
 
@@ -174,10 +176,10 @@ def test_load_operations_skips_files_at_top_level(tmp_path: Path) -> None:
 
 def test_load_single_operation(tmp_path: Path) -> None:
     _write_operation(tmp_path, "audit")
-    result = load_operations(tmp_path)
+    result = load_operations(tmp_path, include_builtins=False, include_user=False)
     assert "audit" in result
     op = result["audit"]
-    assert isinstance(op, SystemOperation)
+    assert isinstance(op, ProjectOperation)
     assert op.description == "Fixture for tests"
     assert len(op.tasks) == 1
     assert isinstance(op.tasks[0], BuiltIn)
@@ -185,14 +187,14 @@ def test_load_single_operation(tmp_path: Path) -> None:
 
 def test_operation_dir_is_set(tmp_path: Path) -> None:
     _write_operation(tmp_path, "audit")
-    result = load_operations(tmp_path)
+    result = load_operations(tmp_path, include_builtins=False, include_user=False)
     assert result["audit"].operation_dir == tmp_path / "audit"
 
 
 def test_load_multiple_operations(tmp_path: Path) -> None:
     _write_operation(tmp_path, "alpha")
     _write_operation(tmp_path, "bravo")
-    result = load_operations(tmp_path)
+    result = load_operations(tmp_path, include_builtins=False, include_user=False)
     assert set(result.keys()) == {"alpha", "bravo"}
 
 
@@ -203,7 +205,7 @@ def test_load_skips_hidden_and_underscore_dirs(tmp_path: Path) -> None:
     _write_operation(tmp_path, "visible")
     _write_operation(tmp_path, ".hidden")
     _write_operation(tmp_path, "_private")
-    result = load_operations(tmp_path)
+    result = load_operations(tmp_path, include_builtins=False, include_user=False)
     assert set(result.keys()) == {"visible"}
 
 
@@ -211,7 +213,7 @@ def test_load_skips_dirs_without_operation_py(tmp_path: Path) -> None:
     _write_operation(tmp_path, "has-op")
     (tmp_path / "no-op").mkdir()
     (tmp_path / "no-op" / "other.py").write_text("# not operation.py")
-    result = load_operations(tmp_path)
+    result = load_operations(tmp_path, include_builtins=False, include_user=False)
     assert set(result.keys()) == {"has-op"}
 
 
@@ -224,7 +226,7 @@ def test_load_skips_operations_with_syntax_errors(
     _write_operation(tmp_path, "good")
     _write_operation(tmp_path, "broken", body="this is not valid python !@#$\n")
     with caplog.at_level(logging.WARNING, logger="darkfactory.loader"):
-        result = load_operations(tmp_path)
+        result = load_operations(tmp_path, include_builtins=False, include_user=False)
     assert "good" in result
     assert "broken" not in result
     assert any("failed to load operation" in rec.message for rec in caplog.records)
@@ -235,7 +237,7 @@ def test_load_skips_operations_missing_attribute(
 ) -> None:
     _write_operation(tmp_path, "bad", body="x = 42\n")
     with caplog.at_level(logging.WARNING, logger="darkfactory.loader"):
-        result = load_operations(tmp_path)
+        result = load_operations(tmp_path, include_builtins=False, include_user=False)
     assert result == {}
     assert any("failed to load operation" in rec.message for rec in caplog.records)
 
@@ -243,9 +245,9 @@ def test_load_skips_operations_missing_attribute(
 def test_load_skips_operations_with_wrong_type(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    _write_operation(tmp_path, "wrong", body="operation = 'not a SystemOperation'\n")
+    _write_operation(tmp_path, "wrong", body="operation = 'not a ProjectOperation'\n")
     with caplog.at_level(logging.WARNING, logger="darkfactory.loader"):
-        result = load_operations(tmp_path)
+        result = load_operations(tmp_path, include_builtins=False, include_user=False)
     assert result == {}
 
 
@@ -254,9 +256,9 @@ def test_load_rejects_duplicate_names(tmp_path: Path) -> None:
     _write_operation(
         tmp_path,
         "second",
-        body="""from darkfactory.system import SystemOperation
-operation = SystemOperation(name="first", description="dup", tasks=[])
+        body="""from darkfactory.project import ProjectOperation
+operation = ProjectOperation(name="first", description="dup", tasks=[])
 """,
     )
     with pytest.raises(ValueError, match="duplicate operation name"):
-        load_operations(tmp_path)
+        load_operations(tmp_path, include_builtins=False, include_user=False)

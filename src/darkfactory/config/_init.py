@@ -31,9 +31,29 @@ _REQUIRED_DIRS = [
     ".darkfactory/data/prds",
     ".darkfactory/data/archive",
     ".darkfactory/workflows",
+    ".darkfactory/operations",
     ".darkfactory/worktrees",
     ".darkfactory/transcripts",
 ]
+
+_SEED_OPERATION = '''\
+"""Sample project operation — delete or replace this directory with your own.
+
+Project operations run across the whole repository (not per-PRD).
+Run with: prd project run hello
+"""
+
+from darkfactory.project import ProjectOperation
+from darkfactory.workflow import ShellTask
+
+operation = ProjectOperation(
+    name="hello",
+    description="Sample operation — replace with your own.",
+    tasks=[
+        ShellTask("greet", cmd="echo \'Hello from darkfactory operations\'", on_failure="fail"),
+    ],
+)
+'''
 
 _CONFIG_PATH = ".darkfactory/config.toml"
 
@@ -82,6 +102,13 @@ def init_project(target: Path) -> str:
     config_path = target / _CONFIG_PATH
     if not config_path.exists():
         config_path.write_text(CONFIG_SKELETON, encoding="utf-8")
+
+    # Seed a sample operation if operations dir is empty
+    ops_dir = target / ".darkfactory" / "operations"
+    hello_dir = ops_dir / "hello"
+    if not hello_dir.exists():
+        hello_dir.mkdir(parents=True, exist_ok=True)
+        (hello_dir / "operation.py").write_text(_SEED_OPERATION, encoding="utf-8")
 
     # Update .gitignore
     _update_gitignore(target)

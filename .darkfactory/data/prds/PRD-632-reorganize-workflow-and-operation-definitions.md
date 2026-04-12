@@ -2,7 +2,7 @@
 id: PRD-632
 title: Reorganize workflow and operation definitions into prd/ and project/ namespaces
 kind: task
-status: ready
+status: review
 priority: medium
 effort: l
 capability: complex
@@ -35,7 +35,7 @@ assignee: null
 reviewers: []
 target_version: null
 created: 2026-04-12
-updated: 2026-04-12
+updated: '2026-04-12'
 tags:
   - architecture
   - refactor

@@ -31,10 +31,10 @@ def build_parser() -> argparse.ArgumentParser:
     from darkfactory.cli.init_cmd import cmd_init
     from darkfactory.cli.rework import cmd_rework
     from darkfactory.cli.rework_watch import cmd_rework_watch
-    from darkfactory.cli.system import (
-        cmd_system_describe,
-        cmd_system_list,
-        cmd_system_run,
+    from darkfactory.cli.project import (
+        cmd_project_describe,
+        cmd_project_list,
+        cmd_project_run,
     )
 
     parser = argparse.ArgumentParser(prog="prd", description="Pumice PRD harness CLI")
@@ -57,7 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         dest="operations_dir",
-        help="Path to system operations directory (default: .darkfactory/operations/)",
+        help="Path to project operations directory (default: .darkfactory/operations/)",
     )
     parser.add_argument(
         "--json", action="store_true", help="Emit JSON output where supported"
@@ -429,51 +429,51 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub_reconcile.set_defaults(func=cmd_reconcile)
 
-    # ---------- system subcommand ----------
+    # ---------- project subcommand ----------
 
-    sub_system = sub.add_parser(
-        "system",
-        help="Discover and run system operations",
+    sub_project = sub.add_parser(
+        "project",
+        help="Discover and run project operations",
     )
-    system_sub = sub_system.add_subparsers(
-        dest="system_subcommand", metavar="SUBCOMMAND", required=True
+    project_sub = sub_project.add_subparsers(
+        dest="project_subcommand", metavar="SUBCOMMAND", required=True
     )
 
-    # system list
-    sub_sys_list = system_sub.add_parser(
-        "list", help="List all available system operations"
+    # project list
+    sub_proj_list = project_sub.add_parser(
+        "list", help="List all available project operations"
     )
-    sub_sys_list.set_defaults(func=cmd_system_list)
+    sub_proj_list.set_defaults(func=cmd_project_list)
 
-    # system describe <name>
-    sub_sys_describe = system_sub.add_parser(
-        "describe", help="Show metadata and task list for a system operation"
+    # project describe <name>
+    sub_proj_describe = project_sub.add_parser(
+        "describe", help="Show metadata and task list for a project operation"
     )
-    sub_sys_describe.add_argument("name", help="Operation name")
-    sub_sys_describe.set_defaults(func=cmd_system_describe)
+    sub_proj_describe.add_argument("name", help="Operation name")
+    sub_proj_describe.set_defaults(func=cmd_project_describe)
 
-    # system run <name>
-    sub_sys_run = system_sub.add_parser(
+    # project run <name>
+    sub_proj_run = project_sub.add_parser(
         "run",
-        help="Run a system operation (dry-run unless --execute)",
+        help="Run a project operation (dry-run unless --execute)",
     )
-    sub_sys_run.add_argument("name", help="Operation name")
-    sub_sys_run.add_argument(
+    sub_proj_run.add_argument("name", help="Operation name")
+    sub_proj_run.add_argument(
         "--execute",
         action="store_true",
         help="Actually execute (default is dry-run)",
     )
-    sub_sys_run.add_argument(
+    sub_proj_run.add_argument(
         "--target",
         default=None,
         metavar="PRD-X",
         help="Target PRD id for operations that accept_target=True",
     )
-    sub_sys_run.add_argument(
+    sub_proj_run.add_argument(
         "--model",
         default=None,
         help="Override the model for agent tasks (e.g. opus)",
     )
-    sub_sys_run.set_defaults(func=cmd_system_run)
+    sub_proj_run.set_defaults(func=cmd_project_run)
 
     return parser
