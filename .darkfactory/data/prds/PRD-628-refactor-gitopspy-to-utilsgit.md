@@ -8,7 +8,8 @@ effort: m
 capability: complex
 parent:
 depends_on: []
-blocks: []
+blocks:
+  - "[[PRD-621-refactor-common-functionality-in-regards-to-external-systems-services-commands-to-util-modules]]"
 impacts: []
 workflow:
 assignee:
