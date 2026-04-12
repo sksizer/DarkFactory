@@ -4,8 +4,8 @@ title: Make a command that will fully reset outstanding work on a PRD
 kind: task
 status: review
 priority: medium
-effort: h
-capability: moderate
+effort: xl
+capability: complex
 parent:
 depends_on:
   - "[[PRD-622-data-model-refactor]]"
