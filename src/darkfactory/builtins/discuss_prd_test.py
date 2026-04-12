@@ -9,6 +9,7 @@ import pytest
 
 from conftest import make_system_ctx, make_system_op
 from darkfactory.builtins.discuss_prd import discuss_prd
+from darkfactory.engine import PrdContext
 from darkfactory.system import SystemContext
 from darkfactory.utils.claude_code import EffortLevel
 from darkfactory.utils.tui import print_phase_banner
@@ -29,7 +30,7 @@ def _make_discuss_ctx(
 ) -> SystemContext:
     op = make_system_op(name="discuss", operation_dir=operation_dir)
     ctx = make_system_ctx(tmp_path, target_prd="PRD-070", operation=op)
-    ctx._shared_state["prd_context"] = prd_context
+    ctx.state.put(PrdContext(summary="", body=prd_context))
     return ctx
 
 

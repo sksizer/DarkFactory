@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from darkfactory.builtins.resolve_rework_context import resolve_rework_context
+from darkfactory.engine import ReworkState
 from darkfactory.pr_comments import CommentFilters, ReviewThread
 from darkfactory.model import PRD
 from darkfactory.rework_context import ReworkContext, ReworkError
@@ -64,18 +65,23 @@ def _make_ctx(
     reply_to_comments: bool = False,
     dry_run: bool = False,
 ) -> ExecutionContext:
-    return ExecutionContext(
+    ctx = ExecutionContext(
         prd=_make_prd(),
         repo_root=tmp_path,
         workflow=Workflow(name="rework", tasks=[]),
         base_ref="main",
         branch_name="prd/PRD-001-my-feature",
         worktree_path=worktree_path,
-        review_threads=review_threads,
-        comment_filters=comment_filters,
-        reply_to_comments=reply_to_comments,
         dry_run=dry_run,
     )
+    ctx.state.put(
+        ReworkState(
+            review_threads=review_threads,
+            comment_filters=comment_filters,
+            reply_to_comments=reply_to_comments,
+        )
+    )
+    return ctx
 
 
 def test_noop_when_context_already_populated(tmp_path: Path) -> None:
@@ -91,7 +97,7 @@ def test_noop_when_context_already_populated(tmp_path: Path) -> None:
 
     # Nothing changes — the builtin trusted the pre-populated state.
     assert ctx.worktree_path == worktree
-    assert ctx.review_threads == [_thread()]
+    assert ctx.state.get(ReworkState).review_threads == [_thread()]
 
 
 def test_dry_run_sets_empty_threads_and_skips_discovery(tmp_path: Path) -> None:
@@ -103,7 +109,7 @@ def test_dry_run_sets_empty_threads_and_skips_discovery(tmp_path: Path) -> None:
         resolve_rework_context(ctx)
         mock_discover.assert_not_called()
 
-    assert ctx.review_threads == []
+    assert ctx.state.get(ReworkState).review_threads == []
 
 
 def test_calls_discover_when_ctx_empty(tmp_path: Path) -> None:
@@ -134,8 +140,8 @@ def test_calls_discover_when_ctx_empty(tmp_path: Path) -> None:
 
     assert ctx.worktree_path == worktree
     assert ctx.cwd == worktree
-    assert ctx.pr_number == 42
-    assert ctx.review_threads == threads
+    assert ctx.state.get(ReworkState).pr_number == 42
+    assert ctx.state.get(ReworkState).review_threads == threads
 
 
 def test_uses_ctx_filters_when_set(tmp_path: Path) -> None:

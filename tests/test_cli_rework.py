@@ -255,14 +255,20 @@ def test_rework_execute_with_comments_invokes_workflow(
 
     assert result == 0
     assert mock_run.called
-    # The CLI hands the discovered state over via context_overrides so the
-    # resolve_rework_context builtin is a no-op when the workflow starts.
+    # The CLI hands the discovered state over via context_overrides (for
+    # ExecutionContext fields) and phase_state_init (for ReworkState).
     _, kwargs = mock_run.call_args
     assert kwargs["dry_run"] is False
     overrides = kwargs["context_overrides"]
     assert overrides["worktree_path"] == discovered.worktree_path
     assert overrides["cwd"] == discovered.worktree_path
-    assert overrides["pr_number"] == 42
-    assert overrides["review_threads"] == [thread]
-    assert overrides["reply_to_comments"] is True
-    assert isinstance(overrides["comment_filters"], CommentFilters)
+    # Rework-specific state is now passed via phase_state_init
+    phase_init = kwargs["phase_state_init"]
+    assert len(phase_init) == 1
+    from darkfactory.engine import ReworkState
+
+    rework_state = phase_init[0]
+    assert isinstance(rework_state, ReworkState)
+    assert rework_state.pr_number == 42
+    assert rework_state.review_threads == [thread]
+    assert rework_state.reply_to_comments is True

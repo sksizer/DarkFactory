@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import argparse
 
+from darkfactory.event_log import generate_session_id
 from darkfactory.loader import load_operations
+from darkfactory.runner import run_system_operation
 from darkfactory.style import Element, Styler
 from darkfactory.system import SystemContext
-from darkfactory.system_runner import run_system_operation
-from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Task
+from darkfactory.workflow import AgentTask, BuiltIn, InteractiveTask, ShellTask, Task
 
 from darkfactory.cli._shared import _emit_json, _find_repo_root, _load
 
@@ -28,6 +29,8 @@ def _describe_system_task(task: Task) -> str:
         return f"agent: {task.name} [model={model}, prompts={prompts}]"
     if isinstance(task, ShellTask):
         return f"shell: {task.name} ({task.on_failure}) -> {task.cmd}"
+    if isinstance(task, InteractiveTask):
+        return f"interactive: {task.name} [prompt={task.prompt_file}]"
     return f"unknown: {type(task).__name__}"
 
 
@@ -166,7 +169,13 @@ def cmd_system_run(args: argparse.Namespace) -> int:
     )
 
     try:
-        result = run_system_operation(operation, ctx, model_override=model_override)
+        result = run_system_operation(
+            operation,
+            ctx,
+            model_override=model_override,
+            session_id=generate_session_id() if not dry_run else None,
+            styler=styler,
+        )
     finally:
         if lock is not None:
             try:

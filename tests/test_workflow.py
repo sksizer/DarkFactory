@@ -174,11 +174,12 @@ def _make_ctx(tmp_data_dir: Path) -> ExecutionContext:
 def test_execution_context_defaults(tmp_data_dir: Path) -> None:
     ctx = _make_ctx(tmp_data_dir)
     assert ctx.base_ref == "main"
-    assert ctx.agent_output is None
-    assert ctx.agent_success is False
     assert ctx.pr_url is None
     assert ctx.dry_run is True
     assert isinstance(ctx.logger, logging.Logger)
+    from darkfactory.engine import PhaseState
+
+    assert isinstance(ctx.state, PhaseState)
 
 
 def test_format_string_expands_prd_fields(tmp_data_dir: Path) -> None:

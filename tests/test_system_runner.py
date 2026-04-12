@@ -6,10 +6,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from darkfactory.system import SystemContext, SystemOperation
-from darkfactory.system_runner import (
-    SYSTEM_BUILTINS,
-    run_system_operation,
-)
+from darkfactory.builtins.system_builtins import SYSTEM_BUILTINS
+from darkfactory.runner import run_system_operation
 from darkfactory.workflow import AgentTask, BuiltIn, ShellTask
 
 
@@ -61,7 +59,7 @@ def test_run_builtin_unknown_name(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
     result = run_system_operation(operation, ctx)
     assert result.success is False
-    assert "no system builtin registered" in (result.failure_reason or "")
+    assert "no builtin registered for" in (result.failure_reason or "")
     assert len(result.steps) == 1
     assert result.steps[0].kind == "builtin"
     assert result.steps[0].success is False
@@ -162,7 +160,7 @@ def test_run_shell_ignore_failure(tmp_path: Path) -> None:
 
 def test_run_shell_format_string_substituted(tmp_path: Path) -> None:
     """format_string is applied to the shell command before execution."""
-    with patch("darkfactory.system_runner.run_shell") as mock_run:
+    with patch("darkfactory.runner.run_shell") as mock_run:
         mock_proc = MagicMock()
         mock_proc.returncode = 0
         mock_run.return_value = mock_proc
@@ -195,7 +193,7 @@ def test_run_agent_dry_run(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, dry_run=True)
     ctx.operation.operation_dir = op_dir
 
-    with patch("darkfactory.system_runner.invoke_claude") as mock_invoke:
+    with patch("darkfactory.runner.invoke_claude") as mock_invoke:
         mock_result = MagicMock()
         mock_result.success = True
         mock_result.failure_reason = None
@@ -222,7 +220,7 @@ def test_run_agent_failure(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, dry_run=False)
     ctx.operation.operation_dir = op_dir
 
-    with patch("darkfactory.system_runner.invoke_claude") as mock_invoke:
+    with patch("darkfactory.runner.invoke_claude") as mock_invoke:
         mock_result = MagicMock()
         mock_result.success = False
         mock_result.failure_reason = "sentinel not found"

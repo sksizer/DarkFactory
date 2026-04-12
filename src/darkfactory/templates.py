@@ -151,11 +151,6 @@ def compose_prompt(
             else ""
         ),
     }
-    review_threads = getattr(execution_context, "review_threads", None)
-    if review_threads is not None:
-        from .rework_prompt import render_rework_feedback
-
-        context["REWORK_FEEDBACK"] = render_rework_feedback(review_threads)
     if extras:
         context.update(extras)
 
@@ -191,6 +186,8 @@ class WorkflowTemplate:
     close: list[BuiltIn]
     middle_kinds: list[type] = field(default_factory=list)
     middle_required: dict[type, tuple[int, int | None]] = field(default_factory=dict)
+    provides: frozenset[type] = frozenset()
+    expects: frozenset[type] = frozenset()
 
     def compose(
         self,

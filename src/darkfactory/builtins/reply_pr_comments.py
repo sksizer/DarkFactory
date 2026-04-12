@@ -1,8 +1,8 @@
 """Built-in: reply_pr_comments — post bot replies to addressed PR threads.
 
 Runs after ``commit`` and ``push_branch`` in the rework workflow.  Only
-executes when ``ctx.reply_to_comments`` is True.  Parses structured reply
-notes from the agent output and posts each one as a GitHub comment reply
+executes when rework state has ``reply_to_comments=True``.  Parses structured
+reply notes from the agent output and posts each one as a GitHub comment reply
 prefixed with ``[harness] addressed in {commit_sha}: ``.
 
 Failures are logged as warnings and do not fail the rework run.
@@ -16,6 +16,7 @@ from pathlib import Path
 from darkfactory.builtins._registry import builtin
 from darkfactory.builtins._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
+from darkfactory.engine import AgentResult, ReworkState
 from darkfactory.utils.git import GitErr, Ok, Timeout, git_run
 from darkfactory.workflow import ExecutionContext
 
@@ -41,40 +42,38 @@ def reply_pr_comments(ctx: ExecutionContext) -> None:
 
     No-op when:
 
-    - ``ctx.reply_to_comments`` is False (opt-in flag not set)
-    - ``ctx.pr_number`` is None (no PR to reply to)
-    - ``ctx.agent_output`` is empty (no agent output to parse)
-
-    When enabled, parses the agent's structured reply-notes block from
-    ``ctx.agent_output``, resolves the current HEAD SHA as the commit
-    reference, and posts each reply via ``gh api``.
-
-    Failed posts are logged as warnings but do not raise — the rework
-    run proceeds regardless.
+    - Rework state not present or ``reply_to_comments`` is False
+    - No PR number in rework state
+    - No agent output in PhaseState
     """
-    if not ctx.reply_to_comments:
+    rework = ctx.state.get(ReworkState, ReworkState())
+
+    if not rework.reply_to_comments:
         _log.debug("reply_pr_comments: --reply-to-comments not set, skipping")
         return
 
-    if ctx.pr_number is None:
+    if rework.pr_number is None:
         ctx.logger.warning(
-            "reply_pr_comments: ctx.pr_number not set, cannot post replies"
+            "reply_pr_comments: pr_number not set in ReworkState, cannot post replies"
         )
         return
 
-    if not ctx.agent_output:
+    agent_output = ""
+    if ctx.state.has(AgentResult):
+        agent_output = ctx.state.get(AgentResult).stdout
+    if not agent_output:
         _log.info("reply_pr_comments: no agent output to parse, skipping")
         return
 
     from darkfactory.pr_comments import parse_agent_replies, post_comment_replies
 
-    replies = parse_agent_replies(ctx.agent_output)
+    replies = parse_agent_replies(agent_output)
     if not replies:
         _log.info("reply_pr_comments: no reply notes found in agent output")
         return
 
     if _log_dry_run(
-        ctx, f"would post {len(replies)} reply/replies to PR #{ctx.pr_number}"
+        ctx, f"would post {len(replies)} reply/replies to PR #{rework.pr_number}"
     ):
         for reply in replies:
             ctx.logger.info(
@@ -85,9 +84,9 @@ def reply_pr_comments(ctx: ExecutionContext) -> None:
     commit_sha = _get_head_sha(str(ctx.cwd)) or "unknown"
 
     results = post_comment_replies(
-        pr_number=ctx.pr_number,
+        pr_number=rework.pr_number,
         replies=replies,
-        threads=ctx.review_threads or [],
+        threads=rework.review_threads or [],
         commit_sha=commit_sha,
         repo_root=ctx.repo_root,
     )
@@ -99,7 +98,7 @@ def reply_pr_comments(ctx: ExecutionContext) -> None:
         "reply_pr_comments: posted %d/%d replies to PR #%d",
         success_count,
         len(results),
-        ctx.pr_number,
+        rework.pr_number,
     )
 
     if fail_count:
@@ -113,7 +112,7 @@ def reply_pr_comments(ctx: ExecutionContext) -> None:
         "reply_pr_comments",
         "reply",
         detail={
-            "pr_number": ctx.pr_number,
+            "pr_number": rework.pr_number,
             "total": len(results),
             "success": success_count,
             "failed": fail_count,

@@ -328,7 +328,7 @@ def test_system_run_report_displayed(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Report lines accumulated by builtins are displayed after the run."""
-    from darkfactory.system_runner import SYSTEM_BUILTINS
+    from darkfactory.builtins.system_builtins import SYSTEM_BUILTINS
     from darkfactory.system import SystemContext
 
     _prd_dir, ops_dir = _setup_project(tmp_path)

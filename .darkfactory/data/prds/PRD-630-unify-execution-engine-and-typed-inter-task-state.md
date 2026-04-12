@@ -2,7 +2,7 @@
 id: PRD-630
 title: Unify execution engine and introduce typed inter-task state
 kind: epic
-status: ready
+status: review
 priority: high
 effort: l
 capability: complex
@@ -33,7 +33,7 @@ assignee: null
 reviewers: []
 target_version: null
 created: '2026-04-11'
-updated: '2026-04-11'
+updated: '2026-04-12'
 tags:
   - refactor
   - architecture

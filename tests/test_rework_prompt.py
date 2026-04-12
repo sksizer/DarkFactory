@@ -208,6 +208,8 @@ def test_rework_feedback_inserted_via_extras(tmp_path: Path) -> None:
     # Minimal fake ExecutionContext attributes via a simple object
     from types import SimpleNamespace
 
+    from darkfactory.engine import PhaseState
+
     prd = SimpleNamespace(
         id="PRD-225",
         title="Rework feedback loop",
@@ -219,6 +221,7 @@ def test_rework_feedback_inserted_via_extras(tmp_path: Path) -> None:
         branch_name="prd/PRD-225-rework",
         base_ref="main",
         worktree_path=None,
+        state=PhaseState(),
     )
 
     result = compose_prompt(
