@@ -1,0 +1,59 @@
+---
+title: "prd archive"
+description: "Move a completed PRD to the archive directory"
+---
+
+## Synopsis
+
+```bash frame="terminal" title="Usage"
+prd archive PRD-ID
+```
+
+## Description
+
+Moves a terminal-state PRD file from `.darkfactory/data/prds/` to `.darkfactory/data/archive/` and stamps its status as `archived`. This keeps the active PRD directory clean without losing history.
+
+## Guardrails
+
+The command enforces two preconditions before archiving:
+
+1. **Terminal status** — the PRD must be in `done`, `superseded`, or `cancelled`. PRDs in any other status are rejected.
+2. **Dependency chain** — all PRDs in the transitive dependency graph (children, blockers, parents) must also be in a terminal state. This prevents archiving a PRD while related work is still in flight.
+
+Both checks run before any files are moved.
+
+## Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `PRD-ID` | Yes | The PRD to archive (e.g. `PRD-070`) |
+
+## Examples
+
+```bash frame="terminal" title="Archive a completed PRD"
+$ prd archive PRD-070
+Archived PRD-070 -> .darkfactory/data/archive/PRD-070-my-feature.md
+```
+
+```bash frame="terminal" title="Rejected — not a terminal status"
+$ prd archive PRD-045
+Cannot archive PRD-045: status is 'in-progress', must be done, superseded, or cancelled
+```
+
+```bash frame="terminal" title="Rejected — related PRDs still active"
+$ prd archive PRD-020
+Cannot archive PRD-020: related PRDs are not in a terminal state:
+  PRD-021 (status: ready)
+  PRD-022 (status: in-progress)
+```
+
+## Notes
+
+- Archived PRDs are included in `load_one` lookups (so dependencies still resolve) but excluded from `load_all` by default, keeping `prd status` and `prd next` uncluttered.
+- The `archived` status is a file-level state set during the move; it is distinct from `done`, `superseded`, and `cancelled` and does not appear in the normal status lifecycle.
+
+## Related
+
+- [`prd status`](/reference/cli/status/) -- View active PRD counts and DAG overview
+- [`concepts/status-lifecycle`](/concepts/status-lifecycle/) -- Full status state machine
+- [`reference/project-layout`](/reference/project-layout/) -- Archive directory location
