@@ -12,7 +12,7 @@ from darkfactory.commands.discuss import discuss_operation
 from darkfactory.commands.discuss.operation import discuss_operation as op_from_module
 from darkfactory.model import load_all
 from darkfactory.system import SystemContext, SystemOperation
-from darkfactory.workflow import BuiltIn
+from darkfactory.workflow import BuiltIn, InteractiveTask
 
 
 def test_discuss_operation_exported() -> None:
@@ -36,15 +36,15 @@ def test_discuss_operation_task_order() -> None:
     assert isinstance(tasks[0], BuiltIn)
     assert tasks[0].name == "gather_prd_context"
 
-    assert isinstance(tasks[1], BuiltIn)
-    assert tasks[1].name == "discuss_prd"
-    assert tasks[1].kwargs["phase"] == "discuss"
-    assert tasks[1].kwargs["effort_level"] == "max"
+    assert isinstance(tasks[1], InteractiveTask)
+    assert tasks[1].name == "discuss"
+    assert tasks[1].prompt_file == "prompts/discuss.md"
+    assert tasks[1].effort_level == "max"
 
-    assert isinstance(tasks[2], BuiltIn)
-    assert tasks[2].name == "discuss_prd"
-    assert tasks[2].kwargs["phase"] == "critique"
-    assert tasks[2].kwargs["effort_level"] == "max"
+    assert isinstance(tasks[2], InteractiveTask)
+    assert tasks[2].name == "critique"
+    assert tasks[2].prompt_file == "prompts/critique.md"
+    assert tasks[2].effort_level == "max"
 
     assert isinstance(tasks[3], BuiltIn)
     assert tasks[3].name == "commit_prd_changes"
@@ -120,8 +120,8 @@ def test_chain_executes_in_order(tmp_path: Path) -> None:
             call_order.append("critique_claude")
         return 0
 
-    with patch("darkfactory.builtins.discuss_prd.spawn_claude", side_effect=mock_spawn):
-        with patch("darkfactory.builtins.discuss_prd.time.sleep"):
+    with patch("darkfactory.runner.spawn_claude", side_effect=mock_spawn):
+        with patch("darkfactory.runner.time.sleep"):
             with patch(
                 "darkfactory.builtins.commit_prd_changes.diff_quiet",
                 return_value=Ok(None),
@@ -133,8 +133,8 @@ def test_chain_executes_in_order(tmp_path: Path) -> None:
     assert result.success
     assert len(result.steps) == 4
     assert result.steps[0].name == "gather_prd_context"
-    assert result.steps[1].name == "discuss_prd"
-    assert result.steps[2].name == "discuss_prd"
+    assert result.steps[1].name == "discuss"
+    assert result.steps[2].name == "critique"
     assert result.steps[3].name == "commit_prd_changes"
 
 
@@ -166,8 +166,8 @@ def test_nonzero_exit_does_not_abort_chain(tmp_path: Path) -> None:
         target_prd="PRD-070",
     )
 
-    with patch("darkfactory.builtins.discuss_prd.spawn_claude", return_value=130):
-        with patch("darkfactory.builtins.discuss_prd.time.sleep"):
+    with patch("darkfactory.runner.spawn_claude", return_value=130):
+        with patch("darkfactory.runner.time.sleep"):
             with patch(
                 "darkfactory.builtins.commit_prd_changes.diff_quiet",
                 return_value=Ok(None),

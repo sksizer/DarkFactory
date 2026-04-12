@@ -9,6 +9,7 @@ import pytest
 from conftest import write_prd
 from darkfactory.builtins.gather_prd_context import gather_prd_context
 from darkfactory.model import PRD, load_all
+from darkfactory.phase_state import PrdContext
 from darkfactory.system import SystemContext, SystemOperation
 
 
@@ -43,7 +44,7 @@ def test_gather_context_basic(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, prds=prds, target_prd="PRD-070")
     gather_prd_context(ctx)
 
-    context = ctx._shared_state["prd_context"]
+    context = ctx.state.get(PrdContext).body
     assert "## Target PRD" in context
     assert "PRD-070" in context
     assert "Test PRD" in context
@@ -71,7 +72,7 @@ def test_gather_context_with_parent_and_deps(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, prds=prds, target_prd="PRD-070")
     gather_prd_context(ctx)
 
-    context = ctx._shared_state["prd_context"]
+    context = ctx.state.get(PrdContext).body
     assert "## Parent" in context
     assert "PRD-001" in context
     assert "Parent Epic" in context
@@ -111,6 +112,6 @@ def test_gather_context_missing_dep_graceful(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, prds=prds, target_prd="PRD-070")
     gather_prd_context(ctx)
 
-    context = ctx._shared_state["prd_context"]
+    context = ctx.state.get(PrdContext).body
     assert "PRD-999" in context
     assert "(not found)" in context

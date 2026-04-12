@@ -192,6 +192,7 @@ def _make_rework_workflow(tmp_path: Path) -> Workflow:
 def test_run_workflow_applies_context_overrides(tmp_path: Path) -> None:
     """context_overrides values appear on the ExecutionContext for every task."""
     from darkfactory.invoke import InvokeResult
+    from darkfactory.phase_state import ReworkState
 
     prd = _make_prd(tmp_path)
     worktree = tmp_path / "worktree"
@@ -209,6 +210,11 @@ def test_run_workflow_applies_context_overrides(tmp_path: Path) -> None:
         exit_code=0,
         success=True,
         failure_reason=None,
+    )
+
+    rework_state = ReworkState(
+        pr_number=42,
+        review_threads=threads,
     )
 
     from darkfactory.builtins._registry import BUILTINS
@@ -233,14 +239,13 @@ def test_run_workflow_applies_context_overrides(tmp_path: Path) -> None:
             context_overrides={
                 "worktree_path": worktree,
                 "cwd": worktree,
-                "pr_number": 42,
-                "review_threads": threads,
             },
+            phase_state_init=[rework_state],
         )
 
     assert result.success
-    assert captured_ctx[0].review_threads == threads
-    assert captured_ctx[0].pr_number == 42
+    assert captured_ctx[0].state.get(ReworkState).review_threads == threads
+    assert captured_ctx[0].state.get(ReworkState).pr_number == 42
     assert captured_ctx[0].worktree_path == worktree
     assert captured_ctx[0].cwd == worktree
 
@@ -261,6 +266,8 @@ def test_run_workflow_rejects_unknown_override_key(tmp_path: Path) -> None:
 
 def test_run_workflow_commit_message_uses_prd_id(tmp_path: Path) -> None:
     """The commit message for rework is formatted with the PRD id."""
+    from darkfactory.phase_state import ReworkState
+
     prd = _make_prd(tmp_path, "PRD-007")
     worktree = tmp_path / "worktree"
     worktree.mkdir()
@@ -279,6 +286,11 @@ def test_run_workflow_commit_message_uses_prd_id(tmp_path: Path) -> None:
         exit_code=0,
         success=True,
         failure_reason=None,
+    )
+
+    rework_state = ReworkState(
+        pr_number=42,
+        review_threads=threads,
     )
 
     from darkfactory.builtins._registry import BUILTINS
@@ -303,9 +315,8 @@ def test_run_workflow_commit_message_uses_prd_id(tmp_path: Path) -> None:
             context_overrides={
                 "worktree_path": worktree,
                 "cwd": worktree,
-                "pr_number": 42,
-                "review_threads": threads,
             },
+            phase_state_init=[rework_state],
         )
 
     assert commit_messages == ["chore(prd): PRD-007 address review feedback"]

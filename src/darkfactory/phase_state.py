@@ -17,6 +17,9 @@ from typing import Any, TypeVar, overload
 
 T = TypeVar("T")
 
+# Sentinel for distinguishing "no default" from "default is None".
+_SENTINEL = object()
+
 
 class PhaseState:
     """Type-keyed registry for inter-task data bundles.
@@ -61,10 +64,6 @@ class PhaseState:
     def has(self, key: type) -> bool:
         """Return True if ``key`` has been stored."""
         return key in self._store
-
-
-# Sentinel for distinguishing "no default" from "default is None".
-_SENTINEL = object()
 
 
 # ---------- Data bundles ----------

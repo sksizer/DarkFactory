@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from darkfactory.loader import load_operations
+from darkfactory.phase_state import PhaseState
 from darkfactory.system import SystemContext, SystemOperation
 from darkfactory.workflow import BuiltIn
 
@@ -104,7 +105,7 @@ def test_system_context_defaults(tmp_path: Path) -> None:
     assert ctx.report == []
     assert ctx.pr_url is None
     assert ctx.target_prd is None
-    assert ctx._shared_state == {}
+    assert isinstance(ctx.state, PhaseState)
 
 
 def test_system_context_logger_default(tmp_path: Path) -> None:

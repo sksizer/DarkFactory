@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from darkfactory.builtins.reply_pr_comments import reply_pr_comments
+from darkfactory.phase_state import AgentResult, PhaseState, ReworkState
 from darkfactory.pr_comments import ReviewThread
 
 
@@ -38,16 +39,23 @@ def _make_ctx(
     review_threads: list[ReviewThread] | None = None,
 ) -> MagicMock:
     ctx = MagicMock()
-    ctx.reply_to_comments = reply_to_comments
-    ctx.pr_number = pr_number
-    ctx.agent_output = agent_output
+    ctx.state = PhaseState()
+    ctx.state.put(ReworkState(
+        reply_to_comments=reply_to_comments,
+        pr_number=pr_number,
+        review_threads=review_threads if review_threads is not None else _default_threads(),
+    ))
+    if agent_output is not None:
+        ctx.state.put(AgentResult(
+            stdout=agent_output,
+            stderr="",
+            exit_code=0,
+            success=True,
+        ))
     ctx.dry_run = dry_run
     ctx.cwd = cwd or Path("/tmp/worktree")
     ctx.repo_root = repo_root or Path("/tmp/repo")
     ctx.event_writer = None
-    ctx.review_threads = (
-        review_threads if review_threads is not None else _default_threads()
-    )
     return ctx
 
 
