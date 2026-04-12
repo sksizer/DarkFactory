@@ -95,7 +95,9 @@ def _discover_artifacts(
             for pr in prs:
                 head = str(pr.get("headRefName", ""))
                 if head.startswith(f"prd/{prd_id}-"):
-                    summary.open_pr_numbers.append(int(pr["number"]))
+                    pr_number = pr["number"]
+                    if isinstance(pr_number, (int, str)):
+                        summary.open_pr_numbers.append(int(pr_number))
     except (subprocess.CalledProcessError, json.JSONDecodeError):
         pass
 
