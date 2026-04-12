@@ -23,7 +23,7 @@ DarkFactory resolves configuration through a **five-layer cascade**. Higher laye
 
 ## Config Dataclass
 
-Configuration is split into two sections:
+Configuration is split into three sections:
 
 ```python
 @dataclass
@@ -38,7 +38,16 @@ class StyleConfig:
     theme: str = "dark"
     icon_set: str = "ascii"
     no_color: bool = False
+
+@dataclass
+class PathsConfig:
+    project_dir: Path | None = None   # .darkfactory/
+    data_dir: Path | None = None      # .darkfactory/data/
+    prds_dir: Path | None = None      # .darkfactory/data/prds/
+    archive_dir: Path | None = None   # .darkfactory/data/archive/
 ```
+
+`PathsConfig` is populated automatically from project discovery and cannot be set via `config.toml` or environment variables.
 
 ## Layer Details
 
@@ -111,16 +120,16 @@ class StyleConfig:
 
     ```bash frame="terminal" title="CLI flag examples"
     # Override model for this run
-    darkfactory execute PRD-042 --model opus
+    prd run PRD-042 --execute --model opus
 
     # Disable color output
-    darkfactory status --no-color
+    prd --no-color status
 
     # Change theme
-    darkfactory status --theme light
+    prd --theme light status
 
     # Change icon set
-    darkfactory status --icon-set unicode
+    prd --icon-set ascii status
     ```
   </TabItem>
 </Tabs>
@@ -139,7 +148,7 @@ complex = "opus"         # PRDs with capability: complex
 
 [style]
 theme = "dark"           # "dark" or "light"
-icon_set = "ascii"       # "ascii" or "unicode"
+icon_set = "ascii"       # "ascii", "nerdfont", or "emoji"
 no_color = false         # disable color output
 ```
 

@@ -69,6 +69,7 @@ class AgentTask(Task):
     verify_prompts: list[str] = field(default_factory=list)
     sentinel_success: str = "PRD_EXECUTE_OK"
     sentinel_failure: str = "PRD_EXECUTE_FAILED"
+    effort_level: EffortLevel | None = None
 ```
 
 | Field | Type | Default | Description |
@@ -82,6 +83,7 @@ class AgentTask(Task):
 | `verify_prompts` | `list[str]` | `[]` | Prompt files used during `retry_agent` re-invocation. Receive `{CHECK_OUTPUT}` bound to failure output. |
 | `sentinel_success` | `str` | `"PRD_EXECUTE_OK"` | String the agent must emit to signal success. |
 | `sentinel_failure` | `str` | `"PRD_EXECUTE_FAILED"` | String the agent emits to signal failure. |
+| `effort_level` | `EffortLevel \| None` | `None` | Session-scoped adaptive-reasoning budget passed to `--effort`. One of `"low"`, `"medium"`, `"high"`, `"max"`. `"max"` requires Opus 4.6. |
 
 <Aside type="caution">
 An empty `tools` list means ALL tools are available, not zero tools. To restrict tool access, explicitly list the permitted tools.

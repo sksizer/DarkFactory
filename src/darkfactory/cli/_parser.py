@@ -20,6 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
     from darkfactory.cli.orphans import cmd_orphans
     from darkfactory.cli.plan import cmd_plan
     from darkfactory.cli.reconcile import cmd_reconcile
+    from darkfactory.cli.reset import cmd_reset
     from darkfactory.cli.run import cmd_run
     from darkfactory.cli.status import cmd_status
     from darkfactory.cli.tree import cmd_tree
@@ -168,6 +169,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Remove even if there are unpushed commits",
     )
     sub_cleanup.set_defaults(func=cmd_cleanup)
+
+    sub_reset = sub.add_parser(
+        "reset",
+        help="Reset outstanding work on a PRD (dry-run unless --execute)",
+    )
+    sub_reset.add_argument("prd_id", help="PRD id to reset (e.g. PRD-626)")
+    sub_reset.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the reset (default is dry-run)",
+    )
+    sub_reset.add_argument(
+        "--yes",
+        "-y",
+        action="store_true",
+        help="Skip confirmation prompt (for scripting/automation)",
+    )
+    sub_reset.set_defaults(func=cmd_reset)
 
     sub_next = sub.add_parser("next", help="List actionable PRDs")
     sub_next.add_argument("--limit", type=int, default=10)

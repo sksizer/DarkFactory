@@ -13,13 +13,13 @@ blocks:
 impacts:
   - src/darkfactory/impacts.py
   - src/darkfactory/runner.py
-  - src/darkfactory/cli.py
+  - src/darkfactory/cli/**
 workflow:
 assignee:
 reviewers: []
 target_version:
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-11'
 tags:
   - harness
   - reliability
@@ -87,7 +87,7 @@ A pre-merge variant (run during the PR's CI pass) is worth a follow-up but is no
 - **`src/darkfactory/drift.py`** (new module) exposing:
   - `compute_drift(prd, merge_sha, repo_root, ignore_globs) -> DriftReport`
   - `DriftReport` dataclass: `prd_id`, `merge_sha`, `declared_globs`, `actual_files`, `drifted_files`, `is_drift: bool`
-- Integration with the post-merge hook in `runner.py` (or a new `cli.py` subcommand `prd check-drift` that runs the same code).
+- Integration with the post-merge hook in `runner.py` (or a new `cli/check_drift.py` subcommand `prd check-drift` that runs the same code).
 - Drift history persisted under `.darkfactory/drift/` as one file per PRD merge (small JSON), so it survives across harness runs and can be queried by other features (notably PRD-545's scheduler).
 - Project policy resolution goes through the cascade resolver from PRD-222.6 once that lands; until then, hardcode the default `warn` policy and accept a CLI override (`--drift-policy=warn|block|auto-update`).
 

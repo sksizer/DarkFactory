@@ -27,7 +27,7 @@ from darkfactory.pr_comments import CommentFilters, ReviewThread
 from darkfactory.pr_comments import fetch_pr_comments as _fetch_pr_comments
 from darkfactory.model import PRD, compute_branch_name
 from darkfactory.rework_guard import ReworkGuard
-from darkfactory.worktree_utils import find_worktree_for_prd
+from darkfactory.utils.git.worktree import find_worktree_for_prd
 
 _log = logging.getLogger(__name__)
 

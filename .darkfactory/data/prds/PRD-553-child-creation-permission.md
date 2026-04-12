@@ -13,14 +13,14 @@ blocks:
 impacts:
   - src/darkfactory/workflow.py
   - src/darkfactory/runner.py
-  - workflows/planning/workflow.py
+  - src/darkfactory/workflows/planning/workflow.py
   - tests/test_workflow_permissions.py
 workflow:
 assignee:
 reviewers: []
 target_version:
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-11'
 tags:
   - harness
   - permissions
@@ -48,9 +48,9 @@ Explicit permission gives us:
 ## Requirements
 
 1. New workflow-task field: `can_create_prds: bool` (default `false`).
-2. Workflow loader validates: if `can_create_prds=true`, the task's tool allowlist must include `Write` for `prds/**`. If `can_create_prds=false`, `Write` for `prds/**` is stripped from the allowlist before prompt composition.
-3. Post-run validator: after a task completes, diff the `prds/` directory in its worktree. If new PRD files exist and the task didn't have `can_create_prds=true`, the run fails and the files are reverted.
-4. Planning workflow (`workflows/planning/workflow.py`) is updated to set `can_create_prds=true` on its decomposition task. Every other existing workflow stays implicitly false.
+2. Workflow loader validates: if `can_create_prds=true`, the task's tool allowlist must include `Write` for `.darkfactory/data/prds/**`. If `can_create_prds=false`, `Write` for `.darkfactory/data/prds/**` is stripped from the allowlist before prompt composition.
+3. Post-run validator: after a task completes, diff the `.darkfactory/data/prds/` directory in its worktree. If new PRD files exist and the task didn't have `can_create_prds=true`, the run fails and the files are reverted.
+4. Planning workflow (`src/darkfactory/workflows/planning/workflow.py`) is updated to set `can_create_prds=true` on its decomposition task. Every other existing workflow stays implicitly false.
 5. PRD-220's graph executor reads this field when deciding whether to re-load PRDs after a run — no need to re-scan if the task couldn't have created anything.
 
 ## Open questions
@@ -62,7 +62,7 @@ Explicit permission gives us:
 ## References
 
 - [[PRD-220-graph-execution]] — consumer; relies on this for `--max-runs` honesty.
-- `workflows/planning/workflow.py` — the one legitimate creator of child PRDs today.
+- `src/darkfactory/workflows/planning/workflow.py` — the one legitimate creator of child PRDs today.
 
 ## Assessment (2026-04-11)
 

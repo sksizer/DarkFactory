@@ -5,7 +5,7 @@ description: The finite set of states a PRD moves through, from initial draft to
 
 import { Tabs, TabItem, Steps, Aside, Card, CardGrid } from '@astrojs/starlight/components';
 
-Every [PRD](/concepts/prds) has a `status` field. Seven possible values, with transitions controlled by the harness, GitHub Actions, or manual editing.
+Every [PRD](/concepts/prds) has a `status` field. Eight possible values, with transitions controlled by the harness, GitHub Actions, or manual editing.
 
 ## States
 
@@ -18,6 +18,7 @@ Every [PRD](/concepts/prds) has a `status` field. Seven possible values, with tr
 | `done` | PR merged. Work complete. |
 | `blocked` | Cannot proceed. Workflow failure or dependency failure during DAG execution. |
 | `cancelled` | Abandoned. Excluded from dependency graph. |
+| `superseded` | Replaced by a different PRD. Excluded from dependency graph. Terminal state eligible for archiving. |
 
 ## State Diagram
 
@@ -33,9 +34,11 @@ stateDiagram-v2
     draft --> cancelled: Manual
     ready --> cancelled: Manual
     blocked --> cancelled: Manual
+    done --> superseded: Manual
+    cancelled --> superseded: Manual
 ```
 
-The happy path flows left to right: **draft** to **ready** to **in-progress** to **review** to **done**. The two recovery paths are **blocked** back to **ready** (when a human resolves the blocker) and **any state** to **cancelled** (manual abandonment).
+The happy path flows left to right: **draft** to **ready** to **in-progress** to **review** to **done**. The two recovery paths are **blocked** back to **ready** (when a human resolves the blocker) and **any state** to **cancelled** or **superseded** (manual abandonment or replacement).
 
 ## Transition Rules
 
@@ -58,10 +61,10 @@ The happy path flows left to right: **draft** to **ready** to **in-progress** to
     ```
 
     **review -> done**
-    Set by a GitHub Action on PR merge, or by `darkfactory reconcile` which scans for merged PRs and updates statuses.
+    Set by a GitHub Action on PR merge, or by `prd reconcile` which scans for merged PRs and updates statuses.
 
     ```bash frame="terminal" title="Manual reconciliation"
-    darkfactory reconcile
+    prd reconcile
     ```
 
     **in-progress -> blocked**
@@ -96,10 +99,11 @@ The happy path flows left to right: **draft** to **ready** to **in-progress** to
 | `draft` | `ready` | Manual: edit frontmatter |
 | `ready` | `in-progress` | Automatic: `set_status` builtin at workflow start |
 | `in-progress` | `review` | Automatic: `set_status` builtin after implementation |
-| `review` | `done` | Automatic: GitHub Action on PR merge, or `darkfactory reconcile` |
+| `review` | `done` | Automatic: GitHub Action on PR merge, or `prd reconcile` |
 | `in-progress` | `blocked` | Automatic: workflow failure or dependency failure during DAG execution |
 | `blocked` | `ready` | Manual: when blocker resolved |
 | Any | `cancelled` | Manual |
+| Any | `superseded` | Manual: when this PRD is replaced by another |
 
 <Aside type="note">
 A dependency is satisfied only when the upstream PRD reaches `done`. PRDs in `review` or `in-progress` do not satisfy dependencies. The one exception is [stacked worktrees](/concepts/worktrees), where a PRD with exactly one dep completed in the current run can branch from that dep's branch.

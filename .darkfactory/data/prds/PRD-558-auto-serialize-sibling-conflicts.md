@@ -12,14 +12,15 @@ blocks: []
 impacts:
   - src/darkfactory/graph_execution.py
   - src/darkfactory/impacts.py
-  - src/darkfactory/cli.py
+  - src/darkfactory/cli/_parser.py
+  - src/darkfactory/cli/run.py
   - tests/test_graph_execution.py
 workflow:
 assignee:
 reviewers: []
 target_version:
 created: 2026-04-09
-updated: '2026-04-09'
+updated: '2026-04-11'
 tags:
   - harness
   - execution

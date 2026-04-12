@@ -11,18 +11,18 @@ depends_on: []
 blocks:
   - "[[PRD-220-graph-execution]]"
 impacts:
-  - workflows/planning/prompts/decomposition-guide.md
-  - workflows/planning/prompts/task.md
-  - workflows/planning/prompts/role.md
-  - workflows/planning/prompts/verify.md
-  - workflows/planning/workflow.py
+  - src/darkfactory/workflows/planning/prompts/decomposition-guide.md
+  - src/darkfactory/workflows/planning/prompts/task.md
+  - src/darkfactory/workflows/planning/prompts/role.md
+  - src/darkfactory/workflows/planning/prompts/verify.md
+  - src/darkfactory/workflows/planning/workflow.py
   - tests/test_planning_workflow.py
 workflow:
 assignee:
 reviewers: []
 target_version:
 created: 2026-04-08
-updated: 2026-04-08
+updated: '2026-04-11'
 tags:
   - workflows
   - planning
@@ -34,7 +34,7 @@ tags:
 
 ## Summary
 
-The planning workflow (`workflows/planning/`) auto-decomposes a ready epic/feature into child task PRDs via an opus agent. A review against the PRD-220 graph executor's needs surfaced several gaps that will produce subtly-wrong children — broken `impacts:` fields, silently-dropped parent `blocks:` updates, dead template references, missing conflict warnings. A subsequent concrete failure (running the workflow against PRD-549 on 2026-04-08) exposed two more: the agent faithfully copies invalid PRD IDs out of a parent's body, and the role prompt doesn't enumerate what the tool allowlist actually permits — so the agent wastes its whole task budget discovering permissions live. This PRD tightens the prompts so decomposition output is executable without a human polish pass.
+The planning workflow (`src/darkfactory/workflows/planning/`) auto-decomposes a ready epic/feature into child task PRDs via an opus agent. A review against the PRD-220 graph executor's needs surfaced several gaps that will produce subtly-wrong children — broken `impacts:` fields, silently-dropped parent `blocks:` updates, dead template references, missing conflict warnings. A subsequent concrete failure (running the workflow against PRD-549 on 2026-04-08) exposed two more: the agent faithfully copies invalid PRD IDs out of a parent's body, and the role prompt doesn't enumerate what the tool allowlist actually permits — so the agent wastes its whole task budget discovering permissions live. This PRD tightens the prompts so decomposition output is executable without a human polish pass.
 
 ## Motivation
 
@@ -44,7 +44,7 @@ PRD-220 just landed sequential graph execution. The obvious first dogfood is `pr
 
 2. **Parent `blocks:` update is not verified.** The prompt instructs the agent to update the parent's `blocks:` wikilinks, but there's no post-run check. If the agent forgets or partially succeeds, `prd validate` passes (blocks is not required) and the children become orphans from the parent's perspective.
 
-3. **Dead template reference.** `task.md` tells the agent to "Read `prds/_template.md` if it exists" — it doesn't exist in this repo. The agent then falls back to guessing from a sibling, which is fine but leaves a stale instruction.
+3. **Dead template reference.** `task.md` tells the agent to "Read `.darkfactory/data/prds/_template.md` if it exists" — it doesn't exist in this repo. The agent then falls back to guessing from a sibling, which is fine but leaves a stale instruction.
 
 4. **No overlapping-impacts warning.** For an epic like PRD-549 (nine siblings all touching `builtins.py`), the children *will* conflict on execution. The agent should be told to flag this explicitly in the decomposition summary so humans can make the conflict-stress-vs-avoidance decision before the graph executor tries to run them.
 
@@ -88,11 +88,11 @@ Each improvement below is a prompt edit + (where applicable) a verification step
     - Add: "Run `uv run prd validate` **after creating the first file** to catch ID format mistakes early. Do not create all N files before validating."
 
 5b. **`role.md` — explicit allowlist enumeration (NEW).**
-    - Add a section listing what tools the planning agent has, and equally important, what it does **not** have: "You have Read, Glob, Grep, Write (scoped to `prds/`), and these Bash commands: `uv run prd validate`, `uv run prd *`, `git add prds/`, `git status`, `git diff prds/`, `git log`. You do **not** have: Edit, rm, mv, git rm, git clean, git mv, or any way to delete or rename files. If your task requires deletion or rename, emit `PRD_EXECUTE_FAILED: need <operation> on <files>` immediately — do not try alternative Bash commands to work around it."
+    - Add a section listing what tools the planning agent has, and equally important, what it does **not** have: "You have Read, Glob, Grep, Write (scoped to `.darkfactory/data/prds/`), and these Bash commands: `uv run prd validate`, `uv run prd *`, `git add .darkfactory/data/prds/`, `git status`, `git diff .darkfactory/data/prds/`, `git log`. You do **not** have: Edit, rm, mv, git rm, git clean, git mv, or any way to delete or rename files. If your task requires deletion or rename, emit `PRD_EXECUTE_FAILED: need <operation> on <files>` immediately — do not try alternative Bash commands to work around it."
     - Add pointer to `docs/agent-verification-model.md` explaining why the architectural choice is "no permission grants; verify from the harness."
 
 6. **`task.md` — template reference.**
-   - Remove the "Read `prds/_template.md` if it exists" line, or add the template file for real (`prds/_template.md`) and point at it. Recommendation: **add the template file** — a canonical exemplar is more robust than "find a good one."
+   - Remove the "Read `.darkfactory/data/prds/_template.md` if it exists" line, or add the template file for real (`.darkfactory/data/prds/_template.md`) and point at it. Recommendation: **add the template file** — a canonical exemplar is more robust than "find a good one."
 
 7. **`task.md` — summary format.**
    - Rewrite step 10 ("Report") to require a structured summary:
@@ -122,7 +122,7 @@ Each improvement below is a prompt edit + (where applicable) a verification step
 
 - [ ] AC-1: `decomposition-guide.md` explicitly constrains `impacts:` to exact paths, no globs, and mandates overlap disclosure in the summary.
 - [ ] AC-2: `decomposition-guide.md` specifies gap-filling ID behavior, per-child effort/capability calibration, `workflow: null` rationale, and task-only recursion.
-- [ ] AC-3: `task.md` either uses a real `prds/_template.md` or removes the dead reference. If added, `_template.md` is a canonical task exemplar.
+- [ ] AC-3: `task.md` either uses a real `.darkfactory/data/prds/_template.md` or removes the dead reference. If added, `_template.md` is a canonical task exemplar.
 - [ ] AC-4: `task.md` requires a structured decomposition summary with children, dependencies, overlaps, and parent-blocks status.
 - [ ] AC-5: The workflow runs a post-decomposition check that the parent's `blocks:` actually lists the new children. Mismatch fails the workflow.
 - [ ] AC-6: Tests cover the new verification task and snapshot the prompt directives.
@@ -135,11 +135,11 @@ Each improvement below is a prompt edit + (where applicable) a verification step
 
 - [ ] Do we want a hard failure on impact-overlap, or just a warning? Recommend warning — PRD-549 explicitly *wants* overlap to stress-test future PRD-551/PRD-552.
 - [ ] Should a failed parent-`blocks:` verification auto-retry the agent, or fail loud? Recommend retry (`on_failure="retry_agent"`) consistent with `validate-children`.
-- [ ] Should we add a `prds/_template.md` as part of this PRD, or split into a sub-PRD? Probably inline — it's tightly coupled.
+- [ ] Should we add a `.darkfactory/data/prds/_template.md` as part of this PRD, or split into a sub-PRD? Probably inline — it's tightly coupled.
 
 ## References
 
-- `workflows/planning/prompts/` — current state.
+- `src/darkfactory/workflows/planning/prompts/` — current state.
 - `docs/agent-verification-model.md` — architectural preference that shaped requirements 5b and AC-9 (no permission grants; verify from the harness).
 - [[PRD-220-graph-execution]] — the consumer of decomposition output.
 - [[PRD-546-impact-declaration-drift-detection]] — needs accurate `impacts:`.

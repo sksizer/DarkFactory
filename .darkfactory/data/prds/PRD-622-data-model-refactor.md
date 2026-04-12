@@ -2,7 +2,7 @@
 id: PRD-622
 title: Data Model Refactor
 kind: task
-status: review
+status: done
 priority: medium
 effort: xl
 capability: complex

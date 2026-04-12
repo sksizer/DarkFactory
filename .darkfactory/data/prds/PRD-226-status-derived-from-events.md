@@ -13,7 +13,7 @@ impacts: []  # epic — children declare their own
 workflow: null
 target_version: null
 created: 2026-04-08
-updated: '2026-04-08'
+updated: '2026-04-11'
 tags:
   - harness
   - architecture
@@ -98,14 +98,14 @@ Everything that's currently a `status:` field becomes a property of the computed
 
 | Today | After this PRD |
 |---|---|
-| `prds/PRD-X.md` frontmatter has `status:` | `prds/PRD-X.md` has `ready:`, `cancelled_reason:` (sometimes); status is derived |
+| `.darkfactory/data/prds/PRD-X.md` frontmatter has `status:` | `.darkfactory/data/prds/PRD-X.md` has `ready:`, `cancelled_reason:` (sometimes); status is derived |
 | `prd status` reads frontmatter | `prd status` queries git + gh + reads frontmatter, derives a status per PRD |
 | `set_status` builtin mutates the file | `set_status` builtin is removed entirely |
 | Status drift is possible | Status drift is **architecturally impossible** — there's nothing to drift |
 
 ### Event log (optional)
 
-Could go further: add a structured event log at `.darkfactory/events/PRD-X.jsonl` that the harness appends to as things happen:
+Could go further: add a structured event log at `.darkfactory/data/events/PRD-X.jsonl` that the harness appends to as things happen:
 
 ```jsonl
 {"ts":"2026-04-08T10:00Z","type":"created","actor":"sksizer"}
