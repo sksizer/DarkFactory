@@ -40,7 +40,12 @@ def test_dry_run_no_subprocess_calls(tmp_path: Path) -> None:
 def test_successful_push_calls_git_push(tmp_path: Path) -> None:
     ctx = make_builtin_ctx(tmp_path, dry_run=False)
     ctx.branch_name = _BRANCH
-    with patch("darkfactory.utils.git._run.subprocess.run", return_value=subprocess.CompletedProcess([], returncode=0, stdout="", stderr="")) as mock_run:
+    with patch(
+        "darkfactory.utils.git._run.subprocess.run",
+        return_value=subprocess.CompletedProcess(
+            [], returncode=0, stdout="", stderr=""
+        ),
+    ) as mock_run:
         push_branch(ctx)
 
     mock_run.assert_called_once()
@@ -51,7 +56,12 @@ def test_successful_push_calls_git_push(tmp_path: Path) -> None:
 def test_successful_push_with_correct_cwd(tmp_path: Path) -> None:
     ctx = make_builtin_ctx(tmp_path, dry_run=False)
     ctx.branch_name = _BRANCH
-    with patch("darkfactory.utils.git._run.subprocess.run", return_value=subprocess.CompletedProcess([], returncode=0, stdout="", stderr="")) as mock_run:
+    with patch(
+        "darkfactory.utils.git._run.subprocess.run",
+        return_value=subprocess.CompletedProcess(
+            [], returncode=0, stdout="", stderr=""
+        ),
+    ) as mock_run:
         push_branch(ctx)
 
     # Verify cwd is passed correctly

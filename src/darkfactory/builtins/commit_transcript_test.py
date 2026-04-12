@@ -78,7 +78,12 @@ def test_successful_run_creates_dest_and_stages(tmp_path: Path) -> None:
     src = transcript_dir / "PRD-549.8.jsonl"
     src.write_text("transcript content")
 
-    with patch("darkfactory.utils.git._run.subprocess.run", return_value=subprocess.CompletedProcess([], returncode=0, stdout="", stderr="")) as mock_run:
+    with patch(
+        "darkfactory.utils.git._run.subprocess.run",
+        return_value=subprocess.CompletedProcess(
+            [], returncode=0, stdout="", stderr=""
+        ),
+    ) as mock_run:
         commit_transcript(ctx)
 
     # Destination directory should be created
@@ -103,7 +108,12 @@ def test_successful_run_logs_staged(tmp_path: Path) -> None:
     transcript_dir.mkdir()
     (transcript_dir / "PRD-549.8.jsonl").write_text("data")
 
-    with patch("darkfactory.utils.git._run.subprocess.run", return_value=subprocess.CompletedProcess([], returncode=0, stdout="", stderr="")):
+    with patch(
+        "darkfactory.utils.git._run.subprocess.run",
+        return_value=subprocess.CompletedProcess(
+            [], returncode=0, stdout="", stderr=""
+        ),
+    ):
         commit_transcript(ctx)
 
     ctx.logger.info.assert_called()

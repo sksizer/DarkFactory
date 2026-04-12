@@ -136,14 +136,15 @@ def find_stale_worktree_for_prd(prd_id: str, repo_root: Path) -> StaleWorktree |
     )
 
 
-
 def remove_worktree(worktree: StaleWorktree, repo_root: Path) -> None:
     """Remove a worktree directory and delete the local branch.
 
     Raises ``RuntimeError`` if the worktree removal fails. Branch deletion
     is best-effort (may already be gone).
     """
-    match git_run("worktree", "remove", "--force", str(worktree.worktree_path), cwd=repo_root):
+    match git_run(
+        "worktree", "remove", "--force", str(worktree.worktree_path), cwd=repo_root
+    ):
         case Ok():
             pass
         case GitErr(returncode=code, stderr=err):

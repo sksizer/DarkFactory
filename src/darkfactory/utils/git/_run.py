@@ -13,7 +13,13 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from darkfactory.utils.git._types import CheckResult, GitErr, GitTimeout, Ok, ProbeResult
+from darkfactory.utils.git._types import (
+    CheckResult,
+    GitErr,
+    GitTimeout,
+    Ok,
+    ProbeResult,
+)
 
 
 def git_run(*args: str, cwd: Path) -> CheckResult:

@@ -28,11 +28,7 @@ def push_branch(ctx: ExecutionContext) -> None:
         case Ok():
             pass
         case GitErr(returncode=code, stdout=out, stderr=err):
-            detail = (
-                f"git push failed (exit {code}):"
-                f"\nstdout: {out}"
-                f"\nstderr: {err}"
-            )
+            detail = f"git push failed (exit {code}):\nstdout: {out}\nstderr: {err}"
             _log.error(detail)
             raise RuntimeError(detail)
 

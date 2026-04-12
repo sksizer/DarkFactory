@@ -176,7 +176,12 @@ def test_successful_creation_calls_git_worktree_add(tmp_path: Path) -> None:
             "darkfactory.builtins.ensure_worktree._branch_exists_remote",
             return_value=False,
         ),
-        patch("darkfactory.utils.git._run.subprocess.run", return_value=subprocess.CompletedProcess([], returncode=0, stdout="", stderr="")) as mock_run,
+        patch(
+            "darkfactory.utils.git._run.subprocess.run",
+            return_value=subprocess.CompletedProcess(
+                [], returncode=0, stdout="", stderr=""
+            ),
+        ) as mock_run,
     ):
         mock_lock = MagicMock()
         mock_lock_cls.return_value = mock_lock
@@ -204,7 +209,12 @@ def test_successful_creation_sets_ctx(tmp_path: Path) -> None:
             "darkfactory.builtins.ensure_worktree._branch_exists_remote",
             return_value=False,
         ),
-        patch("darkfactory.utils.git._run.subprocess.run", return_value=subprocess.CompletedProcess([], returncode=0, stdout="", stderr="")),
+        patch(
+            "darkfactory.utils.git._run.subprocess.run",
+            return_value=subprocess.CompletedProcess(
+                [], returncode=0, stdout="", stderr=""
+            ),
+        ),
     ):
         mock_lock = MagicMock()
         mock_lock_cls.return_value = mock_lock
@@ -230,7 +240,12 @@ def test_lock_acquired_on_success(tmp_path: Path) -> None:
             "darkfactory.builtins.ensure_worktree._branch_exists_remote",
             return_value=False,
         ),
-        patch("darkfactory.utils.git._run.subprocess.run", return_value=subprocess.CompletedProcess([], returncode=0, stdout="", stderr="")),
+        patch(
+            "darkfactory.utils.git._run.subprocess.run",
+            return_value=subprocess.CompletedProcess(
+                [], returncode=0, stdout="", stderr=""
+            ),
+        ),
     ):
         mock_lock = MagicMock()
         mock_lock_cls.return_value = mock_lock

@@ -37,14 +37,8 @@ def find_remote_branches(prd_id: str, repo_root: Path) -> list[str]:
     (e.g. ``origin/prd/PRD-42-add-retry-logic``).
     Returns an empty list when none match or on git failure.
     """
-    match git_run(
-        "branch", "-r", "--list", f"origin/prd/{prd_id}-*", cwd=repo_root
-    ):
+    match git_run("branch", "-r", "--list", f"origin/prd/{prd_id}-*", cwd=repo_root):
         case Ok(stdout=output):
-            return [
-                line.strip()
-                for line in output.splitlines()
-                if line.strip()
-            ]
+            return [line.strip() for line in output.splitlines() if line.strip()]
         case GitErr():
             return []

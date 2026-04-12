@@ -124,9 +124,7 @@ def _is_merged_squash(repo_root: str, branch: str) -> bool:
     A more reliable signal is the ``prd/PRD-X-slug`` pattern that GitHub
     appends to squash-merge commit messages when auto-generated.
     """
-    match git_run(
-        "log", "main", "--oneline", f"--grep={branch}", cwd=Path(repo_root)
-    ):
+    match git_run("log", "main", "--oneline", f"--grep={branch}", cwd=Path(repo_root)):
         case Ok(stdout=output):
             return bool(output.strip())
         case GitErr():

@@ -17,7 +17,9 @@ from darkfactory.rework_guard import ReworkGuard
 
 
 def test_has_changes_returns_true_when_output(tmp_path: Path) -> None:
-    result = subprocess.CompletedProcess([], returncode=0, stdout=" M some_file.py\n", stderr="")
+    result = subprocess.CompletedProcess(
+        [], returncode=0, stdout=" M some_file.py\n", stderr=""
+    )
     with patch("darkfactory.utils.git._run.subprocess.run", return_value=result):
         assert _has_changes(str(tmp_path)) is True
 
@@ -50,7 +52,9 @@ def test_with_changes_resets_counter(tmp_path: Path) -> None:
     guard.record_outcome("PRD-001", had_changes=False)
 
     ctx = make_builtin_ctx(tmp_path)
-    status_result = subprocess.CompletedProcess([], returncode=0, stdout=" M file.py\n", stderr="")
+    status_result = subprocess.CompletedProcess(
+        [], returncode=0, stdout=" M file.py\n", stderr=""
+    )
     with patch("darkfactory.utils.git._run.subprocess.run", return_value=status_result):
         check_rework_guard(ctx)  # should not raise
 
@@ -60,7 +64,9 @@ def test_with_changes_resets_counter(tmp_path: Path) -> None:
 
 def test_with_changes_logs_info(tmp_path: Path) -> None:
     ctx = make_builtin_ctx(tmp_path)
-    status_result = subprocess.CompletedProcess([], returncode=0, stdout=" M file.py\n", stderr="")
+    status_result = subprocess.CompletedProcess(
+        [], returncode=0, stdout=" M file.py\n", stderr=""
+    )
     with patch("darkfactory.utils.git._run.subprocess.run", return_value=status_result):
         check_rework_guard(ctx)
     ctx.logger.info.assert_called()
@@ -118,7 +124,9 @@ def test_blocked_error_message_contains_prd_id(tmp_path: Path) -> None:
 def test_event_writer_called_with_changes(tmp_path: Path) -> None:
     ctx = make_builtin_ctx(tmp_path)
     ctx.event_writer = MagicMock()
-    status_result = subprocess.CompletedProcess([], returncode=0, stdout=" M file.py\n", stderr="")
+    status_result = subprocess.CompletedProcess(
+        [], returncode=0, stdout=" M file.py\n", stderr=""
+    )
     with patch("darkfactory.utils.git._run.subprocess.run", return_value=status_result):
         check_rework_guard(ctx)
     ctx.event_writer.emit.assert_called_once()

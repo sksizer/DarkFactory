@@ -26,7 +26,10 @@ def _fail(
 
 class TestGitRun:
     def test_ok_returns_ok_with_stdout(self) -> None:
-        with patch("darkfactory.utils.git._run.subprocess.run", return_value=_ok(stdout="abc\n")):
+        with patch(
+            "darkfactory.utils.git._run.subprocess.run",
+            return_value=_ok(stdout="abc\n"),
+        ):
             result = git_run("status", cwd=Path("/tmp"))
         assert isinstance(result, Ok)
         assert result.value is None

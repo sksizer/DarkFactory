@@ -78,7 +78,12 @@ def test_successful_removal_calls_git_worktree_remove(tmp_path: Path) -> None:
     ctx.worktree_path = tmp_path / "my-worktree"
     ctx.worktree_path.mkdir()
 
-    with patch("darkfactory.utils.git._run.subprocess.run", return_value=subprocess.CompletedProcess([], returncode=0, stdout="", stderr="")) as mock_run:
+    with patch(
+        "darkfactory.utils.git._run.subprocess.run",
+        return_value=subprocess.CompletedProcess(
+            [], returncode=0, stdout="", stderr=""
+        ),
+    ) as mock_run:
         cleanup_worktree(ctx)
 
     mock_run.assert_called_once()
@@ -94,7 +99,12 @@ def test_successful_removal_passes_repo_root(tmp_path: Path) -> None:
     ctx.worktree_path = tmp_path / "my-worktree"
     ctx.worktree_path.mkdir()
 
-    with patch("darkfactory.utils.git._run.subprocess.run", return_value=subprocess.CompletedProcess([], returncode=0, stdout="", stderr="")) as mock_run:
+    with patch(
+        "darkfactory.utils.git._run.subprocess.run",
+        return_value=subprocess.CompletedProcess(
+            [], returncode=0, stdout="", stderr=""
+        ),
+    ) as mock_run:
         cleanup_worktree(ctx)
 
     call_kwargs = mock_run.call_args[1]

@@ -377,9 +377,7 @@ def test_execute_reset_closes_prs(tmp_path: Path) -> None:
     assert any("#10" in c for c in cleaned)
     assert any("#20" in c for c in cleaned)
     # Filter to gh pr close calls only (git commands also go through subprocess now)
-    gh_calls = [
-        c for c in mock_subprocess.call_args_list if c[0][0][0] == "gh"
-    ]
+    gh_calls = [c for c in mock_subprocess.call_args_list if c[0][0][0] == "gh"]
     assert len(gh_calls) == 2
     # Verify comment content
     first_call = gh_calls[0]

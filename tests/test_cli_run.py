@@ -466,7 +466,9 @@ def test_resolve_base_ref_last_resort_main(tmp_path: Path) -> None:
     def mock_run_all_fail(cmd: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(args=cmd, returncode=1, stdout="", stderr="")
 
-    with patch("darkfactory.utils.git._run.subprocess.run", side_effect=mock_run_all_fail):
+    with patch(
+        "darkfactory.utils.git._run.subprocess.run", side_effect=mock_run_all_fail
+    ):
         result = _resolve_base_ref(None, tmp_path)
         assert result == "main"
 
