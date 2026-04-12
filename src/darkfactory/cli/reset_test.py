@@ -15,7 +15,7 @@ from darkfactory.cli.reset import (
     cmd_reset,
 )
 from darkfactory.model import load_one
-from darkfactory.utils.git._types import Ok
+from darkfactory.utils.git import Ok
 
 # ---------------------------------------------------------------------------
 # Helpers

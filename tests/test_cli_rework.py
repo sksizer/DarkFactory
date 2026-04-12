@@ -3,7 +3,7 @@
 After the rework CLI/workflow consolidation (see ``rework_context.py``
 and ``builtins/resolve_rework_context.py``), the CLI no longer
 duplicates worktree/PR/comment discovery -- it delegates everything to
-:func:`~darkfactory.rework_context.discover_rework_context`. These
+:func:`~darkfactory.rework.context.discover_rework_context`. These
 tests patch that single entry point rather than the former private
 helpers (``find_worktree``, ``find_open_pr``, ``fetch_pr_comments``)
 that used to live in ``cli/rework.py``.
@@ -18,7 +18,7 @@ import pytest
 
 from darkfactory.cli import main
 from darkfactory.utils.github.pr.comments import CommentFilters, ReviewThread
-from darkfactory.rework_context import ReworkContext, ReworkError
+from darkfactory.rework.context import ReworkContext, ReworkError
 
 from .conftest import write_prd
 

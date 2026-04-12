@@ -14,7 +14,7 @@ from pathlib import Path
 from darkfactory.loader import load_workflows
 from darkfactory.config import user_workflows_dir
 from darkfactory.workflow import Workflow
-from darkfactory.workflows import get_builtin_workflows
+from darkfactory.workflow.definitions import get_builtin_workflows
 
 
 class WorkflowNameCollision(Exception):

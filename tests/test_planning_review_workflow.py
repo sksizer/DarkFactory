@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from darkfactory.cli import main
-from darkfactory.graph._containment import is_partially_decomposed
+from darkfactory.graph import containment
 from darkfactory.loader import load_workflows
 from darkfactory.model import load_all
 
@@ -67,7 +67,7 @@ def test_partially_decomposed_false_for_zero_children(tmp_data_dir: Path) -> Non
     """An epic with no children is not partially decomposed."""
     write_prd(tmp_data_dir / "prds", "PRD-100", "epic", kind="epic", status="ready")
     prds = load_all(tmp_data_dir)
-    assert not is_partially_decomposed(prds["PRD-100"], prds)
+    assert not containment.is_partially_decomposed(prds["PRD-100"], prds)
 
 
 def test_partially_decomposed_true_for_has_children(tmp_data_dir: Path) -> None:
@@ -77,7 +77,7 @@ def test_partially_decomposed_true_for_has_children(tmp_data_dir: Path) -> None:
         tmp_data_dir / "prds", "PRD-100.1", "child-task", kind="task", parent="PRD-100"
     )
     prds = load_all(tmp_data_dir)
-    assert is_partially_decomposed(prds["PRD-100"], prds)
+    assert containment.is_partially_decomposed(prds["PRD-100"], prds)
 
 
 def test_partially_decomposed_false_for_complete_flag(tmp_data_dir: Path) -> None:
@@ -94,7 +94,7 @@ def test_partially_decomposed_false_for_complete_flag(tmp_data_dir: Path) -> Non
         tmp_data_dir / "prds", "PRD-100.1", "child-task", kind="task", parent="PRD-100"
     )
     prds = load_all(tmp_data_dir)
-    assert not is_partially_decomposed(prds["PRD-100"], prds)
+    assert not containment.is_partially_decomposed(prds["PRD-100"], prds)
 
 
 # ---------- loader ----------

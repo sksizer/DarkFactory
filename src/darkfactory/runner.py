@@ -28,13 +28,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Protocol, TypeVar
 
-from .builtins import BUILTINS
+from .operations import BUILTINS
 from .event_log import EventWriter, emit_task_event
 from .utils.claude_code import InvokeResult, capability_to_model, invoke_claude
 from .utils.shell import run_shell
 from .model import compute_branch_name
 from .engine import AgentResult, PhaseState
-from .templates import compose_prompt
+from .workflow import compose_prompt
 from .timeouts import resolve_timeout
 from .utils.claude_code import spawn_claude
 from .workflow import (
@@ -638,7 +638,7 @@ def _workflow_compose_prompt(
     if ctx.state.has(ReworkState):
         rework = ctx.state.get(ReworkState)
         if rework.review_threads is not None:
-            from .rework_prompt import render_rework_feedback
+            from darkfactory.rework.prompt import render_rework_feedback
 
             rework_extras["REWORK_FEEDBACK"] = render_rework_feedback(
                 rework.review_threads
@@ -751,7 +751,7 @@ def _system_compose_prompt(
     task: AgentTask, ctx: Any, extras: dict[str, object] | None = None
 ) -> str:
     """Load prompt files and substitute system-op placeholders."""
-    from .templates import load_prompt_files, substitute_placeholders
+    from darkfactory.workflow import load_prompt_files, substitute_placeholders
 
     op_dir = ctx.operation.operation_dir
     if op_dir is None:
@@ -789,7 +789,7 @@ def run_system_operation(
     :class:`EventWriter` is created automatically so system operations
     produce event logs just like workflow runs.
     """
-    from .builtins.system_builtins import SYSTEM_BUILTINS
+    from .operations.system_builtins import SYSTEM_BUILTINS
 
     writer: EventWriter | None = getattr(ctx, "event_writer", None)
     owns_writer = False

@@ -11,10 +11,10 @@ from filelock import FileLock, Timeout
 
 from darkfactory.cli._shared import _find_repo_root
 from darkfactory.event_log import EventWriter, generate_session_id
-from darkfactory.utils._result import Ok
+from darkfactory.utils import Ok
 from darkfactory.utils.git import GitErr, git_run
 from darkfactory.model import TERMINAL_STATUSES, load_one, save, set_status
-from darkfactory.rework_guard import ReworkGuard
+from darkfactory.rework.guard import ReworkGuard
 from darkfactory.utils.git.branch import find_local_branches, find_remote_branches
 from darkfactory.utils.git.worktree import find_stale_worktree_for_prd
 from darkfactory.utils.github import close_pr, list_open_prs

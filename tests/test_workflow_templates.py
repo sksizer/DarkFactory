@@ -6,8 +6,12 @@ from typing import Any
 
 import pytest
 
-from darkfactory.templates import TemplateViolation, WorkflowTemplate
-from darkfactory.templates_builtin import REWORK_TEMPLATE, SYSTEM_OPERATION_TEMPLATE
+from darkfactory.workflow import (
+    REWORK_TEMPLATE,
+    SYSTEM_OPERATION_TEMPLATE,
+    TemplateViolation,
+    WorkflowTemplate,
+)
 from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Task, Workflow
 
 
