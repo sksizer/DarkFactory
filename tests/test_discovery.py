@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from darkfactory.discovery import find_darkfactory_dir, resolve_project_root
+from darkfactory.config import find_darkfactory_dir, resolve_project_root
 
 
 # ---------------------------------------------------------------------------

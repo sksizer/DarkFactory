@@ -9,7 +9,7 @@ from typing import Any
 
 from darkfactory.cli._parser import build_parser
 from darkfactory.config import resolve_config
-from darkfactory.discovery import resolve_project_root
+from darkfactory.config import resolve_project_root
 from darkfactory.style import Styler, resolve_style_config
 
 

@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from darkfactory.paths import user_config_file
+from ._paths import user_config_file
 
 
 @dataclass

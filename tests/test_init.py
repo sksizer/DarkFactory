@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from darkfactory.init import (
+from darkfactory.config import (
     GITIGNORE_ENTRIES,
     init_project,
 )

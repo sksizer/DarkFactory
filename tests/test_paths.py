@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from darkfactory.paths import user_config_dir, user_config_file, user_workflows_dir
+from darkfactory.config import user_config_dir, user_config_file, user_workflows_dir
 
 
 def test_user_config_dir_default(monkeypatch: pytest.MonkeyPatch) -> None:

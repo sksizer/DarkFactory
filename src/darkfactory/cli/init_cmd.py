@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from darkfactory.init import init_project
+from darkfactory.config import init_project
 
 
 def cmd_init(args: argparse.Namespace) -> int:
