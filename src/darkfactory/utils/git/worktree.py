@@ -16,7 +16,6 @@ from darkfactory.git_ops import git_check, git_run
 __all__ = [
     "find_worktree_for_prd",
     "find_stale_worktree_for_prd",
-    "find_orphaned_branches",
     "remove_worktree",
 ]
 
@@ -135,19 +134,6 @@ def find_stale_worktree_for_prd(prd_id: str, repo_root: Path) -> StaleWorktree |
         pr_state=pr_state,
     )
 
-
-def find_orphaned_branches(prd_id: str, repo_root: Path) -> list[str]:
-    """Find local branches matching ``prd/{prd_id}-*`` (glob match).
-
-    Returns all matching branch names (may be empty).
-    """
-    result = git_run("branch", "--list", f"prd/{prd_id}-*", cwd=repo_root)
-    branches: list[str] = []
-    for line in result.stdout.splitlines():
-        branch = line.strip().lstrip("* ")
-        if branch:
-            branches.append(branch)
-    return branches
 
 
 def remove_worktree(worktree: StaleWorktree, repo_root: Path) -> None:

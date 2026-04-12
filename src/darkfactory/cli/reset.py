@@ -15,10 +15,8 @@ from darkfactory.event_log import EventWriter, generate_session_id
 from darkfactory.git_ops import git_check, git_run
 from darkfactory.model import TERMINAL_STATUSES, load_one, save, set_status
 from darkfactory.rework_guard import ReworkGuard
-from darkfactory.utils.git.worktree import (
-    find_orphaned_branches,
-    find_stale_worktree_for_prd,
-)
+from darkfactory.utils.git.branch import find_local_branches, find_remote_branches
+from darkfactory.utils.git.worktree import find_stale_worktree_for_prd
 from darkfactory.utils.github import close_pr, list_open_prs
 
 
@@ -60,20 +58,9 @@ def _discover_artifacts(
         summary.worktree_path = stale.worktree_path
         summary.worktree_branch = stale.branch
 
-    # Local branches (glob match)
-    summary.local_branches = find_orphaned_branches(prd_id, repo_root)
-
-    # Remote branches
-    try:
-        result = git_run(
-            "branch", "-r", "--list", f"origin/prd/{prd_id}-*", cwd=repo_root
-        )
-        for line in result.stdout.splitlines():
-            branch = line.strip()
-            if branch:
-                summary.remote_branches.append(branch)
-    except subprocess.CalledProcessError:
-        pass
+    # Local and remote branches
+    summary.local_branches = find_local_branches(prd_id, repo_root)
+    summary.remote_branches = find_remote_branches(prd_id, repo_root)
 
     # Open PRs — search across all matching branches
     prefix = f"prd/{prd_id}-"

@@ -11,11 +11,8 @@ from darkfactory import checks
 from darkfactory.checks import StaleWorktree, find_stale_worktrees, is_safe_to_remove
 from darkfactory.cli._shared import _find_repo_root
 from darkfactory.git_ops import git_check, git_run
-from darkfactory.utils.git.worktree import (
-    find_orphaned_branches,
-    find_stale_worktree_for_prd,
-    remove_worktree,
-)
+from darkfactory.utils.git.branch import find_local_branches
+from darkfactory.utils.git.worktree import find_stale_worktree_for_prd, remove_worktree
 
 
 def _remove_worktree(worktree: StaleWorktree, repo_root: Path) -> None:
@@ -30,7 +27,7 @@ def _find_worktree_for_prd(prd_id: str, repo_root: Path) -> StaleWorktree | None
 
 def _find_orphaned_branch(prd_id: str, repo_root: Path) -> str | None:
     """Find a local branch for *prd_id* when the worktree dir is gone."""
-    branches = find_orphaned_branches(prd_id, repo_root)
+    branches = find_local_branches(prd_id, repo_root)
     return branches[0] if branches else None
 
 
