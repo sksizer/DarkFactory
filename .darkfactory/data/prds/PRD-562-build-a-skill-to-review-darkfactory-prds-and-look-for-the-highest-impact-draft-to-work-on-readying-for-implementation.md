@@ -17,7 +17,7 @@ assignee: null
 reviewers: []
 target_version: null
 created: '2026-04-09'
-updated: '2026-04-09'
+updated: '2026-04-11'
 tags:
   - skills
   - process
@@ -59,7 +59,7 @@ This is skilled design work that requires understanding the codebase, the PRD DA
 ### Functional
 
 1. The skill is invocable as `/prd-triage` (no arguments = auto-select) or `/prd-triage PRD-XXX` (target a specific draft).
-2. **Scan phase**: read all PRDs from `.darkfactory/prds/`, filter to `status: draft`.
+2. **Scan phase**: read all PRDs from `.darkfactory/data/prds/`, filter to `status: draft`.
 3. **Score phase**: rank each draft on a composite of:
    - **Priority** (`critical` > `high` > `medium` > `low`) — from frontmatter.
    - **Unblock potential** — how many other PRDs does this draft `block`? How many transitive dependents?
@@ -119,7 +119,7 @@ The skill is a single markdown file at `.claude/skills/prd-triage/SKILL.md` foll
 ## References
 
 - Existing skills: `~/.claude/skills/prd-work/SKILL.md`, `~/.claude/skills/prd-driven-tasks/SKILL.md`
-- PRD statuses and lifecycle: defined in `src/darkfactory/prd.py` frontmatter schema
+- PRD statuses and lifecycle: defined in the `src/darkfactory/model/` package (`model/_prd.py`, `model/_persistence.py`) frontmatter schema
 - CLI commands useful for triage: `prd status`, `prd next`, `prd validate`, `prd tree`, `prd undecomposed`
-- Example well-formed draft: `.darkfactory/prds/PRD-226-status-derived-from-events.md`
-- Example stub draft needing work: `.darkfactory/prds/PRD-300-.md`
+- Example well-formed draft: `.darkfactory/data/prds/PRD-226-status-derived-from-events.md`
+- Example stub draft needing work: `.darkfactory/data/prds/PRD-300-.md`

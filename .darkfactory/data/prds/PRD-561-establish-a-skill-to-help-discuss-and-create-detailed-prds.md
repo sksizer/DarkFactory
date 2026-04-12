@@ -10,7 +10,7 @@ parent: null
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/cli.py
+  - src/darkfactory/cli/
   - src/darkfactory/data/commands/
   - src/darkfactory/workflows/prd-authoring/
   - .claude/commands/
@@ -19,7 +19,7 @@ assignee: null
 reviewers: []
 target_version: null
 created: '2026-04-09'
-updated: '2026-04-09'
+updated: '2026-04-11'
 tags: [authoring, skill, workflow]
 ---
 
@@ -46,7 +46,7 @@ Without this skill, every new PRD is a coin flip between "ready for execution" a
    a. Accepts an optional initial idea/title as an argument (e.g. `/prd-create "Add webhook support"`).
    b. Asks structured, adaptive questions to elicit the information needed for each PRD section. Questions should be driven by what's missing, not a fixed script — if the user provides a detailed initial description, skip the basics.
    c. Probes for scope boundaries: what is explicitly out of scope, what the user expects the `kind` to be (epic/feature/task), and whether decomposition is needed.
-   d. Suggests `depends_on` and `blocks` relationships by querying existing PRDs in `.darkfactory/prds/` for related work.
+   d. Suggests `depends_on` and `blocks` relationships by querying existing PRDs in `.darkfactory/data/prds/` for related work.
    e. Drafts each section incrementally, showing the user what it will write and incorporating feedback before moving on.
    f. Generates numbered functional and non-functional requirements (not vague bullets).
    g. Generates testable acceptance criteria in `AC-N` format, each tied to a specific requirement.
@@ -92,19 +92,18 @@ Without this skill, every new PRD is a coin flip between "ready for execution" a
    c. Status transitions: the skill can move a PRD from `draft` → `ready` (after rubric passes) or suggest `blocked` if unresolved dependencies are detected.
 
 7. **Project initialization (`prd init`)** — slash commands are installed as part of project setup:
-   a. `prd init` (new subcommand) bootstraps the `.claude/` directory structure in the project root, including `.claude/commands/prd-create.md` and `.claude/commands/prd-refine.md`.
+   a. `prd init` bootstraps the `.claude/` directory structure in the project root, including `.claude/commands/prd-create.md` and `.claude/commands/prd-refine.md`. (`prd init` already exists and scaffolds `.darkfactory/data/prds/` and `.darkfactory/data/archive/`; this PRD adds the `.claude/commands/` bootstrap on top.)
    b. If `.claude/commands/` already exists, only missing command files are added — existing files are never overwritten.
-   c. The command also creates `.darkfactory/prds/` if it doesn't exist (consolidating the implicit mkdir currently in `prd new`).
-   d. Slash command files are bundled with the `darkfactory` package as package data (e.g. `src/darkfactory/data/commands/`) and copied into the project on init.
-   e. `prd init` is idempotent — running it multiple times on the same project is safe and only adds what's missing.
-   f. Prints a summary of what was created/skipped so the user knows what changed.
+   c. Slash command files are bundled with the `darkfactory` package as package data (e.g. `src/darkfactory/data/commands/`) and copied into the project on init.
+   d. `prd init` is idempotent — running it multiple times on the same project is safe and only adds what's missing.
+   e. Prints a summary of what was created/skipped so the user knows what changed.
 
 ### Non-Functional
 
 1. **Conversational, not interrogative.** The slash command should feel like a design discussion with a knowledgeable colleague, not a form to fill out. It should offer opinions, push back on vague requirements, and suggest alternatives.
 2. **Respect existing patterns.** Generated PRDs must match the formatting, frontmatter schema, and section ordering used by existing PRDs in the project — not invent new conventions.
 3. **Idempotent refinement.** Running `/prd-refine` on an already-complete PRD should report "all criteria pass" and not introduce unnecessary changes.
-4. **No hallucinated dependencies.** When suggesting `depends_on` or `blocks`, only reference PRD IDs that actually exist in `.darkfactory/prds/`.
+4. **No hallucinated dependencies.** When suggesting `depends_on` or `blocks`, only reference PRD IDs that actually exist in `.darkfactory/data/prds/`.
 
 ## Technical Approach
 
@@ -114,7 +113,7 @@ Without this skill, every new PRD is a coin flip between "ready for execution" a
 - Each command file contains the system prompt that guides Claude through the interactive workflow.
 - `/prd-create` prompt structure:
   1. Role framing: "You are a product requirements analyst for the DarkFactory project..."
-  2. Context injection: instruct Claude to read `.darkfactory/prds/` for existing PRDs, source tree for module paths.
+  2. Context injection: instruct Claude to read `.darkfactory/data/prds/` for existing PRDs, source tree for module paths.
   3. Conversation flow: elicit idea → clarify scope → draft sections iteratively → write file.
   4. Quality gate: run rubric check before finalizing.
 - `/prd-refine` prompt structure:
@@ -131,21 +130,20 @@ Without this skill, every new PRD is a coin flip between "ready for execution" a
   - `prompts/verify.md` — re-checks rubric after agent changes.
 - Task sequence:
   1. `BuiltIn("ensure_worktree")` — isolate changes.
-  2. `AgentTask("review-and-refine")` — evaluate + propose changes, constrained tool set (Read, Edit on `.darkfactory/prds/`).
+  2. `AgentTask("review-and-refine")` — evaluate + propose changes, constrained tool set (Read, Edit on `.darkfactory/data/prds/`).
   3. `BuiltIn("commit")` — commit improvements.
   4. `BuiltIn("push_branch")` — push for review.
   5. `BuiltIn("create_pr")` — open PR with rubric report in description.
 
 ### Project initialization (`prd init`)
 
-- New CLI subcommand `prd init` in `src/darkfactory/cli.py`.
+- Extend the existing `prd init` subcommand in `src/darkfactory/cli/init_cmd.py` (backed by `src/darkfactory/init.py`). The command already creates `.darkfactory/data/prds/` and `.darkfactory/data/archive/`; this PRD adds the `.claude/commands/` bootstrap.
 - Slash command source files are stored as package data in `src/darkfactory/data/commands/prd-create.md` and `src/darkfactory/data/commands/prd-refine.md`.
-- Included in the package via `pyproject.toml` / `setup.cfg` package-data configuration.
-- `prd init` performs:
-  1. Create `.darkfactory/prds/` if missing.
-  2. Create `.claude/commands/` if missing.
-  3. For each bundled command file, copy to `.claude/commands/` only if the target doesn't already exist.
-  4. Print a summary: `Created .claude/commands/prd-create.md`, `Skipped .claude/commands/prd-refine.md (already exists)`, etc.
+- Included in the package via `pyproject.toml` package-data configuration.
+- `prd init` additions:
+  1. Create `.claude/commands/` if missing.
+  2. For each bundled command file, copy to `.claude/commands/` only if the target doesn't already exist.
+  3. Print a summary: `Created .claude/commands/prd-create.md`, `Skipped .claude/commands/prd-refine.md (already exists)`, etc.
 - Future skills (beyond this PRD) follow the same pattern — add source to `data/commands/`, `prd init` picks them up automatically.
 
 ### Quality rubric
@@ -155,7 +153,7 @@ Without this skill, every new PRD is a coin flip between "ready for execution" a
 
 ## Acceptance Criteria
 
-- [ ] AC-1: `/prd-create` is available as a Claude Code slash command and produces a fully populated PRD file in `.darkfactory/prds/` with correct frontmatter and all body sections filled.
+- [ ] AC-1: `/prd-create` is available as a Claude Code slash command and produces a fully populated PRD file in `.darkfactory/data/prds/` with correct frontmatter and all body sections filled.
 - [ ] AC-2: `/prd-create` asks adaptive questions — skipping sections the user has already provided detail for — rather than following a rigid script.
 - [ ] AC-3: `/prd-create` suggests `depends_on`/`blocks` relationships based on existing PRDs and does not reference non-existent PRD IDs.
 - [ ] AC-4: `/prd-refine PRD-X` reads the target PRD, evaluates it against the quality rubric, and reports a structured pass/fail checklist.
