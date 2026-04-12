@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from filelock import FileLock
 
     from .event_log import EventWriter
-    from .invoke import InvokeResult
+    from .utils.claude_code import InvokeResult
     from .pr_comments import CommentFilters, ReviewThread
     from .model import PRD
 

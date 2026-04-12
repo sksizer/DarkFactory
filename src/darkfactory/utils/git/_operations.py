@@ -11,6 +11,15 @@ from pathlib import Path
 from darkfactory.utils.git._run import git_run
 from darkfactory.utils.git._types import CheckResult, GitErr, GitResult, Ok
 
+__all__ = [
+    "diff_quiet",
+    "diff_show",
+    "resolve_commit_timestamp",
+    "run_add",
+    "run_commit",
+    "status_other_dirty",
+]
+
 
 def run_add(paths: list[str], cwd: Path) -> CheckResult:
     """Stage specific files."""
@@ -41,6 +50,18 @@ def status_other_dirty(paths: list[str], cwd: Path) -> GitResult[list[str]]:
                 if line.strip() and line[3:].strip() not in paths
             ]
             return Ok(other, stdout=raw)
+        case GitErr() as err:
+            return err
+
+
+def resolve_commit_timestamp(commit: str, cwd: Path) -> GitResult[str]:
+    """Resolve a commit SHA or ref to an ISO-8601 author timestamp.
+
+    Returns ``Ok(timestamp_string)`` on success, ``GitErr`` on failure.
+    """
+    match git_run("log", "-1", "--format=%aI", commit, cwd=cwd):
+        case Ok(stdout=raw):
+            return Ok(raw.strip(), stdout=raw)
         case GitErr() as err:
             return err
 

@@ -12,6 +12,7 @@ from darkfactory.builtins.create_pr import (
     _pr_body,
     create_pr,
 )
+from darkfactory.utils._result import Ok
 
 
 def _make_ctx(tmp_path: Path, *, dry_run: bool = False) -> MagicMock:
@@ -111,9 +112,9 @@ def test_dry_run_logs_command(tmp_path: Path) -> None:
 
 def test_dry_run_no_subprocess_calls(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, dry_run=True)
-    with patch("darkfactory.builtins.create_pr.subprocess.run") as mock_run:
+    with patch("darkfactory.builtins.create_pr.gh_create_pr") as mock_create:
         create_pr(ctx)
-    mock_run.assert_not_called()
+    mock_create.assert_not_called()
 
 
 # ---------- forbidden attribution ----------
@@ -138,28 +139,23 @@ def test_forbidden_attribution_in_body_raises(tmp_path: Path) -> None:
 
 def test_successful_creation_calls_gh_pr_create(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, dry_run=False)
-    mock_result = MagicMock()
-    mock_result.stdout = "https://github.com/owner/repo/pull/42\n"
     with patch(
-        "darkfactory.builtins.create_pr.subprocess.run", return_value=mock_result
-    ) as mock_run:
+        "darkfactory.builtins.create_pr.gh_create_pr",
+        return_value=Ok("https://github.com/owner/repo/pull/42"),
+    ) as mock_create:
         create_pr(ctx)
 
-    mock_run.assert_called_once()
-    cmd = mock_run.call_args[0][0]
-    assert cmd[0] == "gh"
-    assert "pr" in cmd
-    assert "create" in cmd
-    assert "--base" in cmd
-    assert "main" in cmd
+    mock_create.assert_called_once()
+    args = mock_create.call_args
+    assert args[0][0] == "main"  # base
+    assert args[0][1] == "PRD-001: Test PR"  # title
 
 
 def test_successful_creation_sets_pr_url(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, dry_run=False)
-    mock_result = MagicMock()
-    mock_result.stdout = "https://github.com/owner/repo/pull/42\n"
     with patch(
-        "darkfactory.builtins.create_pr.subprocess.run", return_value=mock_result
+        "darkfactory.builtins.create_pr.gh_create_pr",
+        return_value=Ok("https://github.com/owner/repo/pull/42"),
     ):
         create_pr(ctx)
 
@@ -168,13 +164,11 @@ def test_successful_creation_sets_pr_url(tmp_path: Path) -> None:
 
 def test_successful_creation_includes_title(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, dry_run=False)
-    mock_result = MagicMock()
-    mock_result.stdout = "https://github.com/owner/repo/pull/42\n"
     with patch(
-        "darkfactory.builtins.create_pr.subprocess.run", return_value=mock_result
-    ) as mock_run:
+        "darkfactory.builtins.create_pr.gh_create_pr",
+        return_value=Ok("https://github.com/owner/repo/pull/42"),
+    ) as mock_create:
         create_pr(ctx)
 
-    cmd = mock_run.call_args[0][0]
-    title_idx = cmd.index("--title")
-    assert cmd[title_idx + 1] == "PRD-001: Test PR"
+    args = mock_create.call_args
+    assert args[0][1] == "PRD-001: Test PR"

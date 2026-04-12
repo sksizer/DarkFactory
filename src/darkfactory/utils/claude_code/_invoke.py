@@ -41,11 +41,11 @@ from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .utils.claude_code import EffortLevel
+from darkfactory.utils.claude_code._interactive import EffortLevel
 
 if TYPE_CHECKING:
-    from .event_log import EventWriter
-    from .style import Element, Styler
+    from darkfactory.event_log import EventWriter
+    from darkfactory.style import Element, Styler
 
 
 # ---------- capability -> model mapping ----------
@@ -232,7 +232,7 @@ def _summarize_stream_event(
 
     Anything not in this list is skipped (element=None).
     """
-    from .style import Element
+    from darkfactory.style import Element
 
     etype = event.get("type")
 
@@ -243,11 +243,6 @@ def _summarize_stream_event(
     if etype == "assistant":
         msg = event.get("message", {}) or {}
         content = msg.get("content", []) or []
-        # Pick the most informative block. A single assistant event can
-        # contain multiple content blocks; we summarize each on its own line
-        # by returning only the first here and recursing for the others
-        # would over-complicate the contract — instead we join them with
-        # ' | '.
         bits: list[str] = []
         text_accum: list[str] = []
         has_tool_use = False
@@ -258,8 +253,6 @@ def _summarize_stream_event(
                 only_thinking = False
                 text = block.get("text") or ""
                 text_accum.append(text)
-                # Show first 200 chars on a single line; the buffer keeps
-                # the full text for sentinel parsing.
                 snippet = text.replace("\n", " ").strip()
                 if len(snippet) > 200:
                     snippet = snippet[:197] + "..."
@@ -270,7 +263,6 @@ def _summarize_stream_event(
                 has_tool_use = True
                 name = block.get("name", "?")
                 inp = block.get("input", {}) or {}
-                # Render a few high-signal inputs concisely.
                 hint = ""
                 if isinstance(inp, dict):
                     if "command" in inp:
@@ -283,7 +275,6 @@ def _summarize_stream_event(
                         hint = f" {inp['path']}"
                 bits.append(f"tool_use: {name}{hint}")
             elif btype == "thinking":
-                # Don't echo full thinking — too noisy. Just note it happened.
                 bits.append("thinking")
             else:
                 only_thinking = False
@@ -307,7 +298,6 @@ def _summarize_stream_event(
         for block in content:
             if block.get("type") == "tool_result":
                 raw = block.get("content")
-                # tool_result content can be a string or a list of blocks
                 if isinstance(raw, list):
                     raw = " ".join(
                         b.get("text", "") for b in raw if isinstance(b, dict)
@@ -327,8 +317,6 @@ def _summarize_stream_event(
             delta = ev.get("delta", {}) or {}
             if delta.get("type") == "text_delta":
                 text = delta.get("text") or ""
-                # Don't log every micro-delta — too noisy. But DO accumulate
-                # text into the agent buffer so sentinels build up.
                 return (None, "", text)
         return (None, "", "")
 
@@ -346,22 +334,15 @@ def _summarize_stream_event(
         snippet = str(msg).replace("\n", " ").strip()
         if len(snippet) > 200:
             snippet = snippet[:197] + "..."
-        # Extract token usage if present — render result events bold so the
-        # token count stands out (AC-3).
         usage = event.get("usage", {}) or {}
         input_tokens = usage.get("input_tokens", 0) or 0
         output_tokens = usage.get("output_tokens", 0) or 0
         total_tokens = input_tokens + output_tokens
         token_str = f" [{total_tokens:,} tokens]" if total_tokens else ""
         display = f"[result] {subtype}{token_str} {snippet}".strip()
-        # Use TOKEN_COUNT element when usage info is present so the line
-        # renders bold; fall back to SYSTEM otherwise.
         result_elem = Element.TOKEN_COUNT if total_tokens else Element.SYSTEM
-        # The result.result field contains the final text, which is where
-        # the sentinel typically lands.
         return (result_elem, display, str(msg))
 
-    # Unknown event type — log nothing, accumulate nothing.
     return (None, "", "")
 
 
@@ -432,17 +413,6 @@ def invoke_claude(
     if _argv_override is not None:
         cmd: list[str] = [executable] + list(_argv_override)
     else:
-        # --output-format stream-json + --verbose emits JSONL events as
-        # they happen (one event per assistant turn, plus tool results,
-        # rate-limit warnings, and a final result event) instead of
-        # buffering until the process exits. This is what actually makes
-        # streaming-to-logger useful — the raw --print mode writes one
-        # blob at the very end.
-        #
-        # We deliberately do NOT pass --include-partial-messages: per-turn
-        # granularity is plenty for "is the agent making progress"
-        # visibility, and per-delta events add a lot of noise without
-        # much extra signal.
         cmd = [
             executable,
             "dlx",
@@ -455,9 +425,6 @@ def invoke_claude(
             model,
             "--allowed-tools",
             ",".join(tools),
-            # Prevent the agent from reading/writing outside the project
-            # directory (cwd). Without this, file tools accept absolute
-            # paths and can escape a worktree into the main repo.
             "--disallowed-tools",
             "Edit(../)",
             "--disallowed-tools",
@@ -466,10 +433,6 @@ def invoke_claude(
             "Read(../)",
         ]
         if effort_level is not None:
-            # Session-scoped adaptive-reasoning budget. ``max`` is Opus 4.6
-            # only and will fail loud at the CLI if the selected model
-            # doesn't support it — matching this project's "hard failures
-            # over silent degradation" principle.
             cmd.extend(["--effort", effort_level])
 
     try:
@@ -491,29 +454,23 @@ def invoke_claude(
             failure_reason=f"executable not found: {executable!r}",
         )
 
-    # Send the prompt and close stdin so the CLI knows we're done.
     assert proc.stdin is not None
     proc.stdin.write(prompt)
     proc.stdin.close()
 
-    stdout_buf = StringIO()  # raw stdout (JSONL events when stream-json)
-    agent_text_buf = StringIO()  # accumulated assistant text for sentinel matching
+    stdout_buf = StringIO()
+    agent_text_buf = StringIO()
     stderr_buf = StringIO()
     tool_counts: dict[str, int] = {}
     deadline = time.monotonic() + timeout_seconds
     process_done = threading.Event()
     timed_out = threading.Event()
 
-    # Drain stderr in a background thread so it doesn't deadlock
-    # the pipe if Claude writes a lot of warnings.
     def _drain_stderr() -> None:
         assert proc.stderr is not None
         for line in proc.stderr:
             stderr_buf.write(line)
 
-    # Watchdog thread kills the process if it exceeds the deadline.
-    # Uses process_done to wake early when the process finishes normally,
-    # keeping mock-based tests fast.
     def _watchdog() -> None:
         remaining = deadline - time.monotonic()
         if remaining > 0:
@@ -527,12 +484,6 @@ def invoke_claude(
     stderr_thread.start()
     watchdog_thread.start()
 
-    # Read stdout line-by-line on the main thread. With stream-json each
-    # line is a JSON envelope; we summarize each event into a one-line log
-    # message and accumulate any assistant text into the sentinel buffer.
-    # Lines that fail to parse as JSON (e.g. tests using a plain stub
-    # subprocess, or unexpected output) fall back to the legacy behavior
-    # of logging the raw line as-is and treating it as agent text.
     assert proc.stdout is not None
     try:
         for line in proc.stdout:
@@ -543,10 +494,8 @@ def invoke_claude(
             try:
                 event = json.loads(stripped)
             except json.JSONDecodeError:
-                # Not JSON — preserve old behavior. Useful for tests that
-                # stub the subprocess with plain text and for diagnostics.
                 if styler is not None:
-                    from .style import Element
+                    from darkfactory.style import Element
                     import sys
 
                     print(
@@ -562,7 +511,6 @@ def invoke_claude(
                 log.info("agent: %s", stripped)
                 continue
 
-            # Emit agent_event to the structured event log.
             if event_writer is not None:
                 event_writer.emit(
                     "task",
@@ -572,7 +520,6 @@ def invoke_claude(
                 )
 
             element, display_text, agent_text = _summarize_stream_event(event)
-            # Accumulate tool-call counts from assistant events.
             if event.get("type") == "assistant":
                 for block in (event.get("message") or {}).get("content") or []:
                     if block.get("type") == "tool_use":
@@ -580,22 +527,16 @@ def invoke_claude(
                         tool_counts[name] = tool_counts.get(name, 0) + 1
             if element is not None and display_text:
                 if styler is not None:
-                    from .style import Element
+                    from darkfactory.style import Element
 
-                    # Print with styling to stderr so it doesn't mix with
-                    # any stdout output the caller may be collecting.
                     import sys
 
                     print(styler.render(element, display_text), file=sys.stderr)
                 else:
                     log.info("agent: %s", display_text)
             if agent_text:
-                # Append verbatim — adding a trailing newline here would
-                # break sentinel matching when the marker is split across
-                # successive partial-message deltas.
                 agent_text_buf.write(agent_text)
     finally:
-        # Signal watchdog that the process has exited (or we're cleaning up).
         process_done.set()
         try:
             proc.wait(timeout=5)
@@ -638,11 +579,6 @@ def invoke_claude(
             failure_reason=f"timeout after {timeout_seconds}s",
         )
 
-    # Sentinel parsing scans both the assembled assistant text (the
-    # natural place sentinels appear when stream-json is in use) and the
-    # raw stdout buffer (covers the legacy text-mode path and tests that
-    # stub plain stdout). The two-pass approach is harmless: if neither
-    # contains the marker we still produce the same "no sentinel" failure.
     sentinel_haystack = agent_text or stdout
     if (
         agent_text
@@ -650,9 +586,6 @@ def invoke_claude(
         and sentinel_success not in agent_text
         and sentinel_failure not in agent_text
     ):
-        # Fallback: agent text didn't have it, look in raw stdout too.
-        # This catches edge cases where the result event wraps the
-        # sentinel differently than the partial-message stream.
         sentinel_haystack = agent_text + "\n" + stdout
 
     success, failure_reason = _parse_sentinels(
@@ -662,15 +595,12 @@ def invoke_claude(
     )
 
     if exit_code != 0 and success:
-        # Unusual: sentinel says OK but process exited non-zero. Trust
-        # the exit code and surface the real problem.
         success = False
         failure_reason = (
             f"claude exited non-zero ({exit_code}) despite success sentinel; "
             f"stderr: {stderr.strip()[:200]}"
         )
 
-    # Extract the sentinel value (e.g. "PRD-224.3") from the success marker.
     sentinel_value: str | None = None
     if success and sentinel_success == "PRD_EXECUTE_OK":
         m = _SENTINEL_SUCCESS_RE.search(sentinel_haystack)

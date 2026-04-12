@@ -6,13 +6,20 @@ repo. The return type is always ``list[Issue]``.
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
+
+from darkfactory.utils._result import Ok
+from darkfactory.utils.git import GitErr, git_run
+from darkfactory.utils.github._types import GhErr
+from darkfactory.utils.github.pull_request import (
+    fetch_all_pr_states,
+    get_resume_pr_state,
+)
 
 from .model import PRD, compute_branch_name
 
@@ -64,25 +71,8 @@ def is_resume_safe(branch: str, repo_root: Path) -> ResumeStatus:
     and compares local branch tip against ``origin/<branch>``.
     """
     # 1. Check PR state via gh (best-effort; missing gh is not fatal)
-    try:
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "list",
-                "--head",
-                branch,
-                "--state",
-                "all",
-                "--json",
-                "state,mergedAt",
-            ],
-            capture_output=True,
-            text=True,
-            cwd=repo_root,
-        )
-        if result.returncode == 0:
-            prs = json.loads(result.stdout)
+    match get_resume_pr_state(branch, repo_root):
+        case Ok(value=prs):
             for pr in prs:
                 if pr["state"] == "MERGED":
                     return ResumeStatus(
@@ -100,62 +90,49 @@ def is_resume_safe(branch: str, repo_root: Path) -> ResumeStatus:
                         ),
                         kind="pr_closed",
                     )
-        else:
-            logger.warning(
-                "gh pr list failed (rc=%d); skipping PR state check", result.returncode
-            )
-    except FileNotFoundError:
-        logger.warning("gh not found; skipping PR state check")
+        case GhErr(stderr=err):
+            if "gh" in err.lower() or "not found" in err.lower():
+                logger.warning("gh not found; skipping PR state check")
+            else:
+                logger.warning("gh pr list failed; skipping PR state check")
 
     # 2. Check local vs origin divergence (warn only, don't refuse)
-    try:
-        local_result = subprocess.run(
-            ["git", "-C", str(repo_root), "rev-parse", f"refs/heads/{branch}"],
-            capture_output=True,
-            text=True,
-        )
-        origin_result = subprocess.run(
-            ["git", "-C", str(repo_root), "rev-parse", f"refs/remotes/origin/{branch}"],
-            capture_output=True,
-            text=True,
-        )
-        if local_result.returncode == 0 and origin_result.returncode == 0:
-            local_sha = local_result.stdout.strip()
-            origin_sha = origin_result.stdout.strip()
-            if local_sha != origin_sha:
-                # Check if origin has commits local doesn't
-                behind_result = subprocess.run(
-                    [
-                        "git",
-                        "-C",
-                        str(repo_root),
-                        "rev-list",
-                        "--count",
-                        f"{branch}..origin/{branch}",
-                    ],
-                    capture_output=True,
-                    text=True,
-                )
-                if behind_result.returncode == 0:
-                    count = int(behind_result.stdout.strip() or "0")
-                    if count > 0:
-                        logger.warning(
-                            "local branch %r is %d commit(s) behind origin/%s — "
-                            "consider pulling before resuming",
-                            branch,
-                            count,
-                            branch,
-                        )
-                        return ResumeStatus(
-                            safe=True,
-                            reason=(
-                                f"local branch {branch!r} is {count} commit(s) behind "
-                                f"origin/{branch}"
-                            ),
-                            kind="diverged",
-                        )
-    except Exception as exc:
-        logger.warning("divergence check failed (%s); skipping", exc)
+    match git_run("rev-parse", f"refs/heads/{branch}", cwd=repo_root):
+        case Ok(stdout=local_raw):
+            local_sha = local_raw.strip()
+        case GitErr():
+            return ResumeStatus(safe=True, reason="", kind="safe")
+
+    match git_run("rev-parse", f"refs/remotes/origin/{branch}", cwd=repo_root):
+        case Ok(stdout=origin_raw):
+            origin_sha = origin_raw.strip()
+        case GitErr():
+            return ResumeStatus(safe=True, reason="", kind="safe")
+
+    if local_sha != origin_sha:
+        match git_run(
+            "rev-list", "--count", f"{branch}..origin/{branch}", cwd=repo_root
+        ):
+            case Ok(stdout=count_raw):
+                count = int(count_raw.strip() or "0")
+                if count > 0:
+                    logger.warning(
+                        "local branch %r is %d commit(s) behind origin/%s — "
+                        "consider pulling before resuming",
+                        branch,
+                        count,
+                        branch,
+                    )
+                    return ResumeStatus(
+                        safe=True,
+                        reason=(
+                            f"local branch {branch!r} is {count} commit(s) behind "
+                            f"origin/{branch}"
+                        ),
+                        kind="diverged",
+                    )
+            case GitErr():
+                pass
 
     return ResumeStatus(safe=True, reason="", kind="safe")
 
@@ -176,102 +153,34 @@ class RemoveStatus:
 
 def _get_pr_state(branch: str, repo_root: Path) -> str:
     """Get the PR state for a branch. Returns MERGED, CLOSED, OPEN, or UNKNOWN."""
-    try:
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "list",
-                "--head",
-                branch,
-                "--state",
-                "all",
-                "--json",
-                "state",
-            ],
-            capture_output=True,
-            text=True,
-            cwd=repo_root,
-            timeout=10,
-        )
-        if result.returncode == 0:
-            prs = json.loads(result.stdout)
-            if prs:
-                return str(prs[0]["state"])
-    except (
-        FileNotFoundError,
-        json.JSONDecodeError,
-        ValueError,
-        subprocess.TimeoutExpired,
-    ):
-        pass
-    return "UNKNOWN"
+    from darkfactory.utils.github.pull_request import get_pr_state
+
+    match get_pr_state(branch, repo_root, timeout=10):
+        case Ok(value=state):
+            return state
+        case _:
+            return "UNKNOWN"
 
 
 def _fetch_all_pr_states(repo_root: Path) -> dict[str, str]:
-    """Fetch PR states for all branches in a single gh call.
-
-    Returns a mapping of ``headRefName`` → state (MERGED, CLOSED, OPEN).
-    If a branch has multiple PRs, the most relevant state wins
-    (MERGED > CLOSED > OPEN).
-    """
-    try:
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "list",
-                "--state",
-                "all",
-                "--limit",
-                "500",
-                "--json",
-                "headRefName,state",
-            ],
-            capture_output=True,
-            text=True,
-            cwd=repo_root,
-            timeout=30,
-        )
-        if result.returncode != 0:
+    """Fetch PR states for all branches in a single gh call."""
+    match fetch_all_pr_states(repo_root, timeout=30):
+        case Ok(value=states):
+            return states
+        case _:
             return {}
-        prs = json.loads(result.stdout)
-    except (
-        FileNotFoundError,
-        json.JSONDecodeError,
-        ValueError,
-        subprocess.TimeoutExpired,
-    ):
-        return {}
-
-    # If a branch has multiple PRs (e.g. one MERGED, one OPEN), prefer MERGED.
-    priority = {"MERGED": 2, "CLOSED": 1, "OPEN": 0}
-    states: dict[str, str] = {}
-    for pr in prs:
-        branch = pr.get("headRefName", "")
-        state = str(pr.get("state", ""))
-        if not branch or not state:
-            continue
-        existing = states.get(branch)
-        if existing is None or priority.get(state, -1) > priority.get(existing, -1):
-            states[branch] = state
-    return states
 
 
 def _has_unpushed_commits(worktree_path: Path, branch: str) -> bool:
     """Return True if branch has local commits not yet pushed to origin."""
-    try:
-        result = subprocess.run(
-            ["git", "rev-list", "--count", f"origin/{branch}..{branch}"],
-            capture_output=True,
-            text=True,
-            cwd=worktree_path,
-        )
-        if result.returncode == 0:
-            return int(result.stdout.strip() or "0") > 0
-    except (ValueError, Exception):  # noqa: BLE001
-        pass
-    return False
+    match git_run("rev-list", "--count", f"origin/{branch}..{branch}", cwd=worktree_path):
+        case Ok(stdout=raw):
+            try:
+                return int(raw.strip() or "0") > 0
+            except ValueError:
+                return False
+        case _:
+            return False
 
 
 def find_stale_worktrees(repo_root: Path) -> list[StaleWorktree]:

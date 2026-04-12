@@ -162,7 +162,7 @@ def test_run_shell_ignore_failure(tmp_path: Path) -> None:
 
 def test_run_shell_format_string_substituted(tmp_path: Path) -> None:
     """format_string is applied to the shell command before execution."""
-    with patch("darkfactory.system_runner._run_shell_once") as mock_run:
+    with patch("darkfactory.system_runner.run_shell") as mock_run:
         mock_proc = MagicMock()
         mock_proc.returncode = 0
         mock_run.return_value = mock_proc

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from darkfactory.pr_comments import (
     CommentReply,
@@ -11,6 +11,8 @@ from darkfactory.pr_comments import (
     parse_agent_replies,
     post_comment_replies,
 )
+from darkfactory.utils._result import Ok
+from darkfactory.utils.github._types import GhErr
 
 
 def _make_thread(thread_id: str, reply_target_id: str | None) -> ReviewThread:
@@ -112,19 +114,11 @@ def test_parse_agent_replies_empty_array() -> None:
 # ---------- post_comment_replies ----------
 
 
-def _make_mock_run(returncode: int = 0, stderr: str = "") -> MagicMock:
-    mock = MagicMock()
-    mock.returncode = returncode
-    mock.stderr = stderr
-    mock.stdout = "{}"
-    return mock
-
-
 def test_post_comment_replies_success(tmp_path: Path) -> None:
     replies = [CommentReply(thread_id="IC_001", body="Fixed it.")]
     threads = [_make_thread("IC_001", reply_target_id="555001")]
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
-        mock_run.return_value = _make_mock_run(returncode=0)
+    with patch("darkfactory.pr_comments.post_reply") as mock_reply:
+        mock_reply.return_value = Ok(None)
         results = post_comment_replies(
             pr_number=42,
             replies=replies,
@@ -134,21 +128,19 @@ def test_post_comment_replies_success(tmp_path: Path) -> None:
         )
 
     assert results == [("IC_001", True)]
-    mock_run.assert_called_once()
-    call_args = mock_run.call_args[0][0]
-    # Verify the URL uses the numeric reply_target_id, not the thread_id
-    url_arg = next(a for a in call_args if a.startswith("repos/") and "/replies" in a)
-    assert "/comments/555001/replies" in url_arg
-    assert "IC_001" not in url_arg
-    body_arg = next(a for a in call_args if a.startswith("body="))
-    assert body_arg.startswith("body=[harness] addressed in abc1234: Fixed it.")
+    mock_reply.assert_called_once()
+    call_args = mock_reply.call_args
+    endpoint = call_args[0][0]
+    body = call_args[0][1]
+    assert "/comments/555001/replies" in endpoint
+    assert body.startswith("[harness] addressed in abc1234: Fixed it.")
 
 
 def test_post_comment_replies_prefix_format(tmp_path: Path) -> None:
     replies = [CommentReply(thread_id="IC_999", body="Renamed the variable.")]
     threads = [_make_thread("IC_999", reply_target_id="555999")]
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
-        mock_run.return_value = _make_mock_run(returncode=0)
+    with patch("darkfactory.pr_comments.post_reply") as mock_reply:
+        mock_reply.return_value = Ok(None)
         post_comment_replies(
             pr_number=7,
             replies=replies,
@@ -157,16 +149,16 @@ def test_post_comment_replies_prefix_format(tmp_path: Path) -> None:
             repo_root=tmp_path,
         )
 
-    call_args = mock_run.call_args[0][0]
-    body_arg = next(a for a in call_args if a.startswith("body="))
-    assert body_arg == "body=[harness] addressed in deadbeef: Renamed the variable."
+    call_args = mock_reply.call_args
+    body = call_args[0][1]
+    assert body == "[harness] addressed in deadbeef: Renamed the variable."
 
 
 def test_post_comment_replies_failure_returns_false(tmp_path: Path) -> None:
     replies = [CommentReply(thread_id="IC_bad", body="Something.")]
     threads = [_make_thread("IC_bad", reply_target_id="555bad")]
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
-        mock_run.return_value = _make_mock_run(returncode=1, stderr="permission denied")
+    with patch("darkfactory.pr_comments.post_reply") as mock_reply:
+        mock_reply.return_value = GhErr(1, "", "permission denied", ["gh", "api"])
         results = post_comment_replies(
             pr_number=1,
             replies=replies,
@@ -181,7 +173,8 @@ def test_post_comment_replies_failure_returns_false(tmp_path: Path) -> None:
 def test_post_comment_replies_exception_returns_false(tmp_path: Path) -> None:
     replies = [CommentReply(thread_id="IC_exc", body="Something.")]
     threads = [_make_thread("IC_exc", reply_target_id="555exc")]
-    with patch("darkfactory.pr_comments.subprocess.run", side_effect=OSError("no gh")):
+    with patch("darkfactory.pr_comments.post_reply") as mock_reply:
+        mock_reply.return_value = GhErr(-1, "", "no gh", ["gh", "api"])
         results = post_comment_replies(
             pr_number=1,
             replies=replies,
@@ -202,8 +195,11 @@ def test_post_comment_replies_multiple_mixed(tmp_path: Path) -> None:
         _make_thread("IC_ok", reply_target_id="5550"),
         _make_thread("IC_fail", reply_target_id="5551"),
     ]
-    responses = [_make_mock_run(0), _make_mock_run(1, "rate limit")]
-    with patch("darkfactory.pr_comments.subprocess.run", side_effect=responses):
+    with patch("darkfactory.pr_comments.post_reply") as mock_reply:
+        mock_reply.side_effect = [
+            Ok(None),
+            GhErr(1, "", "rate limit", ["gh", "api"]),
+        ]
         results = post_comment_replies(
             pr_number=5,
             replies=replies,
@@ -216,7 +212,7 @@ def test_post_comment_replies_multiple_mixed(tmp_path: Path) -> None:
 
 
 def test_post_comment_replies_empty(tmp_path: Path) -> None:
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.pr_comments.post_reply") as mock_reply:
         results = post_comment_replies(
             pr_number=1,
             replies=[],
@@ -225,14 +221,14 @@ def test_post_comment_replies_empty(tmp_path: Path) -> None:
             repo_root=tmp_path,
         )
     assert results == []
-    mock_run.assert_not_called()
+    mock_reply.assert_not_called()
 
 
 def test_post_comment_replies_unknown_thread_id_skipped(tmp_path: Path) -> None:
     """An agent-supplied thread_id not in the fetched threads is logged and skipped."""
     replies = [CommentReply(thread_id="IC_ghost", body="Done.")]
     threads = [_make_thread("IC_real", reply_target_id="5555")]
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.pr_comments.post_reply") as mock_reply:
         results = post_comment_replies(
             pr_number=1,
             replies=replies,
@@ -241,14 +237,14 @@ def test_post_comment_replies_unknown_thread_id_skipped(tmp_path: Path) -> None:
             repo_root=tmp_path,
         )
     assert results == [("IC_ghost", False)]
-    mock_run.assert_not_called()
+    mock_reply.assert_not_called()
 
 
 def test_post_comment_replies_no_reply_target_skipped(tmp_path: Path) -> None:
     """A thread with no reply_target_id (review summary / issue comment) is skipped."""
     replies = [CommentReply(thread_id="review-1", body="Thanks.")]
     threads = [_make_thread("review-1", reply_target_id=None)]
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.pr_comments.post_reply") as mock_reply:
         results = post_comment_replies(
             pr_number=1,
             replies=replies,
@@ -257,4 +253,4 @@ def test_post_comment_replies_no_reply_target_skipped(tmp_path: Path) -> None:
             repo_root=tmp_path,
         )
     assert results == [("review-1", False)]
-    mock_run.assert_not_called()
+    mock_reply.assert_not_called()

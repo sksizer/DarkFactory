@@ -256,13 +256,13 @@ def test_lock_acquired_on_success(tmp_path: Path) -> None:
 
 
 def test_lock_timeout_raises_runtime_error(tmp_path: Path) -> None:
-    from filelock import Timeout
+    from filelock import Timeout as LockTimeout
 
     ctx = _make_ensure_worktree_ctx(tmp_path)
 
     with patch("darkfactory.builtins.ensure_worktree.FileLock") as mock_lock_cls:
         mock_lock = MagicMock()
-        mock_lock.acquire.side_effect = Timeout("test.lock")
+        mock_lock.acquire.side_effect = LockTimeout("test.lock")
         mock_lock_cls.return_value = mock_lock
 
         with pytest.raises(RuntimeError, match="already being worked on"):

@@ -6,8 +6,9 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-from darkfactory.utils.git._run import git_probe, git_run
-from darkfactory.utils.git._types import GitErr, GitTimeout, Ok
+from darkfactory.utils._result import Timeout
+from darkfactory.utils.git._run import git_run
+from darkfactory.utils.git._types import GitErr, Ok
 
 
 def _ok(stdout: str = "", stderr: str = "") -> subprocess.CompletedProcess[str]:
@@ -48,14 +49,14 @@ class TestGitRun:
         assert result.cmd == ["git", "status"]
 
 
-class TestGitProbe:
-    def test_timeout_returns_gittimeout(self) -> None:
+class TestGitRunWithTimeout:
+    def test_timeout_returns_timeout(self) -> None:
         with patch(
             "darkfactory.utils.git._run.subprocess.run",
             side_effect=subprocess.TimeoutExpired(cmd=["git", "ls-remote"], timeout=5),
         ):
-            result = git_probe("ls-remote", cwd=Path("/tmp"), timeout=5)
-        assert isinstance(result, GitTimeout)
+            result = git_run("ls-remote", cwd=Path("/tmp"), timeout=5)
+        assert isinstance(result, Timeout)
         assert result.cmd == ["git", "ls-remote"]
         assert result.timeout == 5
 
@@ -64,7 +65,7 @@ class TestGitProbe:
             "darkfactory.utils.git._run.subprocess.run",
             side_effect=OSError("no such file"),
         ):
-            result = git_probe("ls-remote", cwd=Path("/tmp"), timeout=10)
+            result = git_run("ls-remote", cwd=Path("/tmp"), timeout=10)
         assert isinstance(result, GitErr)
         assert result.returncode == -1
         assert "no such file" in result.stderr
@@ -75,7 +76,7 @@ class TestGitProbe:
             "darkfactory.utils.git._run.subprocess.run",
             return_value=_ok(stdout="ref\n"),
         ):
-            result = git_probe("ls-remote", cwd=Path("/tmp"), timeout=10)
+            result = git_run("ls-remote", cwd=Path("/tmp"), timeout=10)
         assert isinstance(result, Ok)
         assert result.value is None
 
@@ -84,6 +85,6 @@ class TestGitProbe:
             "darkfactory.utils.git._run.subprocess.run",
             return_value=_fail(returncode=2, stderr="not found"),
         ):
-            result = git_probe("ls-remote", cwd=Path("/tmp"), timeout=10)
+            result = git_run("ls-remote", cwd=Path("/tmp"), timeout=10)
         assert isinstance(result, GitErr)
         assert result.returncode == 2

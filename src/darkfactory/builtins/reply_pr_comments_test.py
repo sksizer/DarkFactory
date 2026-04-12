@@ -7,6 +7,8 @@ from unittest.mock import MagicMock, patch
 
 from darkfactory.builtins.reply_pr_comments import reply_pr_comments
 from darkfactory.pr_comments import ReviewThread
+from darkfactory.utils._result import Ok
+from darkfactory.utils.github._types import GhErr
 
 
 def _default_threads() -> list[ReviewThread]:
@@ -65,31 +67,31 @@ _VALID_OUTPUT = (
 
 def test_skips_when_reply_to_comments_false() -> None:
     ctx = _make_ctx(reply_to_comments=False, agent_output=_VALID_OUTPUT)
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.pr_comments.post_reply") as mock_reply:
         reply_pr_comments(ctx)
-    mock_run.assert_not_called()
+    mock_reply.assert_not_called()
 
 
 def test_skips_when_no_pr_number() -> None:
     ctx = _make_ctx(pr_number=None, agent_output=_VALID_OUTPUT)
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.pr_comments.post_reply") as mock_reply:
         reply_pr_comments(ctx)
-    mock_run.assert_not_called()
+    mock_reply.assert_not_called()
     ctx.logger.warning.assert_called()
 
 
 def test_skips_when_no_agent_output() -> None:
     ctx = _make_ctx(agent_output=None)
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.pr_comments.post_reply") as mock_reply:
         reply_pr_comments(ctx)
-    mock_run.assert_not_called()
+    mock_reply.assert_not_called()
 
 
 def test_skips_when_agent_output_empty_string() -> None:
     ctx = _make_ctx(agent_output="")
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.pr_comments.post_reply") as mock_reply:
         reply_pr_comments(ctx)
-    mock_run.assert_not_called()
+    mock_reply.assert_not_called()
 
 
 # ---------- dry-run ----------
@@ -97,9 +99,9 @@ def test_skips_when_agent_output_empty_string() -> None:
 
 def test_dry_run_logs_without_posting() -> None:
     ctx = _make_ctx(dry_run=True, agent_output=_VALID_OUTPUT)
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.pr_comments.post_reply") as mock_reply:
         reply_pr_comments(ctx)
-    mock_run.assert_not_called()
+    mock_reply.assert_not_called()
     ctx.logger.info.assert_called()
     # Check dry-run message appears
     all_calls = " ".join(str(c) for c in ctx.logger.info.call_args_list)
@@ -112,14 +114,11 @@ def test_dry_run_logs_without_posting() -> None:
 def test_posts_replies_on_success(tmp_path: Path) -> None:
     ctx = _make_ctx(agent_output=_VALID_OUTPUT, repo_root=tmp_path, cwd=tmp_path)
 
-    sha_result = MagicMock()
-    sha_result.stdout = "abc1234\n"
-    sha_result.returncode = 0
+    import subprocess
 
-    post_result = MagicMock()
-    post_result.returncode = 0
-    post_result.stdout = "{}"
-    post_result.stderr = ""
+    sha_result = subprocess.CompletedProcess(
+        args=["git"], returncode=0, stdout="abc1234\n", stderr=""
+    )
 
     with (
         patch(
@@ -127,8 +126,8 @@ def test_posts_replies_on_success(tmp_path: Path) -> None:
             return_value=sha_result,
         ),
         patch(
-            "darkfactory.pr_comments.subprocess.run",
-            return_value=post_result,
+            "darkfactory.pr_comments.post_reply",
+            return_value=Ok(None),
         ),
     ):
         reply_pr_comments(ctx)
@@ -139,13 +138,11 @@ def test_posts_replies_on_success(tmp_path: Path) -> None:
 def test_failure_does_not_raise(tmp_path: Path) -> None:
     ctx = _make_ctx(agent_output=_VALID_OUTPUT, repo_root=tmp_path, cwd=tmp_path)
 
-    sha_result = MagicMock()
-    sha_result.stdout = "abc1234\n"
+    import subprocess
 
-    fail_result = MagicMock()
-    fail_result.returncode = 1
-    fail_result.stderr = "rate limit exceeded"
-    fail_result.stdout = ""
+    sha_result = subprocess.CompletedProcess(
+        args=["git"], returncode=0, stdout="abc1234\n", stderr=""
+    )
 
     with (
         patch(
@@ -153,8 +150,8 @@ def test_failure_does_not_raise(tmp_path: Path) -> None:
             return_value=sha_result,
         ),
         patch(
-            "darkfactory.pr_comments.subprocess.run",
-            return_value=fail_result,
+            "darkfactory.pr_comments.post_reply",
+            return_value=GhErr(1, "", "rate limit exceeded", ["gh", "api"]),
         ),
     ):
         # Must NOT raise even on failure
@@ -169,6 +166,6 @@ def test_no_replies_in_output_is_silent(tmp_path: Path) -> None:
         repo_root=tmp_path,
         cwd=tmp_path,
     )
-    with patch("darkfactory.pr_comments.subprocess.run") as mock_run:
+    with patch("darkfactory.pr_comments.post_reply") as mock_reply:
         reply_pr_comments(ctx)
-    mock_run.assert_not_called()
+    mock_reply.assert_not_called()

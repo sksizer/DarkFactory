@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 
-from darkfactory.invoke import InvokeResult
+from darkfactory.utils.claude_code import InvokeResult
 from darkfactory.model import PRD, load_all
 from darkfactory.runner import (
     _compute_branch_name,
@@ -294,7 +294,7 @@ def test_shell_cmd_is_format_stringed(tmp_path: Path) -> None:
     wf = _make_workflow(tmp_path, [ShellTask("echo", cmd="echo {prd_id}")])
     prd = _make_prd(tmp_path)
 
-    with patch("darkfactory.runner._run_shell_once") as mock_once:
+    with patch("darkfactory.runner.run_shell") as mock_once:
         mock_once.return_value = subprocess.CompletedProcess(
             args=["echo PRD-070"], returncode=0, stdout="PRD-070\n", stderr=""
         )
@@ -334,7 +334,7 @@ def test_shell_failure_triggers_agent_retry(tmp_path: Path) -> None:
     with (
         patch("darkfactory.runner.invoke_claude") as mock_invoke,
         patch(
-            "darkfactory.runner._run_shell_once", side_effect=shell_results
+            "darkfactory.runner.run_shell", side_effect=shell_results
         ) as mock_shell,
     ):
         mock_invoke.return_value = InvokeResult(
@@ -375,7 +375,7 @@ def test_shell_failure_retry_also_fails(tmp_path: Path) -> None:
 
     with (
         patch("darkfactory.runner.invoke_claude") as mock_invoke,
-        patch("darkfactory.runner._run_shell_once", return_value=failing) as mock_shell,
+        patch("darkfactory.runner.run_shell", return_value=failing) as mock_shell,
     ):
         mock_invoke.return_value = InvokeResult(
             stdout="PRD_EXECUTE_OK: PRD-070\n",

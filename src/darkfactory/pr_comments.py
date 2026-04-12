@@ -15,10 +15,17 @@ from __future__ import annotations
 import json
 import logging
 import re
-import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from darkfactory.utils._result import Ok
+from darkfactory.utils.github._comments import (
+    graphql_fetch,
+    post_reply,
+    repo_nwo,
+)
+from darkfactory.utils.github._types import GhErr
 
 _log = logging.getLogger(__name__)
 
@@ -125,26 +132,23 @@ def _gh_fetch(pr_number: int) -> dict[str, Any]:
 
         {"reviewThreads": [...], "reviews": [...], "comments": [...]}
     """
-    owner, name = _gh_repo_nwo()
-    result = subprocess.run(
-        [
-            "gh",
-            "api",
-            "graphql",
-            "-F",
-            f"owner={owner}",
-            "-F",
-            f"name={name}",
-            "-F",
-            f"number={pr_number}",
-            "-f",
-            f"query={_GRAPHQL_QUERY}",
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    payload = json.loads(result.stdout)
+    match repo_nwo(cwd=Path(".")):
+        case Ok(value=(owner, name)):
+            pass
+        case err:
+            raise RuntimeError(f"Failed to get repo owner/name: {err}")
+
+    variables = {
+        "owner": owner,
+        "name": name,
+        "number": str(pr_number),
+    }
+    match graphql_fetch(_GRAPHQL_QUERY, variables, cwd=Path(".")):
+        case Ok(value=payload):
+            pass
+        case err:
+            raise RuntimeError(f"GraphQL fetch failed: {err}")
+
     pr = payload["data"]["repository"]["pullRequest"]
 
     review_threads: list[dict[str, Any]] = []
@@ -164,19 +168,6 @@ def _gh_fetch(pr_number: int) -> dict[str, Any]:
         "reviews": pr["reviews"]["nodes"],
         "comments": pr["comments"]["nodes"],
     }
-
-
-def _gh_repo_nwo() -> tuple[str, str]:
-    """Return ``(owner, name)`` for the current repo via gh."""
-    result = subprocess.run(
-        ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    nwo = result.stdout.strip()
-    owner, _, name = nwo.partition("/")
-    return owner, name
 
 
 def _parse_threads(raw: dict[str, Any]) -> list[ReviewThread]:
@@ -402,59 +393,39 @@ def post_comment_replies(
         prefix = f"[harness] addressed in {commit_sha}: "
         body = prefix + reply.body
 
-        # gh api POST to create a reply on the specific pull request review comment.
-        # GitHub REST endpoint: POST /repos/{owner}/{repo}/pulls/{pull_number}/comments/{comment_id}/replies
-        # {comment_id} must be the numeric databaseId, not a GraphQL node id.
-        cmd = [
-            "gh",
-            "api",
-            "--method",
-            "POST",
-            f"repos/{{owner}}/{{repo}}/pulls/{pr_number}/comments/{target_id}/replies",
-            "-f",
-            f"body={body}",
-        ]
+        endpoint = (
+            f"repos/{{owner}}/{{repo}}/pulls/{pr_number}"
+            f"/comments/{target_id}/replies"
+        )
 
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                cwd=str(repo_root),
-            )
-            if result.returncode != 0:
-                _log.warning(
-                    "post_comment_replies: gh api failed for thread %s (exit %d): %s",
-                    reply.thread_id,
-                    result.returncode,
-                    result.stderr.strip(),
-                )
-                results.append((reply.thread_id, False))
-            else:
+        match post_reply(endpoint, body, cwd=repo_root):
+            case Ok():
                 _log.info(
                     "post_comment_replies: posted reply to thread %s", reply.thread_id
                 )
                 results.append((reply.thread_id, True))
-        except Exception as exc:
-            _log.warning(
-                "post_comment_replies: exception posting reply to thread %s: %s",
-                reply.thread_id,
-                exc,
-            )
-            results.append((reply.thread_id, False))
+            case GhErr(returncode=code, stderr=err):
+                _log.warning(
+                    "post_comment_replies: gh api failed for thread %s (exit %d): %s",
+                    reply.thread_id,
+                    code,
+                    err.strip(),
+                )
+                results.append((reply.thread_id, False))
 
     return results
 
 
 def _resolve_commit_timestamp(commit: str) -> str:
     """Resolve a commit SHA or ref to an ISO-8601 author timestamp."""
-    result = subprocess.run(
-        ["git", "log", "-1", "--format=%aI", commit],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return result.stdout.strip()
+    from darkfactory.utils.git import Ok as GitOk
+    from darkfactory.utils.git import resolve_commit_timestamp
+
+    match resolve_commit_timestamp(commit, cwd=Path(".")):
+        case GitOk(value=ts):
+            return ts
+        case err:
+            raise RuntimeError(f"git log failed: {err}")
 
 
 def _is_bot_comment(author: str, body: str, bot_usernames: list[str]) -> bool:

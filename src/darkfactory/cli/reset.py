@@ -11,7 +11,8 @@ from filelock import FileLock, Timeout
 
 from darkfactory.cli._shared import _find_repo_root
 from darkfactory.event_log import EventWriter, generate_session_id
-from darkfactory.utils.git import GitErr, Ok, git_run
+from darkfactory.utils._result import Ok
+from darkfactory.utils.git import GitErr, git_run
 from darkfactory.model import TERMINAL_STATUSES, load_one, save, set_status
 from darkfactory.rework_guard import ReworkGuard
 from darkfactory.utils.git.branch import find_local_branches, find_remote_branches
@@ -63,11 +64,13 @@ def _discover_artifacts(
 
     # Open PRs — search across all matching branches
     prefix = f"prd/{prd_id}-"
-    summary.open_pr_numbers = [
-        pr.number
-        for pr in list_open_prs(repo_root)
-        if pr.head_ref_name.startswith(prefix)
-    ]
+    match list_open_prs(repo_root):
+        case Ok(value=prs):
+            summary.open_pr_numbers = [
+                pr.number for pr in prs if pr.head_ref_name.startswith(prefix)
+            ]
+        case _:
+            summary.open_pr_numbers = []
 
     # Rework guard
     guard = ReworkGuard(repo_root)
@@ -131,12 +134,13 @@ def _execute_reset(
 
     # 6a. Close all open PRs
     for pr_num in summary.open_pr_numbers:
-        if close_pr(pr_num, repo_root, comment="Closed by `prd reset`."):
-            cleaned.append(f"closed PR #{pr_num}")
-            print(f"  Closed PR #{pr_num}")
-        else:
-            skipped.append(f"PR #{pr_num} (close failed)")
-            print(f"  Skipped PR #{pr_num} (close failed)")
+        match close_pr(pr_num, repo_root, comment="Closed by `prd reset`."):
+            case Ok():
+                cleaned.append(f"closed PR #{pr_num}")
+                print(f"  Closed PR #{pr_num}")
+            case _:
+                skipped.append(f"PR #{pr_num} (close failed)")
+                print(f"  Skipped PR #{pr_num} (close failed)")
 
     # 6b. Remove worktree
     if summary.worktree_path:
