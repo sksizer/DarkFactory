@@ -58,26 +58,14 @@ def main(argv: list[str] | None = None) -> int:
         ensure_data_layout(darkfactory_dir)
 
         args.data_dir = darkfactory_dir / "data"
-        if args.workflows_dir is None:
-            args.workflows_dir = darkfactory_dir / "workflows"
-
-    if getattr(args, "operations_dir", None) is None and darkfactory_dir is not None:
-        # Read [paths].operations from config if available, else default.
-        from darkfactory.config import load_toml
-
-        config_data = load_toml(darkfactory_dir / "config.toml")
-        paths_section = config_data.get("paths", {})
-        ops_rel = paths_section.get("operations", ".darkfactory/operations")
-        wf_rel = paths_section.get("workflows", ".darkfactory/workflows")
-        repo_root = darkfactory_dir.parent
-        args.operations_dir = repo_root / ops_rel
-        if (
-            args.workflows_dir is None
-            or args.workflows_dir == darkfactory_dir / "workflows"
-        ):
-            args.workflows_dir = repo_root / wf_rel
 
     resolved_config = resolve_config(darkfactory_dir)
+
+    # Use config-resolved paths; CLI flags (already on args) take precedence.
+    if args.workflows_dir is None and resolved_config.paths.workflows_dir is not None:
+        args.workflows_dir = resolved_config.paths.workflows_dir
+    if getattr(args, "operations_dir", None) is None and resolved_config.paths.operations_dir is not None:
+        args.operations_dir = resolved_config.paths.operations_dir
     style_config = resolve_style_config(
         config=resolved_config,
         theme=getattr(args, "theme", None),

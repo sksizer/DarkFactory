@@ -429,14 +429,7 @@ def _run_shell(
         ctx.logger.info("[dry-run] %s", cmd)
         return TaskStep(name=task.name, kind="shell", success=True, detail="dry-run")
 
-    # For project operations, shell tasks run with operation_dir as cwd
-    # so relative paths to sibling scripts work correctly.
-    shell_cwd = ctx.cwd
-    op = getattr(ctx, "operation", None)
-    if op is not None and getattr(op, "operation_dir", None) is not None:
-        shell_cwd = op.operation_dir
-
-    first_result = run_shell(cmd, shell_cwd, task.env)
+    first_result = run_shell(cmd, ctx.cwd, task.env)
 
     # Emit shell output events via the event writer.
     writer: EventWriter | None = getattr(ctx, "event_writer", None)
@@ -526,7 +519,7 @@ def _run_shell(
         )
 
     # Re-run the shell task once more after the agent fix
-    second_result = run_shell(cmd, shell_cwd, task.env)
+    second_result = run_shell(cmd, ctx.cwd, task.env)
     if second_result.returncode == 0:
         return TaskStep(
             name=task.name,

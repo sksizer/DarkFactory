@@ -5,8 +5,12 @@ Detects silent code loss from branch merges that didn't actually integrate
 into the mainline (e.g. stale branches overwriting concurrent work).
 """
 
+from pathlib import Path
+
 from darkfactory.project import ProjectOperation
 from darkfactory.workflow import ShellTask
+
+_CHECK_SCRIPT = str(Path(__file__).resolve().parent / "check.py")
 
 operation = ProjectOperation(
     name="verify-merges",
@@ -19,7 +23,7 @@ operation = ProjectOperation(
     tasks=[
         ShellTask(
             name="verify-merge-ancestry",
-            cmd="python check.py",
+            cmd=f"python {_CHECK_SCRIPT}",
         ),
     ],
 )
