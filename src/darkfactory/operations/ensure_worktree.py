@@ -11,7 +11,7 @@ from filelock import Timeout as LockTimeout
 from darkfactory.operations._registry import builtin
 from darkfactory.operations._shared import _log_dry_run
 from darkfactory.checks import is_resume_safe
-from darkfactory.utils._result import Timeout
+from darkfactory.utils import Timeout
 from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.workflow import ExecutionContext
 

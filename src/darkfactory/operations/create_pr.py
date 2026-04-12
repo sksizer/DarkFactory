@@ -10,8 +10,8 @@ from pathlib import Path
 from darkfactory.operations._registry import builtin
 from darkfactory.operations._shared import _log_dry_run, _scan_for_forbidden_attribution
 from darkfactory.event_log import emit_builtin_effect
-from darkfactory.utils._result import Ok
-from darkfactory.utils.github._types import GhErr
+from darkfactory.utils import Ok
+from darkfactory.utils.github import GhErr
 from darkfactory.utils.github.pr import create_pr as gh_create_pr
 from darkfactory.workflow import ExecutionContext
 

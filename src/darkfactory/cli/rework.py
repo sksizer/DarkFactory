@@ -28,7 +28,7 @@ def cmd_rework(args: argparse.Namespace) -> int:
 
     Resolves the PRD, checks it's in ``review``, then delegates all
     worktree/PR/guard/comment discovery to
-    :func:`~darkfactory.rework_context.discover_rework_context`. That
+    :func:`~darkfactory.rework.context.discover_rework_context`. That
     same discovery module is what the ``resolve_rework_context``
     builtin calls when the workflow runs outside the CLI, so the two
     paths cannot drift apart.

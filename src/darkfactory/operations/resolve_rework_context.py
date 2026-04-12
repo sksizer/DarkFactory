@@ -31,7 +31,7 @@ def resolve_rework_context(ctx: ExecutionContext) -> None:
 
     No-op when ``ctx.worktree_path`` is set and ``ReworkState`` has
     ``review_threads`` populated (the CLI pre-discovered). Otherwise
-    calls :func:`~darkfactory.rework_context.discover_rework_context`
+    calls :func:`~darkfactory.rework.context.discover_rework_context`
     and stores the result in PhaseState.
     """
     rework = ctx.state.get(ReworkState, ReworkState())

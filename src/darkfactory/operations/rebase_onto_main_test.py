@@ -14,7 +14,7 @@ from darkfactory.operations.rebase_onto_main import (
     _fetch_origin_main,
     rebase_onto_main,
 )
-from darkfactory.utils.git._types import GitErr as _GitErr, Ok as _Ok
+from darkfactory.utils.git import GitErr as _GitErr, Ok as _Ok
 
 _BRANCH = "prd/PRD-001-test-thing"
 

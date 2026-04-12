@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 from darkfactory.operations.reply_pr_comments import reply_pr_comments
 from darkfactory.engine import AgentResult, PhaseState, ReworkState
 from darkfactory.utils.github.pr.comments import ReviewThread
-from darkfactory.utils._result import Ok
-from darkfactory.utils.github._types import GhErr
+from darkfactory.utils import Ok
+from darkfactory.utils.github import GhErr
 
 
 def _default_threads() -> list[ReviewThread]:

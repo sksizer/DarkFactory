@@ -13,9 +13,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from darkfactory.utils._result import Ok
+from darkfactory.utils import Ok
 from darkfactory.utils.git import GitErr, git_run
-from darkfactory.utils.github._types import GhErr
+from darkfactory.utils.github import GhErr
 from darkfactory.utils.github.pr import (
     fetch_all_pr_states,
     get_resume_pr_state,

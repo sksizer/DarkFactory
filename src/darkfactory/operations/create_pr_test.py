@@ -12,7 +12,7 @@ from darkfactory.operations.create_pr import (
     _pr_body,
     create_pr,
 )
-from darkfactory.utils._result import Ok
+from darkfactory.utils import Ok
 
 
 def _make_ctx(tmp_path: Path, *, dry_run: bool = False) -> MagicMock:

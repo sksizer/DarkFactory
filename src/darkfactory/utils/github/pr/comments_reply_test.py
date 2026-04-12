@@ -11,8 +11,8 @@ from darkfactory.utils.github.pr.comments import (
     parse_agent_replies,
     post_comment_replies,
 )
-from darkfactory.utils._result import Ok
-from darkfactory.utils.github._types import GhErr
+from darkfactory.utils import Ok
+from darkfactory.utils.github import GhErr
 
 
 def _make_thread(thread_id: str, reply_target_id: str | None) -> ReviewThread:
