@@ -13,7 +13,7 @@ the sentinel line.
 
 from __future__ import annotations
 
-from darkfactory.graph._containment import is_fully_decomposed
+from darkfactory.graph import containment
 from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Workflow
 
 
@@ -27,7 +27,7 @@ def _is_undecomposed_epic_or_feature(prd, prds):  # type: ignore[no-untyped-def]
     return (
         prd.kind in ("epic", "feature")
         and prd.status == "ready"
-        and not is_fully_decomposed(prd, prds)
+        and not containment.is_fully_decomposed(prd, prds)
     )
 
 

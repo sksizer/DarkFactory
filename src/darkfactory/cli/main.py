@@ -53,7 +53,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 1
 
-        from darkfactory.model._persistence import ensure_data_layout
+        from darkfactory.model import ensure_data_layout
 
         ensure_data_layout(darkfactory_dir)
 

@@ -77,7 +77,7 @@ A `SystemWorktreeState` dataclass (stored in `ctx.state` via `PhaseState`) could
 ## Open Questions
 
 - OPEN: Should the branch naming be `system/{op-name}` or something else? Need to avoid collisions with `prd/` branches.
-- OPEN: Should `SystemContext` gain explicit `branch_name` and `worktree_path` fields, or should these be carried purely via `PhaseState`?
+- RESOLVED: State threading uses `PhaseState` — a `SystemWorktreeState` dataclass stored via `ctx.state.put()`. `SystemContext` stays generic.
 - OPEN: Should these builtins be named `system_ensure_worktree` (prefixed) or just `ensure_worktree` (same name, different registry)? Using the same names would let existing operation definitions (like `plan`) work without changes.
 
 ## References

@@ -12,7 +12,7 @@ cases because its predicate is more specific.
 
 from __future__ import annotations
 
-from darkfactory.graph._containment import is_partially_decomposed
+from darkfactory.graph import containment
 from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Workflow
 
 
@@ -26,7 +26,7 @@ def _is_review_candidate(prd, prds):  # type: ignore[no-untyped-def]
     return (
         prd.kind in ("epic", "feature")
         and prd.status in ("ready", "in-progress")
-        and is_partially_decomposed(prd, prds)
+        and containment.is_partially_decomposed(prd, prds)
     )
 
 

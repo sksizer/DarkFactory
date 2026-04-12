@@ -34,7 +34,7 @@ from .utils.claude_code import InvokeResult, capability_to_model, invoke_claude
 from .utils.shell import run_shell
 from .model import compute_branch_name
 from .engine import AgentResult, PhaseState
-from .workflow._templates import compose_prompt
+from .workflow import compose_prompt
 from .timeouts import resolve_timeout
 from .utils.claude_code import spawn_claude
 from .workflow import (
@@ -751,7 +751,7 @@ def _system_compose_prompt(
     task: AgentTask, ctx: Any, extras: dict[str, object] | None = None
 ) -> str:
     """Load prompt files and substitute system-op placeholders."""
-    from .workflow._templates import load_prompt_files, substitute_placeholders
+    from darkfactory.workflow import load_prompt_files, substitute_placeholders
 
     op_dir = ctx.operation.operation_dir
     if op_dir is None:
