@@ -11,7 +11,7 @@ from typing import cast
 
 from darkfactory.utils.github.pr.comments import ReviewComment, ReviewThread
 from darkfactory.rework.prompt import render_rework_feedback
-from darkfactory.templates import compose_prompt, substitute_placeholders
+from darkfactory.workflow import compose_prompt, substitute_placeholders
 from darkfactory.workflow import ExecutionContext, Workflow
 
 
@@ -244,7 +244,8 @@ def test_role_md_contains_sentinel_contract() -> None:
         Path(__file__).parent.parent
         / "src"
         / "darkfactory"
-        / "workflows"
+        / "workflow"
+        / "definitions"
         / "rework"
         / "prompts"
         / "role.md"

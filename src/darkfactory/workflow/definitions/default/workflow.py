@@ -23,7 +23,7 @@ pluggable implementation.
 
 from __future__ import annotations
 
-from darkfactory.templates_builtin import PRD_IMPLEMENTATION_TEMPLATE
+from darkfactory.workflow import PRD_IMPLEMENTATION_TEMPLATE
 from darkfactory.workflow import AgentTask, ShellTask
 
 

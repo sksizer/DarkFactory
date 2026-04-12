@@ -18,9 +18,9 @@ separate target repository (no pumice test/lint shell steps). It differs from
 
 from __future__ import annotations
 
-from .engine import AgentResult
-from .templates import WorkflowTemplate
-from .workflow import AgentTask, BuiltIn, ShellTask
+from ..engine import AgentResult
+from ._templates import WorkflowTemplate
+from ._core import AgentTask, BuiltIn, ShellTask
 
 PRD_IMPLEMENTATION_TEMPLATE = WorkflowTemplate(
     name="prd-implementation",

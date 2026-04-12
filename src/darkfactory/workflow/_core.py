@@ -31,14 +31,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
-from .engine import PhaseState
-from .utils.claude_code import EffortLevel
+from ..engine import PhaseState
+from ..utils.claude_code import EffortLevel
 
 if TYPE_CHECKING:
     from filelock import FileLock
 
-    from .event_log import EventWriter
-    from .model import PRD
+    from ..event_log import EventWriter
+    from ..model import PRD
 
 
 # ---------- type aliases ----------

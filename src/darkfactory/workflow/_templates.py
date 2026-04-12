@@ -42,10 +42,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Mapping
 
-from .workflow import BuiltIn, Workflow
+from ._core import BuiltIn, Workflow
 
 if TYPE_CHECKING:
-    from .workflow import ExecutionContext
+    from ._core import ExecutionContext
 
 
 PLACEHOLDER_RE = re.compile(r"\{\{(\w+)\}\}")

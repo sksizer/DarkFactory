@@ -20,7 +20,7 @@ rather than :data:`~darkfactory.templates_builtin.PRD_IMPLEMENTATION_TEMPLATE` b
 
 from __future__ import annotations
 
-from darkfactory.templates_builtin import EXTRACTION_TEMPLATE
+from darkfactory.workflow import EXTRACTION_TEMPLATE
 from darkfactory.workflow import AgentTask
 
 

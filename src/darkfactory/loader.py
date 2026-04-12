@@ -45,7 +45,7 @@ def builtin_workflows_dir() -> Path:
     override = os.environ.get("DARKFACTORY_BUILTINS_DIR")
     if override:
         return Path(override)
-    return Path(__file__).resolve().parent / "workflows"
+    return Path(__file__).resolve().parent / "workflow" / "definitions"
 
 
 def load_workflows(

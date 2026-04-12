@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from darkfactory.model import load_all
-from darkfactory.templates import (
+from darkfactory.workflow import (
     compose_prompt,
     load_prompt_files,
     substitute_placeholders,
