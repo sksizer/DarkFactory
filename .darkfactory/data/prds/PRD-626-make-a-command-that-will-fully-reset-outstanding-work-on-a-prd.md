@@ -2,7 +2,7 @@
 id: PRD-626
 title: Make a command that will fully reset outstanding work on a PRD
 kind: task
-status: in-progress
+status: review
 priority: medium
 effort: h
 capability: moderate
