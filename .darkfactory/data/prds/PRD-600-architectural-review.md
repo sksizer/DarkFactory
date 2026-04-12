@@ -2,7 +2,7 @@
 id: PRD-600
 title: "Architectural Review and Code Quality Roadmap"
 kind: epic
-status: draft
+status: superseded
 priority: high
 effort: xl
 capability: complex
