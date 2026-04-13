@@ -1,4 +1,4 @@
-"""prd-harness — SDLC automation for the Pumice PRD lifecycle."""
+"""darkfactory — SDLC automation for the PRD lifecycle."""
 
 from __future__ import annotations
 
