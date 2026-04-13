@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import sys
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -14,9 +15,15 @@ from darkfactory.utils import Timeout
 from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.utils.github import GhErr, gh_json, gh_run
 
+_MERGED_PR_LIMIT = 1000
 
-def _get_merged_prd_prs(repo_root: Path) -> list[dict[str, Any]]:
-    """Return merged PRs whose head branch matches ``prd/PRD-*``."""
+
+def _get_merged_prd_prs(repo_root: Path) -> tuple[list[dict[str, Any]], bool]:
+    """Return merged PRs whose head branch matches ``prd/PRD-*``.
+
+    Returns ``(prs, maybe_truncated)`` where ``maybe_truncated`` is True
+    when the gh response hit the configured result cap.
+    """
     match gh_json(
         "pr",
         "list",
@@ -25,11 +32,12 @@ def _get_merged_prd_prs(repo_root: Path) -> list[dict[str, Any]]:
         "--json",
         "headRefName,mergedAt,mergeCommit,number",
         "--limit",
-        "200",
+        str(_MERGED_PR_LIMIT),
         cwd=repo_root,
     ):
         case Ok(value=prs):
-            return [pr for pr in prs if re.match(r"^prd/PRD-", pr["headRefName"])]
+            merged = [pr for pr in prs if re.match(r"^prd/PRD-", pr["headRefName"])]
+            return merged, len(prs) >= _MERGED_PR_LIMIT
         case GhErr(stderr=err):
             raise SystemExit(f"gh pr list failed: {err.strip()}")
         case Timeout():
@@ -105,6 +113,17 @@ def _commit_to_main(
     repo_root: Path,
 ) -> None:
     """Stage changed PRD files and commit directly to main."""
+    _stage_and_commit(candidates, repo_root)
+
+
+def _stage_and_commit(
+    candidates: list[tuple[Path, dict[str, Any]]],
+    repo_root: Path,
+) -> str:
+    """Stage reconciled PRD files and create a commit.
+
+    Returns the commit message used for the commit.
+    """
     files = [str(c[0]) for c in candidates]
     match git_run("add", *files, cwd=repo_root):
         case Ok():
@@ -117,6 +136,7 @@ def _commit_to_main(
             pass
         case GitErr(returncode=code, stderr=err):
             raise RuntimeError(f"git commit failed (exit {code}):\n{err}")
+    return msg
 
 
 def _create_reconcile_pr(
@@ -132,18 +152,7 @@ def _create_reconcile_pr(
             pass
         case GitErr(returncode=code, stderr=err):
             raise RuntimeError(f"git checkout failed (exit {code}):\n{err}")
-    files = [str(c[0]) for c in candidates]
-    match git_run("add", *files, cwd=repo_root):
-        case Ok():
-            pass
-        case GitErr(returncode=code, stderr=err):
-            raise RuntimeError(f"git add failed (exit {code}):\n{err}")
-    msg = _build_reconcile_commit_msg(candidates)
-    match git_run("commit", "-m", msg, cwd=repo_root):
-        case Ok():
-            pass
-        case GitErr(returncode=code, stderr=err):
-            raise RuntimeError(f"git commit failed (exit {code}):\n{err}")
+    msg = _stage_and_commit(candidates, repo_root)
     match git_run("push", "-u", "origin", branch, cwd=repo_root):
         case Ok():
             pass
@@ -170,7 +179,13 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
     repo_root = _find_repo_root(args.data_dir)
 
     # 1. Get merged PRs with prd/* branches.
-    merged_prs = _get_merged_prd_prs(repo_root)
+    merged_prs, maybe_truncated = _get_merged_prd_prs(repo_root)
+    if maybe_truncated:
+        print(
+            f"WARNING: gh returned {_MERGED_PR_LIMIT} merged PRs (result cap); "
+            "older merged PRDs may be omitted.",
+            file=sys.stderr,
+        )
 
     # 2. Find corresponding PRD files still in 'review'.
     candidates: list[tuple[Path, dict[str, Any]]] = []

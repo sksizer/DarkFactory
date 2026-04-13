@@ -270,7 +270,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub_plan.add_argument(
         "--base",
         default=None,
-        help="Base ref for the new branch (default: current HEAD)",
+        help="Base ref for the new branch (default: project default branch)",
     )
     sub_plan.add_argument(
         "--model",
@@ -323,7 +323,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub_run.add_argument(
         "--base",
         default=None,
-        help="Base ref for the new branch (default: current HEAD)",
+        help="Base ref for the new branch (default: project default branch)",
     )
     sub_run.add_argument(
         "--model",

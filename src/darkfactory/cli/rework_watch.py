@@ -352,6 +352,20 @@ def _cmd_stop(repo_root: Path) -> int:
         return 1
 
 
+def _ensure_single_instance(repo_root: Path) -> bool:
+    """Return True when it's safe to start; reject active duplicate runs."""
+    pid = _read_pid(repo_root)
+    if pid is None:
+        return True
+    if _pid_is_alive(pid):
+        print(f"rework-watch: already running (PID {pid})")
+        return False
+
+    print(f"rework-watch: removing stale PID {pid}")
+    _remove_pid(repo_root)
+    return True
+
+
 # ── Poll loop ────────────────────────────────────────────────────────────────
 
 
@@ -467,6 +481,9 @@ def cmd_rework_watch(args: argparse.Namespace) -> int:
         return _cmd_resume(repo_root)
     if args.stop:
         return _cmd_stop(repo_root)
+
+    if not _ensure_single_instance(repo_root):
+        return 1
 
     poll_interval: int = args.interval
     max_reworks: int = args.max_reworks
