@@ -22,6 +22,7 @@ tags:
   - skills
   - process
   - triage
+  - feature
 ---
 
 # Build a skill to triage draft PRDs and ready the highest-impact one

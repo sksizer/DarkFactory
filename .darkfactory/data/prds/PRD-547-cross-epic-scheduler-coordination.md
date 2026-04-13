@@ -24,6 +24,7 @@ tags:
   - harness
   - scheduler
   - concurrency
+  - feature
 ---
 
 # Cross-epic scheduler coordination — coordinate parallel runs across multiple epics

@@ -23,6 +23,7 @@ tags:
   - harness
   - execution
   - dag
+  - feature
 ---
 
 # Graph execution: walk DAG and run actionable PRDs

@@ -27,6 +27,7 @@ tags:
   - dag
   - merge-conflicts
   - ergonomics
+  - feature
 ---
 
 # Auto-serialize sibling PRDs with overlapping impacts to avoid hand-resolved merge conflicts

@@ -25,6 +25,7 @@ tags:
   - harness
   - observability
   - diagnostics
+  - feature
 ---
 
 # Unified structured event log for harness execution

@@ -21,6 +21,7 @@ tags:
   - harness
   - observability
   - dx
+  - feature
 ---
 
 # Stream agent subprocess output in real time

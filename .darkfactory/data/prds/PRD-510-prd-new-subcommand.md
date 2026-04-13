@@ -22,6 +22,7 @@ tags:
   - harness
   - cli
   - authoring
+  - feature
 ---
 
 # prd new subcommand for creating draft PRDs

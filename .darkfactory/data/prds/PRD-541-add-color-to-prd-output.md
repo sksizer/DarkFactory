@@ -16,7 +16,8 @@ reviewers: []
 target_version:
 created: 2026-04-08
 updated: '2026-04-08'
-tags: []
+tags:
+  - feature
 ---
 
 # Add color to prd output

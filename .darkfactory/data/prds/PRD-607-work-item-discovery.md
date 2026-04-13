@@ -23,6 +23,7 @@ tags:
   - adoption
   - discovery
   - cli
+  - feature
 value: 5
 ---
 

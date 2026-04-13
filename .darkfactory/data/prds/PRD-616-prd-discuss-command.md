@@ -34,6 +34,7 @@ tags:
   - harness
   - cli
   - agent
+  - feature
 ---
 
 # Interactive PRD discussion via phased Claude Code chain

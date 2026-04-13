@@ -24,6 +24,7 @@ tags:
   - harness
   - workflow
   - system
+  - feature
 ---
 
 # System operations: reuse the workflow harness for non-PRD-bound tasks

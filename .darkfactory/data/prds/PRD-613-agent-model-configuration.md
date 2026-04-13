@@ -24,6 +24,7 @@ tags:
   - agent
   - configuration
   - model
+  - feature
 value: 2
 ---
 

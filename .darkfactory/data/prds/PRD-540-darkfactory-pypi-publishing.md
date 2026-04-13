@@ -22,6 +22,7 @@ tags:
   - extraction
   - release
   - pypi
+  - feature
 ---
 
 # Set up PyPI publishing for darkfactory
