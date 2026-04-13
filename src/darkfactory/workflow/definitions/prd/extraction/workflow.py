@@ -1,7 +1,7 @@
 """Extraction workflow — for PRDs that operate on a separate target repo.
 
 Used by the darkfactory extraction (PRD-500..505): the work happens in
-a *different* repo on disk, so the pumice ``just test`` / ``just lint``
+a *different* repo on disk, so the df ``just test`` / ``just lint``
 shell steps from the default workflow don't apply. The agent is
 responsible for whatever verification matters in the target repo.
 
@@ -12,7 +12,7 @@ default (0), below specialized workflows like ui-component (10).
 rather than :data:`~darkfactory.templates_builtin.PRD_IMPLEMENTATION_TEMPLATE` because:
 
 - No :class:`~darkfactory.workflow.ShellTask` is needed (the agent verifies
-  in the target repo, not via pumice).
+  in the target repo, not via df).
 - The close sequence commits before updating status and adds
   ``lint_attribution`` before pushing — a pattern that doesn't fit the
   standard template's ``summarize_agent_run`` / ``commit_transcript`` close.
@@ -32,7 +32,7 @@ workflow = EXTRACTION_TEMPLATE.compose(
     name="extraction",
     description=(
         "Repo-extraction workflow — for PRDs whose work happens in a "
-        "separate target repository (no pumice test/lint phase)."
+        "separate target repository (no df test/lint phase)."
     ),
     applies_to=_is_extraction,
     priority=5,

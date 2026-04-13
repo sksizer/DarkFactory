@@ -275,46 +275,15 @@ def _cmd_run_queue(
             "# Executing queue (--all)",
         )
     )
-
-    events: list[RunEvent] = []
-
-    def sink(ev: RunEvent) -> None:
-        events.append(ev)
-        if args.json:
-            print(json.dumps(ev.as_dict()), flush=True)
-        else:
-            _print_run_event(ev, styler)
-
-    session = generate_session_id()
-
-    report = execute_graph(
-        data_dir=args.data_dir,
+    return _execute_graph_with_reporting(
+        args=args,
         repo_root=repo_root,
         workflows=workflows,
-        strategy=strategy,
         default_base=default_base,
         max_runs=max_runs,
-        model_override=args.model,
-        workflow_override=args.workflow,
-        dry_run=False,
-        event_sink=sink,
         styler=styler,
-        session_id=session,
+        strategy=strategy,
     )
-
-    print()
-    print(f"  Completed: {len(report.completed)}")
-    for pid in report.completed:
-        print(f"    {styler.render(Element.RUN_SUCCESS, '✓')} {pid}")
-    if report.failed:
-        print(f"  Failed: {len(report.failed)}")
-        for pid, reason in report.failed:
-            print(f"    {styler.render(Element.RUN_FAILURE, '✗')} {pid} — {reason}")
-    if report.skipped:
-        print(f"  Skipped: {len(report.skipped)}")
-        for pid, reason in report.skipped:
-            print(f"    - {pid}: {reason}")
-    return report.exit_code
 
 
 def _cmd_run_graph(
@@ -394,23 +363,43 @@ def _cmd_run_graph(
             f"# Executing graph: {prd.id} (base {default_base})",
         )
     )
+    return _execute_graph_with_reporting(
+        args=args,
+        repo_root=repo_root,
+        workflows=workflows,
+        default_base=default_base,
+        max_runs=max_runs,
+        styler=styler,
+        root_id=prd.id,
+    )
 
-    events: list[RunEvent] = []
+
+def _execute_graph_with_reporting(
+    *,
+    args: argparse.Namespace,
+    repo_root: Path,
+    workflows: dict[str, Workflow],
+    default_base: str,
+    max_runs: int | None,
+    styler: Styler,
+    root_id: str | None = None,
+    strategy: QueueStrategy | None = None,
+) -> int:
+    """Execute graph mode and print streamed events plus final summary."""
 
     def sink(ev: RunEvent) -> None:
-        events.append(ev)
         if args.json:
             print(json.dumps(ev.as_dict()), flush=True)
         else:
             _print_run_event(ev, styler)
 
     session = generate_session_id()
-
     report = execute_graph(
-        root_id=prd.id,
+        root_id=root_id,
         data_dir=args.data_dir,
         repo_root=repo_root,
         workflows=workflows,
+        strategy=strategy,
         default_base=default_base,
         max_runs=max_runs,
         model_override=args.model,

@@ -1,6 +1,6 @@
 # Task: Execute {{PRD_ID}} — {{PRD_TITLE}}
 
-You are inside the pumice worktree at `{{WORKTREE_PATH}}` on branch
+You are inside the df worktree at `{{WORKTREE_PATH}}` on branch
 `{{BRANCH_NAME}}`. The PRD's actual work happens in a separate target
 repository — read the PRD to find which one and where it lives on disk.
 
@@ -40,10 +40,10 @@ AC-2: PASS — <one-line evidence>
 
 If any AC fails, report `PRD_EXECUTE_FAILED` with the failing AC.
 
-### 4. Commit pumice-side changes (if any)
+### 4. Commit df-side changes (if any)
 
 The harness has already committed the status transition. If you made
-*additional* pumice-side changes (rare for extraction PRDs — usually
+*additional* df-side changes (rare for extraction PRDs — usually
 none), stage and commit them now with a conventional-commits message:
 
 - `chore(prd): {{PRD_ID}} <one-line summary>`
