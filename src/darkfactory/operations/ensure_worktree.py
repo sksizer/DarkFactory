@@ -8,7 +8,7 @@ from pathlib import Path
 from filelock import FileLock
 from filelock import Timeout as LockTimeout
 
-from darkfactory.engine import CodeEnv, WorktreeState
+from darkfactory.engine import CodeEnv, PrdWorkflowRun, WorktreeState
 from darkfactory.operations._registry import builtin
 from darkfactory.operations._shared import _log_dry_run
 from darkfactory.checks import is_resume_safe
@@ -25,13 +25,38 @@ from darkfactory.workflow import RunContext
 _log = logging.getLogger(__name__)
 
 
-def _worktree_target(repo_root: Path, branch: str) -> Path:
-    """Compute the worktree path under ``.worktrees/``.
+def _worktree_dir_name(branch: str, prd_run: PrdWorkflowRun | None) -> str:
+    """Compute the worktree directory name.
 
-    Uses the branch name (with slashes replaced) as the directory name.
+    For PRD runs, preserves the ``PRD-{id}-{slug}`` naming convention
+    that cleanup, reset, and rework_watch expect (they scan for
+    ``^(PRD-[\\d.]+)`` in ``.worktrees/``).
+
+    For non-PRD runs, uses the full branch name with slashes replaced.
     """
-    safe_name = branch.replace("/", "-")
-    return repo_root / ".worktrees" / safe_name
+    if prd_run is not None:
+        return f"{prd_run.prd.id}-{prd_run.prd.slug}"
+    return branch.replace("/", "-")
+
+
+def _worktree_target(
+    repo_root: Path, branch: str, prd_run: PrdWorkflowRun | None = None
+) -> Path:
+    """Compute the worktree path under ``.worktrees/``."""
+    return repo_root / ".worktrees" / _worktree_dir_name(branch, prd_run)
+
+
+def _lock_name(branch: str, prd_run: PrdWorkflowRun | None) -> str:
+    """Compute the lock file name (without ``.lock`` suffix).
+
+    For PRD runs, uses ``{prd.id}`` to match the convention used by
+    ``reset``, ``rework_watch``, and other lock-checking codepaths.
+
+    For non-PRD runs, uses the branch name with slashes replaced.
+    """
+    if prd_run is not None:
+        return prd_run.prd.id
+    return branch.replace("/", "-")
 
 
 @builtin("ensure_worktree")
@@ -55,7 +80,8 @@ def ensure_worktree(ctx: RunContext) -> None:
     branch = wt.branch
     base_ref = wt.base_ref
 
-    worktree_path = _worktree_target(repo_root, branch)
+    prd_run = ctx.state.get(PrdWorkflowRun) if ctx.state.has(PrdWorkflowRun) else None
+    worktree_path = _worktree_target(repo_root, branch, prd_run)
 
     if _log_dry_run(ctx, f"git worktree add -b {branch} {worktree_path} {base_ref}"):
         # Dry-run produces no side effects, so no lock needed.
@@ -66,8 +92,8 @@ def ensure_worktree(ctx: RunContext) -> None:
         return
 
     # Acquire the lock BEFORE the resume-check or any mutation.
-    safe_name = branch.replace("/", "-")
-    lock_path = repo_root / ".worktrees" / f"{safe_name}.lock"
+    lock_file = _lock_name(branch, prd_run)
+    lock_path = repo_root / ".worktrees" / f"{lock_file}.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
 
     lock = FileLock(str(lock_path))
@@ -82,14 +108,14 @@ def ensure_worktree(ctx: RunContext) -> None:
         ) from None
 
     # Store the lock on the context for the runner to release later.
-    ctx._worktree_lock = lock  # type: ignore[attr-defined]
+    ctx._worktree_lock = lock
 
     # ---- existing logic below, now lock-protected ----
     if worktree_path.exists():
         status = is_resume_safe(branch, repo_root)
         if not status.safe:
             lock.release()
-            ctx._worktree_lock = None  # type: ignore[attr-defined]
+            ctx._worktree_lock = None
             raise RuntimeError(status.reason)
         ctx.logger.info("resuming existing worktree: %s", worktree_path)
         ctx.state.put(CodeEnv(repo_root=repo_root, cwd=worktree_path))
@@ -103,7 +129,7 @@ def ensure_worktree(ctx: RunContext) -> None:
     if local_exists or remote_exists:
         # Release the lock before raising so the error state is clean.
         lock.release()
-        ctx._worktree_lock = None  # type: ignore[attr-defined]
+        ctx._worktree_lock = None
         raise RuntimeError(
             f"branch {branch!r} already exists but worktree {worktree_path} is gone. "
             f"Delete the branch manually or run cleanup."

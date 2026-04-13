@@ -40,6 +40,8 @@ from ..engine.payloads import (
 from ..utils.claude_code import EffortLevel
 
 if TYPE_CHECKING:
+    from filelock import FileLock
+
     from ..event_log import EventWriter
     from ..model import PRD
 
@@ -256,6 +258,7 @@ class RunContext:
     state: PhaseState = field(default_factory=PhaseState)
     event_writer: "EventWriter | None" = None
     report: list[str] = field(default_factory=list)
+    _worktree_lock: "FileLock | None" = field(default=None, repr=False)
 
     @property
     def cwd(self) -> Path:

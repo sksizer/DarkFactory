@@ -92,6 +92,17 @@ class PrRequest:
     body: str
 
 
+@dataclass(frozen=True)
+class PrResult:
+    """Result of PR creation.
+
+    Put by ``create_pr`` on success.
+    Read by the runner to populate ``RunResult.pr_url``.
+    """
+
+    url: str | None = None
+
+
 # ---------- original payloads ----------
 
 

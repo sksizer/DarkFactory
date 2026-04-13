@@ -46,7 +46,7 @@ def test_worktree_target_builds_path(tmp_path: Path) -> None:
 def test_dry_run_updates_state(tmp_path: Path) -> None:
     ctx = _make_ensure_worktree_ctx(tmp_path, dry_run=True)
     ensure_worktree(ctx)
-    expected = tmp_path / ".worktrees" / "prd-PRD-001-test-thing"
+    expected = tmp_path / ".worktrees" / "PRD-001-test"
     assert ctx.state.get(WorktreeState).worktree_path == expected
     assert ctx.state.get(CodeEnv).cwd == expected
 
@@ -69,7 +69,7 @@ def test_dry_run_logs_command(tmp_path: Path) -> None:
 
 def test_resume_existing_worktree(tmp_path: Path) -> None:
     ctx = _make_ensure_worktree_ctx(tmp_path)
-    worktree_path = tmp_path / ".worktrees" / "prd-PRD-001-test-thing"
+    worktree_path = tmp_path / ".worktrees" / "PRD-001-test"
     worktree_path.mkdir(parents=True)
 
     resume_status = MagicMock()
@@ -92,7 +92,7 @@ def test_resume_existing_worktree(tmp_path: Path) -> None:
 
 def test_resume_unsafe_raises(tmp_path: Path) -> None:
     ctx = _make_ensure_worktree_ctx(tmp_path)
-    worktree_path = tmp_path / ".worktrees" / "prd-PRD-001-test-thing"
+    worktree_path = tmp_path / ".worktrees" / "PRD-001-test"
     worktree_path.mkdir(parents=True)
 
     resume_status = MagicMock()
@@ -198,7 +198,7 @@ def test_successful_creation_calls_git_worktree_add(tmp_path: Path) -> None:
 
 def test_successful_creation_updates_state(tmp_path: Path) -> None:
     ctx = _make_ensure_worktree_ctx(tmp_path)
-    expected = tmp_path / ".worktrees" / "prd-PRD-001-test-thing"
+    expected = tmp_path / ".worktrees" / "PRD-001-test"
 
     with (
         patch("darkfactory.operations.ensure_worktree.FileLock") as mock_lock_cls,
@@ -253,7 +253,7 @@ def test_lock_acquired_on_success(tmp_path: Path) -> None:
         ensure_worktree(ctx)
 
     mock_lock.acquire.assert_called_once_with(timeout=0)
-    assert ctx._worktree_lock is mock_lock  # type: ignore[attr-defined]
+    assert ctx._worktree_lock is mock_lock
 
 
 def test_lock_timeout_raises_runtime_error(tmp_path: Path) -> None:

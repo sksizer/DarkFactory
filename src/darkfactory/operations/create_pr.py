@@ -7,7 +7,13 @@ import re
 import tempfile
 from pathlib import Path
 
-from darkfactory.engine import CodeEnv, PrRequest, PrdWorkflowRun, WorktreeState
+from darkfactory.engine import (
+    CodeEnv,
+    PrRequest,
+    PrResult,
+    PrdWorkflowRun,
+    WorktreeState,
+)
 from darkfactory.operations._registry import builtin
 from darkfactory.operations._shared import _log_dry_run, _scan_for_forbidden_attribution
 from darkfactory.event_log import emit_builtin_effect
@@ -61,34 +67,46 @@ def create_pr(
 ) -> None:
     """Open a pull request via ``gh pr create``.
 
-    If ``title``/``body`` kwargs are provided, formats them via
-    ``format_string()``. Otherwise, falls back to PrRequest payload
-    from state, then to PRD-derived defaults from PrdWorkflowRun.
+    Resolves ``title`` and ``body`` independently through a cascade:
+    kwargs override > ``PrRequest`` payload > PRD-derived defaults from
+    ``PrdWorkflowRun``. Each field is resolved on its own so callers
+    can override just one without losing the other.
 
-    On success, stores the PR URL (accessible via result.pr_url from
-    the runner).
+    On success, puts a ``PrResult`` payload in state (read by the
+    runner to populate ``RunResult.pr_url``).
     """
     wt = ctx.state.get(WorktreeState)
     env = ctx.state.get(CodeEnv)
 
-    # Resolve title and body from kwargs, PrRequest payload, or PRD defaults.
-    if title is not None and body is not None:
+    # Resolve title and body independently: kwargs > PrRequest > PRD defaults.
+    resolved_title: str | None = None
+    resolved_body: str | None = None
+
+    if title is not None:
         resolved_title = ctx.format_string(title)
+    if body is not None:
         resolved_body = ctx.format_string(body)
-    elif ctx.state.has(PrRequest):
+
+    if ctx.state.has(PrRequest):
         pr_req = ctx.state.get(PrRequest)
-        resolved_title = ctx.format_string(pr_req.title)
-        resolved_body = ctx.format_string(pr_req.body)
-    elif ctx.state.has(PrdWorkflowRun):
+        if resolved_title is None:
+            resolved_title = ctx.format_string(pr_req.title)
+        if resolved_body is None:
+            resolved_body = ctx.format_string(pr_req.body)
+
+    if ctx.state.has(PrdWorkflowRun):
         prd_run = ctx.state.get(PrdWorkflowRun)
-        resolved_title = f"{prd_run.prd.id}: {prd_run.prd.title}"
-        resolved_body = _pr_body_from_prd(ctx, prd_run)
-        if prd_run.run_summary:
-            resolved_body += "\n\n" + prd_run.run_summary
-    else:
+        if resolved_title is None:
+            resolved_title = f"{prd_run.prd.id}: {prd_run.prd.title}"
+        if resolved_body is None:
+            resolved_body = _pr_body_from_prd(ctx, prd_run)
+            if prd_run.run_summary:
+                resolved_body += "\n\n" + prd_run.run_summary
+
+    if resolved_title is None or resolved_body is None:
         raise RuntimeError(
-            "create_pr: no title/body kwargs, no PrRequest in state, "
-            "and no PrdWorkflowRun in state — cannot determine PR content"
+            "create_pr: cannot determine PR title/body — provide kwargs, "
+            "a PrRequest payload, or a PrdWorkflowRun payload"
         )
 
     _scan_for_forbidden_attribution(resolved_title, source="PR title")
@@ -98,7 +116,7 @@ def create_pr(
         ctx,
         f"gh pr create --base {wt.base_ref} --title {resolved_title!r} --body <generated>",
     ):
-        ctx._pr_url = "https://example.test/dry-run/pr/0"  # type: ignore[attr-defined]
+        ctx.state.put(PrResult(url="https://example.test/dry-run/pr/0"))
         return
 
     # Write the body to a temp file — passing long bodies via --body
@@ -109,10 +127,11 @@ def create_pr(
         body_file.write(resolved_body)
         body_path = body_file.name
 
+    pr_url: str | None = None
     try:
         match gh_create_pr(wt.base_ref, resolved_title, body_path, env.cwd):
             case Ok(value=url):
-                ctx._pr_url = url or None  # type: ignore[attr-defined]
+                pr_url = url or None
             case GhErr(returncode=code, stderr=err):
                 detail = f"gh pr create failed (exit {code}):\n{err}"
                 _log.error(detail)
@@ -120,12 +139,14 @@ def create_pr(
     finally:
         Path(body_path).unlink(missing_ok=True)
 
+    ctx.state.put(PrResult(url=pr_url))
+
     emit_builtin_effect(
         ctx,
         "create_pr",
         "create_pr",
         detail={
-            "pr_url": getattr(ctx, "_pr_url", None),
+            "pr_url": pr_url,
             "base": wt.base_ref,
             "title": resolved_title,
         },

@@ -36,6 +36,7 @@ from .model import compute_branch_name
 from .engine import (
     AgentResult,
     CodeEnv,
+    PrResult,
     PrdWorkflowRun,
     ProjectRun,
     WorktreeState,
@@ -573,7 +574,7 @@ def _run_interactive(task: InteractiveTask, ctx: RunContext) -> TaskStep:
 
 def _release_worktree_lock(ctx: RunContext) -> None:
     """Release the advisory lock acquired by ensure_worktree, if any."""
-    lock = getattr(ctx, "_worktree_lock", None)
+    lock = ctx._worktree_lock
     if lock is None:
         return
     try:
@@ -581,7 +582,7 @@ def _release_worktree_lock(ctx: RunContext) -> None:
     except Exception as exc:  # noqa: BLE001
         ctx.logger.warning("failed to release worktree lock: %s", exc)
     finally:
-        ctx._worktree_lock = None  # type: ignore[attr-defined]
+        ctx._worktree_lock = None
 
 
 # ---------- workflow-specific entry point ----------
@@ -696,7 +697,7 @@ def run_workflow(
             writer.close()
         _release_worktree_lock(ctx)
 
-    result.pr_url = getattr(ctx, "_pr_url", None)
+    result.pr_url = ctx.state.get(PrResult).url if ctx.state.has(PrResult) else None
     return result
 
 
@@ -791,5 +792,5 @@ def run_project_operation(
             if owns_writer:
                 writer.close()
 
-    result.pr_url = getattr(ctx, "_pr_url", None)
+    result.pr_url = ctx.state.get(PrResult).url if ctx.state.has(PrResult) else None
     return result

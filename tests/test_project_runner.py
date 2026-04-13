@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from darkfactory.engine import CodeEnv, ProjectRun
+from darkfactory.engine import CodeEnv, PrResult, ProjectRun
 from darkfactory.operations.project_builtins import SYSTEM_BUILTINS
 from darkfactory.runner import run_project_operation
 from darkfactory.workflow import AgentTask, BuiltIn, RunContext, ShellTask, Workflow
@@ -280,7 +280,7 @@ def test_early_stop_on_failure(tmp_path: Path) -> None:
 
 def test_pr_url_propagated(tmp_path: Path) -> None:
     def builtin_sets_pr(ctx: RunContext, **kwargs: object) -> None:
-        ctx._pr_url = "https://github.com/org/repo/pull/42"  # type: ignore[attr-defined]
+        ctx.state.put(PrResult(url="https://github.com/org/repo/pull/42"))
 
     SYSTEM_BUILTINS["_test_pr_url"] = builtin_sets_pr
     try:

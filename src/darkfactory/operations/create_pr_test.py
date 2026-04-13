@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from darkfactory.engine import PrdWorkflowRun
+from darkfactory.engine import PrResult, PrdWorkflowRun
 from darkfactory.operations._test_helpers import make_builtin_ctx
 from darkfactory.operations.create_pr import (
     _extract_acceptance_criteria,
@@ -163,7 +163,7 @@ def test_pr_body_includes_workflow_name(tmp_path: Path) -> None:
 def test_dry_run_sets_pr_url(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, dry_run=True)
     create_pr(ctx)
-    assert ctx._pr_url == "https://example.test/dry-run/pr/0"  # type: ignore[attr-defined]
+    assert ctx.state.get(PrResult).url == "https://example.test/dry-run/pr/0"
 
 
 def test_dry_run_no_subprocess_calls(tmp_path: Path) -> None:
@@ -252,7 +252,7 @@ def test_successful_creation_sets_pr_url(tmp_path: Path) -> None:
     ):
         create_pr(ctx)
 
-    assert ctx._pr_url == "https://github.com/owner/repo/pull/42"  # type: ignore[attr-defined]
+    assert ctx.state.get(PrResult).url == "https://github.com/owner/repo/pull/42"
 
 
 def test_successful_creation_includes_title(tmp_path: Path) -> None:

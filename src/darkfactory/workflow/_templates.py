@@ -15,7 +15,7 @@ from Python's ``str.format`` ``{lowercase}`` style used by
 ``RunContext.format_string`` — the two templating systems serve
 different purposes:
 
-- :meth:`RunContext.format_string` is **strict**: unknown
+- :meth:`RunContext.format_string` is **lenient**: unknown
   placeholders pass through unchanged. Used for commit messages and
   shell commands.
 - :func:`substitute_placeholders` is **permissive**: unknown
