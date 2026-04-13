@@ -2,7 +2,7 @@
 id: PRD-631
 title: Unified RunContext, unified Workflow type, and project operation PR support
 kind: task
-status: ready
+status: in-progress
 priority: high
 effort: l
 capability: complex
@@ -24,7 +24,7 @@ assignee:
 reviewers: []
 target_version:
 created: 2026-04-12
-updated: 2026-04-12
+updated: '2026-04-12'
 tags:
   - architecture
   - refactor
