@@ -10,8 +10,8 @@ parent: null
 depends_on: []
 blocks: []
 impacts:
-  - "src/darkfactory/cli/run.py"
-  - "src/darkfactory/cli/assign_cmd.py"
+  - "python/darkfactory/cli/run.py"
+  - "python/darkfactory/cli/assign_cmd.py"
 workflow: null
 target_version: null
 created: '2026-04-09'

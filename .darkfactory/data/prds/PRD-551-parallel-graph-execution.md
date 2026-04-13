@@ -12,9 +12,9 @@ depends_on:
   - "[[PRD-546-impact-declaration-drift-detection]]"
 blocks: []
 impacts:
-  - src/darkfactory/graph_execution.py
-  - src/darkfactory/runner.py
-  - src/darkfactory/cli/run.py
+  - python/darkfactory/graph_execution.py
+  - python/darkfactory/runner.py
+  - python/darkfactory/cli/run.py
   - tests/test_graph_execution_parallel.py
 workflow:
 assignee:

@@ -157,17 +157,17 @@ Note: PRD-567.1â€“567.4 are further decomposed into sub-tasks (e.g. PRD-567.1.1â
 
 These are the expected files to be modified across child tasks:
 
-- `src/darkfactory/builtins/ensure_worktree.py`
-- `src/darkfactory/invoke.py`
-- `src/darkfactory/workflows/task/workflow.py`
-- `src/darkfactory/workflows/planning/workflow.py`
-- `src/darkfactory/workflows/default/prompts/role.md`
-- `src/darkfactory/workflows/task/prompts/role.md`
-- `src/darkfactory/workflows/task/prompts/task.md`
-- `src/darkfactory/workflows/default/prompts/task.md`
-- `src/darkfactory/graph_execution.py`
-- `src/darkfactory/event_log.py`
-- `src/darkfactory/templates_builtin.py`
+- `python/darkfactory/builtins/ensure_worktree.py`
+- `python/darkfactory/invoke.py`
+- `python/darkfactory/workflows/task/workflow.py`
+- `python/darkfactory/workflows/planning/workflow.py`
+- `python/darkfactory/workflows/default/prompts/role.md`
+- `python/darkfactory/workflows/task/prompts/role.md`
+- `python/darkfactory/workflows/task/prompts/task.md`
+- `python/darkfactory/workflows/default/prompts/task.md`
+- `python/darkfactory/graph_execution.py`
+- `python/darkfactory/event_log.py`
+- `python/darkfactory/templates_builtin.py`
 
 ## References
 

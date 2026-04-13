@@ -11,9 +11,9 @@ depends_on:
   - "[[PRD-545-harness-driven-rebase-and-conflict-resolution]]"
 blocks: []
 impacts:
-  - src/darkfactory/scheduler.py
-  - src/darkfactory/runner.py
-  - src/darkfactory/state.py
+  - python/darkfactory/scheduler.py
+  - python/darkfactory/runner.py
+  - python/darkfactory/state.py
 workflow:
 assignee:
 reviewers: []
@@ -37,7 +37,7 @@ PRD-545 introduces a per-epic scheduler that uses `impacts:` overlap to sequence
 
 ### The gap
 
-PRD-545's v1 scheduler reasons about one epic's children at a time. If you run `prd run epic-A` in one terminal and `prd run epic-B` in another, each scheduler builds its own conflict graph independently and they have no shared view. Two children — one from each epic — can be queued simultaneously, both touch `src/darkfactory/runner.py`, and the harness produces two branches that conflict at merge time exactly the way PRD-545 was supposed to prevent.
+PRD-545's v1 scheduler reasons about one epic's children at a time. If you run `prd run epic-A` in one terminal and `prd run epic-B` in another, each scheduler builds its own conflict graph independently and they have no shared view. Two children — one from each epic — can be queued simultaneously, both touch `python/darkfactory/runner.py`, and the harness produces two branches that conflict at merge time exactly the way PRD-545 was supposed to prevent.
 
 ### Why this is a real-world concern, not a theoretical one
 
@@ -76,7 +76,7 @@ Three reasons:
 
 ## Technical Approach
 
-- **`src/darkfactory/registry.py`** (new) exposing:
+- **`python/darkfactory/registry.py`** (new) exposing:
   - `register(prd, impacts, epic) -> RegistryEntry` — atomic insert if no conflicts; raises `WouldConflict(blockers)` otherwise.
   - `release(entry)` — called on PRD completion/failure.
   - `query(prd_id) -> RegistryEntry | None`.
@@ -112,7 +112,7 @@ Three reasons:
 
 - [[PRD-545-harness-driven-rebase-and-conflict-resolution]] — the per-epic scheduler this PRD generalizes to global scope. Hard dependency.
 - [[PRD-546-impact-declaration-drift-detection]] — the source of truth for "effective impacts" that this PRD's registry consults. Soft dependency; both can ship in either order, but they're better together.
-- `src/darkfactory/impacts.py` and `src/darkfactory/containment.py` — the underlying primitives.
+- `python/darkfactory/impacts.py` and `python/darkfactory/containment.py` — the underlying primitives.
 
 ## Assessment (2026-04-11)
 

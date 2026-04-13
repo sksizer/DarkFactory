@@ -11,18 +11,18 @@ depends_on: []
 blocks:
   - "[[PRD-631-system-operation-git-primitives]]"
 impacts:
-  - src/darkfactory/utils/
-  - src/darkfactory/operations/ensure_worktree.py
-  - src/darkfactory/operations/fast_forward_branch.py
-  - src/darkfactory/operations/rebase_onto_main.py
-  - src/darkfactory/operations/analyze_transcript.py
-  - src/darkfactory/cli/reconcile.py
-  - src/darkfactory/cli/rework_watch.py
-  - src/darkfactory/cli/new.py
-  - src/darkfactory/checks.py
-  - src/darkfactory/graph/_impacts.py
-  - src/darkfactory/rework/context.py
-  - src/darkfactory/workflow/definitions/project/verify_merges/check.py
+  - python/darkfactory/utils/
+  - python/darkfactory/operations/ensure_worktree.py
+  - python/darkfactory/operations/fast_forward_branch.py
+  - python/darkfactory/operations/rebase_onto_main.py
+  - python/darkfactory/operations/analyze_transcript.py
+  - python/darkfactory/cli/reconcile.py
+  - python/darkfactory/cli/rework_watch.py
+  - python/darkfactory/cli/new.py
+  - python/darkfactory/checks.py
+  - python/darkfactory/graph/_impacts.py
+  - python/darkfactory/rework/context.py
+  - python/darkfactory/workflow/definitions/project/verify_merges/check.py
   - tests/test_subprocess_gateway.py
 workflow: task
 assignee:
@@ -116,7 +116,7 @@ Tests updated to mock at the gateway function level (`git_run`, `gh_json`) inste
 
 ### Part 6: Sentinel test
 
-New test `tests/test_subprocess_gateway.py` — AST-scans all non-test `.py` files under `src/darkfactory/` and fails if ANY `subprocess.run`/`Popen`/`check_output` call exists outside `utils/`. No allowlist. Zero exceptions.
+New test `tests/test_subprocess_gateway.py` — AST-scans all non-test `.py` files under `python/darkfactory/` and fails if ANY `subprocess.run`/`Popen`/`check_output` call exists outside `utils/`. No allowlist. Zero exceptions.
 
 ## Acceptance Criteria
 
@@ -138,14 +138,14 @@ New test `tests/test_subprocess_gateway.py` — AST-scans all non-test `.py` fil
 
 ## Relationship to PRD-621
 
-PRD-621 ("Refactor common functionality to util modules", status: review) established the `utils/git/` and `utils/github/` package structure and defined AC-6: "zero occurrences of `subprocess.run(["gh"` outside `utils/github/`." That work stalled — the structure exists but the full migration was never completed. This PRD completes the migration for ALL subprocess calls across `src/darkfactory/` — not just git/gh but also Claude Code invocations, editor launches, and self-invocations — and adds a sentinel test enforcing that zero subprocess calls exist outside `utils/`.
+PRD-621 ("Refactor common functionality to util modules", status: review) established the `utils/git/` and `utils/github/` package structure and defined AC-6: "zero occurrences of `subprocess.run(["gh"` outside `utils/github/`." That work stalled — the structure exists but the full migration was never completed. This PRD completes the migration for ALL subprocess calls across `python/darkfactory/` — not just git/gh but also Claude Code invocations, editor launches, and self-invocations — and adds a sentinel test enforcing that zero subprocess calls exist outside `utils/`.
 
 ## References
 
-- `src/darkfactory/utils/git/_run.py` — `git_run()` gateway
-- `src/darkfactory/utils/github/_cli.py` — `gh_run()` gateway
-- `src/darkfactory/utils/git/_operations.py` — existing context-free helpers
-- `src/darkfactory/utils/github/pr/__init__.py` — existing `create_pr()` helper
+- `python/darkfactory/utils/git/_run.py` — `git_run()` gateway
+- `python/darkfactory/utils/github/_cli.py` — `gh_run()` gateway
+- `python/darkfactory/utils/git/_operations.py` — existing context-free helpers
+- `python/darkfactory/utils/github/pr/__init__.py` — existing `create_pr()` helper
 - [[PRD-615-codebase-duplication-cleanup]] — established the duplication cleanup that led to utils extraction
 - [[PRD-621-refactor-common-functionality-in-regards-to-external-systems-services-commands-to-util-modules]] — partially completed subprocess consolidation (review, stalled)
 - [[PRD-628-refactor-gitopspy-to-utilsgit]] — moved `git_ops.py` to `utils/git/`

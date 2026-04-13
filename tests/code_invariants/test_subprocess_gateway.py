@@ -20,7 +20,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-_SRC_ROOT = Path(__file__).resolve().parent.parent / "src" / "darkfactory"
+_SRC_ROOT = Path(__file__).resolve().parent.parent / "python" / "darkfactory"
 _UTILS_PREFIX = "utils" + "/"  # files under utils/ are allowed
 
 _SUBPROCESS_ATTRS = {"run", "Popen", "check_output"}

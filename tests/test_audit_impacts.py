@@ -254,10 +254,12 @@ def test_audit_impacts_report_includes_status(tmp_path: Path) -> None:
 
 def test_operation_loads_correctly(tmp_path: Path) -> None:
     """audit-impacts operation is discoverable via load_operations."""
-    # The real operation.py lives in src/darkfactory/workflow/definitions/project/
+    # The real operation.py lives in python/darkfactory/workflow/definitions/project/
     # Locate it relative to this test file.
     repo_root = Path(__file__).resolve().parents[1]
-    ops_dir = repo_root / "src" / "darkfactory" / "workflow" / "definitions" / "project"
+    ops_dir = (
+        repo_root / "python" / "darkfactory" / "workflow" / "definitions" / "project"
+    )
 
     operations = load_operations(ops_dir, include_builtins=False, include_user=False)
     assert "audit-impacts" in operations

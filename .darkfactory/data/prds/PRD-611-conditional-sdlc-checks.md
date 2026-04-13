@@ -11,9 +11,9 @@ depends_on:
   - "[[PRD-608-project-toolchain-setup]]"
 blocks: []
 impacts:
-  - src/darkfactory/config.py
-  - src/darkfactory/workflow.py
-  - src/darkfactory/runner.py
+  - python/darkfactory/config.py
+  - python/darkfactory/workflow.py
+  - python/darkfactory/runner.py
 workflow:
 assignee:
 reviewers: []
@@ -58,7 +58,7 @@ lint = "eslint --ext .vue ."
 test = "vitest run"
 
 [[sdlc-slots.conditional]]
-when = "src/darkfactory/builtins/**"
+when = "python/darkfactory/builtins/**"
 test = "pytest tests/test_builtins.py"
 
 [[sdlc-slots.conditional]]

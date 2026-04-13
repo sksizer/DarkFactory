@@ -14,7 +14,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-_SRC_ROOT = Path(__file__).resolve().parent.parent / "src" / "darkfactory"
+_SRC_ROOT = Path(__file__).resolve().parent.parent / "python" / "darkfactory"
 
 
 def _find_violations() -> list[str]:

@@ -10,8 +10,8 @@ parent:
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/cli/main.py
-  - src/darkfactory/discover.py
+  - python/darkfactory/cli/main.py
+  - python/darkfactory/discover.py
 workflow:
 assignee:
 reviewers: []
@@ -159,10 +159,10 @@ prd discover [--source code|pr|all] [--dry-run]
 ```
 
 ### New Modules
-- `src/darkfactory/discover.py` — `DiscoveryEngine`, `DiscoveredItem` dataclass, `Clusterer`
-- `src/darkfactory/scanners/code_comments.py` — code marker scanner
-- `src/darkfactory/scanners/pr_comments.py` — PR review comment scanner
-- `src/darkfactory/cli/discover.py` — `cmd_discover` CLI handler + interactive triage loop
+- `python/darkfactory/discover.py` — `DiscoveryEngine`, `DiscoveredItem` dataclass, `Clusterer`
+- `python/darkfactory/scanners/code_comments.py` — code marker scanner
+- `python/darkfactory/scanners/pr_comments.py` — PR review comment scanner
+- `python/darkfactory/cli/discover.py` — `cmd_discover` CLI handler + interactive triage loop
 
 ### Key Design Decisions
 - **Interactive-first**: No intermediate file format. Items are scanned, clustered, and presented in a single CLI session. This keeps the adoption path simple.

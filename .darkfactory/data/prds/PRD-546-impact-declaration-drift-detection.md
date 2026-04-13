@@ -11,9 +11,9 @@ depends_on: []
 blocks:
   - "[[PRD-545-harness-driven-rebase-and-conflict-resolution]]"
 impacts:
-  - src/darkfactory/impacts.py
-  - src/darkfactory/runner.py
-  - src/darkfactory/cli/**
+  - python/darkfactory/impacts.py
+  - python/darkfactory/runner.py
+  - python/darkfactory/cli/**
 workflow:
 assignee:
 reviewers: []
@@ -40,7 +40,7 @@ This PRD adds a post-merge drift check: after a PRD's PR merges, the harness com
 ### Why declared impacts get out of sync
 
 - PRDs are written before implementation. Authors guess at the file list. The agent then ranges wider than expected (touches a test file, adds an import to a shared header, refactors a helper) and the declared globs lag.
-- Globs can be wrong by accident. A PRD says `impacts: src/darkfactory/runner.py` but the agent also touches `src/darkfactory/state.py`. Today nothing notices.
+- Globs can be wrong by accident. A PRD says `impacts: python/darkfactory/runner.py` but the agent also touches `python/darkfactory/state.py`. Today nothing notices.
 - Globs can be wrong by omission. A PRD says nothing in `impacts:` (empty list) and proceeds to rewrite ten files. Today nothing notices.
 - PRD authors update the body of a PRD as scope grows but forget to update the frontmatter. Today nothing notices.
 
@@ -85,7 +85,7 @@ A pre-merge variant (run during the PR's CI pass) is worth a follow-up but is no
 
 ## Technical Approach
 
-- **`src/darkfactory/drift.py`** (new module) exposing:
+- **`python/darkfactory/drift.py`** (new module) exposing:
   - `compute_drift(prd, merge_sha, repo_root, ignore_globs) -> DriftReport`
   - `DriftReport` dataclass: `prd_id`, `merge_sha`, `declared_globs`, `actual_files`, `drifted_files`, `is_drift: bool`
 - Integration with the post-merge hook in `runner.py` (or a new `cli/check_drift.py` subcommand `prd check-drift` that runs the same code).
@@ -118,8 +118,8 @@ A pre-merge variant (run during the PR's CI pass) is worth a follow-up but is no
 ## References
 
 - [[PRD-545-harness-driven-rebase-and-conflict-resolution]] — the consumer of this data; the scheduler's parallelism guarantees are only as good as the impacts declarations they're built on.
-- `src/darkfactory/impacts.py` — current static conflict detector. Drift detection complements it: impacts.py predicts conflicts from declared globs; this PRD validates the declared globs against reality after the fact.
-- `src/darkfactory/containment.py` — `effective_impacts` aggregation needs to be aware of drift records when computing scheduling impact sets.
+- `python/darkfactory/impacts.py` — current static conflict detector. Drift detection complements it: impacts.py predicts conflicts from declared globs; this PRD validates the declared globs against reality after the fact.
+- `python/darkfactory/containment.py` — `effective_impacts` aggregation needs to be aware of drift records when computing scheduling impact sets.
 
 ## Assessment (2026-04-11)
 
@@ -127,11 +127,11 @@ A pre-merge variant (run during the PR's CI pass) is worth a follow-up but is no
   Its biggest payoff is as input to PRD-545's scheduler (Phase 1), and
   that scheduler isn't scheduled yet. Standalone, the value is "surface
   when PRDs lied about their impacts" — useful but not urgent.
-- **Effort**: m — one focused module (`src/darkfactory/drift.py`),
+- **Effort**: m — one focused module (`python/darkfactory/drift.py`),
   a CLI subcommand (`prd check-drift`), per-PRD record persistence, and
   integration with the existing post-merge hook. Most of the primitive
   pieces already exist (impacts globs, `git show --name-only`, etc.).
-- **Current state**: greenfield. `src/darkfactory/drift.py` doesn't
+- **Current state**: greenfield. `python/darkfactory/drift.py` doesn't
   exist. `.darkfactory/drift/` isn't created. `prd check-drift` isn't
   a subcommand.
 - **Gaps to fully implement**:

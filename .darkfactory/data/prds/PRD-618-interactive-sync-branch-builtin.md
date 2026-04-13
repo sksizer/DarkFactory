@@ -11,7 +11,7 @@ depends_on:
   - PRD-617
 blocks: []
 impacts:
-  - src/darkfactory/builtins/
+  - python/darkfactory/builtins/
 workflow: null
 assignee: null
 reviewers: []

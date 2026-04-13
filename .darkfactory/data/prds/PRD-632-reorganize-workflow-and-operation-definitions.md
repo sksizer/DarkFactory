@@ -10,21 +10,21 @@ parent: null
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/workflow/definitions/
-  - src/darkfactory/loader.py
-  - src/darkfactory/config/_paths.py
-  - src/darkfactory/config/_init.py
-  - src/darkfactory/system.py
-  - src/darkfactory/cli/system.py
-  - src/darkfactory/cli/_parser.py
-  - src/darkfactory/cli/main.py
-  - src/darkfactory/cli/discuss.py
-  - src/darkfactory/runner.py
-  - src/darkfactory/operations/system_builtins.py
-  - src/darkfactory/operations/gather_prd_context.py
-  - src/darkfactory/operations/discuss_prd.py
-  - src/darkfactory/operations/commit_prd_changes.py
-  - src/darkfactory/commands/discuss/operation.py
+  - python/darkfactory/workflow/definitions/
+  - python/darkfactory/loader.py
+  - python/darkfactory/config/_paths.py
+  - python/darkfactory/config/_init.py
+  - python/darkfactory/system.py
+  - python/darkfactory/cli/system.py
+  - python/darkfactory/cli/_parser.py
+  - python/darkfactory/cli/main.py
+  - python/darkfactory/cli/discuss.py
+  - python/darkfactory/runner.py
+  - python/darkfactory/operations/system_builtins.py
+  - python/darkfactory/operations/gather_prd_context.py
+  - python/darkfactory/operations/discuss_prd.py
+  - python/darkfactory/operations/commit_prd_changes.py
+  - python/darkfactory/commands/discuss/operation.py
   - tests/test_cli_system.py
   - tests/test_system.py
   - tests/test_system_runner.py
@@ -45,7 +45,7 @@ tags:
 
 ## Summary
 
-Move built-in project operations from `.darkfactory/operations/` into `src/darkfactory/workflow/definitions/project/` and nest the existing PRD workflows under `src/darkfactory/workflow/definitions/prd/`. This gives the definitions directory a clear two-namespace layout (`prd/` vs `project/`) instead of mixing PRD workflows at the top level while project operations live in an unrelated data directory.
+Move built-in project operations from `.darkfactory/operations/` into `python/darkfactory/workflow/definitions/project/` and nest the existing PRD workflows under `python/darkfactory/workflow/definitions/prd/`. This gives the definitions directory a clear two-namespace layout (`prd/` vs `project/`) instead of mixing PRD workflows at the top level while project operations live in an unrelated data directory.
 
 ## Motivation
 
@@ -240,8 +240,8 @@ This is a real loadable operation visible in `prd project list`. Users delete or
 
 ## Acceptance Criteria
 
-- [ ] AC-1: `src/darkfactory/workflow/definitions/prd/` contains all 6 PRD workflows, discoverable by `load_workflows()`.
-- [ ] AC-2: `src/darkfactory/workflow/definitions/project/` contains the 3 built-in project operations (plan, audit-impacts, verify-merges), discoverable by `load_operations()`.
+- [ ] AC-1: `python/darkfactory/workflow/definitions/prd/` contains all 6 PRD workflows, discoverable by `load_workflows()`.
+- [ ] AC-2: `python/darkfactory/workflow/definitions/project/` contains the 3 built-in project operations (plan, audit-impacts, verify-merges), discoverable by `load_operations()`.
 - [ ] AC-3: `.darkfactory/operations/` is scaffolded by `prd init` and seeded with a `hello/` operation visible in `prd project list`.
 - [ ] AC-4: Name collision across any operation layers (built-in, user, project) raises `ValueError`.
 - [ ] AC-5: `prd project list` shows operations from all three layers (built-in, user, project).

@@ -11,9 +11,9 @@ depends_on:
   - "[[PRD-546-impact-declaration-drift-detection]]"
 blocks: []
 impacts:
-  - src/darkfactory/impacts.py
-  - src/darkfactory/model/**
-  - src/darkfactory/cli/**
+  - python/darkfactory/impacts.py
+  - python/darkfactory/model/**
+  - python/darkfactory/cli/**
   - .darkfactory/data/prds/README.md
 workflow:
 assignee:
@@ -65,7 +65,7 @@ upstream_changes:
   - prd: PRD-548
     merged: 2026-04-08
     overlapping_impacts:
-      - src/darkfactory/builtins.py
+      - python/darkfactory/builtins.py
     acknowledged: false
 ```
 
@@ -93,7 +93,7 @@ Two triggers:
 
 ## How this changes the 549 example
 
-If PRD-548 merges and touches `src/darkfactory/builtins.py`, and PRD-549 lists that file in its `impacts:`, the tooling would:
+If PRD-548 merges and touches `python/darkfactory/builtins.py`, and PRD-549 lists that file in its `impacts:`, the tooling would:
 
 1. Append an `upstream_changes:` entry to PRD-549 pointing at PRD-548.
 2. Move PRD-549 from `ready` → `needs-refresh` (or equivalent).

@@ -13,10 +13,10 @@ depends_on:
   - "[[PRD-549-builtins-package-split]]"
 blocks: []
 impacts:
-  - src/darkfactory/workflows/planning/workflow.py
-  - src/darkfactory/builtins/**
-  - src/darkfactory/templates.py
-  - src/darkfactory/model/_persistence.py
+  - python/darkfactory/workflows/planning/workflow.py
+  - python/darkfactory/builtins/**
+  - python/darkfactory/templates.py
+  - python/darkfactory/model/_persistence.py
 workflow: null
 target_version: null
 created: 2026-04-08
@@ -54,7 +54,7 @@ These are all real risks but they're acceptable for PRD-228 because the alternat
 
 ### 1. Migrate to `PLANNING_TEMPLATE`
 
-PRD-227 ships `PLANNING_TEMPLATE` as a bundled template. This PRD updates `src/darkfactory/workflows/planning/workflow.py` to compose from it:
+PRD-227 ships `PLANNING_TEMPLATE` as a bundled template. This PRD updates `python/darkfactory/workflows/planning/workflow.py` to compose from it:
 
 ```python
 from darkfactory.templates_builtin import PLANNING_TEMPLATE
@@ -240,7 +240,7 @@ def set_blocks(
     update_frontmatter_block_at(parent_path, "blocks", blocks_yaml)
 ```
 
-This needs a companion `update_frontmatter_block_at` function in `src/darkfactory/model/_persistence.py` (multi-line variant of `update_frontmatter_field_at`). PRD-216's `normalize_list_field_at` is close to what's needed; this is a related but slightly different operation (replacing the whole list, not just sorting it).
+This needs a companion `update_frontmatter_block_at` function in `python/darkfactory/model/_persistence.py` (multi-line variant of `update_frontmatter_field_at`). PRD-216's `normalize_list_field_at` is close to what's needed; this is a related but slightly different operation (replacing the whole list, not just sorting it).
 
 ### 4. Update planning agent prompts
 
@@ -267,9 +267,9 @@ The runner parses the `created:` line into `ctx.run_summary["created_children"]`
 - [ ] AC-1: `WorkflowTemplate` has a `forbidden_path_globs` field
 - [ ] AC-2: `verify_path_scope` BuiltIn exists; raises on forbidden-path changes; no-op when forbidden_path_globs is empty
 - [ ] AC-3: `set_blocks` BuiltIn updates the parent PRD's `blocks:` field byte-preserving
-- [ ] AC-4: `update_frontmatter_block_at` (or equivalent) exists in `src/darkfactory/model/_persistence.py`
+- [ ] AC-4: `update_frontmatter_block_at` (or equivalent) exists in `python/darkfactory/model/_persistence.py`
 - [ ] AC-5: `PLANNING_TEMPLATE` includes `verify_path_scope` in its close list and lists `forbidden_path_globs` for src/tests/workflows/.github
-- [ ] AC-6: `src/darkfactory/workflows/planning/workflow.py` is composed from `PLANNING_TEMPLATE` instead of declaring a flat task list
+- [ ] AC-6: `python/darkfactory/workflows/planning/workflow.py` is composed from `PLANNING_TEMPLATE` instead of declaring a flat task list
 - [ ] AC-7: Agent allowlist no longer includes `Edit`
 - [ ] AC-8: Agent prompts updated to emit `created: PRD-X, PRD-Y, ...` after sentinel; harness parses it into `run_summary`
 - [ ] AC-9: Manual end-to-end: re-run planning on a previously-decomposed epic (or a new one); workflow completes; verify no `Edit` was used and `blocks:` was updated by the BuiltIn

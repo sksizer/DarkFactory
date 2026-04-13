@@ -51,7 +51,7 @@ def test_prompt_files_exist() -> None:
     """AC-3: Prompt files exist in the package."""
     pkg_dir = (
         Path(__file__).resolve().parent.parent
-        / "src"
+        / "python"
         / "darkfactory"
         / "commands"
         / "discuss"
@@ -64,7 +64,7 @@ def test_prompt_files_have_placeholders() -> None:
     """AC-5: Prompt files contain expected placeholders."""
     pkg_dir = (
         Path(__file__).resolve().parent.parent
-        / "src"
+        / "python"
         / "darkfactory"
         / "commands"
         / "discuss"
@@ -86,7 +86,7 @@ def test_chain_executes_in_order(tmp_path: Path) -> None:
 
     pkg_dir = (
         Path(__file__).resolve().parent.parent
-        / "src"
+        / "python"
         / "darkfactory"
         / "commands"
         / "discuss"
@@ -148,7 +148,7 @@ def test_nonzero_exit_does_not_abort_chain(tmp_path: Path) -> None:
 
     pkg_dir = (
         Path(__file__).resolve().parent.parent
-        / "src"
+        / "python"
         / "darkfactory"
         / "commands"
         / "discuss"

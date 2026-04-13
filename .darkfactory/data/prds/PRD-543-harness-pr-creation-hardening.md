@@ -11,9 +11,9 @@ depends_on:
   - "[[PRD-549-builtins-package-split]]"
 blocks: []
 impacts:
-  - src/darkfactory/builtins/create_pr.py
-  - src/darkfactory/builtins/push_branch.py
-  - src/darkfactory/runner.py
+  - python/darkfactory/builtins/create_pr.py
+  - python/darkfactory/builtins/push_branch.py
+  - python/darkfactory/runner.py
 workflow:
 assignee:
 reviewers: []
@@ -29,7 +29,7 @@ tags:
 
 ## Summary
 
-Two small but high-impact reliability fixes to the harness, both motivated by a concrete incident today. Note that `src/darkfactory/builtins.py` has since been decomposed into the `src/darkfactory/builtins/` package (PRD-549), so edits land in the per-builtin modules (`create_pr.py`, `push_branch.py`) rather than a monolithic file.
+Two small but high-impact reliability fixes to the harness, both motivated by a concrete incident today. Note that `python/darkfactory/builtins.py` has since been decomposed into the `python/darkfactory/builtins/` package (PRD-549), so edits land in the per-builtin modules (`create_pr.py`, `push_branch.py`) rather than a monolithic file.
 
 - **(A) `create_pr` must surface the real `gh` stderr.** Today, when the `create_pr` builtin fails, the harness re-raises a `CalledProcessError` whose message is just the argv. The actual `gh` error text — the one line that would tell the user *why* — is captured by subprocess and thrown away. Every failure in this step is therefore equally opaque.
 - **(B) The harness must refuse (or loudly warn and prompt) when a PRD is re-run after its branch has already been merged.** Re-running a merged PRD is almost always a user mistake: it re-runs the agent on top of a branch whose work is already in the target branch, re-does the implementation, and then fails confusingly at `create_pr` because GitHub sees either "no commits between base and head" or a stale cache of the just-merged PR.
@@ -100,16 +100,16 @@ Furthermore, the deeper mistake was that the PRD should never have been re-run a
 
 ### (A) Subprocess helper
 
-- Add `src/darkfactory/_subprocess.py` (or fold into `src/darkfactory/builtins/_shared.py`) exposing:
+- Add `python/darkfactory/_subprocess.py` (or fold into `python/darkfactory/builtins/_shared.py`) exposing:
   ```python
   def run_cli(argv: list[str], *, step_name: str, cwd: Path | None = None) -> subprocess.CompletedProcess
   ```
 - Runs the process with `capture_output=True, text=True`. On non-zero exit, raises a custom `BuiltinCommandError(step_name, argv, returncode, stdout, stderr)` whose `__str__` includes the first stderr line and whose full payload is dumped to the harness log.
-- Update `create_pr`, `push_branch`, and any other `subprocess.run(["gh", ...])` / `subprocess.run(["git", ...])` sites in `src/darkfactory/builtins/` to use this helper.
+- Update `create_pr`, `push_branch`, and any other `subprocess.run(["gh", ...])` / `subprocess.run(["git", ...])` sites in `python/darkfactory/builtins/` to use this helper.
 
 ### (B) Merged-PR guard
 
-- Add a new helper `check_prd_already_merged(prd, branch) -> MergedPRInfo | None` in `src/darkfactory/builtins/_shared.py` (or a new `gh.py` module).
+- Add a new helper `check_prd_already_merged(prd, branch) -> MergedPRInfo | None` in `python/darkfactory/builtins/_shared.py` (or a new `gh.py` module).
 - Call it from the runner *before* the first mutating step (before `ensure_worktree` / `set_status` / `commit`).
 - On hit: raise a `PRDAlreadyMergedError` (new exception) that the CLI formats into the refusal message. Do not touch worktree or PRD file.
 - On miss or error: proceed normally.

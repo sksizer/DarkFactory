@@ -90,7 +90,7 @@ package manager runner resolves that bug as a side-effect.
    `[tools]` section.
 3. The helper is covered by unit tests for all four supported package managers.
 4. A pytest scan test in `tests/` asserts that no `*.py` file under
-   `src/darkfactory/` (excluding `config/` and `node_runner.py`) contains the
+   `python/darkfactory/` (excluding `config/` and `node_runner.py`) contains the
    literal string `"pnpm"`. This enforces AC-7 automatically in CI.
 
 ## Technical Approach
@@ -222,13 +222,13 @@ The `executable` parameter is removed.
   is explicitly detected and rejected with a human-readable error. No version
   constraints apply to pnpm, npm, or bun.
 - RESOLVED: Hardcoded-string enforcement uses a pytest scan test (not a custom
-  ruff plugin). The test lives in `tests/` and scans `src/darkfactory/**/*.py`
+  ruff plugin). The test lives in `tests/` and scans `python/darkfactory/**/*.py`
   excluding `config/` and `node_runner.py`.
 
 ## References
 
 - PRD-629 — config package refactor; must land first
-- `src/darkfactory/invoke.py:380` — existing `executable` parameter (never wired)
-- `src/darkfactory/builtins/analyze_transcript.py:190` — hardcoded pnpm
-- `src/darkfactory/utils/claude_code.py:28` — bare `claude` binary invocation
-- `src/darkfactory/utils/system.py:11` — `shutil.which("claude")` to replace
+- `python/darkfactory/invoke.py:380` — existing `executable` parameter (never wired)
+- `python/darkfactory/builtins/analyze_transcript.py:190` — hardcoded pnpm
+- `python/darkfactory/utils/claude_code.py:28` — bare `claude` binary invocation
+- `python/darkfactory/utils/system.py:11` — `shutil.which("claude")` to replace

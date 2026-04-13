@@ -10,7 +10,7 @@ parent: null
 depends_on: []
 blocks: []
 impacts:
-  - "src/darkfactory/runner.py"
+  - "python/darkfactory/runner.py"
 workflow: null
 target_version: null
 created: '2026-04-09'

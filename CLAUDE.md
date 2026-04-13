@@ -23,7 +23,7 @@ See `README.md § Architectural Principles` for the canonical list. Key points:
 
 - Active PRDs live in `.darkfactory/data/prds/` with YAML frontmatter
 - Archived PRDs (terminal states only) live in `.darkfactory/data/archive/`
-- Use `_next_flat_prd_id()` from `src/darkfactory/cli/new.py` for new PRD IDs
-- Workflows in `src/darkfactory/workflows/{name}/workflow.py`
+- Use `_next_flat_prd_id()` from `python/darkfactory/cli/new.py` for new PRD IDs
+- Workflows in `python/darkfactory/workflows/{name}/workflow.py`
 - Config in `.darkfactory/config.toml`
 - When referencing other PRDs in Markdown prose **ALWAYS** use a wikiink to the file

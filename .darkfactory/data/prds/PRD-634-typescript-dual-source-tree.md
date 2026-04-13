@@ -2,7 +2,7 @@
 id: PRD-634
 title: Rename src to python and prepare dual source tree
 kind: task
-status: in-progress
+status: review
 priority: high
 effort: s
 capability: simple
@@ -44,7 +44,7 @@ Porting DarkFactory to TypeScript will be done incrementally while the Python ve
 
 ### Rename `src/` to `python/`
 
-Update every reference to `src` or `src/darkfactory` in project configuration:
+Update every reference to `src` or `python/darkfactory` in project configuration:
 
 1. `git mv src python` — the actual rename
 2. `pyproject.toml`:
@@ -55,10 +55,10 @@ Update every reference to `src` or `src/darkfactory` in project configuration:
 3. `justfile` — all `src` references → `python`
 4. `.github/workflows/ci.yml` — `uv run mypy src tests` → `python tests`
 5. `CLAUDE.md`:
-   - `src/darkfactory/cli/new.py` → `python/darkfactory/cli/new.py`
-   - `src/darkfactory/workflows/{name}/workflow.py` → `python/darkfactory/workflows/{name}/workflow.py`
-6. `README.md` — update `src/darkfactory/cli/` and `src/darkfactory/builtins/` references in Architectural Principles section
-7. Active PRDs (non-terminated) in `.darkfactory/data/prds/` — bulk-update `src/darkfactory` path references to `python/darkfactory`
+   - `python/darkfactory/cli/new.py` → `python/darkfactory/cli/new.py`
+   - `python/darkfactory/workflows/{name}/workflow.py` → `python/darkfactory/workflows/{name}/workflow.py`
+6. `README.md` — update `python/darkfactory/cli/` and `python/darkfactory/builtins/` references in Architectural Principles section
+7. Active PRDs (non-terminated) in `.darkfactory/data/prds/` — bulk-update `python/darkfactory` path references to `python/darkfactory`
 
 ### Update justfile and .gitignore
 
@@ -102,7 +102,7 @@ ts/coverage/
 - [ ] CI workflow updated and would pass
 - [ ] `.gitignore` updated for Node artifacts
 - [ ] `CLAUDE.md` and `README.md` updated with new paths
-- [ ] Active PRDs updated — no non-terminated PRD references `src/darkfactory`
+- [ ] Active PRDs updated — no non-terminated PRD references `python/darkfactory`
 - [ ] Editable install (`uv sync && prd --help`) produces working CLI
 
 ## Out of scope
