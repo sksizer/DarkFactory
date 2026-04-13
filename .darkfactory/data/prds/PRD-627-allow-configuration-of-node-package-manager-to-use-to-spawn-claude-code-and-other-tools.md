@@ -16,7 +16,8 @@ reviewers: []
 target_version: null
 created: '2026-04-11'
 updated: '2026-04-11'  # revised post-critique
-tags: []
+tags:
+  - feature
 ---
 
 # Allow configuration of node package manager to use to spawn claude code and other tools

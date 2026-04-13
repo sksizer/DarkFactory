@@ -23,6 +23,7 @@ tags:
   - harness
   - cli
   - execution
+  - feature
 ---
 
 # plan + run CLI Subcommands

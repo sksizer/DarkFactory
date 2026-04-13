@@ -26,6 +26,7 @@ tags:
   - harness
   - workflow
   - feedback
+  - feature
 ---
 
 # Rework loop: feed PR review comments back to the agent

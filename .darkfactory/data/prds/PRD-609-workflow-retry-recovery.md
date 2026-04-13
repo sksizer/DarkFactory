@@ -25,6 +25,7 @@ tags:
   - retry
   - recovery
   - agent
+  - feature
 value: 2
 ---
 

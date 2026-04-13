@@ -27,6 +27,7 @@ tags:
   - execution
   - merge
   - agent
+  - feature
 ---
 
 # Merge-upstream task for PRDs with multiple dependencies

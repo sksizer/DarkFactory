@@ -17,7 +17,8 @@ reviewers: []
 target_version:
 created: 2026-04-11
 updated: '2026-04-11'
-tags: []
+tags:
+  - feature
 ---
 
 # Make a command that will fully reset outstanding work on a PRD

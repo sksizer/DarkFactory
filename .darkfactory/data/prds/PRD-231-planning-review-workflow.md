@@ -26,6 +26,7 @@ tags:
   - workflow
   - planning
   - review
+  - feature
 ---
 
 # Planning review workflow: extend partially-decomposed epics

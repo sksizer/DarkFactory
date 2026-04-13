@@ -24,6 +24,7 @@ tags:
   - harness
   - reliability
   - scheduler
+  - feature
 ---
 
 # Detect drift between declared impacts and actual diff after PRD merges

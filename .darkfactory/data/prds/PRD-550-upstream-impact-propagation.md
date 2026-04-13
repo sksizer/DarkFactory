@@ -25,6 +25,7 @@ tags:
   - harness
   - planning
   - reliability
+  - feature
 ---
 
 # Flag downstream PRDs when an upstream change invalidates their assumptions

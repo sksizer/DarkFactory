@@ -20,7 +20,7 @@ reviewers: []
 target_version: null
 created: '2026-04-09'
 updated: '2026-04-11'
-tags: [authoring, skill, workflow]
+tags: [authoring, skill, workflow, feature]
 ---
 
 # Establish a skill to help discuss and create detailed PRDs

@@ -30,6 +30,7 @@ tags:
   - configuration
   - cli
   - toolchain
+  - feature
 value: 8
 ---
 

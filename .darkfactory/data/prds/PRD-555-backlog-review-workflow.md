@@ -29,6 +29,7 @@ tags:
   - hygiene
   - planning
   - reliability
+  - feature
 ---
 
 # `backlog_review` workflow — audit every ready PRD against current code state

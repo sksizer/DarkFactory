@@ -27,6 +27,7 @@ tags:
   - cli
   - packaging
   - config
+  - feature
 ---
 
 # Make darkfactory a general-purpose CLI tool installable anywhere

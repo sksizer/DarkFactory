@@ -26,6 +26,7 @@ tags:
   - harness
   - execution
   - dag
+  - feature
 ---
 
 # Drain-ready-queue execution mode: run all ready PRDs without a target

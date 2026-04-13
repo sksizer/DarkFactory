@@ -31,6 +31,7 @@ tags:
   - config
   - init
   - ergonomics
+  - feature
 ---
 
 # Interactive project init with configurable prd/workflow path overrides

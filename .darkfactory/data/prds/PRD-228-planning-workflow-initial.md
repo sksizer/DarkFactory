@@ -26,6 +26,7 @@ tags:
   - harness
   - workflow
   - planning
+  - feature
 ---
 
 # Initial planning workflow: decompose epics into child PRDs

@@ -24,6 +24,7 @@ tags:
   - configuration
   - sdlc-slots
   - workflow
+  - feature
 value: 2
 ---
 
