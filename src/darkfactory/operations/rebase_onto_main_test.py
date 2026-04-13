@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from darkfactory.operations._test_helpers import make_builtin_ctx
+from darkfactory.workflow import RunContext
 from darkfactory.operations.rebase_onto_main import (
     _fetch_origin_main,
     rebase_onto_main,
@@ -20,10 +21,8 @@ _BRANCH = "prd/PRD-001-test-thing"
 # ---------- helpers ----------
 
 
-def _make_ctx(tmp_path: Path, *, event_writer: object = None) -> MagicMock:
-    ctx = make_builtin_ctx(tmp_path, event_writer=event_writer)
-    ctx.branch_name = _BRANCH
-    return ctx
+def _make_ctx(tmp_path: Path, *, event_writer: object = None) -> RunContext:
+    return make_builtin_ctx(tmp_path, branch_name=_BRANCH, event_writer=event_writer)
 
 
 def _ok(stdout: str = "") -> _Ok[None]:
@@ -73,7 +72,7 @@ def test_rebase_emits_rebased_effect(tmp_path: Path) -> None:
             "darkfactory.operations.rebase_onto_main.git_run",
             side_effect=[
                 _GitErr(1, "", "", ["git"]),  # merge-base -> not ancestor
-                _ok(),                         # rebase -> success
+                _ok(),  # rebase -> success
             ],
         ),
         patch(
@@ -100,7 +99,7 @@ def test_rebase_calls_git_rebase_origin_main(tmp_path: Path) -> None:
             "darkfactory.operations.rebase_onto_main.git_run",
             side_effect=[
                 _GitErr(1, "", "", ["git"]),  # merge-base -> not ancestor
-                _ok(),                         # rebase -> success
+                _ok(),  # rebase -> success
             ],
         ) as mock_git,
         patch(
@@ -148,7 +147,7 @@ def test_conflict_aborts_rebase_and_raises(tmp_path: Path) -> None:
             side_effect=[
                 _GitErr(1, "", "", ["git"]),  # merge-base -> not ancestor
                 _fail(1, stderr="CONFLICT"),  # rebase -> conflict
-                _ok(),                         # rebase --abort -> success
+                _ok(),  # rebase --abort -> success
             ],
         ) as mock_git,
         patch(
@@ -177,8 +176,8 @@ def test_conflict_error_lists_conflicting_files(tmp_path: Path) -> None:
             "darkfactory.operations.rebase_onto_main.git_run",
             side_effect=[
                 _GitErr(1, "", "", ["git"]),  # merge-base -> not ancestor
-                _fail(1),                      # rebase -> fails
-                _ok(),                         # rebase --abort -> success
+                _fail(1),  # rebase -> fails
+                _ok(),  # rebase --abort -> success
             ],
         ),
         patch(

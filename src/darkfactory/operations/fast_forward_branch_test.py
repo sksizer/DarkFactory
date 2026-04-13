@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from darkfactory.operations._test_helpers import make_builtin_ctx
+from darkfactory.workflow import RunContext
 from darkfactory.utils.git import GitErr as _GitErr, Ok as _Ok, Timeout as _Timeout
 from darkfactory.operations.fast_forward_branch import (
     _check_divergence,
@@ -22,7 +23,7 @@ _BRANCH = "prd/PRD-001-test-thing"
 # ---------- helpers ----------
 
 
-def _make_ctx(tmp_path: Path, *, event_writer: object = None) -> "RunContext":  # noqa: F821
+def _make_ctx(tmp_path: Path, *, event_writer: object = None) -> RunContext:
     return make_builtin_ctx(tmp_path, branch_name=_BRANCH, event_writer=event_writer)
 
 
