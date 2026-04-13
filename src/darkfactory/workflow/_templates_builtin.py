@@ -5,13 +5,13 @@ lifecycle with PRD-224 invariants enforced. Most workflows compose from this
 template rather than building open/close lists from scratch.
 
 Also provides :data:`EXTRACTION_TEMPLATE` for workflows that operate on a
-separate target repository (no pumice test/lint shell steps). It differs from
+separate target repository (no df test/lint shell steps). It differs from
 :data:`PRD_IMPLEMENTATION_TEMPLATE` in two ways:
 
 1. **Middle**: only :class:`AgentTask` is allowed -- no :class:`ShellTask` is
    required because the agent verifies in the target repo directly.
 2. **Close**: omits ``summarize_agent_run`` and ``commit_transcript`` (no
-   pumice transcript to record), adds ``lint_attribution`` before pushing,
+   df transcript to record), adds ``lint_attribution`` before pushing,
    and commits the review message before updating the status (matching the
    pre-existing extraction convention).
 """
@@ -50,7 +50,7 @@ PRD_IMPLEMENTATION_TEMPLATE = WorkflowTemplate(
 )
 
 # Extraction workflows run against a separate target repository, so there are
-# no pumice shell steps and no pumice transcript to summarize. The close
+# no df shell steps and no df transcript to summarize. The close
 # sequence commits first (capturing the agent's work in the worktree), then
 # marks the status, then runs lint_attribution before pushing.
 EXTRACTION_TEMPLATE = WorkflowTemplate(
@@ -65,7 +65,7 @@ EXTRACTION_TEMPLATE = WorkflowTemplate(
         BuiltIn("commit", kwargs={"message": "chore(prd): {prd_id} start work"}),
     ],
     # Only AgentTask is allowed in the middle — no ShellTask, because the agent
-    # runs verification directly in the target repo rather than via pumice.
+    # runs verification directly in the target repo rather than via df.
     middle_kinds=[AgentTask],
     middle_required={
         AgentTask: (1, None),
