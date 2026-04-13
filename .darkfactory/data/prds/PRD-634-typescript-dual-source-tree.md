@@ -2,7 +2,7 @@
 id: PRD-634
 title: Rename src to python and prepare dual source tree
 kind: task
-status: review
+status: in-progress
 priority: high
 effort: s
 capability: simple
