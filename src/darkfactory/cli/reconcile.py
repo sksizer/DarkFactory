@@ -179,7 +179,12 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
     repo_root = _find_repo_root(args.data_dir)
 
     # 1. Get merged PRs with prd/* branches.
-    merged_prs, maybe_truncated = _get_merged_prd_prs(repo_root)
+    merged_result = _get_merged_prd_prs(repo_root)
+    if isinstance(merged_result, tuple):
+        merged_prs, maybe_truncated = merged_result
+    else:
+        merged_prs = merged_result
+        maybe_truncated = False
     if maybe_truncated:
         print(
             f"WARNING: gh returned {_MERGED_PR_LIMIT} merged PRs (result cap); "
