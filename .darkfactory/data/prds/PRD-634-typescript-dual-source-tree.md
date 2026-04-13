@@ -2,7 +2,7 @@
 id: PRD-634
 title: Rename src to python and prepare dual source tree
 kind: task
-status: ready
+status: in-progress
 priority: high
 effort: s
 capability: simple
@@ -24,7 +24,7 @@ assignee:
 reviewers: []
 target_version:
 created: 2026-04-13
-updated: 2026-04-13
+updated: '2026-04-13'
 tags:
   - infrastructure
   - typescript
