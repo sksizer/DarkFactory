@@ -255,20 +255,22 @@ def test_rework_execute_with_comments_invokes_workflow(
 
     assert result == 0
     assert mock_run.called
-    # The CLI hands the discovered state over via context_overrides (for
-    # ExecutionContext fields) and phase_state_init (for ReworkState).
+    # The CLI hands the discovered state over via phase_state_init:
+    # ReworkState, WorktreeState, and CodeEnv.
     _, kwargs = mock_run.call_args
     assert kwargs["dry_run"] is False
-    overrides = kwargs["context_overrides"]
-    assert overrides["worktree_path"] == discovered.worktree_path
-    assert overrides["cwd"] == discovered.worktree_path
-    # Rework-specific state is now passed via phase_state_init
     phase_init = kwargs["phase_state_init"]
-    assert len(phase_init) == 1
-    from darkfactory.engine import ReworkState
+    assert len(phase_init) == 3
 
-    rework_state = phase_init[0]
-    assert isinstance(rework_state, ReworkState)
+    from darkfactory.engine import CodeEnv, ReworkState, WorktreeState
+
+    rework_state = [p for p in phase_init if isinstance(p, ReworkState)][0]
     assert rework_state.pr_number == 42
     assert rework_state.review_threads == [thread]
     assert rework_state.reply_to_comments is True
+
+    worktree_state = [p for p in phase_init if isinstance(p, WorktreeState)][0]
+    assert worktree_state.worktree_path == discovered.worktree_path
+
+    code_env = [p for p in phase_init if isinstance(p, CodeEnv)][0]
+    assert code_env.cwd == discovered.worktree_path

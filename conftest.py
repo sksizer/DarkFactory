@@ -8,7 +8,8 @@ from pathlib import Path
 import pytest
 
 from darkfactory.model import PRD
-from darkfactory.project import ProjectContext, ProjectOperation
+from darkfactory.engine import CodeEnv, ProjectRun
+from darkfactory.workflow import RunContext, Workflow
 
 
 def init_git_repo(path: Path) -> None:
@@ -112,13 +113,13 @@ def make_project_op(
     name: str = "test-op",
     description: str = "test",
     operation_dir: Path | None = None,
-) -> ProjectOperation:
-    """Create a ProjectOperation for testing."""
-    return ProjectOperation(
+) -> Workflow:
+    """Create a Workflow for project-operation testing."""
+    return Workflow(
         name=name,
         description=description,
         tasks=[],
-        operation_dir=operation_dir,
+        workflow_dir=operation_dir,
     )
 
 
@@ -126,17 +127,21 @@ def make_project_ctx(
     tmp_path: Path,
     prds: dict[str, PRD] | None = None,
     target_prd: str | None = None,
-    operation: ProjectOperation | None = None,
-) -> ProjectContext:
-    """Create a ProjectContext for testing."""
-    return ProjectContext(
-        repo_root=tmp_path,
-        prds=prds or {},
-        operation=operation or make_project_op(),
-        cwd=tmp_path,
-        dry_run=False,
-        target_prd=target_prd,
+    operation: Workflow | None = None,
+) -> RunContext:
+    """Create a RunContext seeded with ProjectRun for testing."""
+    op = operation or make_project_op()
+    ctx = RunContext(dry_run=False)
+    ctx.state.put(CodeEnv(repo_root=tmp_path, cwd=tmp_path))
+    ctx.state.put(
+        ProjectRun(
+            workflow=op,
+            prds=prds or {},
+            targets=tuple((prds or {}).keys()),
+            target_prd=target_prd,
+        )
     )
+    return ctx
 
 
 def setup_repo_with_prd(tmp_path: Path) -> tuple[Path, dict[str, PRD]]:

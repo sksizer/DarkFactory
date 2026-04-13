@@ -6,13 +6,14 @@ from pathlib import Path
 
 import pytest
 
+from darkfactory.engine import CodeEnv, PrdWorkflowRun, WorktreeState
 from darkfactory.model import load_all
 from darkfactory.workflow import (
     compose_prompt,
     load_prompt_files,
     substitute_placeholders,
 )
-from darkfactory.workflow import ExecutionContext, Workflow
+from darkfactory.workflow import RunContext, Workflow
 
 from .conftest import write_prd
 
@@ -118,21 +119,21 @@ def test_substitute_nested_braces_in_code_blocks() -> None:
 # ---------- compose_prompt ----------
 
 
-def _make_ctx(
-    tmp_data_dir: Path, workflow_dir: Path
-) -> tuple[Workflow, ExecutionContext]:
-    """Build a workflow (with workflow_dir set) and a context for testing compose."""
+def _make_ctx(tmp_data_dir: Path, workflow_dir: Path) -> tuple[Workflow, RunContext]:
+    """Build a workflow (with workflow_dir set) and a RunContext for testing compose."""
     (tmp_data_dir / "prds").mkdir(exist_ok=True)
     write_prd(tmp_data_dir / "prds", "PRD-070", "test-task")
     prds = load_all(tmp_data_dir)
     wf = Workflow(name="default", workflow_dir=workflow_dir)
-    ctx = ExecutionContext(
-        prd=prds["PRD-070"],
-        repo_root=tmp_data_dir,
-        workflow=wf,
-        base_ref="main",
-        branch_name="prd/PRD-070-test-task",
-        worktree_path=tmp_data_dir / ".worktrees" / "PRD-070-test-task",
+    ctx = RunContext(dry_run=True)
+    ctx.state.put(CodeEnv(repo_root=tmp_data_dir, cwd=tmp_data_dir))
+    ctx.state.put(PrdWorkflowRun(prd=prds["PRD-070"], workflow=wf))
+    ctx.state.put(
+        WorktreeState(
+            branch="prd/PRD-070-test-task",
+            base_ref="main",
+            worktree_path=tmp_data_dir / ".worktrees" / "PRD-070-test-task",
+        )
     )
     return wf, ctx
 
@@ -165,7 +166,8 @@ def test_compose_prompt_substitutes_worktree_path(tmp_path: Path) -> None:
 
     result = compose_prompt(wf, ["prompts/task.md"], ctx)
     assert "cd " in result
-    assert str(ctx.worktree_path) in result
+    wt = ctx.state.get(WorktreeState)
+    assert str(wt.worktree_path) in result
 
 
 def test_compose_prompt_worktree_empty_when_unset(tmp_path: Path) -> None:
@@ -176,7 +178,14 @@ def test_compose_prompt_worktree_empty_when_unset(tmp_path: Path) -> None:
     prd_dir = tmp_path / "prds"
     prd_dir.mkdir()
     wf, ctx = _make_ctx(prd_dir, tmp_path / "default")
-    ctx.worktree_path = None  # override to unset
+    # Replace WorktreeState with one that has no worktree_path
+    ctx.state.put(
+        WorktreeState(
+            branch="prd/PRD-070-test-task",
+            base_ref="main",
+            worktree_path=None,
+        )
+    )
 
     result = compose_prompt(wf, ["prompts/task.md"], ctx)
     assert "path=[]" in result
@@ -228,13 +237,11 @@ def test_compose_prompt_raises_when_workflow_dir_unset(tmp_path: Path) -> None:
     prds = load_all(data_dir)
 
     wf = Workflow(name="hand-built")  # workflow_dir is None
-    ctx = ExecutionContext(
-        prd=prds["PRD-070"],
-        repo_root=data_dir,
-        workflow=wf,
-        base_ref="main",
-        branch_name="prd/PRD-070-test",
-    )
+    ctx = RunContext(dry_run=True)
+    ctx.state.put(CodeEnv(repo_root=data_dir, cwd=data_dir))
+    ctx.state.put(PrdWorkflowRun(prd=prds["PRD-070"], workflow=wf))
+    ctx.state.put(WorktreeState(branch="prd/PRD-070-test", base_ref="main"))
+
     with pytest.raises(ValueError, match="no workflow_dir"):
         compose_prompt(wf, ["prompts/task.md"], ctx)
 

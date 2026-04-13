@@ -19,8 +19,8 @@ from darkfactory.operations.project_builtins import (
     project_load_review_prds,
 )
 from darkfactory.model import PRD, parse_prd
-from darkfactory.engine import CandidateList
-from darkfactory.project import ProjectContext, ProjectOperation
+from darkfactory.engine import CandidateList, CodeEnv, ProjectRun
+from darkfactory.workflow import RunContext, Workflow
 
 from tests.conftest import write_prd
 
@@ -28,8 +28,8 @@ from tests.conftest import write_prd
 # ---------- helpers ----------
 
 
-def _make_op() -> ProjectOperation:
-    return ProjectOperation(name="test-op", description="test", tasks=[])
+def _make_op() -> Workflow:
+    return Workflow(name="test-op", description="test", tasks=[])
 
 
 def _make_ctx(
@@ -39,14 +39,15 @@ def _make_ctx(
     dry_run: bool = False,
     targets: list[str] | None = None,
     shared_state: dict[str, object] | None = None,
-) -> ProjectContext:
-    ctx = ProjectContext(
-        repo_root=tmp_path,
-        prds=prds or {},
-        operation=_make_op(),
-        cwd=tmp_path,
-        dry_run=dry_run,
-        targets=targets or [],
+) -> RunContext:
+    ctx = RunContext(dry_run=dry_run)
+    ctx.state.put(CodeEnv(repo_root=tmp_path, cwd=tmp_path))
+    ctx.state.put(
+        ProjectRun(
+            workflow=_make_op(),
+            prds=prds or {},
+            targets=tuple(targets or []),
+        )
     )
     if shared_state and "candidates" in shared_state:
         candidates = shared_state["candidates"]
@@ -134,7 +135,7 @@ def test_set_status_bulk_dry_run_logs(
     prd = _write_and_parse(tmp_path, "PRD-21", "epsilon", status="review")
     ctx = _make_ctx(tmp_path, {"PRD-21": prd}, dry_run=True, targets=["PRD-21"])
 
-    with caplog.at_level(logging.INFO, logger="darkfactory.project"):
+    with caplog.at_level(logging.INFO, logger="darkfactory"):
         set_status_bulk(ctx, status="done")
 
     assert any("dry-run" in rec.message for rec in caplog.records)
@@ -177,7 +178,7 @@ def test_set_status_bulk_missing_prd_id_warns(
 ) -> None:
     ctx = _make_ctx(tmp_path, {}, targets=["PRD-999"])
 
-    with caplog.at_level(logging.WARNING, logger="darkfactory.project"):
+    with caplog.at_level(logging.WARNING, logger="darkfactory"):
         set_status_bulk(ctx, status="done")
 
     assert any("PRD-999" in rec.message for rec in caplog.records)
@@ -252,7 +253,8 @@ def test_system_check_merged_standard_merge(tmp_path: Path) -> None:
     with patch("darkfactory.utils.git._run.subprocess.run", side_effect=fake_run):
         system_check_merged(ctx)
 
-    assert "PRD-60" in ctx.targets
+    proj = ctx.state.get(ProjectRun)
+    assert "PRD-60" in proj.targets
     assert any("PRD-60" in line and "standard" in line for line in ctx.report)
 
 
@@ -273,7 +275,8 @@ def test_system_check_merged_remote_standard_merge(tmp_path: Path) -> None:
     with patch("darkfactory.utils.git._run.subprocess.run", side_effect=fake_run):
         system_check_merged(ctx)
 
-    assert "PRD-61" in ctx.targets
+    proj = ctx.state.get(ProjectRun)
+    assert "PRD-61" in proj.targets
 
 
 # ---------- system_check_merged — squash-and-merge ----------
@@ -299,7 +302,8 @@ def test_system_check_merged_squash_merge(tmp_path: Path) -> None:
     with patch("darkfactory.utils.git._run.subprocess.run", side_effect=fake_run):
         system_check_merged(ctx)
 
-    assert "PRD-70" in ctx.targets
+    proj = ctx.state.get(ProjectRun)
+    assert "PRD-70" in proj.targets
     assert any("PRD-70" in line and "squash" in line for line in ctx.report)
 
 
@@ -320,7 +324,8 @@ def test_system_check_merged_not_merged(tmp_path: Path) -> None:
     ):
         system_check_merged(ctx)
 
-    assert "PRD-80" not in ctx.targets
+    proj = ctx.state.get(ProjectRun)
+    assert "PRD-80" not in proj.targets
     assert any("PRD-80" in line and "not merged" in line for line in ctx.report)
 
 
@@ -343,7 +348,8 @@ def test_system_check_merged_populates_targets_only_with_merged(tmp_path: Path) 
     with patch("darkfactory.utils.git._run.subprocess.run", side_effect=fake_run):
         system_check_merged(ctx)
 
-    assert ctx.targets == ["PRD-81"]
+    proj = ctx.state.get(ProjectRun)
+    assert proj.targets == ("PRD-81",)
 
 
 # ---------- system_check_merged — dry-run ----------
@@ -375,7 +381,7 @@ def test_system_check_merged_dry_run_logs(
         shared_state={"candidates": ["PRD-91"]},
     )
 
-    with caplog.at_level(logging.INFO, logger="darkfactory.project"):
+    with caplog.at_level(logging.INFO, logger="darkfactory"):
         system_check_merged(ctx)
 
     assert any("dry-run" in rec.message for rec in caplog.records)

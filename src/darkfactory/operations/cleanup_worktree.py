@@ -4,37 +4,33 @@ from __future__ import annotations
 
 import logging
 
+from darkfactory.engine import CodeEnv, WorktreeState
 from darkfactory.operations._registry import builtin
 from darkfactory.operations._shared import _log_dry_run
 from darkfactory.utils.git import GitErr, Ok, git_run
-from darkfactory.workflow import ExecutionContext
+from darkfactory.workflow import RunContext
 
 _log = logging.getLogger(__name__)
 
 
 @builtin("cleanup_worktree")
-def cleanup_worktree(ctx: ExecutionContext) -> None:
-    """Remove the worktree after a successful run.
+def cleanup_worktree(ctx: RunContext) -> None:
+    """Remove the worktree after a successful run."""
+    wt = ctx.state.get(WorktreeState, WorktreeState(branch=""))
+    env = ctx.state.get(CodeEnv)
 
-    Idempotent — if the worktree is already gone, logs and returns.
-    Normally skipped during chain execution so downstream worktrees
-    can base on this branch; called explicitly via ``prd cleanup``
-    after the whole chain is done.
-    """
-    if ctx.worktree_path is None:
+    if wt.worktree_path is None:
         ctx.logger.info("cleanup_worktree: no worktree path set, skipping")
         return
 
-    if not ctx.worktree_path.exists():
-        ctx.logger.info(
-            "cleanup_worktree: %s already gone, skipping", ctx.worktree_path
-        )
+    if not wt.worktree_path.exists():
+        ctx.logger.info("cleanup_worktree: %s already gone, skipping", wt.worktree_path)
         return
 
-    if _log_dry_run(ctx, f"git -C {ctx.repo_root} worktree remove {ctx.worktree_path}"):
+    if _log_dry_run(ctx, f"git -C {env.repo_root} worktree remove {wt.worktree_path}"):
         return
 
-    match git_run("worktree", "remove", str(ctx.worktree_path), cwd=ctx.repo_root):
+    match git_run("worktree", "remove", str(wt.worktree_path), cwd=env.repo_root):
         case Ok():
             pass
         case GitErr(returncode=code, stderr=err):

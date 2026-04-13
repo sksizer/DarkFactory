@@ -49,7 +49,7 @@ class ReworkContext:
 
     Populated by :func:`discover_rework_context` and consumed by both
     ``cmd_rework`` (to render the dry-run summary and seed the
-    ExecutionContext for the executor) and ``resolve_rework_context``
+    RunContext for the executor) and ``resolve_rework_context``
     (the builtin that runs when the CLI has not pre-discovered).
     """
 
@@ -71,10 +71,14 @@ def find_open_pr(branch_name: str, repo_root: Path) -> int | None:
     message.
     """
     match gh_json(
-        "pr", "list",
-        "--head", branch_name,
-        "--state", "open",
-        "--json", "number",
+        "pr",
+        "list",
+        "--head",
+        branch_name,
+        "--state",
+        "open",
+        "--json",
+        "number",
         cwd=repo_root,
     ):
         case Ok(value=prs) if prs:

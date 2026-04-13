@@ -14,8 +14,7 @@ from pathlib import Path
 import pytest
 
 from darkfactory.loader import load_operations
-from darkfactory.project import ProjectOperation
-from darkfactory.workflow import AgentTask, BuiltIn, ShellTask
+from darkfactory.workflow import AgentTask, BuiltIn, ShellTask, Workflow
 
 
 # ---------- helpers ----------
@@ -59,28 +58,12 @@ def test_plan_operation_loads() -> None:
     )
 
 
-def test_plan_operation_accepts_target() -> None:
-    """The plan operation has accepts_target=True."""
+def test_plan_operation_is_workflow() -> None:
+    """The loaded plan operation is a Workflow instance."""
     ops_dir = _find_operations_dir()
     operations = load_operations(ops_dir, include_builtins=False, include_user=False)
     op = operations["plan"]
-    assert op.accepts_target is True
-
-
-def test_plan_operation_creates_pr() -> None:
-    """The plan operation has creates_pr=True."""
-    ops_dir = _find_operations_dir()
-    operations = load_operations(ops_dir, include_builtins=False, include_user=False)
-    op = operations["plan"]
-    assert op.creates_pr is True
-
-
-def test_plan_operation_is_system_operation() -> None:
-    """The loaded plan operation is a ProjectOperation instance."""
-    ops_dir = _find_operations_dir()
-    operations = load_operations(ops_dir, include_builtins=False, include_user=False)
-    op = operations["plan"]
-    assert isinstance(op, ProjectOperation)
+    assert isinstance(op, Workflow)
 
 
 # ---------- task list structure ----------
@@ -94,14 +77,14 @@ def test_plan_operation_task_list_not_empty() -> None:
     assert len(op.tasks) > 0
 
 
-def test_plan_operation_has_ensure_worktree() -> None:
-    """The first task is BuiltIn('ensure_worktree')."""
+def test_plan_operation_has_name_worktree() -> None:
+    """The first task is BuiltIn('name_worktree')."""
     ops_dir = _find_operations_dir()
     operations = load_operations(ops_dir, include_builtins=False, include_user=False)
     op = operations["plan"]
     first = op.tasks[0]
     assert isinstance(first, BuiltIn)
-    assert first.name == "ensure_worktree"
+    assert first.name == "name_worktree"
 
 
 def test_plan_operation_has_decompose_agent() -> None:
@@ -152,39 +135,6 @@ def test_plan_operation_has_commit_push_pr() -> None:
 
 
 # ---------- target requirement ----------
-
-
-def test_plan_operation_requires_target(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Running the plan operation without --target is rejected by the CLI."""
-    from darkfactory.cli import main
-
-    _setup_project(tmp_path)
-    ops_dir = _find_operations_dir()
-
-    # Suppress builtin discovery — ops_dir IS the builtin dir, which would cause
-    # duplicates if both layers scan the same path.
-    empty = tmp_path / "_empty"
-    empty.mkdir()
-    monkeypatch.setenv("DARKFACTORY_BUILTINS_OPERATIONS_DIR", str(empty))
-
-    with pytest.raises(SystemExit) as exc:
-        main(
-            [
-                "--directory",
-                str(tmp_path),
-                "--workflows-dir",
-                str(tmp_path / "workflows"),
-                "--operations-dir",
-                str(ops_dir),
-                "project",
-                "run",
-                "plan",
-            ]
-        )
-    # The CLI should exit non-zero when target is required but missing
-    assert exc.value.code != 0
 
 
 # ---------- CLI discoverability ----------

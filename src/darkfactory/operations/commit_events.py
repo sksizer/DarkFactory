@@ -9,23 +9,14 @@ from darkfactory.operations._registry import builtin
 from darkfactory.operations._shared import _log_dry_run
 from darkfactory.config import load_section
 from darkfactory.utils.git import GitErr, Ok, git_run
-from darkfactory.workflow import ExecutionContext
+from darkfactory.workflow import RunContext
 
 _log = logging.getLogger(__name__)
 
 
 @builtin("commit_events")
-def commit_events(ctx: ExecutionContext) -> None:
-    """Copy the event log into the worktree and stage it.
-
-    This builtin is a no-op unless event log committing is enabled in
-    ``.darkfactory/config.toml``. Reads from ``[workflow.events] commit``
-    first, falls back to ``[events] commit`` for backwards compatibility.
-
-    Default is NOT to commit — event logs may contain sensitive data and
-    are primarily diagnostic artifacts.
-    """
-    # Check config — opt-in only.
+def commit_events(ctx: RunContext) -> None:
+    """Copy the event log into the worktree and stage it."""
     config_path = ctx.repo_root / ".darkfactory" / "config.toml"
     if config_path.is_file():
         events_config = load_section(config_path, "events")

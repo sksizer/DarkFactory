@@ -52,9 +52,12 @@ def claude_print(
     and pipes *prompt* via stdin.
     """
     argv = [
-        "pnpm", "dlx", "@anthropic-ai/claude-code",
+        "pnpm",
+        "dlx",
+        "@anthropic-ai/claude-code",
         "--print",
-        "--model", model,
+        "--model",
+        model,
     ]
     if allowed_tools:
         for tool in allowed_tools:

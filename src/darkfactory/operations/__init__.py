@@ -14,7 +14,7 @@ Workflows reference built-ins by name via :class:`~darkfactory.workflow.BuiltIn`
     BuiltIn("commit", kwargs={"message": "chore(prd): {prd_id} start work"})
 
 The runner looks up ``"commit"`` in :data:`BUILTINS` and calls the
-registered function with the :class:`~darkfactory.workflow.ExecutionContext`
+registered function with the :class:`~darkfactory.workflow.RunContext`
 plus any formatted kwargs.
 
 **Dry-run mode**: every built-in checks ``ctx.dry_run`` before doing

@@ -8,13 +8,13 @@ from darkfactory.operations._registry import builtin
 from darkfactory.operations._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
 from darkfactory.engine import ReworkState
-from darkfactory.workflow import ExecutionContext
+from darkfactory.workflow import RunContext
 
 _log = logging.getLogger(__name__)
 
 
 @builtin("fetch_pr_comments")
-def fetch_pr_comments(ctx: ExecutionContext) -> None:
+def fetch_pr_comments(ctx: RunContext) -> None:
     """Fetch unresolved PR review threads and store them in PhaseState.
 
     If ``ReworkState`` already has ``review_threads`` populated (e.g.

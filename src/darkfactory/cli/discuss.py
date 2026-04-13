@@ -8,8 +8,9 @@ from pathlib import Path
 
 from darkfactory.cli._shared import _find_repo_root, _load, _resolve_prd_or_exit
 from darkfactory.commands.discuss import discuss_operation
+from darkfactory.engine import CodeEnv, ProjectRun
 from darkfactory.runner import run_project_operation
-from darkfactory.project import ProjectContext
+from darkfactory.workflow import RunContext
 from darkfactory.utils.system import check_prerequisites
 
 
@@ -29,15 +30,17 @@ def launch_discuss_for_prd(prd_id: str, args: argparse.Namespace) -> int:
     pkg_dir = Path(__file__).resolve().parent.parent / "commands" / "discuss"
 
     op = discuss_operation
-    op.operation_dir = pkg_dir
+    op.workflow_dir = pkg_dir
 
-    ctx = ProjectContext(
-        repo_root=repo_root,
-        prds=prds,
-        operation=op,
-        cwd=repo_root,
-        dry_run=False,
-        target_prd=prd_id,
+    ctx = RunContext(dry_run=False)
+    ctx.state.put(CodeEnv(repo_root=repo_root, cwd=repo_root))
+    ctx.state.put(
+        ProjectRun(
+            workflow=op,
+            prds=prds,
+            targets=tuple(prds.keys()),
+            target_prd=prd_id,
+        )
     )
 
     result = run_project_operation(op, ctx)

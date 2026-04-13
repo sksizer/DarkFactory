@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from darkfactory.operations.project_builtins import _register
-from darkfactory.project import ProjectContext
+from darkfactory.engine import ProjectRun
+from darkfactory.workflow import RunContext
 from darkfactory.utils.git import (
     GitErr,
     Ok,
@@ -18,21 +20,33 @@ from darkfactory.utils.git import (
 from darkfactory.utils.terminal import prompt_user
 
 
+def _find_prd_file(ctx: RunContext) -> Path:
+    """Resolve the file path for the target PRD."""
+    proj = ctx.state.get(ProjectRun)
+    if not proj.target_prd:
+        raise ValueError("requires target_prd to be set")
+    prd = proj.prds.get(proj.target_prd)
+    if prd is None:
+        raise ValueError(f"target PRD {proj.target_prd!r} not found in loaded PRDs")
+    return Path(prd.path)
+
+
 @_register("commit_prd_changes")
 def commit_prd_changes(
-    ctx: ProjectContext,
+    ctx: RunContext,
     *,
     message: str | None = None,
     paths: list[str] | None = None,
 ) -> None:
     """Offer to commit PRD changes at the end of a discuss chain."""
-    prd_file = ctx.find_prd_file()
+    prd_file = _find_prd_file(ctx)
+    proj = ctx.state.get(ProjectRun)
 
     if paths is None:
         paths = [str(prd_file)]
 
     if message is None:
-        message = f"docs(prd): {ctx.target_prd} discuss session refinements"
+        message = f"docs(prd): {proj.target_prd} discuss session refinements"
     elif "{target_prd}" in message:
         message = ctx.format_string(message)
 

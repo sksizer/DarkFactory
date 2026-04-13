@@ -3,12 +3,11 @@ from __future__ import annotations
 from typing import Callable
 
 BuiltInFunc = Callable[..., None]
-"""Signature every built-in shares: takes ``ExecutionContext`` plus **kwargs, returns None.
+"""Signature every built-in shares: takes ``RunContext`` plus **kwargs, returns None.
 
 Return value is always ``None`` — built-ins communicate results by
-mutating the context (setting ``ctx.worktree_path``, ``ctx.pr_url``, etc.)
-and signal failure by raising an exception. This keeps the dispatch
-uniform in the runner.
+replacing PhaseState payloads and signal failure by raising an exception.
+This keeps the dispatch uniform in the runner.
 """
 
 BUILTINS: dict[str, BuiltInFunc] = {}

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from darkfactory.operations.project_builtins import _register
 from darkfactory.model import PRD
-from darkfactory.engine import PrdContext
-from darkfactory.project import ProjectContext
+from darkfactory.engine import PrdContext, ProjectRun
+from darkfactory.workflow import RunContext
 
 
 def _one_line_summary(prd: PRD) -> str:
@@ -22,14 +22,15 @@ def _format_prd_ref(prd: PRD) -> str:
 
 
 @_register("gather_prd_context")
-def gather_prd_context(ctx: ProjectContext) -> None:
+def gather_prd_context(ctx: RunContext) -> None:
     """Read the target PRD file plus parent and dependencies, store context in PhaseState."""
-    if not ctx.target_prd:
-        raise ValueError("gather_prd_context requires ctx.target_prd to be set")
+    proj = ctx.state.get(ProjectRun)
+    if not proj.target_prd:
+        raise ValueError("gather_prd_context requires target_prd to be set")
 
-    prd = ctx.prds.get(ctx.target_prd)
+    prd = proj.prds.get(proj.target_prd)
     if prd is None:
-        raise ValueError(f"target PRD {ctx.target_prd!r} not found in loaded PRDs")
+        raise ValueError(f"target PRD {proj.target_prd!r} not found in loaded PRDs")
 
     lines: list[str] = []
 
@@ -46,7 +47,7 @@ def gather_prd_context(ctx: ProjectContext) -> None:
     if prd.parent:
         lines.append("")
         lines.append("## Parent")
-        parent = ctx.prds.get(prd.parent)
+        parent = proj.prds.get(prd.parent)
         if parent:
             parent_ref = _format_prd_ref(parent)
             lines.append(parent_ref)
@@ -58,7 +59,7 @@ def gather_prd_context(ctx: ProjectContext) -> None:
         lines.append("")
         lines.append("## Dependencies")
         for dep_id in prd.depends_on:
-            dep = ctx.prds.get(dep_id)
+            dep = proj.prds.get(dep_id)
             if dep:
                 ref = _format_prd_ref(dep)
                 dep_refs.append(ref)
@@ -75,4 +76,4 @@ def gather_prd_context(ctx: ProjectContext) -> None:
             dependency_refs=tuple(dep_refs),
         )
     )
-    ctx.logger.info("gather_prd_context: collected context for %s", ctx.target_prd)
+    ctx.logger.info("gather_prd_context: collected context for %s", proj.target_prd)

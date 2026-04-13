@@ -8,11 +8,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from darkfactory.operations.resolve_rework_context import resolve_rework_context
-from darkfactory.engine import ReworkState
+from darkfactory.engine import CodeEnv, PrdWorkflowRun, ReworkState, WorktreeState
 from darkfactory.utils.github.pr.comments import CommentFilters, ReviewThread
 from darkfactory.model import PRD
 from darkfactory.rework.context import ReworkContext, ReworkError
-from darkfactory.workflow import ExecutionContext, Workflow
+from darkfactory.workflow import RunContext, Workflow
 
 
 def _make_prd(prd_id: str = "PRD-001", slug: str = "my-feature") -> PRD:
@@ -64,16 +64,19 @@ def _make_ctx(
     comment_filters: CommentFilters | None = None,
     reply_to_comments: bool = False,
     dry_run: bool = False,
-) -> ExecutionContext:
-    ctx = ExecutionContext(
-        prd=_make_prd(),
-        repo_root=tmp_path,
-        workflow=Workflow(name="rework", tasks=[]),
-        base_ref="main",
-        branch_name="prd/PRD-001-my-feature",
-        worktree_path=worktree_path,
-        dry_run=dry_run,
-    )
+) -> RunContext:
+    prd = _make_prd()
+    ctx = RunContext(dry_run=dry_run)
+    ctx.state.put(CodeEnv(repo_root=tmp_path, cwd=tmp_path))
+    ctx.state.put(PrdWorkflowRun(prd=prd, workflow=Workflow(name="rework", tasks=[])))
+    if worktree_path is not None:
+        ctx.state.put(
+            WorktreeState(
+                branch="prd/PRD-001-my-feature",
+                base_ref="main",
+                worktree_path=worktree_path,
+            )
+        )
     ctx.state.put(
         ReworkState(
             review_threads=review_threads,
@@ -96,7 +99,7 @@ def test_noop_when_context_already_populated(tmp_path: Path) -> None:
         mock_discover.assert_not_called()
 
     # Nothing changes — the builtin trusted the pre-populated state.
-    assert ctx.worktree_path == worktree
+    assert ctx.state.get(WorktreeState).worktree_path == worktree
     assert ctx.state.get(ReworkState).review_threads == [_thread()]
 
 
@@ -138,8 +141,7 @@ def test_calls_discover_when_ctx_empty(tmp_path: Path) -> None:
     assert isinstance(kwargs["comment_filters"], CommentFilters)
     assert kwargs["reply_to_comments"] is False
 
-    assert ctx.worktree_path == worktree
-    assert ctx.cwd == worktree
+    assert ctx.state.get(CodeEnv).cwd == worktree
     assert ctx.state.get(ReworkState).pr_number == 42
     assert ctx.state.get(ReworkState).review_threads == threads
 

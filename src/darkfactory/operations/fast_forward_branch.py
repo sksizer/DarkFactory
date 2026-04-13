@@ -13,8 +13,9 @@ from pathlib import Path
 from darkfactory.operations._registry import builtin
 from darkfactory.operations._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
+from darkfactory.engine import WorktreeState
 from darkfactory.utils.git import GitErr, Ok, Timeout, git_run
-from darkfactory.workflow import ExecutionContext
+from darkfactory.workflow import RunContext
 
 _log = logging.getLogger(__name__)
 
@@ -59,7 +60,9 @@ def _check_divergence(cwd: Path, branch: str) -> tuple[int, int] | None:
         case GitErr() | Timeout():
             return None
 
-    match git_run("rev-list", "--left-right", "--count", f"HEAD...origin/{branch}", cwd=cwd):
+    match git_run(
+        "rev-list", "--left-right", "--count", f"HEAD...origin/{branch}", cwd=cwd
+    ):
         case Ok(stdout=raw):
             parts = raw.strip().split()
             return int(parts[0]), int(parts[1])
@@ -82,7 +85,7 @@ def _get_head_sha(cwd: Path) -> str:
 
 @builtin("fast_forward_branch")
 def fast_forward_branch(
-    ctx: ExecutionContext,
+    ctx: RunContext,
     *,
     fetch_timeout: int = _DEFAULT_FETCH_TIMEOUT,
 ) -> None:
@@ -104,7 +107,8 @@ def fast_forward_branch(
 
     Raises :class:`RuntimeError` on divergence, fetch failure, or timeout.
     """
-    branch = ctx.branch_name
+    wt = ctx.state.get(WorktreeState)
+    branch = wt.branch
     cwd = ctx.cwd
 
     if _log_dry_run(

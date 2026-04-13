@@ -2,7 +2,7 @@
 
 Submodules:
 
-- :mod:`~darkfactory.workflow._core` — task types, ``Workflow``, ``ExecutionContext``
+- :mod:`~darkfactory.workflow._core` — task types, ``Workflow``, ``RunContext``
 - :mod:`~darkfactory.workflow._templates` — prompt loading and ``WorkflowTemplate``
 - :mod:`~darkfactory.workflow._templates_builtin` — pre-built workflow templates
 - :mod:`~darkfactory.workflow.definitions` — shipped workflow implementations
@@ -10,14 +10,14 @@ Submodules:
 
 from __future__ import annotations
 
-# _core — task types, workflow container, execution context
+# _core — task types, workflow container, run context
 from ._core import (
     AgentTask,
     AppliesToPredicate,
     BuiltIn,
-    ExecutionContext,
     InteractiveTask,
     OnFailure,
+    RunContext,
     ShellTask,
     Status,
     Task,
@@ -48,9 +48,9 @@ __all__ = [
     "AgentTask",
     "AppliesToPredicate",
     "BuiltIn",
-    "ExecutionContext",
     "InteractiveTask",
     "OnFailure",
+    "RunContext",
     "ShellTask",
     "Status",
     "Task",

@@ -1,9 +1,12 @@
-"""Project-operation builtins — bulk mutation and status helpers.
+"""Project-workflow builtins — bulk mutation, status helpers, and git operations.
 
-These builtins operate on :class:`~darkfactory.project.ProjectContext` rather
-than the per-PRD :class:`~darkfactory.workflow.ExecutionContext` used by
-workflow builtins.  They are registered in :data:`SYSTEM_BUILTINS`, a
-parallel registry that the project runner dispatches against.
+These builtins operate on :class:`~darkfactory.workflow.RunContext` and are
+registered in :data:`SYSTEM_BUILTINS`, a parallel registry that the project
+workflow runner dispatches against.
+
+Git operations (ensure_worktree, commit, push_branch, create_pr, name_worktree,
+check_clean_main) are registered in both BUILTINS and SYSTEM_BUILTINS so they
+work in both PRD workflow and project workflow modes.
 """
 
 from __future__ import annotations
@@ -13,17 +16,17 @@ from typing import Callable
 
 from darkfactory import model as model_module
 from darkfactory.graph import containment
-from darkfactory.engine import CandidateList
+from darkfactory.engine import CandidateList, ProjectRun
 from darkfactory.utils.git import GitErr, Ok, Timeout, git_run
 from darkfactory.model import compute_branch_name
-from darkfactory.project import ProjectContext
+from darkfactory.workflow import RunContext
 
 SYSTEM_BUILTINS: dict[str, Callable[..., None]] = {}
 """Global registry mapping project builtin name to its implementing function.
 
 Populated at import time via the :func:`_register` decorator.  The project
 runner looks up names here when dispatching a :class:`~darkfactory.workflow.BuiltIn`
-task inside a :class:`~darkfactory.project.ProjectOperation`.
+task inside a project workflow.
 """
 
 
@@ -38,15 +41,16 @@ def _register(name: str) -> Callable[[Callable[..., None]], Callable[..., None]]
 
 
 @_register("set_status_bulk")
-def set_status_bulk(ctx: ProjectContext, *, status: str) -> None:
-    """Update the status field of every PRD id in ``ctx.targets``.
+def set_status_bulk(ctx: RunContext, *, status: str) -> None:
+    """Update the status field of every PRD id in targets.
 
-    Respects ``ctx.dry_run`` — in dry-run mode the function logs what would
-    change without writing to disk.  Idempotent: PRDs whose status is already
-    ``status`` are skipped silently.
+    Reads targets and PRDs from the ``ProjectRun`` payload in ``ctx.state``.
+    Respects ``ctx.dry_run``. Idempotent: PRDs already at ``status`` are skipped.
     """
-    for prd_id in ctx.targets:
-        prd = ctx.prds.get(prd_id)
+    proj = ctx.state.get(ProjectRun)
+
+    for prd_id in proj.targets:
+        prd = proj.prds.get(prd_id)
         if prd is None:
             ctx.logger.warning(
                 "set_status_bulk: %s not found in loaded PRDs, skipping", prd_id
@@ -74,20 +78,21 @@ def set_status_bulk(ctx: ProjectContext, *, status: str) -> None:
 
 
 @_register("project_load_review_prds")
-def project_load_review_prds(ctx: ProjectContext) -> None:
+def project_load_review_prds(ctx: RunContext) -> None:
     """Convenience wrapper: load PRDs with status ``"review"`` into candidates."""
     project_load_prds_by_status(ctx, status="review")
 
 
 @_register("project_load_prds_by_status")
-def project_load_prds_by_status(ctx: ProjectContext, *, status: str) -> None:
-    """Filter ``ctx.prds`` by ``status`` and store matching ids in PhaseState.
+def project_load_prds_by_status(ctx: RunContext, *, status: str) -> None:
+    """Filter PRDs by ``status`` and store matching ids in PhaseState.
 
     The result is stored as a :class:`CandidateList` in ``ctx.state``.
-    Downstream tasks (e.g. :func:`project_check_merged`) read this to know
+    Downstream tasks (e.g. :func:`system_check_merged`) read this to know
     which PRDs to examine.
     """
-    candidates = [prd_id for prd_id, prd in ctx.prds.items() if prd.status == status]
+    proj = ctx.state.get(ProjectRun)
+    candidates = [prd_id for prd_id, prd in proj.prds.items() if prd.status == status]
     ctx.state.put(CandidateList(prd_ids=candidates))
     ctx.logger.info(
         "project_load_prds_by_status: found %d PRD(s) with status=%r",
@@ -116,13 +121,7 @@ def _is_merged_standard(repo_root: str, branch: str) -> bool:
 
 
 def _is_merged_squash(repo_root: str, branch: str) -> bool:
-    """Return True if any commit on main references ``branch`` in its message.
-
-    GitHub's squash-and-merge includes the branch name in the commit message
-    (e.g. ``"Fix stuff (#42)"`` with the branch name in the PR body / title).
-    A more reliable signal is the ``prd/PRD-X-slug`` pattern that GitHub
-    appends to squash-merge commit messages when auto-generated.
-    """
+    """Return True if any commit on main references ``branch`` in its message."""
     match git_run("log", "main", "--oneline", f"--grep={branch}", cwd=Path(repo_root)):
         case Ok(stdout=output):
             return bool(output.strip())
@@ -131,25 +130,23 @@ def _is_merged_squash(repo_root: str, branch: str) -> bool:
 
 
 @_register("system_check_merged")
-def system_check_merged(ctx: ProjectContext) -> None:
+def system_check_merged(ctx: RunContext) -> None:
     """Check which candidate PRDs have had their branch merged to main.
 
-    Reads ``CandidateList`` from ``ctx.state`` (populated by
-    :func:`project_load_prds_by_status`).  For each candidate, checks:
+    Reads ``CandidateList`` from ``ctx.state``. For each candidate, checks
+    standard merge and squash-and-merge patterns.
 
-    1. Standard merge commit — branch appears in ``git branch --merged main``.
-    2. Squash-and-merge — branch name appears in ``git log main``.
-
-    Populates ``ctx.targets`` with the ids of confirmed-merged PRDs and
-    appends human-readable lines to ``ctx.report``.
+    Replaces the ``ProjectRun`` payload with updated targets and appends
+    lines to ``ctx.report``.
     """
     cl = ctx.state.get(CandidateList, CandidateList())
     candidates: list[str] = cl.prd_ids
+    proj = ctx.state.get(ProjectRun)
     repo_root = str(ctx.repo_root)
     confirmed: list[str] = []
 
     for prd_id in candidates:
-        prd = ctx.prds.get(prd_id)
+        prd = proj.prds.get(prd_id)
         if prd is None:
             ctx.report.append(f"{prd_id}: not found in loaded PRDs — skipped")
             continue
@@ -172,12 +169,20 @@ def system_check_merged(ctx: ProjectContext) -> None:
         else:
             ctx.report.append(f"{prd_id}: not merged (branch={branch})")
 
-    ctx.targets = confirmed
+    # Replace ProjectRun with updated targets.
+    ctx.state.put(
+        ProjectRun(
+            workflow=proj.workflow,
+            prds=proj.prds,
+            targets=tuple(confirmed),
+            target_prd=proj.target_prd,
+        )
+    )
 
 
 @_register("system_mark_done")
-def system_mark_done(ctx: ProjectContext) -> None:
-    """Set status to ``"done"`` for all PRDs in ``ctx.targets``."""
+def system_mark_done(ctx: RunContext) -> None:
+    """Set status to ``"done"`` for all PRDs in targets."""
     set_status_bulk(ctx, status="done")
 
 
@@ -185,31 +190,24 @@ _COMPLETED_STATUSES = {"done", "review"}
 
 
 @_register("audit_impacts_check")
-def audit_impacts_check(ctx: ProjectContext) -> None:
+def audit_impacts_check(ctx: RunContext) -> None:
     """Walk all PRDs and verify that declared impact paths exist on disk.
 
     Severity depends on PRD status:
 
-    - **done/review** PRDs: missing impacts are **errors** — the work is
-      complete, so every declared file should exist.
-    - **ready/in_progress/draft** PRDs: missing impacts are **warnings** —
-      the PRD hasn't been implemented yet, so files it plans to create
-      won't exist.
+    - **done/review** PRDs: missing impacts are **errors**.
+    - **ready/in_progress/draft** PRDs: missing impacts are **warnings**.
 
-    Raises ``ValueError`` only when completed PRDs have missing impacts
-    (causing the runner to return a non-zero exit status, useful for CI).
-
-    This builtin is intentionally read-only — it never modifies PRD files.
-    The ``ctx.dry_run`` flag is ignored because no mutations are performed.
+    Raises ``ValueError`` only when completed PRDs have missing impacts.
     """
+    proj = ctx.state.get(ProjectRun)
     total_checked = 0
     errors: dict[str, list[str]] = {}
     warnings: dict[str, list[str]] = {}
 
-    for prd_id, prd in sorted(ctx.prds.items()):
+    for prd_id, prd in sorted(proj.prds.items()):
         # Skip containers — their impacts are aggregated from descendants.
-        # Each leaf is checked individually by its own status.
-        if containment.children(prd_id, ctx.prds):
+        if containment.children(prd_id, proj.prds):
             continue
         if not prd.impacts:
             continue
@@ -236,13 +234,13 @@ def audit_impacts_check(ctx: ProjectContext) -> None:
         ctx.report.append("ERRORS — missing impacts on completed PRDs:")
         for prd_id, paths in sorted(errors.items()):
             for path in paths:
-                ctx.report.append(f"  {prd_id} [{ctx.prds[prd_id].status}]: {path}")
+                ctx.report.append(f"  {prd_id} [{proj.prds[prd_id].status}]: {path}")
 
     if warnings:
         ctx.report.append("WARNINGS — missing impacts on incomplete PRDs (expected):")
         for prd_id, paths in sorted(warnings.items()):
             for path in paths:
-                ctx.report.append(f"  {prd_id} [{ctx.prds[prd_id].status}]: {path}")
+                ctx.report.append(f"  {prd_id} [{proj.prds[prd_id].status}]: {path}")
 
     if errors:
         raise ValueError(
@@ -256,3 +254,36 @@ def audit_impacts_check(ctx: ProjectContext) -> None:
 import darkfactory.operations.gather_prd_context as _gather  # noqa: E402, F401
 import darkfactory.operations.discuss_prd as _discuss  # noqa: E402, F401
 import darkfactory.operations.commit_prd_changes as _commit  # noqa: E402, F401
+
+
+# ---------- Register git operations in both registries ----------
+# Git operations are already registered in BUILTINS via @builtin decorator.
+# We also register them in SYSTEM_BUILTINS so project workflows can use them.
+
+
+def _register_git_operations() -> None:
+    """Copy git operations from BUILTINS to SYSTEM_BUILTINS."""
+    from darkfactory.operations._registry import BUILTINS
+
+    # Import all git operation modules to ensure they're registered in BUILTINS.
+    import darkfactory.operations.ensure_worktree as _ew  # noqa: F811, F401
+    import darkfactory.operations.commit as _cm  # noqa: F811, F401
+    import darkfactory.operations.push_branch as _pb  # noqa: F811, F401
+    import darkfactory.operations.create_pr as _cp  # noqa: F811, F401
+    import darkfactory.operations.name_worktree as _nw  # noqa: F811, F401
+    import darkfactory.operations.check_clean_main as _ccm  # noqa: F811, F401
+
+    git_ops = [
+        "ensure_worktree",
+        "commit",
+        "push_branch",
+        "create_pr",
+        "name_worktree",
+        "check_clean_main",
+    ]
+    for name in git_ops:
+        if name in BUILTINS and name not in SYSTEM_BUILTINS:
+            SYSTEM_BUILTINS[name] = BUILTINS[name]
+
+
+_register_git_operations()

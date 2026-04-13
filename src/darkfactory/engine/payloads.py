@@ -7,10 +7,92 @@ avoid circular imports and to keep the ``engine`` package self-contained.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from darkfactory.model import PRD
     from darkfactory.utils.github.pr.comments import CommentFilters, ReviewThread
+    from darkfactory.workflow._core import Workflow
+
+
+# ---------- execution environment ----------
+
+
+@dataclass(frozen=True)
+class CodeEnv:
+    """Execution environment — where code runs.
+
+    Seeded by the runner at construction with ``cwd=repo_root``.
+    Replaced by ``ensure_worktree`` with ``cwd=worktree_path``.
+
+    Tasks that execute commands read ``ctx.state.get(CodeEnv).cwd``.
+    """
+
+    repo_root: Path
+    cwd: Path
+
+
+# ---------- run-mode payloads ----------
+
+
+@dataclass(frozen=True)
+class PrdWorkflowRun:
+    """Identifies a PRD workflow run.
+
+    Put by ``run_prd_workflow()`` at construction.
+    """
+
+    prd: "PRD"
+    workflow: "Workflow"
+    run_summary: str | None = None
+
+
+@dataclass(frozen=True)
+class ProjectRun:
+    """Identifies a project workflow run.
+
+    Put by ``run_project_workflow()`` at construction.
+    ``prds`` is the full PRD lookup dict (read-only reference).
+    ``targets`` is replaced by downstream tasks (e.g. system_check_merged).
+    """
+
+    workflow: "Workflow"
+    prds: dict[str, "PRD"] = field(default_factory=dict)
+    targets: tuple[str, ...] = ()
+    target_prd: str | None = None
+
+
+# ---------- git / worktree state ----------
+
+
+@dataclass(frozen=True)
+class WorktreeState:
+    """Git worktree contract shared between ensure_worktree and downstream ops.
+
+    Put by ``name_worktree`` (branch + base_ref only).
+    Replaced by ``ensure_worktree`` (adds worktree_path).
+    Read by ``commit``, ``push_branch``, ``create_pr``.
+    """
+
+    branch: str
+    base_ref: str = "main"
+    worktree_path: Path | None = None
+
+
+@dataclass(frozen=True)
+class PrRequest:
+    """PR metadata for create_pr.
+
+    Put by tasks that want to control PR title/body.
+    Read by ``create_pr`` as an alternative to PRD-derived defaults.
+    """
+
+    title: str
+    body: str
+
+
+# ---------- original payloads ----------
 
 
 @dataclass(frozen=True)

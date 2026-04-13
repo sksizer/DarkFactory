@@ -82,7 +82,9 @@ def test_discuss_launches_chain(tmp_path: Path) -> None:
     assert result == 0
     mock_run.assert_called_once()
     ctx = mock_run.call_args[0][1]
-    assert ctx.target_prd == "PRD-070"
+    from darkfactory.engine import ProjectRun
+
+    assert ctx.state.get(ProjectRun).target_prd == "PRD-070"
 
 
 def test_new_discuss_flag_registered() -> None:
