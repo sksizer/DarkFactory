@@ -25,3 +25,12 @@ def run_shell(
         env=full_env,
         check=False,
     )
+
+
+def run_foreground(cmd: list[str], *, cwd: Path | None = None) -> int:
+    """Run a command with stdout/stderr flowing to the terminal.
+
+    Returns the process exit code. No output is captured.
+    """
+    result = subprocess.run(cmd, cwd=str(cwd) if cwd else None, check=False)
+    return result.returncode

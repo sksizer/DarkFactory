@@ -1,13 +1,18 @@
-"""Enforce that git/gh subprocess calls go through the gateway layer.
+"""Enforce that all subprocess calls live in ``utils/``.
 
-All ``subprocess.run`` / ``subprocess.Popen`` / ``subprocess.check_output``
-calls invoking ``git`` or ``gh`` must use the designated gateways:
+Every ``subprocess.run`` / ``subprocess.Popen`` / ``subprocess.check_output``
+call must live under ``src/darkfactory/utils/``.  Code outside ``utils/``
+must delegate to a gateway function instead of calling subprocess directly.
 
-- ``utils/git/_run.py``  — ``git_run()``
-- ``utils/github/_cli.py`` — ``gh_run()`` / ``gh_json()``
+Gateways:
+- ``utils/git/_run.py``          — ``git_run()``
+- ``utils/github/_cli.py``       — ``gh_run()`` / ``gh_json()``
+- ``utils/shell.py``             — ``run_shell()`` / ``run_foreground()``
+- ``utils/claude_code/_*.py``    — ``spawn_claude()`` / ``claude_print()`` / ``invoke_claude()``
 
-This test AST-scans every ``.py`` file under ``src/darkfactory/`` and fails
-if any non-allowlisted file makes a direct git/gh subprocess call.
+This test AST-scans every non-test ``.py`` file under ``src/darkfactory/``
+and fails if any file outside ``utils/`` makes a direct subprocess call.
+No allowlist — every violation must be fixed.
 """
 
 from __future__ import annotations
@@ -16,20 +21,7 @@ import ast
 from pathlib import Path
 
 _SRC_ROOT = Path(__file__).resolve().parent.parent / "src" / "darkfactory"
-
-# Primary gateways — these ARE the subprocess entry points.
-_GATEWAY_FILES = {
-    "utils/git/_run.py",
-    "utils/github/_cli.py",
-}
-
-# Files allowed to bypass the gateways with justification.
-# Every entry MUST still contain the violation — if it's cleaned up,
-# the staleness test below forces removal from this dict.
-_BYPASS_ALLOWLIST: dict[str, str] = {
-    "utils/git/_operations.py": "diff_show: terminal passthrough (no capture_output)",
-    "workflow/definitions/project/verify_merges/check.py": "standalone __main__ script",
-}
+_UTILS_PREFIX = "utils" + "/"  # files under utils/ are allowed
 
 _SUBPROCESS_ATTRS = {"run", "Popen", "check_output"}
 
@@ -45,34 +37,6 @@ def _is_subprocess_call(node: ast.Call) -> bool:
     )
 
 
-def _first_arg_is_git_or_gh(node: ast.Call) -> bool:
-    """Heuristic: does the first positional arg start with ``git`` or ``gh``?
-
-    Handles string literals (``subprocess.run("git ...")``) and list/tuple
-    literals (``subprocess.run(["git", "..."])``).  Variable arguments are
-    conservatively treated as non-git/gh — the import-hygiene test and code
-    review catch those.
-    """
-    if not node.args:
-        return False
-    first = node.args[0]
-    # Direct string: subprocess.run("git ...")
-    if isinstance(first, ast.Constant) and isinstance(first.value, str):
-        return first.value.startswith(("git", "gh"))
-    # List/tuple literal: subprocess.run(["git", ...])
-    if isinstance(first, (ast.List, ast.Tuple)) and first.elts:
-        elt = first.elts[0]
-        if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
-            return elt.value in ("git", "gh")
-    # BinOp: subprocess.run(["git", ...] + other_list)
-    if isinstance(first, ast.BinOp) and isinstance(first.left, (ast.List, ast.Tuple)):
-        if first.left.elts:
-            elt = first.left.elts[0]
-            if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
-                return elt.value in ("git", "gh")
-    return False
-
-
 def _scan_violations() -> list[str]:
     """Return ``file:line`` strings for every violating call site."""
     violations: list[str] = []
@@ -83,67 +47,24 @@ def _scan_violations() -> list[str]:
         # Skip test files.
         if py.name.endswith("_test.py") or py.name.startswith("test_"):
             continue
-        # Skip gateways and explicitly allowed files.
-        if rel in _GATEWAY_FILES or rel in _BYPASS_ALLOWLIST:
+        # Files under utils/ are the designated gateway layer.
+        if rel.startswith(_UTILS_PREFIX):
             continue
         try:
             tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
         except SyntaxError:
             continue
         for node in ast.walk(tree):
-            if (
-                isinstance(node, ast.Call)
-                and _is_subprocess_call(node)
-                and _first_arg_is_git_or_gh(node)
-            ):
+            if isinstance(node, ast.Call) and _is_subprocess_call(node):
                 violations.append(f"{rel}:{node.lineno}")
     return violations
 
 
-def _scan_stale_allowlist() -> list[str]:
-    """Return entries in ``_BYPASS_ALLOWLIST`` whose file no longer violates."""
-    stale: list[str] = []
-    for rel in sorted(_BYPASS_ALLOWLIST):
-        py = _SRC_ROOT / rel
-        if not py.exists():
-            stale.append(f"{rel}: file does not exist")
-            continue
-        try:
-            tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
-        except SyntaxError:
-            stale.append(f"{rel}: SyntaxError")
-            continue
-        # Check for ANY subprocess call (not just literal git/gh) because
-        # some bypass patterns use variable args (e.g. _run(cmd)) or
-        # list concatenation (["git", ...] + paths).
-        has_violation = any(
-            isinstance(node, ast.Call) and _is_subprocess_call(node)
-            for node in ast.walk(tree)
-        )
-        if not has_violation:
-            stale.append(f"{rel}: no git/gh subprocess calls found — remove from allowlist")
-    return stale
-
-
-def test_no_direct_git_gh_subprocess_calls() -> None:
-    """All git/gh subprocess calls must go through the gateway layer."""
+def test_no_subprocess_calls_outside_utils() -> None:
+    """All subprocess calls must live under utils/."""
     violations = _scan_violations()
     assert violations == [], (
-        "Direct git/gh subprocess calls found outside the gateway layer.\n"
-        "Use git_run() from utils/git/ or gh_run()/gh_json() from utils/github/ instead:\n"
+        "Direct subprocess calls found outside utils/.\n"
+        "Route through the appropriate gateway in utils/ instead:\n"
         + "\n".join(f"  {v}" for v in violations)
-    )
-
-
-def test_bypass_allowlist_is_not_stale() -> None:
-    """Every bypass-allowlisted file must still contain a violation.
-
-    If you've migrated a file to use the gateways, remove it from the
-    ``_BYPASS_ALLOWLIST`` dict so the allowlist only shrinks over time.
-    """
-    stale = _scan_stale_allowlist()
-    assert stale == [], (
-        "Stale entries in _BYPASS_ALLOWLIST — these files no longer bypass "
-        "the gateway and should be removed:\n"
-        + "\n".join(f"  {s}" for s in stale)
     )

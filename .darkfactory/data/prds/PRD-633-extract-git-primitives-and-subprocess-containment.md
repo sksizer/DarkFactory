@@ -11,17 +11,18 @@ depends_on: []
 blocks:
   - "[[PRD-631-system-operation-git-primitives]]"
 impacts:
-  - src/darkfactory/utils/git/
-  - src/darkfactory/utils/github/
+  - src/darkfactory/utils/
   - src/darkfactory/operations/ensure_worktree.py
   - src/darkfactory/operations/fast_forward_branch.py
   - src/darkfactory/operations/rebase_onto_main.py
   - src/darkfactory/operations/analyze_transcript.py
   - src/darkfactory/cli/reconcile.py
   - src/darkfactory/cli/rework_watch.py
+  - src/darkfactory/cli/new.py
   - src/darkfactory/checks.py
   - src/darkfactory/graph/_impacts.py
   - src/darkfactory/rework/context.py
+  - src/darkfactory/workflow/definitions/project/verify_merges/check.py
   - tests/test_subprocess_gateway.py
 workflow: task
 assignee:
@@ -39,7 +40,7 @@ tags:
 
 ## Summary
 
-Extract reusable git primitives from workflow operations into `utils/git/`, convert all direct `subprocess.run(["git"/"gh", ...])` calls outside the gateway layer to use `git_run()`/`gh_run()`/`gh_json()`, and add a sentinel test enforcing the single-gateway contract.
+Extract reusable git primitives from workflow operations into `utils/git/`, route ALL `subprocess` calls outside `utils/` through gateway functions, and add a sentinel test enforcing that no subprocess calls exist outside `utils/`. Zero allowlist.
 
 ## Motivation
 
@@ -63,8 +64,9 @@ Moved `_branch_exists_local()` and `_branch_exists_remote()` from `operations/en
 **`operations/rebase_onto_main.py`** — 5 direct `subprocess.run` calls converted:
 - `_fetch_origin_main()`, `_get_sha()`, `_get_conflicting_files()`, rebase call, rebase abort — all converted to `git_run()` with pattern matching
 
-**`operations/analyze_transcript.py`** — 1 git call converted:
+**`operations/analyze_transcript.py`** — 2 calls converted:
 - `subprocess.run(["git", "add", "-f", ...], check=True)` → `git_run("add", "-f", ...)` with match
+- `subprocess.run(["pnpm", "dlx", "@anthropic-ai/claude-code", "--print", ...])` → `claude_print()` from `utils/claude_code/`
 
 ### Part 3: Convert CLI and other modules
 
@@ -72,9 +74,10 @@ Moved `_branch_exists_local()` and `_branch_exists_remote()` from `operations/en
 - `_get_merged_prd_prs()` → `gh_json()`, added `repo_root: Path` parameter
 - `_create_reconcile_pr()` → `gh_run()` for PR creation
 
-**`cli/rework_watch.py`** — 2 gh calls converted:
+**`cli/rework_watch.py`** — 3 calls converted:
 - `fetch_open_prd_prs()` → `gh_json()`, replaces try/except FileNotFoundError
 - `_fetch_comment_ids()` → `gh_json()`, added `repo_root: Path` parameter, threaded through call chain
+- `_trigger_rework()` → `run_foreground()` from `utils/shell.py`
 
 **`rework/context.py`** — 1 gh call converted:
 - `find_open_pr()` → `gh_json()`, replaces try/except block
@@ -85,33 +88,35 @@ Moved `_branch_exists_local()` and `_branch_exists_remote()` from `operations/en
 **`graph/_impacts.py`** — 1 git call converted:
 - `tracked_files()` → `git_run("ls-files", ...)` with match
 
-### Part 4: Re-export `gh_run` / `gh_json` from `utils/github/__init__.py`
+**`cli/new.py`** — 1 call converted:
+- `subprocess.run([editor, str(path)])` → `run_foreground()` from `utils/shell.py`
 
-Added `gh_run` and `gh_json` to the public re-exports so callers outside the package don't need to import from private `_cli` module.
+**`workflow/definitions/project/verify_merges/check.py`** — 3 calls converted:
+- `_run(["git", "merge-base", ...])` → `git_run()` with match
+- `_run(["gh", "pr", "list", ...])` → `gh_json()` with match
+- Removed standalone `_run()` wrapper
+
+### Part 4: New gateway functions
+
+**`utils/shell.py`** — added `run_foreground(cmd, *, cwd)` for running commands with terminal passthrough (no capture). Used by `cli/new.py` and `cli/rework_watch.py`.
+
+**`utils/claude_code/_interactive.py`** — added `claude_print(prompt, *, model, cwd, ...)` for `--print` mode Claude Code invocations with captured output. Used by `operations/analyze_transcript.py`.
+
+**`utils/github/__init__.py`** — added `gh_run` and `gh_json` to public re-exports.
 
 ### Part 5: Update all affected tests
 
 Tests updated to mock at the gateway function level (`git_run`, `gh_json`) instead of `subprocess.run`. Return types changed from `CompletedProcess` to `Ok`/`GitErr`/`Timeout`/`GhErr`. Key test files updated:
 - `fast_forward_branch_test.py` — 6 tests updated (mock target + return types)
 - `rebase_onto_main_test.py` — 8 tests updated (consolidated dual git_run/subprocess mocks)
-- `analyze_transcript_test.py` — split mock for git_run vs subprocess.run (pnpm)
+- `analyze_transcript_test.py` — mocks changed to git_run + claude_print
 - `rework_watch_test.py` — gh mocks changed to gh_json
 - `context_test.py` — 5 tests updated to mock gh_json
 - `tests/test_checks.py` — 6 tests rewritten to mock `get_resume_pr_state` and `git_run` instead of global subprocess.run
 
 ### Part 6: Sentinel test
 
-New test `tests/test_subprocess_gateway.py` with two assertions:
-1. **No violations** — AST-scans all non-test `.py` files under `src/darkfactory/`, flags any `subprocess.run`/`Popen`/`check_output` call with `git` or `gh` as first arg outside the gateways
-2. **Allowlist freshness** — every bypass-allowlisted file still contains a subprocess call (prevents stale allowlist entries)
-
-**Gateway files** (where subprocess calls are expected):
-- `utils/git/_run.py` — `git_run()` gateway
-- `utils/github/_cli.py` — `gh_run()`/`gh_json()` gateway
-
-**Bypass allowlist** (2 entries):
-- `utils/git/_operations.py` — `diff_show()` terminal passthrough (no `capture_output`)
-- `workflow/definitions/project/verify_merges/check.py` — standalone `__main__` script
+New test `tests/test_subprocess_gateway.py` — AST-scans all non-test `.py` files under `src/darkfactory/` and fails if ANY `subprocess.run`/`Popen`/`check_output` call exists outside `utils/`. No allowlist. Zero exceptions.
 
 ## Acceptance Criteria
 
@@ -119,20 +124,21 @@ New test `tests/test_subprocess_gateway.py` with two assertions:
 - [x] AC-2: `operations/ensure_worktree.py` imports from `utils/git/` instead of defining locally
 - [x] AC-3: `operations/fast_forward_branch.py` has zero direct `subprocess.run` calls
 - [x] AC-4: `operations/rebase_onto_main.py` has zero direct `subprocess.run` calls
-- [x] AC-5: `operations/analyze_transcript.py` git call converted to `git_run()`
+- [x] AC-5: `operations/analyze_transcript.py` has zero direct `subprocess` calls — git via `git_run()`, LLM via `claude_print()`
 - [x] AC-6: `cli/reconcile.py` has zero direct `subprocess` calls — converted to `gh_json()`/`gh_run()`
-- [x] AC-7: `cli/rework_watch.py` gh calls converted to `gh_json()`
-- [x] AC-8: `rework/context.py` converted to `gh_json()`
-- [x] AC-9: `checks.py` delegates to `branch_exists_remote()` from utils/git
-- [x] AC-10: `graph/_impacts.py` converted to `git_run()`
-- [x] AC-11: Sentinel test exists and passes — no direct git/gh subprocess calls outside gateways (beyond 2-entry bypass allowlist)
-- [x] AC-12: Sentinel test validates allowlist freshness — every allowlisted file still contains a violation
-- [x] AC-13: All existing tests pass (with mock targets updated to gateway functions)
-- [x] AC-14: `mypy --strict` clean across all changed modules
+- [x] AC-7: `cli/rework_watch.py` has zero direct `subprocess` calls — gh via `gh_json()`, self-invocation via `run_foreground()`
+- [x] AC-8: `rework/context.py` has zero direct `subprocess` calls — converted to `gh_json()`
+- [x] AC-9: `checks.py` has zero direct `subprocess` calls — delegates to `branch_exists_remote()`
+- [x] AC-10: `graph/_impacts.py` has zero direct `subprocess` calls — converted to `git_run()`
+- [x] AC-11: `cli/new.py` has zero direct `subprocess` calls — editor launch via `run_foreground()`
+- [x] AC-12: `verify_merges/check.py` has zero direct `subprocess` calls — converted to `git_run()`/`gh_json()`
+- [x] AC-13: Sentinel test exists and passes — zero `subprocess` calls outside `utils/`, no allowlist
+- [x] AC-14: All existing tests pass (with mock targets updated to gateway functions)
+- [x] AC-15: `mypy --strict` clean across all changed modules
 
 ## Relationship to PRD-621
 
-PRD-621 ("Refactor common functionality to util modules", status: review) established the `utils/git/` and `utils/github/` package structure and defined AC-6: "zero occurrences of `subprocess.run(["gh"` outside `utils/github/`." That work stalled — the structure exists but the full migration was never completed. This PRD completes the migration for all git/gh subprocess calls across `src/darkfactory/` and adds the sentinel test that PRD-621 lacked.
+PRD-621 ("Refactor common functionality to util modules", status: review) established the `utils/git/` and `utils/github/` package structure and defined AC-6: "zero occurrences of `subprocess.run(["gh"` outside `utils/github/`." That work stalled — the structure exists but the full migration was never completed. This PRD completes the migration for ALL subprocess calls across `src/darkfactory/` — not just git/gh but also Claude Code invocations, editor launches, and self-invocations — and adds a sentinel test enforcing that zero subprocess calls exist outside `utils/`.
 
 ## References
 

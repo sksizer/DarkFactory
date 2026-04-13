@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import json
 import logging
-import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +29,7 @@ from darkfactory.operations.analyze_transcript_detectors import (
     DETECTORS,
     Finding,
 )
+from darkfactory.utils.claude_code import claude_print
 from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.utils.secrets import redact
 from darkfactory.workflow import ExecutionContext
@@ -186,21 +186,11 @@ def _call_llm(
     Returns the stripped stdout on success, or ``None`` on any failure.
     """
     try:
-        result = subprocess.run(
-            [
-                "pnpm",
-                "dlx",
-                "@anthropic-ai/claude-code",
-                "--print",
-                "--model",
-                model,
-                "--allowed-tools",
-                "Read",
-            ],
-            input=prompt,
-            capture_output=True,
-            text=True,
-            cwd=str(cwd),
+        result = claude_print(
+            prompt,
+            model=model,
+            cwd=cwd,
+            allowed_tools=["Read"],
             timeout=120,
         )
     except Exception as exc:

@@ -36,3 +36,34 @@ def spawn_claude(
         check=False,
     )
     return result.returncode
+
+
+def claude_print(
+    prompt: str,
+    *,
+    model: str,
+    cwd: Path,
+    allowed_tools: list[str] | None = None,
+    timeout: int = 120,
+) -> subprocess.CompletedProcess[str]:
+    """Run ``pnpm dlx @anthropic-ai/claude-code --print`` and return the result.
+
+    Unlike :func:`spawn_claude` (interactive) this captures stdout/stderr
+    and pipes *prompt* via stdin.
+    """
+    argv = [
+        "pnpm", "dlx", "@anthropic-ai/claude-code",
+        "--print",
+        "--model", model,
+    ]
+    if allowed_tools:
+        for tool in allowed_tools:
+            argv.extend(["--allowed-tools", tool])
+    return subprocess.run(
+        argv,
+        input=prompt,
+        capture_output=True,
+        text=True,
+        cwd=str(cwd),
+        timeout=timeout,
+    )

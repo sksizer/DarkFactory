@@ -21,7 +21,6 @@ import logging
 import os
 import re
 import signal
-import subprocess
 import sys
 import time
 
@@ -31,6 +30,7 @@ from typing import Any
 
 from darkfactory.utils.git import GitErr, Ok, Timeout, git_run
 from darkfactory.utils.github import GhErr, gh_json
+from darkfactory.utils.shell import run_foreground
 
 _log = logging.getLogger(__name__)
 
@@ -356,8 +356,7 @@ def _trigger_rework(prd_id: str, data_dir: Path) -> int:
     Returns the subprocess exit code.
     """
     cmd = [sys.executable, "-m", "darkfactory.cli", "rework", prd_id, "--execute"]
-    result = subprocess.run(cmd, cwd=data_dir.parent)
-    return result.returncode
+    return run_foreground(cmd, cwd=data_dir.parent)
 
 
 def run_poll_loop(

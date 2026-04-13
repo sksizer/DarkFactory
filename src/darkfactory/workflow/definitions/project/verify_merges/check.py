@@ -10,40 +10,31 @@ Requires: git, gh (GitHub CLI)
 
 from __future__ import annotations
 
-import json
-import subprocess
 import sys
+from pathlib import Path
 
-
-def _run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, capture_output=True, text=True, check=False)
+from darkfactory.utils.git import Ok, git_run
+from darkfactory.utils.github import gh_json
 
 
 def _is_ancestor(sha: str, branch: str = "main") -> bool:
-    result = _run(["git", "merge-base", "--is-ancestor", sha, branch])
-    return result.returncode == 0
+    match git_run("merge-base", "--is-ancestor", sha, branch, cwd=Path.cwd()):
+        case Ok():
+            return True
+        case _:
+            return False
 
 
 def main() -> int:
     # Fetch all merged PRs via gh CLI
-    result = _run(
-        [
-            "gh",
-            "pr",
-            "list",
-            "--state",
-            "merged",
-            "--limit",
-            "200",
-            "--json",
-            "number,title,mergeCommit,mergedAt",
-        ]
-    )
-    if result.returncode != 0:
-        print(f"ERROR: gh pr list failed: {result.stderr}", file=sys.stderr)
-        return 1
-
-    prs = json.loads(result.stdout)
+    match gh_json("pr", "list", "--state", "merged", "--limit", "200",
+                  "--json", "number,title,mergeCommit,mergedAt",
+                  cwd=Path.cwd()):
+        case Ok(value=prs):
+            pass
+        case _:
+            print("ERROR: gh pr list failed", file=sys.stderr)
+            return 1
     prs.sort(key=lambda p: p.get("mergedAt", ""))
 
     missing: list[dict[str, object]] = []
