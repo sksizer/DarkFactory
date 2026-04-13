@@ -22,10 +22,8 @@ _BRANCH = "prd/PRD-001-test-thing"
 # ---------- helpers ----------
 
 
-def _make_ctx(tmp_path: Path, *, event_writer: object = None) -> MagicMock:
-    ctx = make_builtin_ctx(tmp_path, event_writer=event_writer)
-    ctx.branch_name = _BRANCH
-    return ctx
+def _make_ctx(tmp_path: Path, *, event_writer: object = None) -> "RunContext":  # noqa: F821
+    return make_builtin_ctx(tmp_path, branch_name=_BRANCH, event_writer=event_writer)
 
 
 def _ok(stdout: str = "") -> _Ok[None]:
@@ -135,7 +133,10 @@ def test_fast_forward_emits_builtin_effect(tmp_path: Path) -> None:
             "darkfactory.operations.fast_forward_branch._get_head_sha",
             side_effect=["aaa00001", "bbb00002"],
         ),
-        patch("darkfactory.utils.git._run.subprocess.run", return_value=CompletedProcess([], returncode=0, stdout="", stderr="")),
+        patch(
+            "darkfactory.utils.git._run.subprocess.run",
+            return_value=CompletedProcess([], returncode=0, stdout="", stderr=""),
+        ),
     ):
         fast_forward_branch(ctx)
 
@@ -304,8 +305,9 @@ def test_fetch_timeout_propagates_runtime_error(tmp_path: Path) -> None:
 
 def test_dry_run_skips_subprocess_and_emits_up_to_date(tmp_path: Path) -> None:
     writer = MagicMock()
-    ctx = make_builtin_ctx(tmp_path, dry_run=True, event_writer=writer)
-    ctx.branch_name = _BRANCH
+    ctx = make_builtin_ctx(
+        tmp_path, dry_run=True, branch_name=_BRANCH, event_writer=writer
+    )
 
     with (
         patch(

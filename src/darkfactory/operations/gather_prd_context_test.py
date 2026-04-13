@@ -6,31 +6,19 @@ from pathlib import Path
 
 import pytest
 
-from conftest import write_prd
+from conftest import make_project_ctx, write_prd
 from darkfactory.operations.gather_prd_context import gather_prd_context
 from darkfactory.model import PRD, load_all
 from darkfactory.engine import PrdContext
-from darkfactory.project import ProjectContext, ProjectOperation
-
-
-def _make_op() -> ProjectOperation:
-    return ProjectOperation(name="test-op", description="test", tasks=[])
+from darkfactory.workflow import RunContext
 
 
 def _make_ctx(
     tmp_path: Path,
     prds: dict[str, PRD] | None = None,
     target_prd: str | None = None,
-) -> ProjectContext:
-    ctx = ProjectContext(
-        repo_root=tmp_path,
-        prds=prds or {},
-        operation=_make_op(),
-        cwd=tmp_path,
-        dry_run=False,
-        target_prd=target_prd,
-    )
-    return ctx
+) -> RunContext:
+    return make_project_ctx(tmp_path, prds=prds, target_prd=target_prd)
 
 
 def test_gather_context_basic(tmp_path: Path) -> None:
@@ -91,7 +79,7 @@ def test_gather_context_missing_target_raises(tmp_path: Path) -> None:
 
 def test_gather_context_no_target_prd_raises(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, target_prd=None)
-    with pytest.raises(ValueError, match="requires ctx.target_prd"):
+    with pytest.raises(ValueError, match="requires target_prd"):
         gather_prd_context(ctx)
 
 

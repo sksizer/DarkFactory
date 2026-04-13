@@ -8,16 +8,16 @@ That involves three steps:
    relative to the workflow's directory.
 2. **Concatenate** them with blank-line separators, preserving order.
 3. **Substitute** ``{{PLACEHOLDER}}``-style tokens with values from
-   the current :class:`~darkfactory.workflow.ExecutionContext`.
+   the current :class:`~darkfactory.workflow.RunContext`.
 
 The placeholder syntax (``{{UPPERCASE_NAME}}``) is deliberately distinct
 from Python's ``str.format`` ``{lowercase}`` style used by
-``ExecutionContext.format_string`` — the two templating systems serve
+``RunContext.format_string`` — the two templating systems serve
 different purposes:
 
-- :meth:`ExecutionContext.format_string` is **strict**: unknown
-  placeholders raise ``KeyError``. Used for commit messages and shell
-  commands where typos must be caught early.
+- :meth:`RunContext.format_string` is **strict**: unknown
+  placeholders pass through unchanged. Used for commit messages and
+  shell commands.
 - :func:`substitute_placeholders` is **permissive**: unknown
   placeholders are left as-is. This lets agent prompts evolve
   incrementally — you can reference ``{{NEW_FIELD}}`` in a prompt
@@ -40,12 +40,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Mapping
+from typing import Any, Callable, Mapping
 
-from ._core import BuiltIn, Workflow
-
-if TYPE_CHECKING:
-    from ._core import ExecutionContext
+from ._core import BuiltIn, RunContext, Workflow
+from ..engine.payloads import PrdWorkflowRun, WorktreeState
 
 
 PLACEHOLDER_RE = re.compile(r"\{\{(\w+)\}\}")
@@ -106,12 +104,12 @@ def substitute_placeholders(template: str, context: Mapping[str, object]) -> str
 def compose_prompt(
     workflow: Workflow,
     prompts: list[str],
-    execution_context: ExecutionContext,
+    ctx: RunContext,
     extras: Mapping[str, object] | None = None,
 ) -> str:
     """End-to-end: load prompt files and substitute context placeholders.
 
-    The standard placeholder set populated from the ExecutionContext:
+    The standard placeholder set populated from the RunContext payloads:
 
     - ``{{PRD_ID}}`` — the PRD's id
     - ``{{PRD_TITLE}}`` — the PRD's title
@@ -123,7 +121,7 @@ def compose_prompt(
 
     ``extras`` is merged into the context after the standard keys, so
     callers can inject ad-hoc values (e.g. ``CHECK_OUTPUT`` for retry
-    prompts) without modifying the ExecutionContext.
+    prompts) without modifying the RunContext.
 
     Raises ``ValueError`` if the workflow has no ``workflow_dir`` set
     (shouldn't happen in practice — the loader sets it — but makes the
@@ -137,19 +135,18 @@ def compose_prompt(
 
     raw = load_prompt_files(workflow.workflow_dir, prompts)
 
-    prd = execution_context.prd
+    prd_run = ctx.state.get(PrdWorkflowRun)
+    prd = prd_run.prd
+    wt = ctx.state.get(WorktreeState) if ctx.state.has(WorktreeState) else None
+
     context: dict[str, object] = {
         "PRD_ID": prd.id,
         "PRD_TITLE": prd.title,
         "PRD_PATH": str(prd.path),
         "PRD_SLUG": prd.slug,
-        "BRANCH_NAME": execution_context.branch_name,
-        "BASE_REF": execution_context.base_ref,
-        "WORKTREE_PATH": (
-            str(execution_context.worktree_path)
-            if execution_context.worktree_path
-            else ""
-        ),
+        "BRANCH_NAME": wt.branch if wt else "",
+        "BASE_REF": wt.base_ref if wt else "",
+        "WORKTREE_PATH": (str(wt.worktree_path) if wt and wt.worktree_path else ""),
     }
     if extras:
         context.update(extras)
