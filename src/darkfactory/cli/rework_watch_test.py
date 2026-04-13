@@ -16,6 +16,7 @@ from darkfactory.utils.github import GhErr as _GhErr
 from darkfactory.cli.rework_watch import (
     PRWatchState,
     WatchState,
+    _ensure_single_instance,
     _cmd_pause,
     _cmd_resume,
     _cmd_status,
@@ -310,6 +311,35 @@ def test_cmd_stop_sends_sigterm(tmp_path: Path) -> None:
         rc = _cmd_stop(tmp_path)
     assert rc == 0
     mock_kill.assert_called_once()
+
+
+# ── Startup guard ────────────────────────────────────────────────────────────
+
+
+def test_ensure_single_instance_allows_start_when_no_pid(tmp_path: Path) -> None:
+    assert _ensure_single_instance(tmp_path) is True
+
+
+def test_ensure_single_instance_rejects_live_pid(tmp_path: Path) -> None:
+    pid_file = tmp_path / ".darkfactory" / "state" / "rework-watch.pid"
+    pid_file.parent.mkdir(parents=True)
+    pid_file.write_text("12345")
+
+    with patch("darkfactory.cli.rework_watch._pid_is_alive", return_value=True):
+        assert _ensure_single_instance(tmp_path) is False
+
+    assert pid_file.exists()
+
+
+def test_ensure_single_instance_removes_stale_pid(tmp_path: Path) -> None:
+    pid_file = tmp_path / ".darkfactory" / "state" / "rework-watch.pid"
+    pid_file.parent.mkdir(parents=True)
+    pid_file.write_text("12345")
+
+    with patch("darkfactory.cli.rework_watch._pid_is_alive", return_value=False):
+        assert _ensure_single_instance(tmp_path) is True
+
+    assert not pid_file.exists()
 
 
 # ── run_poll_loop ─────────────────────────────────────────────────────────────
