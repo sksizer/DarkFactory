@@ -156,9 +156,9 @@ def _make_transcript_file(tmp_path: Path) -> Path:
 def test_dry_run_logs_and_returns(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path, dry_run=True)
     _make_transcript_file(tmp_path)
-    with patch("darkfactory.operations.analyze_transcript.subprocess.run") as mock_sub:
+    with patch("darkfactory.operations.analyze_transcript.claude_print") as mock_cp:
         analyze_transcript(ctx)
-    mock_sub.assert_not_called()
+    mock_cp.assert_not_called()
     ctx.logger.info.assert_called()
 
 
@@ -189,18 +189,11 @@ def test_info_only_findings_skip_stage2(tmp_path: Path) -> None:
     path.write_text(content)
     ctx = _make_ctx(tmp_path)
 
-    with patch("darkfactory.operations.analyze_transcript.subprocess.run") as mock_sub:
-        # subprocess.run should only be called for git add, not for LLM
-        mock_sub.return_value = MagicMock(returncode=0)
+    with patch("darkfactory.operations.analyze_transcript.claude_print") as mock_cp:
         analyze_transcript(ctx)
 
-    # The LLM call uses pnpm -- check none of the subprocess calls used pnpm
-    for call in mock_sub.call_args_list:
-        args = call[0][0] if call[0] else call[1].get("args", [])
-        if isinstance(args, list):
-            assert "pnpm" not in args, (
-                "Stage 2 LLM should not fire for info-only findings"
-            )
+    # Stage 2 LLM should not fire for info-only findings
+    mock_cp.assert_not_called()
 
 
 def test_warning_findings_use_model_default(tmp_path: Path) -> None:
@@ -232,20 +225,19 @@ def test_warning_findings_use_model_default(tmp_path: Path) -> None:
 
     llm_calls: list[list[str]] = []
 
-    def _fake_run(args: list[str], **kwargs: object) -> MagicMock:
-        if "pnpm" in args:
-            llm_calls.append(args)
-            r = MagicMock()
-            r.returncode = 0
-            r.stdout = "## Summary\n\nOK\n\n### Findings\n\nNone\n\n### Recommendations\n\nNone\n\n### Suggested PRD\n\n(none)\n"
-            return r
+    def _fake_claude_print(
+        prompt: str, *, model: str, cwd: object, allowed_tools: object = None,
+        timeout: int = 120,
+    ) -> MagicMock:
+        llm_calls.append(["--model", model])
         r = MagicMock()
         r.returncode = 0
+        r.stdout = "## Summary\n\nOK\n\n### Findings\n\nNone\n\n### Recommendations\n\nNone\n\n### Suggested PRD\n\n(none)\n"
         return r
 
     with patch(
-        "darkfactory.operations.analyze_transcript.subprocess.run",
-        side_effect=_fake_run,
+        "darkfactory.operations.analyze_transcript.claude_print",
+        side_effect=_fake_claude_print,
     ):
         analyze_transcript(ctx)
 
@@ -267,20 +259,19 @@ def test_error_findings_use_model_severe(tmp_path: Path) -> None:
 
     llm_calls: list[list[str]] = []
 
-    def _fake_run(args: list[str], **kwargs: object) -> MagicMock:
-        if "pnpm" in args:
-            llm_calls.append(args)
-            r = MagicMock()
-            r.returncode = 0
-            r.stdout = "narrative text"
-            return r
+    def _fake_claude_print(
+        prompt: str, *, model: str, cwd: object, allowed_tools: object = None,
+        timeout: int = 120,
+    ) -> MagicMock:
+        llm_calls.append(["--model", model])
         r = MagicMock()
         r.returncode = 0
+        r.stdout = "narrative text"
         return r
 
     with patch(
-        "darkfactory.operations.analyze_transcript.subprocess.run",
-        side_effect=_fake_run,
+        "darkfactory.operations.analyze_transcript.claude_print",
+        side_effect=_fake_claude_print,
     ):
         analyze_transcript(ctx)
 
@@ -294,20 +285,9 @@ def test_analysis_file_written_not_staged_by_default(tmp_path: Path) -> None:
     _make_transcript_file(tmp_path)
     ctx = _make_ctx(tmp_path)
 
-    staged: list[list[str]] = []
-
-    def _fake_run(args: list[str], **kwargs: object) -> MagicMock:
-        if args[:2] == ["git", "add"]:
-            staged.append(args)
-        r = MagicMock()
-        r.returncode = 0
-        r.stdout = ""
-        return r
-
     with patch(
-        "darkfactory.operations.analyze_transcript.subprocess.run",
-        side_effect=_fake_run,
-    ):
+        "darkfactory.operations.analyze_transcript.git_run",
+    ) as mock_git:
         analyze_transcript(ctx)
 
     # An analysis file should exist
@@ -315,8 +295,8 @@ def test_analysis_file_written_not_staged_by_default(tmp_path: Path) -> None:
     analysis_files = list(td.glob("*.analysis.md"))
     assert len(analysis_files) == 1
 
-    # git add should NOT have been called (default: no commit)
-    assert not staged
+    # git_run should NOT have been called (default: no commit)
+    mock_git.assert_not_called()
 
 
 def test_analysis_file_staged_when_config_commit_true(tmp_path: Path) -> None:
@@ -329,24 +309,18 @@ def test_analysis_file_staged_when_config_commit_true(tmp_path: Path) -> None:
     config_dir.mkdir(parents=True, exist_ok=True)
     (config_dir / "config.toml").write_text('[analysis]\ncommit = "true"\n')
 
-    staged: list[list[str]] = []
-
-    def _fake_run(args: list[str], **kwargs: object) -> MagicMock:
-        if args[:2] == ["git", "add"]:
-            staged.append(args)
-        r = MagicMock()
-        r.returncode = 0
-        r.stdout = ""
-        return r
+    from darkfactory.utils import Ok as _Ok
 
     with patch(
-        "darkfactory.operations.analyze_transcript.subprocess.run",
-        side_effect=_fake_run,
-    ):
+        "darkfactory.operations.analyze_transcript.git_run",
+        return_value=_Ok(None),
+    ) as mock_git:
         analyze_transcript(ctx)
 
-    # git add should have been called
-    assert len(staged) >= 1
+    # git_run should have been called for staging
+    mock_git.assert_called_once()
+    call_args = mock_git.call_args
+    assert call_args[0][0] == "add"
 
 
 def test_run_summary_augmented(tmp_path: Path) -> None:
@@ -355,9 +329,7 @@ def test_run_summary_augmented(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
     ctx.run_summary = "## Harness execution summary\n\n- **Workflow:** default\n"
 
-    with patch("darkfactory.operations.analyze_transcript.subprocess.run") as mock_sub:
-        mock_sub.return_value = MagicMock(returncode=0)
-        analyze_transcript(ctx)
+    analyze_transcript(ctx)
 
     assert ctx.run_summary is not None
     assert "## Transcript analysis" in ctx.run_summary
@@ -371,9 +343,7 @@ def test_run_summary_set_when_none(tmp_path: Path) -> None:
     ctx = _make_ctx(tmp_path)
     assert ctx.run_summary is None
 
-    with patch("darkfactory.operations.analyze_transcript.subprocess.run") as mock_sub:
-        mock_sub.return_value = MagicMock(returncode=0)
-        analyze_transcript(ctx)
+    analyze_transcript(ctx)
 
     assert ctx.run_summary is not None
     assert "Transcript analysis" in ctx.run_summary
@@ -405,16 +375,9 @@ def test_llm_failure_does_not_fail_workflow(tmp_path: Path) -> None:
     path.write_text(content)
     ctx = _make_ctx(tmp_path)
 
-    def _fake_run(args: list[str], **kwargs: object) -> MagicMock:
-        if "pnpm" in args:
-            raise RuntimeError("LLM subprocess failed")
-        r = MagicMock()
-        r.returncode = 0
-        return r
-
     with patch(
-        "darkfactory.operations.analyze_transcript.subprocess.run",
-        side_effect=_fake_run,
+        "darkfactory.operations.analyze_transcript.claude_print",
+        side_effect=RuntimeError("LLM subprocess failed"),
     ):
         analyze_transcript(ctx)
 
@@ -453,21 +416,8 @@ def test_config_min_severity_respected(tmp_path: Path) -> None:
     path.write_text(content)
     ctx = _make_ctx(tmp_path)
 
-    llm_calls: list[list[str]] = []
-
-    def _fake_run(args: list[str], **kwargs: object) -> MagicMock:
-        if "pnpm" in args:
-            llm_calls.append(args)
-        r = MagicMock()
-        r.returncode = 0
-        r.stdout = ""
-        return r
-
-    with patch(
-        "darkfactory.operations.analyze_transcript.subprocess.run",
-        side_effect=_fake_run,
-    ):
+    with patch("darkfactory.operations.analyze_transcript.claude_print") as mock_cp:
         analyze_transcript(ctx)
 
     # min_severity=error, max severity was warning -> Stage 2 should not fire
-    assert llm_calls == []
+    mock_cp.assert_not_called()

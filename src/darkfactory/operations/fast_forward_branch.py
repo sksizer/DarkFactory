@@ -8,13 +8,12 @@ external push has advanced the remote branch beyond the local worktree.
 from __future__ import annotations
 
 import logging
-import subprocess
 from pathlib import Path
 
 from darkfactory.operations._registry import builtin
 from darkfactory.operations._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
-from darkfactory.utils.git import GitErr, Ok, git_run
+from darkfactory.utils.git import GitErr, Ok, Timeout, git_run
 from darkfactory.workflow import ExecutionContext
 
 _log = logging.getLogger(__name__)
@@ -30,31 +29,20 @@ def _fetch_origin_branch(cwd: Path, branch: str, timeout: int) -> bool:
 
     Raises :class:`RuntimeError` on timeout or any other fetch failure.
     """
-    try:
-        result = subprocess.run(
-            ["git", "fetch", "origin", branch],
-            cwd=str(cwd),
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-    except subprocess.TimeoutExpired:
-        raise RuntimeError(
-            f"git fetch origin {branch} timed out after {timeout}s — "
-            "check network connectivity or increase fetch_timeout"
-        )
-
-    if result.returncode == 0:
-        return True
-
-    # "couldn't find remote ref" means the branch hasn't been pushed yet.
-    combined = result.stdout + result.stderr
-    if "couldn't find remote ref" in combined:
-        return False
-
-    raise RuntimeError(
-        f"git fetch origin {branch} failed (exit {result.returncode}):\n{result.stderr}"
-    )
+    match git_run("fetch", "origin", branch, cwd=cwd, timeout=timeout):
+        case Ok():
+            return True
+        case Timeout():
+            raise RuntimeError(
+                f"git fetch origin {branch} timed out after {timeout}s — "
+                "check network connectivity or increase fetch_timeout"
+            )
+        case GitErr(stderr=err) if "couldn't find remote ref" in err:
+            return False
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(
+                f"git fetch origin {branch} failed (exit {code}):\n{err}"
+            )
 
 
 def _check_divergence(cwd: Path, branch: str) -> tuple[int, int] | None:
@@ -65,36 +53,31 @@ def _check_divergence(cwd: Path, branch: str) -> tuple[int, int] | None:
     early).  In that case the caller should treat the branch as up-to-date.
     """
     # Verify the remote ref is present locally before running rev-list.
-    probe = subprocess.run(
-        ["git", "rev-parse", "--verify", f"origin/{branch}"],
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-    )
-    if probe.returncode != 0:
-        return None
+    match git_run("rev-parse", "--verify", f"origin/{branch}", cwd=cwd):
+        case Ok():
+            pass
+        case GitErr() | Timeout():
+            return None
 
-    result = subprocess.run(
-        ["git", "rev-list", "--left-right", "--count", f"HEAD...origin/{branch}"],
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    parts = result.stdout.strip().split()
-    return int(parts[0]), int(parts[1])
+    match git_run("rev-list", "--left-right", "--count", f"HEAD...origin/{branch}", cwd=cwd):
+        case Ok(stdout=raw):
+            parts = raw.strip().split()
+            return int(parts[0]), int(parts[1])
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(f"git rev-list failed (exit {code}):\n{err}")
+        case Timeout():
+            return None
 
 
 def _get_head_sha(cwd: Path) -> str:
     """Return the short SHA of HEAD."""
-    result = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return result.stdout.strip()
+    match git_run("rev-parse", "HEAD", cwd=cwd):
+        case Ok(stdout=raw):
+            return raw.strip()
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(f"git rev-parse HEAD failed (exit {code}):\n{err}")
+        case Timeout():
+            raise RuntimeError("git rev-parse HEAD timed out")
 
 
 @builtin("fast_forward_branch")

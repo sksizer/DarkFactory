@@ -5,10 +5,10 @@ from __future__ import annotations
 import argparse
 import os
 import re
-import subprocess
 from collections.abc import Mapping
 from datetime import date
 from darkfactory.model import PRD_ID_RE, dump_frontmatter, load_all
+from darkfactory.utils.shell import run_foreground
 
 
 def _slugify(title: str) -> str:
@@ -116,7 +116,7 @@ def cmd_new(args: argparse.Namespace) -> int:
     if args.open:
         editor = os.environ.get("EDITOR", "")
         if editor:
-            subprocess.run([editor, str(path)], check=False)
+            run_foreground([editor, str(path)])
 
     if getattr(args, "discuss", False):
         from darkfactory.cli.discuss import launch_discuss_for_prd

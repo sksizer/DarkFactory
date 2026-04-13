@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from darkfactory.utils.claude_code._interactive import (
     EffortLevel as EffortLevel,
+    claude_print as claude_print,
     spawn_claude as spawn_claude,
 )
 from darkfactory.utils.claude_code._invoke import (

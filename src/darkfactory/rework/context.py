@@ -17,12 +17,12 @@ workflow entirely and applied filter logic only in the CLI path.
 
 from __future__ import annotations
 
-import json
 import logging
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from darkfactory.utils import Ok
+from darkfactory.utils.github import gh_json
 from darkfactory.utils.github.pr.comments import CommentFilters, ReviewThread
 from darkfactory.utils.github.pr.comments import fetch_pr_comments as _fetch_pr_comments
 from darkfactory.model import PRD, compute_branch_name
@@ -70,31 +70,20 @@ def find_open_pr(branch_name: str, repo_root: Path) -> int | None:
     open PR" and raises :class:`ReworkError` with the PRD id in the
     message.
     """
-    try:
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "list",
-                "--head",
-                branch_name,
-                "--state",
-                "open",
-                "--json",
-                "number",
-            ],
-            capture_output=True,
-            text=True,
-            cwd=repo_root,
-        )
-        if result.returncode != 0:
+    match gh_json(
+        "pr", "list",
+        "--head", branch_name,
+        "--state", "open",
+        "--json", "number",
+        cwd=repo_root,
+    ):
+        case Ok(value=prs) if prs:
+            try:
+                return int(prs[0]["number"])
+            except (KeyError, IndexError, ValueError, TypeError):
+                return None
+        case _:
             return None
-        prs = json.loads(result.stdout)
-        if prs:
-            return int(prs[0]["number"])
-    except (FileNotFoundError, json.JSONDecodeError, ValueError):
-        pass
-    return None
 
 
 def discover_rework_context(

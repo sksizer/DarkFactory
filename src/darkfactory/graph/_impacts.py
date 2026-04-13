@@ -38,23 +38,22 @@ cross-tree or sibling overlaps produce warnings.
 from __future__ import annotations
 
 import fnmatch
-import subprocess
 from pathlib import Path
 
 from . import _containment as containment
 from ..model import PRD, parse_id_sort_key
+from ..utils.git import GitErr, Ok, git_run
 
 
 def tracked_files(repo_root: Path) -> list[str]:
     """Return all git-tracked files as repo-relative POSIX paths."""
-    result = subprocess.run(
-        ["git", "ls-files"],
-        capture_output=True,
-        text=True,
-        cwd=repo_root,
-        check=True,
-    )
-    return [line for line in result.stdout.strip().split("\n") if line]
+    match git_run("ls-files", cwd=repo_root):
+        case Ok(stdout=raw):
+            return [line for line in raw.strip().split("\n") if line]
+        case GitErr(returncode=code, stderr=err):
+            raise RuntimeError(f"git ls-files failed (exit {code}):\n{err}")
+        case _:
+            raise RuntimeError("git ls-files timed out")
 
 
 _GLOB_META = set("*?[{")
