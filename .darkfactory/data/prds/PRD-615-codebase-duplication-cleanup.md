@@ -10,45 +10,45 @@ parent:
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/cli/plan.py
-  - src/darkfactory/cli/_shared.py
-  - src/darkfactory/cli/children.py
-  - src/darkfactory/cli/conflicts.py
-  - src/darkfactory/cli/normalize.py
-  - src/darkfactory/cli/rework.py
-  - src/darkfactory/cli/run.py
-  - src/darkfactory/cli/tree.py
-  - src/darkfactory/cli/validate.py
-  - src/darkfactory/cli/cleanup.py
-  - src/darkfactory/cli/reconcile.py
-  - src/darkfactory/cli/next_cmd.py
-  - src/darkfactory/cli/status.py
-  - src/darkfactory/cli/orphans.py
-  - src/darkfactory/cli/undecomposed.py
-  - src/darkfactory/cli/assign_cmd.py
-  - src/darkfactory/cli/list_workflows.py
-  - src/darkfactory/cli/system.py
-  - src/darkfactory/builtins/_shared.py
-  - src/darkfactory/builtins/commit.py
-  - src/darkfactory/builtins/commit_transcript.py
-  - src/darkfactory/builtins/commit_events.py
-  - src/darkfactory/builtins/push_branch.py
-  - src/darkfactory/builtins/create_pr.py
-  - src/darkfactory/builtins/fetch_pr_comments.py
-  - src/darkfactory/builtins/reply_pr_comments.py
-  - src/darkfactory/builtins/ensure_worktree.py
-  - src/darkfactory/builtins/cleanup_worktree.py
-  - src/darkfactory/builtins/set_status.py
-  - src/darkfactory/builtins/lint_attribution.py
-  - src/darkfactory/builtins/rework_guard.py
-  - src/darkfactory/builtins/analyze_transcript.py
-  - src/darkfactory/builtins/system_builtins.py
-  - src/darkfactory/event_log.py
-  - src/darkfactory/config.py
-  - src/darkfactory/prd.py
-  - src/darkfactory/paths.py
-  - src/darkfactory/checks.py
-  - src/darkfactory/runner.py
+  - python/darkfactory/cli/plan.py
+  - python/darkfactory/cli/_shared.py
+  - python/darkfactory/cli/children.py
+  - python/darkfactory/cli/conflicts.py
+  - python/darkfactory/cli/normalize.py
+  - python/darkfactory/cli/rework.py
+  - python/darkfactory/cli/run.py
+  - python/darkfactory/cli/tree.py
+  - python/darkfactory/cli/validate.py
+  - python/darkfactory/cli/cleanup.py
+  - python/darkfactory/cli/reconcile.py
+  - python/darkfactory/cli/next_cmd.py
+  - python/darkfactory/cli/status.py
+  - python/darkfactory/cli/orphans.py
+  - python/darkfactory/cli/undecomposed.py
+  - python/darkfactory/cli/assign_cmd.py
+  - python/darkfactory/cli/list_workflows.py
+  - python/darkfactory/cli/system.py
+  - python/darkfactory/builtins/_shared.py
+  - python/darkfactory/builtins/commit.py
+  - python/darkfactory/builtins/commit_transcript.py
+  - python/darkfactory/builtins/commit_events.py
+  - python/darkfactory/builtins/push_branch.py
+  - python/darkfactory/builtins/create_pr.py
+  - python/darkfactory/builtins/fetch_pr_comments.py
+  - python/darkfactory/builtins/reply_pr_comments.py
+  - python/darkfactory/builtins/ensure_worktree.py
+  - python/darkfactory/builtins/cleanup_worktree.py
+  - python/darkfactory/builtins/set_status.py
+  - python/darkfactory/builtins/lint_attribution.py
+  - python/darkfactory/builtins/rework_guard.py
+  - python/darkfactory/builtins/analyze_transcript.py
+  - python/darkfactory/builtins/system_builtins.py
+  - python/darkfactory/event_log.py
+  - python/darkfactory/config.py
+  - python/darkfactory/prd.py
+  - python/darkfactory/paths.py
+  - python/darkfactory/checks.py
+  - python/darkfactory/runner.py
   - tests/conftest.py
   - conftest.py
 workflow: task
@@ -95,12 +95,12 @@ Refactors are grouped into themed PRs that should land in the suggested order. E
 
 ### Group A — Critical bug hazards (do first)
 
-1. **A1.** Delete the duplicate definitions of `_check_runnable` and `_resolve_base_ref` from `src/darkfactory/cli/plan.py` (lines 45–128). Import them from `cli/_shared.py` instead, matching the pattern in `cli/run.py`.
+1. **A1.** Delete the duplicate definitions of `_check_runnable` and `_resolve_base_ref` from `python/darkfactory/cli/plan.py` (lines 45–128). Import them from `cli/_shared.py` instead, matching the pattern in `cli/run.py`.
 2. **A2.** Delete the duplicate `write_prd()` helper from `tests/conftest.py` (lines 37–106). Keep only the copy in root `conftest.py`; pytest's automatic fixture discovery makes the second copy redundant.
 
 ### Group B — High-impact shared helpers
 
-3. **B1.** Create `src/darkfactory/git_ops.py` with three functions:
+3. **B1.** Create `python/darkfactory/git_ops.py` with three functions:
    - `git_check(*args, cwd) -> bool` — silent returncode probe.
    - `git_run(*args, cwd) -> CompletedProcess` — raises with rich `CalledProcessError` detail on non-zero exit.
    - `git_probe(*args, cwd, timeout=10) -> bool` — bounded probe with warn-and-fall-back on timeout.
@@ -134,7 +134,7 @@ Refactors are grouped into themed PRs that should land in the suggested order. E
    - `builtins/rework_guard.py:45`
    - `builtins/analyze_transcript.py:239`
 
-5. **B3.** Add helper functions to `src/darkfactory/event_log.py`:
+5. **B3.** Add helper functions to `python/darkfactory/event_log.py`:
    - `emit_builtin_effect(ctx, task: str, effect: str, **detail) -> None`
    - `emit_dag(writer, ...) -> None` for the runner/graph_execution call sites.
    
@@ -149,7 +149,7 @@ Refactors are grouped into themed PRs that should land in the suggested order. E
    - `make_workflow` — factory replacing the 4 inconsistent local variants in `test_runner.py:37`, `test_assign.py:17`, `test_registry.py:22`, `test_rework_workflow.py:251`. Optional `with_prompts=True` flag for tests that need a prompts dir.
    - `make_execution_context` — factory replacing the 5 boilerplate ctx-creation blocks in `test_workflow.py:161` and `test_rework_workflow.py:138, 166, 191, 224`.
 
-7. **C2.** Add a `make_builtin_ctx` factory (in `tests/conftest.py` or a new shared helper module) for the 12+ peer test files in `src/darkfactory/builtins/*_test.py` that each define their own MagicMock-based `_make_ctx()`. Migrate `commit_test.py`, `commit_transcript_test.py`, `ensure_worktree_test.py`, `push_branch_test.py`, `cleanup_worktree_test.py`, `set_status_test.py`, `lint_attribution_test.py`, `create_pr_test.py`, `reply_pr_comments_test.py`, `analyze_transcript_test.py`, etc.
+7. **C2.** Add a `make_builtin_ctx` factory (in `tests/conftest.py` or a new shared helper module) for the 12+ peer test files in `python/darkfactory/builtins/*_test.py` that each define their own MagicMock-based `_make_ctx()`. Migrate `commit_test.py`, `commit_transcript_test.py`, `ensure_worktree_test.py`, `push_branch_test.py`, `cleanup_worktree_test.py`, `set_status_test.py`, `lint_attribution_test.py`, `create_pr_test.py`, `reply_pr_comments_test.py`, `analyze_transcript_test.py`, etc.
 
 ### Group D — CLI shared helpers
 
@@ -171,7 +171,7 @@ Refactors are grouped into themed PRs that should land in the suggested order. E
 
 12. **E3.** Investigate then unify worktree discovery. `cli/cleanup.py:29-51` iterates `.worktrees/` and uses `checks._get_pr_state()`; `cli/rework.py:24-47` parses `git worktree list --porcelain`. Each strategy may handle edge cases (orphan branches, missing dirs) the other misses. Produce a single `find_worktree_for_prd(prd_id, repo_root) -> WorktreeInfo | None` helper that handles both, document the edge cases in its docstring, and migrate both call sites. **Investigate before merging** — the differences may indicate latent bugs.
 
-13. **E4.** Add timestamp helpers (in a new `src/darkfactory/timestamps.py` or extend `paths.py`):
+13. **E4.** Add timestamp helpers (in a new `python/darkfactory/timestamps.py` or extend `paths.py`):
     - `today_iso() -> str` — `YYYY-MM-DD`
     - `now_iso_utc() -> str` — UTC, millisecond ISO-8601 with `Z` suffix (matches `event_log.py:37`)
     - `now_filename_safe() -> str` — hyphens-in-time form for filenames (matches `commit_transcript.py:42`)
@@ -200,11 +200,11 @@ Each PR must keep `just lint && just typecheck && just test` green. No test remo
 ## Acceptance Criteria
 
 - [ ] AC-1 (Group A): `cli/plan.py` no longer redefines `_check_runnable` or `_resolve_base_ref`; both are imported from `cli/_shared.py`. `tests/conftest.py` no longer defines `write_prd()` (only the root `conftest.py` does).
-- [ ] AC-2 (Group B1): `src/darkfactory/git_ops.py` exists and exports `git_check`, `git_run`, `git_probe`. The 10+ migration sites listed in B1 use the new helpers; no direct `subprocess.run(["git", ...])` calls remain in `builtins/` or `cli/` outside of `git_ops.py` itself.
+- [ ] AC-2 (Group B1): `python/darkfactory/git_ops.py` exists and exports `git_check`, `git_run`, `git_probe`. The 10+ migration sites listed in B1 use the new helpers; no direct `subprocess.run(["git", ...])` calls remain in `builtins/` or `cli/` outside of `git_ops.py` itself.
 - [ ] AC-3 (Group B2): `builtins/_shared.py` exports a dry-run helper. None of the 13 migration sites in B2 contain a literal `if ctx.dry_run:` block.
 - [ ] AC-4 (Group B3): `event_log.py` exports `emit_builtin_effect` (and any sibling helpers needed for runner/graph_execution sites). No `ctx.event_writer.emit(` calls remain in `builtins/`; runner.py and graph_execution.py go through the new helpers.
 - [ ] AC-5 (Group C1): `tests/conftest.py` defines `git_repo`, `cli_project`, `make_prd`, `make_workflow`, and `make_execution_context` fixtures. No test file in `tests/` defines its own `_init_git_repo()`. `test_cli_run.py` test bodies use the `cli_project` fixture instead of inline 6–8 line scaffolds.
-- [ ] AC-6 (Group C2): A `make_builtin_ctx` factory is reachable from peer tests in `src/darkfactory/builtins/*_test.py`. None of those peer tests define a local `_make_ctx()` MagicMock factory.
+- [ ] AC-6 (Group C2): A `make_builtin_ctx` factory is reachable from peer tests in `python/darkfactory/builtins/*_test.py`. None of those peer tests define a local `_make_ctx()` MagicMock factory.
 - [ ] AC-7 (Group D1): `cli/_shared.py` exports `_resolve_prd_or_exit`. The 8 migration sites in D1 use it. The literal string `unknown PRD id:` appears only inside `cli/_shared.py`.
 - [ ] AC-8 (Group D2): `cli/_shared.py` exports `_emit_json`, `_prd_to_dict`, and `_format_prd_line`. The migration sites use them.
 - [ ] AC-9 (Group E1): `config.py` exports public `load_toml` and `load_section`. The three migration sites in E1 use them.
@@ -218,7 +218,7 @@ Each PR must keep `just lint && just typecheck && just test` green. No test remo
 
 - **OPEN — E3 worktree discovery:** Are the two existing strategies actually equivalent, or does each handle a case the other misses? Resolve during the E3 investigation; if they are not equivalent, the unified helper must preserve the union of edge cases.
 - **OPEN — B3 event schema:** Should `emit_builtin_effect` accept `**detail` freely, or should detail keys be validated against a schema? Recommendation: accept freely for now (matches current behavior); revisit if event consumers grow brittle.
-- **OPEN — C2 test factory location:** Should the builtin-ctx factory live in `tests/conftest.py` (cross-suite) or a new `src/darkfactory/builtins/_test_helpers.py` (peer-test-only)? Recommendation: `tests/conftest.py` if pytest's collection picks it up for peer tests; otherwise the peer-test helper module.
+- **OPEN — C2 test factory location:** Should the builtin-ctx factory live in `tests/conftest.py` (cross-suite) or a new `python/darkfactory/builtins/_test_helpers.py` (peer-test-only)? Recommendation: `tests/conftest.py` if pytest's collection picks it up for peer tests; otherwise the peer-test helper module.
 
 ## References
 

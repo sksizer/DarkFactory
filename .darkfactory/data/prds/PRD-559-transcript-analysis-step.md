@@ -134,7 +134,7 @@ Otherwise, call `claude --print` (the same plumbing AgentTask uses) with:
   Hardcoded fallback if neither key is set: Haiku for warnings, Sonnet
   for errors.
 - Prompt: `prompts/analyze_transcript.md` placed adjacent to
-  `analyze_transcript.py` under `src/darkfactory/builtins/` (colocated
+  `analyze_transcript.py` under `python/darkfactory/builtins/` (colocated
   with the builtin code, not under a separate `prompts/` tree). This is
   the first builtin to ship with a prompt file; the convention going
   forward is "prompts live next to the code that loads them."
@@ -196,7 +196,7 @@ Apply the same insertion to `planning` and `extraction` workflows.
 ## Target layout
 
 ```
-src/darkfactory/builtins/
+python/darkfactory/builtins/
 ├── analyze_transcript.py            # builtin entry point + Finding dataclass
 ├── analyze_transcript_test.py
 ├── analyze_transcript_detectors.py  # detector registry + initial detectors
@@ -258,13 +258,13 @@ one.
 
 ## References
 
-- `src/darkfactory/builtins/commit_transcript.py` — sibling builtin that
+- `python/darkfactory/builtins/commit_transcript.py` — sibling builtin that
   this one runs after.
-- `src/darkfactory/builtins/summarize_agent_run.py` — existing summary
+- `python/darkfactory/builtins/summarize_agent_run.py` — existing summary
   this builtin augments via `ctx.run_summary`.
-- `src/darkfactory/builtins/_registry.py` — registry pattern to mirror
+- `python/darkfactory/builtins/_registry.py` — registry pattern to mirror
   for the detector registry.
-- `src/darkfactory/workflows/default/workflow.py` — primary insertion
+- `python/darkfactory/workflows/default/workflow.py` — primary insertion
   site.
 - `.darkfactory/transcripts/` — current corpus to use for fixture
   selection.

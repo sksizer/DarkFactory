@@ -193,8 +193,8 @@ prd rework-watch --stop          # kill the daemon
 **Effort:** m. New module + state file + signal handling. Test coverage needs a fake `gh pr view` and time-controlled polling loop.
 
 **Impacts:**
-- `src/darkfactory/cli.py` (new cmd_rework_watch)
-- `src/darkfactory/rework_watch.py` (new module)
+- `python/darkfactory/cli.py` (new cmd_rework_watch)
+- `python/darkfactory/rework_watch.py` (new module)
 - `tests/test_rework_watch.py` (new file)
 - `.darkfactory/state/` directory in the layout (PRD-222)
 

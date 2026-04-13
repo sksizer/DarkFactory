@@ -14,7 +14,7 @@ blocks:
   - "[[PRD-209-real-builtins]]"
   - "[[PRD-210-runner]]"
 impacts:
-  - src/darkfactory/builtins.py
+  - python/darkfactory/builtins.py
   - tests/test_builtins.py
 workflow: null
 target_version: null

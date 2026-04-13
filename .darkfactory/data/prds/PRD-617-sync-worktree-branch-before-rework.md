@@ -10,8 +10,8 @@ parent:
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/workflows/rework/workflow.py
-  - src/darkfactory/builtins/
+  - python/darkfactory/workflows/rework/workflow.py
+  - python/darkfactory/builtins/
 workflow:
 assignee:
 reviewers: []
@@ -124,7 +124,7 @@ helper both import.
 
 ### Builtin 1: `fast_forward_branch`
 
-`src/darkfactory/builtins/fast_forward_branch.py`
+`python/darkfactory/builtins/fast_forward_branch.py`
 
 Fast-forwards the worktree's local branch to match its own
 `origin/<branch>`. Solves the "push rejected" problem.
@@ -166,7 +166,7 @@ Steps:
 
 ### Builtin 2: `rebase_onto_main`
 
-`src/darkfactory/builtins/rebase_onto_main.py`
+`python/darkfactory/builtins/rebase_onto_main.py`
 
 Rebases the worktree's branch onto `origin/main` so the agent
 works against current mainline code. Solves the "stale branch"
@@ -192,7 +192,7 @@ Steps:
 ### Workflow change
 
 Add both builtins as the first two tasks in
-`src/darkfactory/workflows/rework/workflow.py`, before
+`python/darkfactory/workflows/rework/workflow.py`, before
 `fetch_pr_comments`:
 
 ```python
@@ -208,7 +208,7 @@ on git state issues, not about protecting `fetch_pr_comments`.
 
 ### Tests
 
-**`src/darkfactory/builtins/fast_forward_branch_test.py`:**
+**`python/darkfactory/builtins/fast_forward_branch_test.py`:**
 - happy path: behind-by-N → fast-forward succeeds, emits
   `builtin_effect` with `from`/`to` shas
 - no-op: HEAD already at origin → emits `result: up_to_date`, no
@@ -223,7 +223,7 @@ on git state issues, not about protecting `fetch_pr_comments`.
 - fetch timeout: fetch exceeds timeout → raises
 - event writer is None: builtin still works, just skips emission
 
-**`src/darkfactory/builtins/rebase_onto_main_test.py`:**
+**`python/darkfactory/builtins/rebase_onto_main_test.py`:**
 - happy path: branch behind main → rebase succeeds, emits
   `builtin_effect` with `from`/`to`/`onto` shas
 - no-op: branch already contains main HEAD → emits
@@ -303,10 +303,10 @@ None remaining.
   `.darkfactory/events/PRD-616-20260411T130733.jsonl` — the
   specific run that surfaced the issue; shows the halt-after-push
   behavior.
-- `src/darkfactory/runner.py:242-245` — the halt-on-failure loop
+- `python/darkfactory/runner.py:242-245` — the halt-on-failure loop
   exit that turns any mid-workflow failure into a silent skip of
   downstream tasks.
-- `src/darkfactory/workflows/rework/workflow.py` — current task
+- `python/darkfactory/workflows/rework/workflow.py` — current task
   order.
 - CLAUDE.md "Architectural Principles": parse at the boundary,
   hard failures over silent degradation — this PRD applies both.

@@ -14,7 +14,7 @@ depends_on:
 blocks:
   - "[[PRD-211-plan-run-cli]]"
 impacts:
-  - src/darkfactory/cli.py
+  - python/darkfactory/cli.py
   - tests/test_cli.py
 workflow: null
 target_version: null

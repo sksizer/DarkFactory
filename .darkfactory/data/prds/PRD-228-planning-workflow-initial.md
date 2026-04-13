@@ -15,8 +15,8 @@ impacts:
   - workflows/planning/prompts/role.md
   - workflows/planning/prompts/decomposition-guide.md
   - workflows/planning/prompts/task.md
-  - src/darkfactory/containment.py
-  - src/darkfactory/cli.py
+  - python/darkfactory/containment.py
+  - python/darkfactory/cli.py
   - tests/test_planning_workflow.py
 workflow: null
 target_version: null
@@ -200,7 +200,7 @@ workflow = Workflow(
 If not already in `containment.py` from earlier work:
 
 ```python
-# src/darkfactory/containment.py
+# python/darkfactory/containment.py
 
 def is_fully_decomposed(prd: PRD, prds: dict[str, PRD]) -> bool:
     """True if the PRD has at least one task-kind descendant.

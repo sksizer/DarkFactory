@@ -11,8 +11,8 @@ depends_on:
   - "[[PRD-214-frontmatter-roundtrip-drift]]"
 blocks: []
 impacts:
-  - src/darkfactory/prd.py
-  - src/darkfactory/cli.py
+  - python/darkfactory/prd.py
+  - python/darkfactory/cli.py
   - tests/test_prd.py
   - tests/test_cli_normalize.py
 workflow: null

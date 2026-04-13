@@ -74,7 +74,7 @@ The right answer is "reuse all of this with a different context shape", not "bui
 ### New concept: `SystemOperation`
 
 ```python
-# src/darkfactory/system.py
+# python/darkfactory/system.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -108,7 +108,7 @@ class SystemOperation:
 ### New context: `SystemContext`
 
 ```python
-# src/darkfactory/system.py (continued)
+# python/darkfactory/system.py (continued)
 
 @dataclass
 class SystemContext:

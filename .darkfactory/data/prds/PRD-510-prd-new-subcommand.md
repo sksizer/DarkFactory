@@ -12,7 +12,7 @@ depends_on:
   - "[[PRD-505-darkfactory-verify-and-push]]"
 blocks: []
 impacts:
-  - (darkfactory repo) src/darkfactory/cli.py
+  - (darkfactory repo) python/darkfactory/cli.py
   - (darkfactory repo) tests/test_cli_new.py
 workflow: null
 target_version: null
@@ -57,7 +57,7 @@ This was the original request from the user that motivated the extraction — "c
 
 ## Technical Approach
 
-**Modify**: `src/darkfactory/cli.py`
+**Modify**: `python/darkfactory/cli.py`
 
 Add two helpers:
 
@@ -217,4 +217,4 @@ Tests:
 ## References
 
 - [[PRD-505-darkfactory-verify-and-push]] — dependency (needs darkfactory to exist first)
-- `tools/prd-harness/src/prd_harness/cli.py` — CLI location in pumice (becomes `src/darkfactory/cli.py` post-extraction)
+- `tools/prd-harness/src/prd_harness/cli.py` — CLI location in pumice (becomes `python/darkfactory/cli.py` post-extraction)

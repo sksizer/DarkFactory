@@ -10,10 +10,10 @@ parent:
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/workflows/task/workflow.py
-  - src/darkfactory/workflows/task/prompts/role.md
-  - src/darkfactory/workflows/task/prompts/task.md
-  - src/darkfactory/workflows/task/prompts/verify.md
+  - python/darkfactory/workflows/task/workflow.py
+  - python/darkfactory/workflows/task/prompts/role.md
+  - python/darkfactory/workflows/task/prompts/task.md
+  - python/darkfactory/workflows/task/prompts/verify.md
 workflow:
 target_version:
 created: 2026-04-10
@@ -72,7 +72,7 @@ allowlist that blocks `git commit`.
 
 ## Technical Approach
 
-### `src/darkfactory/workflows/task/workflow.py`
+### `python/darkfactory/workflows/task/workflow.py`
 
 Add one line to the implement AgentTask tools list:
 

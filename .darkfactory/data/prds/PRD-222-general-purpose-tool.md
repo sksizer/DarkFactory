@@ -47,12 +47,12 @@ This is an **epic**. It decomposes into scoped child PRDs that can land independ
 
 There are two conceptually separate things that the previous draft conflated, and the *right* way to untangle them is to apply a single convention uniformly rather than special-case darkfactory's own repo.
 
-- **Darkfactory-the-tool's own Python source** — `src/darkfactory/`, tests, pyproject.toml, etc. This is package source code and ships in the wheel.
+- **Darkfactory-the-tool's own Python source** — `python/darkfactory/`, tests, pyproject.toml, etc. This is package source code and ships in the wheel.
 - **Darkfactory the project's design state** — its roadmap PRDs (PRD-200, PRD-222, …), config, and any custom workflows it wants for its *own* development. This is exactly the kind of thing `.darkfactory/` is designed to hold.
 
 The clean split is:
 
-- **First-party built-in workflows live inside the package** at `src/darkfactory/workflows/`. They ship in the wheel and every install gets them for free. This currently means **`default`, `extraction`, and `planning`** — all three are first-party built-ins, not custom darkfactory-specific things.
+- **First-party built-in workflows live inside the package** at `python/darkfactory/workflows/`. They ship in the wheel and every install gets them for free. This currently means **`default`, `extraction`, and `planning`** — all three are first-party built-ins, not custom darkfactory-specific things.
 - **Darkfactory's own repo uses `.darkfactory/` like any other project.** It gets a `.darkfactory/prds/` (where PRD-200, PRD-222, etc. move to), a `.darkfactory/config.toml` (if it wants any project-level overrides), a `.darkfactory/workflows/` (empty, or for one-off dev workflows darkfactory doesn't want to ship to end users), and `.darkfactory/worktrees/` / `.darkfactory/transcripts/` for runtime state.
 - **No dev-mode hardcoding.** The tool does not sniff pyproject.toml to decide "am I running in my own repo?" and take a special-case path. There is one convention — `.darkfactory/` at the target repo root — and darkfactory's own clone follows it the same way any other project does.
 
@@ -111,7 +111,7 @@ Both workflows and config settings resolve through the same layered model:
 
 | Layer | Workflow location | Config location | Scope |
 |---|---|---|---|
-| **Built-in** | `src/darkfactory/workflows/<name>/` (inside the wheel) | hardcoded defaults | Ships with the tool. Available to every install. |
+| **Built-in** | `python/darkfactory/workflows/<name>/` (inside the wheel) | hardcoded defaults | Ships with the tool. Available to every install. |
 | **User** | `~/.config/darkfactory/workflows/<name>/` | `~/.config/darkfactory/config.toml` | Per-developer. Same across all projects on this machine. |
 | **Project** | `<project>/.darkfactory/workflows/<name>/` | `<project>/.darkfactory/config.toml` | Per-project. Tracked in the project's git repo. |
 | *(future)* | *(directory-level — deferred)* | *(directory-level — deferred)* | Per-subtree within a project. Not in this epic. |
@@ -141,7 +141,7 @@ A workflow discovered in any layer must conform to the expected module API (requ
    - `.darkfactory/worktrees/` — runtime worktrees (git-ignored)
    - `.darkfactory/transcripts/` — agent output logs (git-ignored)
    - `.darkfactory/config.toml` — project config (tracked; optional)
-5. **Built-in workflows ship with the package**: built-in workflows (`default`, eventually `planning`, `extraction`, etc.) live inside the installed darkfactory package at `src/darkfactory/workflows/`, not on disk in the target repo.
+5. **Built-in workflows ship with the package**: built-in workflows (`default`, eventually `planning`, `extraction`, etc.) live inside the installed darkfactory package at `python/darkfactory/workflows/`, not on disk in the target repo.
 6. **User-level config directory**: darkfactory reads `~/.config/darkfactory/` (honoring `$XDG_CONFIG_HOME` if set) for:
    - `~/.config/darkfactory/config.toml` — user-level config
    - `~/.config/darkfactory/workflows/<name>/` — user-level custom workflows shared across all projects
@@ -150,7 +150,7 @@ A workflow discovered in any layer must conform to the expected module API (requ
    - **Workflows**: discovered from all three layers (built-in, user, project). Names must be globally unique. Any collision is a **hard error** at startup naming all conflicting paths.
 8. **Strict workflow API validation**: every discovered workflow is validated against the expected module contract at load time. Failures raise a clear error naming the layer, the file, and the specific violation. No silent skipping.
 9. **`prd init` subcommand**: scaffolds `.darkfactory/prds/`, `.darkfactory/workflows/` (empty, ready for overrides), `.darkfactory/config.toml` (with commented examples), and updates `.gitignore` to exclude `.darkfactory/worktrees/` and `.darkfactory/transcripts/`.
-10. **Darkfactory's own repo follows the `.darkfactory/` convention.** Its roadmap PRDs move from `prds/` to `.darkfactory/prds/`. Its in-repo workflows (`default`, `extraction`, `planning`) move *into the package* at `src/darkfactory/workflows/` as first-party built-ins. No dev-mode fallback, no special-case detection — the tool runs against its own clone exactly the way it runs against any other project.
+10. **Darkfactory's own repo follows the `.darkfactory/` convention.** Its roadmap PRDs move from `prds/` to `.darkfactory/prds/`. Its in-repo workflows (`default`, `extraction`, `planning`) move *into the package* at `python/darkfactory/workflows/` as first-party built-ins. No dev-mode fallback, no special-case detection — the tool runs against its own clone exactly the way it runs against any other project.
 11. **`pyproject.toml` scripts entry**: `prd = "darkfactory.cli:main"` already exists; verify that `uv tool install` picks it up. Also expose `darkfactory = "darkfactory.cli:main"` as a secondary alias in case of `prd` name conflicts.
 12. **Documentation update**: README rewritten to show `uv tool install darkfactory && cd ~/my-project && prd init && prd status` as the quickstart. Must explicitly call out that `.darkfactory/` is the target-project convention, separate from darkfactory's own source tree.
 
@@ -171,7 +171,7 @@ This is an epic. Suggested breakdown:
   - Works inside darkfactory's own repo too; PRD-222.8 uses it to bootstrap.
 
 - **PRD-222.3 — Bundle built-in workflows inside the package**
-  - Move `workflows/default/`, `workflows/extraction/`, and `workflows/planning/` into `src/darkfactory/workflows/` so they ship in the wheel.
+  - Move `workflows/default/`, `workflows/extraction/`, and `workflows/planning/` into `python/darkfactory/workflows/` so they ship in the wheel.
   - All three are first-party built-ins available to every install.
   - Loader discovers built-in workflows via direct module import under `darkfactory.workflows`.
   - Delete the old top-level `workflows/` directory once the loader is switched over.
@@ -239,8 +239,8 @@ High-level for the epic; children get their own concrete ACs:
 
 ## References
 
-- Current CLI structure: `src/darkfactory/cli.py` (`_default_prd_dir`, `_default_workflows_dir`, `_find_repo_root`)
-- Workflow loader: `src/darkfactory/loader.py`
+- Current CLI structure: `python/darkfactory/cli.py` (`_default_prd_dir`, `_default_workflows_dir`, `_find_repo_root`)
+- Workflow loader: `python/darkfactory/loader.py`
 - Style config cascade (same layering, prior art): [[PRD-541-add-color-to-prd-output]]
 - Examples of similar tools with dot-directories: `.github/`, `.vscode/`, `.mise/`, `.cursor/`, `.claude/`
 - [[PRD-540-darkfactory-pypi-publishing]] — blocks AC-7

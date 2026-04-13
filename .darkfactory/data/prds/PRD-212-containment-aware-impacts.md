@@ -10,8 +10,8 @@ parent: null
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/impacts.py
-  - src/darkfactory/cli.py
+  - python/darkfactory/impacts.py
+  - python/darkfactory/cli.py
   - tests/test_impacts.py
 workflow: null
 target_version: null

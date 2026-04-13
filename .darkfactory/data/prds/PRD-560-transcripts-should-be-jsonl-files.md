@@ -58,9 +58,9 @@ Switching to pure JSONL makes transcripts a first-class structured format that a
 
 **Affected files:**
 
-- `src/darkfactory/runner.py` (~lines 356-377) — rewrite the transcript assembly block to emit JSONL lines instead of `#`-prefixed comments.
-- `src/darkfactory/builtins/commit_transcript.py` (~lines 36-58) — change `.log` references to `.jsonl`.
-- `src/darkfactory/invoke.py` — verify `_find_terminal_result` and `_parse_sentinels` still work (they parse JSON lines and skip non-JSON; the new envelope lines are JSON so confirm they don't interfere with sentinel detection).
+- `python/darkfactory/runner.py` (~lines 356-377) — rewrite the transcript assembly block to emit JSONL lines instead of `#`-prefixed comments.
+- `python/darkfactory/builtins/commit_transcript.py` (~lines 36-58) — change `.log` references to `.jsonl`.
+- `python/darkfactory/invoke.py` — verify `_find_terminal_result` and `_parse_sentinels` still work (they parse JSON lines and skip non-JSON; the new envelope lines are JSON so confirm they don't interfere with sentinel detection).
 
 **JSONL structure of a transcript file:**
 
@@ -90,6 +90,6 @@ Switching to pure JSONL makes transcripts a first-class structured format that a
 
 ## References
 
-- `src/darkfactory/runner.py:356-377` — current transcript writing
-- `src/darkfactory/builtins/commit_transcript.py:36-58` — transcript commit logic
-- `src/darkfactory/invoke.py:104-343` — transcript parsing
+- `python/darkfactory/runner.py:356-377` — current transcript writing
+- `python/darkfactory/builtins/commit_transcript.py:36-58` — transcript commit logic
+- `python/darkfactory/invoke.py:104-343` — transcript parsing

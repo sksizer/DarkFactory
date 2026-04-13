@@ -12,7 +12,7 @@ depends_on:
 blocks:
   - "[[PRD-505-darkfactory-verify-and-push]]"
 impacts:
-  - (darkfactory repo) src/darkfactory/cli.py
+  - (darkfactory repo) python/darkfactory/cli.py
   - (darkfactory repo) tests/test_cli_workflows.py
   - (darkfactory repo) tests/test_cli_run.py
   - (darkfactory repo) prds/**

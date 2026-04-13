@@ -16,7 +16,7 @@ depends_on:
 blocks:
   - "[[PRD-211-plan-run-cli]]"
 impacts:
-  - src/darkfactory/runner.py
+  - python/darkfactory/runner.py
   - tests/test_runner.py
 workflow: null
 target_version: null

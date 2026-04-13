@@ -64,7 +64,7 @@ When an agent run produces garbage output, requirements change mid-flight, or a 
 
 ## Technical Approach
 
-- New CLI subcommand in `src/darkfactory/cli/reset.py`, registered in `_parser.py`.
+- New CLI subcommand in `python/darkfactory/cli/reset.py`, registered in `_parser.py`.
 - **Shared utilities refactor**: before implementing, extract `_find_worktree_for_prd` (the `StaleWorktree`-wrapping variant), `_find_orphaned_branch`, and `_remove_worktree` from `cleanup.py` into `worktree_utils.py`. Update `cleanup.py` to import from there. Then `reset.py` imports the same functions.
 - **Discovery phase**: probe for each artifact type — `find_worktree_for_prd()`, `gh pr list --state open --head {branch}`, `git branch --list prd/{prd_id}-*` (glob match, no slug needed), `ReworkGuard.is_blocked()` / entry existence, frontmatter status read via `model.load_one(data_dir, prd_id)`. Collect results into a summary dataclass.
 - **Concurrency gate**: acquire `FileLock` at `.worktrees/{prd_id}.lock` (non-blocking) before entering execution phase. Abort if held.
@@ -103,7 +103,7 @@ When an agent run produces garbage output, requirements change mid-flight, or a 
 
 ## References
 
-- Existing `prd cleanup` command: `src/darkfactory/cli/cleanup.py`
-- Rework guard state: `src/darkfactory/builtins/rework_guard.py`
-- Worktree management: `src/darkfactory/builtins/ensure_worktree.py`
+- Existing `prd cleanup` command: `python/darkfactory/cli/cleanup.py`
+- Rework guard state: `python/darkfactory/builtins/rework_guard.py`
+- Worktree management: `python/darkfactory/builtins/ensure_worktree.py`
 

@@ -15,7 +15,7 @@ impacts:
   - workflows/planning-review/prompts/role.md
   - workflows/planning-review/prompts/review-guide.md
   - workflows/planning-review/prompts/task.md
-  - src/darkfactory/containment.py
+  - python/darkfactory/containment.py
   - tests/test_planning_review_workflow.py
 workflow: null
 target_version: null

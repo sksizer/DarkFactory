@@ -13,7 +13,7 @@ depends_on:
   - "[[PRD-210-runner]]"
 blocks: []
 impacts:
-  - src/darkfactory/cli.py
+  - python/darkfactory/cli.py
   - tests/test_cli.py
 workflow: null
 target_version: null

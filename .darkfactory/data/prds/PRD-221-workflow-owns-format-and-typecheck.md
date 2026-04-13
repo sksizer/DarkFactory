@@ -169,7 +169,7 @@ on logic correctness.
 
 ## References
 
-- PRD-216 timeout post-mortem: `src/darkfactory/prd.py` + `cli.py` done, stuck on format drift in tests
-- PRD-218 timeout post-mortem: `src/darkfactory/invoke.py` + tests done, stuck on one mypy type annotation
+- PRD-216 timeout post-mortem: `python/darkfactory/prd.py` + `cli.py` done, stuck on format drift in tests
+- PRD-218 timeout post-mortem: `python/darkfactory/invoke.py` + tests done, stuck on one mypy type annotation
 - [[PRD-218-stream-agent-output]] — streaming helps diagnose the loop; this PRD prevents it
 - Workflow architecture: `workflows/default/workflow.py` tasks list

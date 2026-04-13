@@ -43,7 +43,7 @@ Every second reconcile run fails unconditionally because the stale remote branch
 
 ## Technical Approach
 
-In `_create_reconcile_pr` (`src/darkfactory/cli/reconcile.py`), replace the hardcoded branch name with one that includes today's date:
+In `_create_reconcile_pr` (`python/darkfactory/cli/reconcile.py`), replace the hardcoded branch name with one that includes today's date:
 
 ```python
 from datetime import date
@@ -53,7 +53,7 @@ branch = f"prd/reconcile-status-{date.today().strftime('%Y%m%d')}"
 
 Example: `prd/reconcile-status-20260410`. The existing local-branch teardown (`git branch -D`, fire-and-forget) already handles same-day retries cleanly. The remote branch from a previous day is simply a different name and never conflicts.
 
-Affected file: `src/darkfactory/cli/reconcile.py`, function `_create_reconcile_pr` (~line 123).
+Affected file: `python/darkfactory/cli/reconcile.py`, function `_create_reconcile_pr` (~line 123).
 
 ## Acceptance Criteria
 
@@ -69,5 +69,5 @@ Affected file: `src/darkfactory/cli/reconcile.py`, function `_create_reconcile_p
 
 ## References
 
-- `src/darkfactory/cli/reconcile.py`, `_create_reconcile_pr` (line ~118)
+- `python/darkfactory/cli/reconcile.py`, `_create_reconcile_pr` (line ~118)
 - Error reproduced on 2026-04-10 after PR #147 left a stale `prd/reconcile-status` remote branch

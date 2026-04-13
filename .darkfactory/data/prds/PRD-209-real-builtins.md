@@ -12,7 +12,7 @@ depends_on:
 blocks:
   - "[[PRD-211-plan-run-cli]]"
 impacts:
-  - src/darkfactory/builtins.py
+  - python/darkfactory/builtins.py
   - tests/test_builtins.py
 workflow: null
 target_version: null

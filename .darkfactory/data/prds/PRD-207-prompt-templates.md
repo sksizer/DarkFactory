@@ -12,7 +12,7 @@ depends_on:
 blocks:
   - "[[PRD-210-runner]]"
 impacts:
-  - src/darkfactory/templates.py
+  - python/darkfactory/templates.py
   - tests/test_templates.py
 workflow: null
 target_version: null

@@ -10,9 +10,9 @@ parent:
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/cli.py
-  - src/darkfactory/runner.py
-  - src/darkfactory/graph_execution.py
+  - python/darkfactory/cli.py
+  - python/darkfactory/runner.py
+  - python/darkfactory/graph_execution.py
   - tests/test_graph_execution.py
   - prds/README.md
 workflow:

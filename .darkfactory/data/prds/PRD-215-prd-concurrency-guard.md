@@ -11,8 +11,8 @@ depends_on:
   - "[[PRD-213-set-status-wrong-repo]]"
 blocks: []
 impacts:
-  - src/darkfactory/builtins.py
-  - src/darkfactory/runner.py
+  - python/darkfactory/builtins.py
+  - python/darkfactory/runner.py
   - tests/test_builtins.py
 workflow: null
 target_version: null

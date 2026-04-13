@@ -10,7 +10,7 @@ parent:
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/cli.py
+  - python/darkfactory/cli.py
   - tests/test_cli_run.py
 workflow:
 target_version:
@@ -26,7 +26,7 @@ tags:
 
 ## Summary
 
-`_resolve_base_ref` in `src/darkfactory/cli.py` currently defaults to the **current branch** (`git rev-parse --abbrev-ref HEAD`) when no explicit `--base` is supplied. That means running `prd run PRD-X --execute` from a feature branch creates a worktree branched from that feature branch instead of `main`. The downstream effects are confusing and have already broken several runs:
+`_resolve_base_ref` in `python/darkfactory/cli.py` currently defaults to the **current branch** (`git rev-parse --abbrev-ref HEAD`) when no explicit `--base` is supplied. That means running `prd run PRD-X --execute` from a feature branch creates a worktree branched from that feature branch instead of `main`. The downstream effects are confusing and have already broken several runs:
 
 1. The PRD's worktree branch carries unrelated commits from the feature branch the user happened to be on
 2. `gh pr create --base <feature-branch>` either fails (the base branch doesn't exist on origin yet) or opens a stacked PR the user didn't intend
@@ -87,7 +87,7 @@ A reasonable defaults principle: **the harness's defaults should reflect what us
 ## Technical Approach
 
 ```python
-# src/darkfactory/cli.py
+# python/darkfactory/cli.py
 
 def _resolve_base_ref(explicit: str | None, repo_root: Path) -> str:
     """Determine the git base ref for a new workflow branch.

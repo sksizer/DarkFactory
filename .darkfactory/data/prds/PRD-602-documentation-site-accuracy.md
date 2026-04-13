@@ -40,8 +40,8 @@ PR #146 (documentation site) has ~30 review comments identifying inaccuracies be
 - PRD storage documented at `.darkfactory/prds/` — actual location (post PRD-622) is `.darkfactory/data/prds/` for active PRDs and `.darkfactory/data/archive/` for terminal-state PRDs
 
 ### Module paths (post PRD-622 refactor)
-- Any reference to `src/darkfactory/prd.py` or `from darkfactory.prd import ...` is stale — the module is now the `src/darkfactory/model/` package, imported as `from darkfactory.model import PRD, load_all, save, set_status, archive, ...`
-- `src/darkfactory/cli.py` is no longer a monolith — it is now the `src/darkfactory/cli/` package with one module per subcommand (`cli/new.py`, `cli/status.py`, `cli/archive.py`, etc.)
+- Any reference to `python/darkfactory/prd.py` or `from darkfactory.prd import ...` is stale — the module is now the `python/darkfactory/model/` package, imported as `from darkfactory.model import PRD, load_all, save, set_status, archive, ...`
+- `python/darkfactory/cli.py` is no longer a monolith — it is now the `python/darkfactory/cli/` package with one module per subcommand (`cli/new.py`, `cli/status.py`, `cli/archive.py`, etc.)
 - The `--prd-dir` CLI flag has been removed — only `--directory` / `DARKFACTORY_DIR` is used to override the project root
 - `Config` now has a nested `PathsConfig` section (`config.paths.project_dir`, `config.paths.data_dir`, `config.paths.prds_dir`, `config.paths.archive_dir`)
 - `prd archive PRD-NNN` is a new command (terminal-state PRDs only; transitive-terminal guardrail)
@@ -67,10 +67,10 @@ PR #146 (documentation site) has ~30 review comments identifying inaccuracies be
 
 ## Acceptance criteria
 
-- [ ] All `AgentTask`, `ShellTask`, `BuiltIn`, `ExecutionContext` references match `src/darkfactory/workflow.py`
+- [ ] All `AgentTask`, `ShellTask`, `BuiltIn`, `ExecutionContext` references match `python/darkfactory/workflow.py`
 - [ ] All path references match actual runtime locations, including `.darkfactory/data/prds/` and `.darkfactory/data/archive/`
 - [ ] All CLI output examples match `prd plan`/`prd run` output
-- [ ] All config examples match `src/darkfactory/` config handling, including `config.paths.*`
+- [ ] All config examples match `python/darkfactory/` config handling, including `config.paths.*`
 - [ ] Sentinel format uses colon form (`PRD_EXECUTE_OK:`)
 - [ ] All Python snippets import from `darkfactory.model` (not `darkfactory.prd`)
 - [ ] `prd archive` command is documented with its guardrails

@@ -10,7 +10,7 @@ parent: null
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/prd.py
+  - python/darkfactory/prd.py
   - tests/test_prd.py
 workflow: null
 target_version: null

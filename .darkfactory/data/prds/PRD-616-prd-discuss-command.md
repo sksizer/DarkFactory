@@ -10,20 +10,20 @@ parent:
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/cli/discuss.py
-  - src/darkfactory/cli/new.py
-  - src/darkfactory/cli/_parser.py
-  - src/darkfactory/cli/main.py
-  - src/darkfactory/commands/__init__.py
-  - src/darkfactory/commands/discuss/__init__.py
-  - src/darkfactory/commands/discuss/operation.py
-  - src/darkfactory/commands/discuss/prompts/discuss.md
-  - src/darkfactory/commands/discuss/prompts/critique.md
-  - src/darkfactory/builtins/discuss_prd.py
-  - src/darkfactory/builtins/gather_prd_context.py
-  - src/darkfactory/builtins/commit_prd_changes.py
-  - src/darkfactory/builtins/system_builtins.py
-  - src/darkfactory/system_runner.py
+  - python/darkfactory/cli/discuss.py
+  - python/darkfactory/cli/new.py
+  - python/darkfactory/cli/_parser.py
+  - python/darkfactory/cli/main.py
+  - python/darkfactory/commands/__init__.py
+  - python/darkfactory/commands/discuss/__init__.py
+  - python/darkfactory/commands/discuss/operation.py
+  - python/darkfactory/commands/discuss/prompts/discuss.md
+  - python/darkfactory/commands/discuss/prompts/critique.md
+  - python/darkfactory/builtins/discuss_prd.py
+  - python/darkfactory/builtins/gather_prd_context.py
+  - python/darkfactory/builtins/commit_prd_changes.py
+  - python/darkfactory/builtins/system_builtins.py
+  - python/darkfactory/system_runner.py
   - tests/test_cli_discuss.py
   - tests/test_commands_discuss.py
 workflow:
@@ -79,13 +79,13 @@ A second pain point: when an LLM-assisted editor session (or any tool-assisted e
 
 1. **`prd discuss <prd-id>` command.** New subcommand registered in `cli/_parser.py`. Handler in `cli/discuss.py` resolves the PRD by id (using the new `_resolve_prd_or_exit` helper from PRD-615 if it lands first; otherwise inline), loads the discuss `SystemOperation`, builds a `SystemContext` with `target_prd=prd_id`, and dispatches to `system_runner.run_system_operation`.
 2. **`prd new --discuss` flag.** New flag on `cli/new.py:cmd_new`. After successful PRD creation, if `--discuss` is set, the command calls into the same code path as `prd discuss <new-id>` (via a shared helper, not by re-invoking the parser). Compatible with `--open`: if both are set, `--open` runs first, then `--discuss` (the editor exits, then the session launches).
-3. **`commands/discuss/` module.** New subpackage at `src/darkfactory/commands/discuss/` containing:
+3. **`commands/discuss/` module.** New subpackage at `python/darkfactory/commands/discuss/` containing:
    - `__init__.py` — exports `discuss_operation: SystemOperation`
    - `operation.py` — defines the `SystemOperation` and its task list
    - `prompts/discuss.md` — initial-message prompt for the collaborator phase
    - `prompts/critique.md` — initial-message prompt for the critic phase
    - The package exposes `discuss_operation` so `cli/discuss.py` can import it directly without going through the `.darkfactory/operations/` discovery mechanism (this is a built-in command, not a user-defined operation).
-4. **`gather_prd_context` builtin.** New system builtin at `src/darkfactory/builtins/gather_prd_context.py`. Reads `ctx.target_prd`'s file from disk, walks parent (`prd.parent`) and direct dependencies (`prd.depends_on`) one level deep, and composes a markdown context block of the form:
+4. **`gather_prd_context` builtin.** New system builtin at `python/darkfactory/builtins/gather_prd_context.py`. Reads `ctx.target_prd`'s file from disk, walks parent (`prd.parent`) and direct dependencies (`prd.depends_on`) one level deep, and composes a markdown context block of the form:
    ```
    ## Target PRD
    - id: PRD-616
@@ -104,7 +104,7 @@ A second pain point: when an LLM-assisted editor session (or any tool-assisted e
    - PRD-ZZZ: ... (status: ...) — <one-line summary>
    ```
    Stores the block at `ctx._shared_state["prd_context"]`. Pure data — no agent invocation, no subprocess.
-5. **`discuss_prd` builtin.** New system builtin at `src/darkfactory/builtins/discuss_prd.py`. Accepts kwargs `phase: str`, `prompt_file: str` (relative to the operation_dir), and `instructions: str | None` (the "exit when done" reminder). Loads the prompt file, substitutes `{PRD_CONTEXT}` with `ctx._shared_state["prd_context"]` and `{PHASE}` with `phase`, prints a phase banner to the terminal (e.g., `── Discuss phase ── (exit Claude with /exit or Ctrl-D when done)`), then spawns `subprocess.run(["claude", composed_prompt], cwd=ctx.cwd, check=False)` and blocks until the subprocess exits. On non-zero exit, log a warning but proceed to the next task (a user pressing Ctrl-C inside Claude Code is not a chain failure).
+5. **`discuss_prd` builtin.** New system builtin at `python/darkfactory/builtins/discuss_prd.py`. Accepts kwargs `phase: str`, `prompt_file: str` (relative to the operation_dir), and `instructions: str | None` (the "exit when done" reminder). Loads the prompt file, substitutes `{PRD_CONTEXT}` with `ctx._shared_state["prd_context"]` and `{PHASE}` with `phase`, prints a phase banner to the terminal (e.g., `── Discuss phase ── (exit Claude with /exit or Ctrl-D when done)`), then spawns `subprocess.run(["claude", composed_prompt], cwd=ctx.cwd, check=False)` and blocks until the subprocess exits. On non-zero exit, log a warning but proceed to the next task (a user pressing Ctrl-C inside Claude Code is not a chain failure).
 6. **Discuss `SystemOperation` task list:**
    ```python
    discuss_operation = SystemOperation(
@@ -141,7 +141,7 @@ A second pain point: when an LLM-assisted editor session (or any tool-assisted e
    ─────────────────────────────────────
    ```
    The runner pauses for ~1 second after printing the banner so the user has time to abort before the subprocess takes over the terminal.
-9. **`commit_prd_changes` builtin.** New system builtin at `src/darkfactory/builtins/commit_prd_changes.py`. Signature: `commit_prd_changes(ctx: SystemContext, message: str | None = None, paths: list[str] | None = None) -> None`.
+9. **`commit_prd_changes` builtin.** New system builtin at `python/darkfactory/builtins/commit_prd_changes.py`. Signature: `commit_prd_changes(ctx: SystemContext, message: str | None = None, paths: list[str] | None = None) -> None`.
    - Resolves `paths` default to `[<file for ctx.target_prd>]` (uses the same file resolution that `gather_prd_context` does — find the PRD file under the configured PRD directory by id).
    - Resolves `message` default to `f"chore(prd): {ctx.target_prd} discuss session refinements"`. If the supplied `message` template contains `{target_prd}`, substitute via `ctx.format_string`.
    - Runs `git diff --quiet -- <paths>` in `ctx.cwd`. If no changes, prints `No PRD changes to commit.` and returns cleanly without prompting.
@@ -185,7 +185,7 @@ The consequence is that `BuiltIn("discuss_prd", kwargs={...})` and `BuiltIn("com
 
 ### Architectural decision: `commands/` subpackage
 
-The user-facing CLI verbs live in `cli/*.py` as small modules that parse args and dispatch. Workflow definitions live in `workflows/<name>/`. There is currently no home for "the implementation of a CLI verb that is large enough to need multiple files and prompt assets". This PRD introduces `src/darkfactory/commands/` as that home. For v1, only `commands/discuss/` exists; the directory pattern is established for future commands of the same shape.
+The user-facing CLI verbs live in `cli/*.py` as small modules that parse args and dispatch. Workflow definitions live in `workflows/<name>/`. There is currently no home for "the implementation of a CLI verb that is large enough to need multiple files and prompt assets". This PRD introduces `python/darkfactory/commands/` as that home. For v1, only `commands/discuss/` exists; the directory pattern is established for future commands of the same shape.
 
 The split between `cli/discuss.py` and `commands/discuss/` is:
 
@@ -259,14 +259,14 @@ if args.discuss:
 
 - [ ] AC-1: `prd discuss <prd-id>` is registered in `cli/_parser.py`. Running it on a known PRD launches the chain; running it on an unknown PRD exits cleanly with the standard "unknown PRD id" error.
 - [ ] AC-2: `prd new --discuss --title "Some title"` creates the PRD and immediately launches a discuss chain against the new PRD's id. The flag composes correctly with `--open` (editor opens first, then discuss starts after editor exits).
-- [ ] AC-3: `src/darkfactory/commands/discuss/` exists with `__init__.py`, `operation.py`, and `prompts/discuss.md` and `prompts/critique.md`. `commands/discuss/__init__.py` exports `discuss_operation: SystemOperation`.
+- [ ] AC-3: `python/darkfactory/commands/discuss/` exists with `__init__.py`, `operation.py`, and `prompts/discuss.md` and `prompts/critique.md`. `commands/discuss/__init__.py` exports `discuss_operation: SystemOperation`.
 - [ ] AC-4: `gather_prd_context` is registered in `SYSTEM_BUILTINS` and produces the expected markdown context block when run against a fixture PRD with a parent and two dependencies.
 - [ ] AC-5: `discuss_prd` is registered in `SYSTEM_BUILTINS`, composes the prompt by substituting `{PRD_CONTEXT}` and `{PHASE}`, prints the phase banner, and spawns the subprocess via a monkeypatchable wrapper. Tests verify all three behaviors.
 - [ ] AC-6: The discuss chain runs the four tasks in order: `gather_prd_context`, `discuss_prd(phase="discuss")`, `discuss_prd(phase="critique")`, `commit_prd_changes`. Verified by an integration test that mocks the interactive launches and the commit subprocess and asserts the call order.
 - [ ] AC-7: Running `prd discuss <id>` when `claude` is not on PATH exits with a clear error before the gather phase runs. Same for missing `git` or non-git `cwd`.
 - [ ] AC-8: A non-zero exit from the interactive `claude` subprocess (e.g., the user Ctrl-C's during the discuss phase) logs a warning and proceeds to the critique phase rather than aborting the chain. Verified by a test.
 - [ ] AC-9: All new modules pass `just lint && just typecheck && just test`. mypy strict has no escapes (`# type: ignore` only with comment justification).
-- [ ] AC-10: Peer test files exist for `discuss_prd`, `gather_prd_context`, and `commit_prd_changes` in `src/darkfactory/builtins/`. Integration tests exist in `tests/test_cli_discuss.py` (CLI dispatch) and `tests/test_commands_discuss.py` (operation shape and chain order).
+- [ ] AC-10: Peer test files exist for `discuss_prd`, `gather_prd_context`, and `commit_prd_changes` in `python/darkfactory/builtins/`. Integration tests exist in `tests/test_cli_discuss.py` (CLI dispatch) and `tests/test_commands_discuss.py` (operation shape and chain order).
 - [ ] AC-11: `prd discuss --help` and `prd new --help` describe the new command and flag clearly, including the chain's phases and the manual-exit interaction model.
 - [ ] AC-12: `commit_prd_changes` is registered in `SYSTEM_BUILTINS`. Running it when the target PRD file has no working-tree changes prints `No PRD changes to commit.` and returns without prompting.
 - [ ] AC-13: Running `commit_prd_changes` when the target PRD file IS dirty prints the diff, prints the suggested commit message, and prompts `[y/N/e]`. Default (Enter) is skip. Pressing `y` results in a single commit containing only the target PRD file. Pressing `e` prompts for a new message and commits with that message. Pressing `n` (or default) leaves the working tree dirty and the chain exits cleanly.
@@ -288,16 +288,16 @@ if args.discuss:
 
 ## References
 
-- Architectural fit: `src/darkfactory/system.py` (SystemOperation), `src/darkfactory/system_runner.py` (chain dispatcher), `src/darkfactory/cli/new.py:115` (existing pattern for handing the terminal to a subprocess and waiting).
+- Architectural fit: `python/darkfactory/system.py` (SystemOperation), `python/darkfactory/system_runner.py` (chain dispatcher), `python/darkfactory/cli/new.py:115` (existing pattern for handing the terminal to a subprocess and waiting).
 - PRD-615 introduces `_resolve_prd_or_exit` in `cli/_shared.py`, which `cli/discuss.py` should use once it lands (otherwise inline the same check). PRD-615 also introduces the `git_ops.py` wrapper that `commit_prd_changes` should use for its `git diff` / `git add` / `git commit` calls.
-- Existing commit builtin shape: `src/darkfactory/builtins/commit.py` (workflow-scoped). `commit_prd_changes` is a sibling system-scoped variant tailored for discussion chains — narrower paths, interactive confirmation, no PRD frontmatter mutation, no push, no PR.
+- Existing commit builtin shape: `python/darkfactory/builtins/commit.py` (workflow-scoped). `commit_prd_changes` is a sibling system-scoped variant tailored for discussion chains — narrower paths, interactive confirmation, no PRD frontmatter mutation, no push, no PR.
 
 ## Assessment (2026-04-11)
 
 - **Value**: n/a (already landed).
 - **Effort**: n/a
 - **Current state**: drift / done. State survey confirms
-  `src/darkfactory/cli/discuss.py` exists and `prd discuss` is
+  `python/darkfactory/cli/discuss.py` exists and `prd discuss` is
   wired in the parser. The `commands/discuss/` subpackage, the
   three new builtins (`gather_prd_context`, `discuss_prd`,
   `commit_prd_changes`), and the prompt files all appear to

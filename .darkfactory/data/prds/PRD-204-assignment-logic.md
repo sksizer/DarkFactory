@@ -13,7 +13,7 @@ blocks:
   - "[[PRD-206-list-workflows-assign-cli]]"
   - "[[PRD-210-runner]]"
 impacts:
-  - src/darkfactory/assign.py
+  - python/darkfactory/assign.py
   - tests/test_assign.py
 workflow: null
 target_version: null

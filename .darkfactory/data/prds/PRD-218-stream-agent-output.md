@@ -10,8 +10,8 @@ parent: null
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/invoke.py
-  - src/darkfactory/runner.py
+  - python/darkfactory/invoke.py
+  - python/darkfactory/runner.py
   - tests/test_invoke.py
 workflow: null
 target_version: null
@@ -66,7 +66,7 @@ This also lays the groundwork for **PRD-219 (per-task configurable timeouts)** â
 
 ### Replace `subprocess.run` with `Popen`
 
-`src/darkfactory/invoke.py`:
+`python/darkfactory/invoke.py`:
 
 ```python
 import subprocess

@@ -13,7 +13,7 @@ blocks:
   - "[[PRD-503-darkfactory-port-tests-workflows]]"
   - "[[PRD-504-darkfactory-cli-defaults]]"
 impacts:
-  - (darkfactory repo) src/darkfactory/**
+  - (darkfactory repo) python/darkfactory/**
 workflow: null
 target_version: null
 created: 2026-04-08
@@ -28,11 +28,11 @@ tags:
 
 ## Summary
 
-Copy every file from `tools/prd-harness/src/prd_harness/` into `darkfactory/src/darkfactory/` and rename all internal `prd_harness` references to `darkfactory`. Mechanical find-and-replace across imports, type hints, log names, and `__name__` references.
+Copy every file from `tools/prd-harness/src/prd_harness/` into `darkfactory/python/darkfactory/` and rename all internal `prd_harness` references to `darkfactory`. Mechanical find-and-replace across imports, type hints, log names, and `__name__` references.
 
 ## Requirements
 
-1. All 13 Python files from `src/prd_harness/` are copied to `src/darkfactory/`:
+1. All 13 Python files from `src/prd_harness/` are copied to `python/darkfactory/`:
    `__init__.py`, `__main__.py`, `cli.py`, `prd.py`, `graph.py`, `containment.py`, `impacts.py`, `workflow.py`, `builtins.py`, `runner.py`, `invoke.py`, `assign.py`, `loader.py`, `templates.py`.
 2. All `from prd_harness.X import Y` and `from .X import Y` relative imports still resolve after rename.
 3. All `from prd_harness import ...` full imports become `from darkfactory import ...`.
@@ -46,17 +46,17 @@ The mechanical steps:
 
 ```bash
 # Copy source tree
-mkdir -p ~/Developer/darkfactory/src/darkfactory
+mkdir -p ~/Developer/darkfactory/python/darkfactory
 cp tools/prd-harness/src/prd_harness/*.py \
-   ~/Developer/darkfactory/src/darkfactory/
+   ~/Developer/darkfactory/python/darkfactory/
 
-# Find-and-replace within darkfactory/src/darkfactory/
+# Find-and-replace within darkfactory/python/darkfactory/
 # Using find + sed (or a Python one-liner for safety):
 cd ~/Developer/darkfactory
 python3 -c "
 import re
 from pathlib import Path
-for p in Path('src/darkfactory').rglob('*.py'):
+for p in Path('python/darkfactory').rglob('*.py'):
     text = p.read_text()
     # Package-qualified imports
     text = text.replace('from prd_harness', 'from darkfactory')
@@ -90,11 +90,11 @@ Should print `ok` if the package imports cleanly.
 
 ## Acceptance Criteria
 
-- [ ] AC-1: `src/darkfactory/` contains all 13 source files.
+- [ ] AC-1: `python/darkfactory/` contains all 13 source files.
 - [ ] AC-2: `grep -rn "prd_harness" src/` returns no results.
 - [ ] AC-3: `uv run python -c "import darkfactory"` succeeds.
 - [ ] AC-4: `uv run python -c "from darkfactory.workflow import Workflow, BuiltIn, AgentTask, ShellTask"` succeeds.
-- [ ] AC-5: `uv run mypy src/darkfactory` passes with `strict = true` (tests come in PRD-503).
+- [ ] AC-5: `uv run mypy python/darkfactory` passes with `strict = true` (tests come in PRD-503).
 
 ## References
 
