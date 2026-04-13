@@ -7,14 +7,14 @@ from pathlib import Path
 
 from darkfactory.operations.project_builtins import _register
 from darkfactory.engine import PrdContext
-from darkfactory.project import ProjectContext
+from darkfactory.workflow import RunContext
 from darkfactory.utils.claude_code import EffortLevel, spawn_claude
 from darkfactory.utils.tui import print_phase_banner
 
 
 @_register("discuss_prd")
 def discuss_prd(
-    ctx: ProjectContext,
+    ctx: RunContext,
     *,
     phase: str,
     prompt_file: str,
@@ -29,10 +29,20 @@ def discuss_prd(
             "discuss_prd: no PRD context in state, proceeding with empty context"
         )
 
-    op_dir = ctx.operation.operation_dir
-    if op_dir is not None:
-        prompt_path = op_dir / prompt_file
-    else:
+    # Try to resolve prompt file relative to workflow_dir.
+    # For backwards compatibility, check for operation_dir pattern too.
+    from darkfactory.engine import ProjectRun
+
+    prompt_path: Path | None = None
+    if ctx.state.has(ProjectRun):
+        proj = ctx.state.get(ProjectRun)
+        wf_dir = proj.workflow.workflow_dir
+        if wf_dir is not None:
+            candidate = wf_dir / prompt_file
+            if candidate.exists():
+                prompt_path = candidate
+
+    if prompt_path is None:
         pkg_dir = Path(__file__).resolve().parent.parent / "commands" / "discuss"
         prompt_path = pkg_dir / prompt_file
 

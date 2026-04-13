@@ -15,7 +15,7 @@ The engine is the glue between every other module in the harness:
 - For each :class:`~darkfactory.workflow.InteractiveTask`, it launches
   an interactive Claude Code session via ``spawn_claude``.
 
-Both workflow and system operation execution paths use the single
+Both workflow and project workflow execution paths use the single
 :func:`run_tasks` dispatch function, parameterized on their respective
 builtin registries, prompt composers, and model pickers.
 """
@@ -26,22 +26,29 @@ import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, Callable
 
 from .operations import BUILTINS
 from .event_log import EventWriter, emit_task_event
 from .utils.claude_code import InvokeResult, capability_to_model, invoke_claude
 from .utils.shell import run_shell
 from .model import compute_branch_name
-from .engine import AgentResult, PhaseState
+from .engine import (
+    AgentResult,
+    CodeEnv,
+    PrResult,
+    PrdWorkflowRun,
+    ProjectRun,
+    WorktreeState,
+)
 from .workflow import compose_prompt
 from .timeouts import resolve_timeout
 from .utils.claude_code import spawn_claude
 from .workflow import (
     AgentTask,
     BuiltIn,
-    ExecutionContext,
     InteractiveTask,
+    RunContext,
     ShellTask,
     Task,
     Workflow,
@@ -70,30 +77,12 @@ class TaskStep:
 
 @dataclass
 class RunResult:
-    """Structured outcome of a workflow or system operation run."""
+    """Structured outcome of a workflow or project workflow run."""
 
     success: bool
     pr_url: str | None = None
     steps: list[TaskStep] = field(default_factory=list)
     failure_reason: str | None = None
-
-
-# ---------- context protocol ----------
-
-
-class RunContext(Protocol):
-    """Minimal protocol that both ExecutionContext and ProjectContext satisfy."""
-
-    cwd: Path
-    dry_run: bool
-    logger: logging.Logger
-    state: PhaseState
-    event_writer: EventWriter | None
-
-    def format_string(self, template: str) -> str: ...
-
-
-C = TypeVar("C", bound=RunContext)
 
 
 # ---------- model selection ----------
@@ -158,7 +147,7 @@ PickModelFn = Callable[[AgentTask, str | None], str]
 
 def run_tasks(
     tasks: list[Task],
-    ctx: Any,
+    ctx: RunContext,
     builtins: dict[str, Callable[..., None]],
     compose_prompt_fn: ComposePromptFn,
     pick_model_fn: PickModelFn,
@@ -171,30 +160,16 @@ def run_tasks(
     timeout_capability: str | None = None,
     timeout_frontmatter: int | None = None,
 ) -> RunResult:
-    """Unified dispatch loop for both workflow and system operation runs.
+    """Unified dispatch loop for both workflow and project workflow runs.
 
     Walks ``tasks`` in order, dispatching each to the appropriate handler
     based on its type. On any task failure or uncaught exception, the
     loop halts and returns a failure result with the partial steps.
-
-    Parameters:
-        tasks: Ordered task list to execute.
-        ctx: Execution context (ExecutionContext or ProjectContext).
-        builtins: Registry mapping builtin names to callables.
-        compose_prompt_fn: Callback ``(task, ctx, extras) -> str``.
-        pick_model_fn: Callback ``(task, override) -> model_name``.
-        model_override: CLI-level model override.
-        cli_timeout_minutes: CLI-level timeout override.
-        config_timeouts: Config-file timeout section.
-        styler: Colorized output renderer.
-        timeout_effort: PRD effort for timeout resolution.
-        timeout_capability: PRD capability for timeout resolution.
-        timeout_frontmatter: PRD frontmatter timeout_minutes value.
     """
     result = RunResult(success=True)
     last_agent_task: AgentTask | None = None
     last_agent_invoke: InvokeResult | None = None
-    writer: EventWriter | None = getattr(ctx, "event_writer", None)
+    writer: EventWriter | None = ctx.event_writer
 
     for task in tasks:
         try:
@@ -306,7 +281,7 @@ def run_tasks(
 
 def _run_builtin(
     task: BuiltIn,
-    ctx: Any,
+    ctx: RunContext,
     builtins: dict[str, Callable[..., None]],
 ) -> TaskStep:
     """Look up the built-in by name and call it with formatted kwargs."""
@@ -333,7 +308,7 @@ def _run_builtin(
 
 def _run_agent(
     task: AgentTask,
-    ctx: Any,
+    ctx: RunContext,
     compose_prompt_fn: ComposePromptFn,
     pick_model_fn: PickModelFn,
     model_override: str | None,
@@ -359,7 +334,7 @@ def _run_agent(
     )
     logger.info("Timeout: %ds (source: %s)", timeout_seconds, timeout_source)
 
-    writer: EventWriter | None = getattr(ctx, "event_writer", None)
+    writer: EventWriter | None = ctx.event_writer
 
     result = invoke_claude(
         prompt=prompt,
@@ -408,7 +383,7 @@ def _run_agent(
 
 def _run_shell(
     task: ShellTask,
-    ctx: Any,
+    ctx: RunContext,
     last_agent_task: AgentTask | None,
     last_agent_result: InvokeResult | None,
     compose_prompt_fn: ComposePromptFn,
@@ -432,7 +407,7 @@ def _run_shell(
     first_result = run_shell(cmd, ctx.cwd, task.env)
 
     # Emit shell output events via the event writer.
-    writer: EventWriter | None = getattr(ctx, "event_writer", None)
+    writer: EventWriter | None = ctx.event_writer
     if writer:
         if first_result.stdout:
             emit_task_event(
@@ -539,7 +514,7 @@ def _run_shell(
     )
 
 
-def _run_interactive(task: InteractiveTask, ctx: Any) -> TaskStep:
+def _run_interactive(task: InteractiveTask, ctx: RunContext) -> TaskStep:
     """Launch an interactive Claude Code session via spawn_claude."""
     if ctx.dry_run:
         ctx.logger.info("[dry-run] interactive: %s", task.name)
@@ -552,9 +527,15 @@ def _run_interactive(task: InteractiveTask, ctx: Any) -> TaskStep:
 
     prompt = ""
     if task.prompt_file:
-        op_dir = getattr(getattr(ctx, "operation", None), "operation_dir", None)
-        if op_dir is not None:
-            prompt_path = op_dir / task.prompt_file
+        # Resolve prompt file relative to workflow_dir
+        wf_dir: Path | None = None
+        if ctx.state.has(PrdWorkflowRun):
+            wf_dir = ctx.state.get(PrdWorkflowRun).workflow.workflow_dir
+        elif ctx.state.has(ProjectRun):
+            wf_dir = ctx.state.get(ProjectRun).workflow.workflow_dir
+
+        if wf_dir is not None:
+            prompt_path = wf_dir / task.prompt_file
         else:
             prompt_path = Path(task.prompt_file)
 
@@ -588,29 +569,10 @@ def _run_interactive(task: InteractiveTask, ctx: Any) -> TaskStep:
     return TaskStep(name=task.name, kind="interactive", success=True)
 
 
-# ---------- workflow-specific entry point ----------
+# ---------- worktree lock management ----------
 
 
-def _apply_context_overrides(ctx: ExecutionContext, overrides: dict[str, Any]) -> None:
-    """Apply caller-supplied overrides to ``ctx`` before task dispatch.
-
-    Validates each key against the dataclass fields so an unknown key
-    fails with a clear ``ValueError`` instead of silently attaching a
-    stray attribute that no downstream task will read.
-    """
-    from dataclasses import fields
-
-    valid_fields = {f.name for f in fields(ctx)}
-    for key, value in overrides.items():
-        if key not in valid_fields:
-            raise ValueError(
-                f"run_workflow: unknown ExecutionContext field {key!r} in "
-                f"context_overrides"
-            )
-        setattr(ctx, key, value)
-
-
-def _release_worktree_lock(ctx: ExecutionContext) -> None:
+def _release_worktree_lock(ctx: RunContext) -> None:
     """Release the advisory lock acquired by ensure_worktree, if any."""
     lock = ctx._worktree_lock
     if lock is None:
@@ -623,15 +585,19 @@ def _release_worktree_lock(ctx: ExecutionContext) -> None:
         ctx._worktree_lock = None
 
 
+# ---------- workflow-specific entry point ----------
+
+
 def _workflow_compose_prompt(
-    task: AgentTask, ctx: ExecutionContext, extras: dict[str, object] | None = None
+    task: AgentTask, ctx: RunContext, extras: dict[str, object] | None = None
 ) -> str:
     """Compose prompt for workflow AgentTask.
 
-    Injects ``REWORK_FEEDBACK`` from ReworkState when present, so the
-    generic ``compose_prompt`` doesn't need rework-specific knowledge.
+    Injects ``REWORK_FEEDBACK`` from ReworkState when present.
     """
     from .engine import ReworkState
+
+    prd_run = ctx.state.get(PrdWorkflowRun)
 
     rework_extras: dict[str, object] = {}
     if ctx.state.has(ReworkState):
@@ -645,13 +611,9 @@ def _workflow_compose_prompt(
     if extras:
         rework_extras.update(extras)
 
-    return compose_prompt(ctx.workflow, task.prompts, ctx, extras=rework_extras or None)
-
-
-def _workflow_pick_model(task: AgentTask, override: str | None = None) -> str:
-    """Pick model for workflow AgentTask — needs the PRD, captured via closure."""
-    # This is replaced per-call in run_workflow with a closure over prd.
-    raise NotImplementedError("must be replaced with a closure over prd")
+    return compose_prompt(
+        prd_run.workflow, task.prompts, ctx, extras=rework_extras or None
+    )
 
 
 def run_workflow(
@@ -666,7 +628,6 @@ def run_workflow(
     config_timeouts: dict[str, object] | None = None,
     styler: "Styler | None" = None,
     session_id: str | None = None,
-    context_overrides: dict[str, Any] | None = None,
     phase_state_init: list[object] | None = None,
 ) -> RunResult:
     """Execute a workflow against a single PRD and return the result."""
@@ -676,32 +637,29 @@ def run_workflow(
     if not dry_run and session_id:
         writer = EventWriter(repo_root, session_id, prd.id)
 
-    ctx = ExecutionContext(
-        prd=prd,
-        repo_root=repo_root,
-        workflow=workflow,
-        base_ref=base_ref,
-        branch_name=branch_name,
-        cwd=repo_root,
+    ctx = RunContext(
         dry_run=dry_run,
         logger=logger,
         event_writer=writer,
     )
 
-    if context_overrides:
-        _apply_context_overrides(ctx, context_overrides)
+    # Seed the PhaseState with CodeEnv, PrdWorkflowRun, and WorktreeState.
+    ctx.state.put(CodeEnv(repo_root=repo_root, cwd=repo_root))
+    ctx.state.put(PrdWorkflowRun(prd=prd, workflow=workflow))
+    ctx.state.put(WorktreeState(branch=branch_name, base_ref=base_ref))
 
     if phase_state_init:
         for bundle in phase_state_init:
             ctx.state.put(bundle)
 
     if writer:
+        wt = ctx.state.get(WorktreeState)
         writer.emit(
             "workflow",
             "workflow_start",
             workflow=workflow.name,
-            branch_name=branch_name,
-            worktree_path=str(ctx.worktree_path) if ctx.worktree_path else None,
+            branch_name=wt.branch,
+            worktree_path=str(wt.worktree_path) if wt.worktree_path else None,
         )
 
     def pick_model_for_prd(task: AgentTask, override: str | None = None) -> str:
@@ -739,32 +697,33 @@ def run_workflow(
             writer.close()
         _release_worktree_lock(ctx)
 
-    result.pr_url = ctx.pr_url
+    result.pr_url = ctx.state.get(PrResult).url if ctx.state.has(PrResult) else None
     return result
 
 
-# ---------- project operation entry point ----------
+# ---------- project workflow entry point ----------
 
 
 def _project_compose_prompt(
-    task: AgentTask, ctx: Any, extras: dict[str, object] | None = None
+    task: AgentTask, ctx: RunContext, extras: dict[str, object] | None = None
 ) -> str:
-    """Load prompt files and substitute project-op placeholders."""
+    """Load prompt files and substitute project-workflow placeholders."""
     from darkfactory.workflow import load_prompt_files, substitute_placeholders
 
-    op_dir = ctx.operation.operation_dir
-    if op_dir is None:
+    proj = ctx.state.get(ProjectRun)
+    wf_dir = proj.workflow.workflow_dir
+    if wf_dir is None:
         raise ValueError(
-            f"operation {ctx.operation.name!r} has no operation_dir; "
+            f"workflow {proj.workflow.name!r} has no workflow_dir; "
             "the loader normally sets this at import time"
         )
 
-    raw = load_prompt_files(op_dir, task.prompts)
+    raw = load_prompt_files(wf_dir, task.prompts)
 
     context: dict[str, object] = {
-        "OPERATION_NAME": ctx.operation.name,
-        "TARGET_COUNT": len(ctx.targets),
-        "TARGET_PRD": ctx.target_prd or "",
+        "OPERATION_NAME": proj.workflow.name,
+        "TARGET_COUNT": len(proj.targets),
+        "TARGET_PRD": proj.target_prd or "",
     }
     if extras:
         context.update(extras)
@@ -773,8 +732,8 @@ def _project_compose_prompt(
 
 
 def run_project_operation(
-    operation: Any,
-    ctx: Any,
+    operation: Workflow,
+    ctx: RunContext,
     model_override: str | None = None,
     *,
     session_id: str | None = None,
@@ -782,15 +741,15 @@ def run_project_operation(
     config_timeouts: dict[str, object] | None = None,
     styler: "Styler | None" = None,
 ) -> RunResult:
-    """Execute a project operation via the unified dispatch engine.
+    """Execute a project workflow via the unified dispatch engine.
 
     When ``session_id`` is provided and the context is not dry-run, an
-    :class:`EventWriter` is created automatically so project operations
+    :class:`EventWriter` is created automatically so project workflows
     produce event logs just like workflow runs.
     """
     from .operations.project_builtins import SYSTEM_BUILTINS
 
-    writer: EventWriter | None = getattr(ctx, "event_writer", None)
+    writer: EventWriter | None = ctx.event_writer
     owns_writer = False
 
     if writer is None and session_id and not ctx.dry_run:
@@ -833,5 +792,5 @@ def run_project_operation(
             if owns_writer:
                 writer.close()
 
-    result.pr_url = ctx.pr_url
+    result.pr_url = ctx.state.get(PrResult).url if ctx.state.has(PrResult) else None
     return result

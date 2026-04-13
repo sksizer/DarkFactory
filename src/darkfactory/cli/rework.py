@@ -35,7 +35,7 @@ def cmd_rework(args: argparse.Namespace) -> int:
 
     Without ``--execute``, prints a dry-run summary and exits.
     With ``--execute`` and any unresolved threads, invokes the rework
-    workflow, seeding the ExecutionContext's PhaseState with the
+    workflow, seeding the RunContext's PhaseState with the
     already-discovered state so the builtin at position 0 is a no-op.
     """
     prds = _load(args.data_dir)
@@ -79,11 +79,25 @@ def cmd_rework(args: argparse.Namespace) -> int:
     base_ref = _resolve_base_ref(None, repo_root)
     session = generate_session_id()
 
+    from darkfactory.engine import CodeEnv, WorktreeState
+
     rework_state = ReworkState(
         pr_number=discovered.pr_number,
         review_threads=discovered.review_threads,
         comment_filters=discovered.comment_filters,
         reply_to_comments=discovered.reply_to_comments,
+    )
+
+    # Seed WorktreeState and CodeEnv with the discovered worktree so
+    # the resolve_rework_context builtin at position 0 is a no-op.
+    worktree_state = WorktreeState(
+        branch=discovered.branch_name,
+        base_ref=base_ref,
+        worktree_path=discovered.worktree_path,
+    )
+    code_env_override = CodeEnv(
+        repo_root=repo_root,
+        cwd=discovered.worktree_path,
     )
 
     result = run_workflow(
@@ -93,11 +107,7 @@ def cmd_rework(args: argparse.Namespace) -> int:
         base_ref,
         dry_run=False,
         session_id=session,
-        context_overrides={
-            "worktree_path": discovered.worktree_path,
-            "cwd": discovered.worktree_path,
-        },
-        phase_state_init=[rework_state],
+        phase_state_init=[rework_state, worktree_state, code_env_override],
     )
     return 0 if result.success else 1
 

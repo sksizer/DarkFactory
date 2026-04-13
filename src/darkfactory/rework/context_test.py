@@ -64,7 +64,9 @@ def _thread(thread_id: str = "t-1") -> ReviewThread:
 
 
 def test_find_open_pr_returns_number_on_match(tmp_path: Path) -> None:
-    with patch("darkfactory.rework.context.gh_json", return_value=_Ok([{"number": 42}])):
+    with patch(
+        "darkfactory.rework.context.gh_json", return_value=_Ok([{"number": 42}])
+    ):
         assert find_open_pr("prd/PRD-001-my-feature", tmp_path) == 42
 
 
@@ -92,7 +94,9 @@ def test_find_open_pr_returns_none_on_missing_gh(tmp_path: Path) -> None:
 def test_find_open_pr_returns_none_on_invalid_json(tmp_path: Path) -> None:
     with patch(
         "darkfactory.rework.context.gh_json",
-        return_value=_GhErr(-1, "NOT JSON", "invalid JSON in stdout", ["gh", "pr", "list"]),
+        return_value=_GhErr(
+            -1, "NOT JSON", "invalid JSON in stdout", ["gh", "pr", "list"]
+        ),
     ):
         assert find_open_pr("prd/PRD-001-my-feature", tmp_path) is None
 

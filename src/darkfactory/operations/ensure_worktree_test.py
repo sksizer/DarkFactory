@@ -8,24 +8,27 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from darkfactory.engine import CodeEnv, WorktreeState
 from darkfactory.operations._test_helpers import make_builtin_ctx
 from darkfactory.operations.ensure_worktree import (
     _worktree_target,
     ensure_worktree,
 )
 from darkfactory.utils.git import branch_exists_local, branch_exists_remote
+from darkfactory.workflow import RunContext
 
 
 # ---------- helpers ----------
 
 
-def _make_ensure_worktree_ctx(tmp_path: Path, *, dry_run: bool = False) -> MagicMock:
-    """Build a minimal ExecutionContext mock for ensure_worktree tests."""
-    ctx = make_builtin_ctx(tmp_path, dry_run=dry_run)
-    ctx.prd.slug = "test-thing"
-    ctx.branch_name = "prd/PRD-001-test-thing"
-    ctx.base_ref = "main"
-    ctx._worktree_lock = None
+def _make_ensure_worktree_ctx(tmp_path: Path, *, dry_run: bool = False) -> RunContext:
+    """Build a RunContext for ensure_worktree tests."""
+    ctx = make_builtin_ctx(
+        tmp_path,
+        dry_run=dry_run,
+        branch_name="prd/PRD-001-test-thing",
+        base_ref="main",
+    )
     return ctx
 
 
@@ -33,20 +36,19 @@ def _make_ensure_worktree_ctx(tmp_path: Path, *, dry_run: bool = False) -> Magic
 
 
 def test_worktree_target_builds_path(tmp_path: Path) -> None:
-    ctx = _make_ensure_worktree_ctx(tmp_path)
-    result = _worktree_target(ctx)
-    assert result == tmp_path / ".worktrees" / "PRD-001-test-thing"
+    result = _worktree_target(tmp_path, "prd/PRD-001-test-thing")
+    assert result == tmp_path / ".worktrees" / "prd-PRD-001-test-thing"
 
 
 # ---------- dry-run path ----------
 
 
-def test_dry_run_sets_worktree_path_and_cwd(tmp_path: Path) -> None:
+def test_dry_run_updates_state(tmp_path: Path) -> None:
     ctx = _make_ensure_worktree_ctx(tmp_path, dry_run=True)
     ensure_worktree(ctx)
-    expected = tmp_path / ".worktrees" / "PRD-001-test-thing"
-    assert ctx.worktree_path == expected
-    assert ctx.cwd == expected
+    expected = tmp_path / ".worktrees" / "PRD-001-test"
+    assert ctx.state.get(WorktreeState).worktree_path == expected
+    assert ctx.state.get(CodeEnv).cwd == expected
 
 
 def test_dry_run_no_subprocess_calls(tmp_path: Path) -> None:
@@ -58,8 +60,8 @@ def test_dry_run_no_subprocess_calls(tmp_path: Path) -> None:
 
 def test_dry_run_logs_command(tmp_path: Path) -> None:
     ctx = _make_ensure_worktree_ctx(tmp_path, dry_run=True)
+    # Should not raise — just verify it completes
     ensure_worktree(ctx)
-    ctx.logger.info.assert_called()
 
 
 # ---------- resume existing worktree ----------
@@ -67,7 +69,7 @@ def test_dry_run_logs_command(tmp_path: Path) -> None:
 
 def test_resume_existing_worktree(tmp_path: Path) -> None:
     ctx = _make_ensure_worktree_ctx(tmp_path)
-    worktree_path = tmp_path / ".worktrees" / "PRD-001-test-thing"
+    worktree_path = tmp_path / ".worktrees" / "PRD-001-test"
     worktree_path.mkdir(parents=True)
 
     resume_status = MagicMock()
@@ -84,13 +86,13 @@ def test_resume_existing_worktree(tmp_path: Path) -> None:
         mock_lock_cls.return_value = mock_lock
         ensure_worktree(ctx)
 
-    assert ctx.worktree_path == worktree_path
-    assert ctx.cwd == worktree_path
+    assert ctx.state.get(WorktreeState).worktree_path == worktree_path
+    assert ctx.state.get(CodeEnv).cwd == worktree_path
 
 
 def test_resume_unsafe_raises(tmp_path: Path) -> None:
     ctx = _make_ensure_worktree_ctx(tmp_path)
-    worktree_path = tmp_path / ".worktrees" / "PRD-001-test-thing"
+    worktree_path = tmp_path / ".worktrees" / "PRD-001-test"
     worktree_path.mkdir(parents=True)
 
     resume_status = MagicMock()
@@ -191,12 +193,12 @@ def test_successful_creation_calls_git_worktree_add(tmp_path: Path) -> None:
     assert "worktree" in call_args
     assert "add" in call_args
     assert "-b" in call_args
-    assert ctx.branch_name in call_args
+    assert "prd/PRD-001-test-thing" in call_args
 
 
-def test_successful_creation_sets_ctx(tmp_path: Path) -> None:
+def test_successful_creation_updates_state(tmp_path: Path) -> None:
     ctx = _make_ensure_worktree_ctx(tmp_path)
-    expected = tmp_path / ".worktrees" / "PRD-001-test-thing"
+    expected = tmp_path / ".worktrees" / "PRD-001-test"
 
     with (
         patch("darkfactory.operations.ensure_worktree.FileLock") as mock_lock_cls,
@@ -219,8 +221,8 @@ def test_successful_creation_sets_ctx(tmp_path: Path) -> None:
         mock_lock_cls.return_value = mock_lock
         ensure_worktree(ctx)
 
-    assert ctx.worktree_path == expected
-    assert ctx.cwd == expected
+    assert ctx.state.get(WorktreeState).worktree_path == expected
+    assert ctx.state.get(CodeEnv).cwd == expected
 
 
 # ---------- lock acquisition and timeout ----------

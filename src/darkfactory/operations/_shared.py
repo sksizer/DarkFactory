@@ -4,7 +4,7 @@ import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from darkfactory.workflow import ExecutionContext
+    from darkfactory.workflow import RunContext
 
 # ----- attribution lint -----
 #
@@ -22,7 +22,7 @@ _FORBIDDEN_ATTRIBUTION_PATTERNS: tuple[re.Pattern[str], ...] = (
 )
 
 
-def _log_dry_run(ctx: "ExecutionContext", message: str) -> bool:
+def _log_dry_run(ctx: "RunContext", message: str) -> bool:
     """Return True (and log) if ``ctx`` is in dry-run mode.
 
     Eliminates the repeated ``if ctx.dry_run: ctx.logger.info(...); return``

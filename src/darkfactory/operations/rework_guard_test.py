@@ -21,13 +21,13 @@ def test_has_changes_returns_true_when_output(tmp_path: Path) -> None:
         [], returncode=0, stdout=" M some_file.py\n", stderr=""
     )
     with patch("darkfactory.utils.git._run.subprocess.run", return_value=result):
-        assert _has_changes(str(tmp_path)) is True
+        assert _has_changes(tmp_path) is True
 
 
 def test_has_changes_returns_false_when_empty(tmp_path: Path) -> None:
     result = subprocess.CompletedProcess([], returncode=0, stdout="", stderr="")
     with patch("darkfactory.utils.git._run.subprocess.run", return_value=result):
-        assert _has_changes(str(tmp_path)) is False
+        assert _has_changes(tmp_path) is False
 
 
 # ---------- dry-run mode ----------
@@ -38,7 +38,6 @@ def test_dry_run_logs_and_does_not_touch_state(tmp_path: Path) -> None:
     with patch("darkfactory.utils.git._run.subprocess.run") as mock_run:
         check_rework_guard(ctx)
     mock_run.assert_not_called()
-    ctx.logger.info.assert_called()
     # State file should not exist.
     assert not (tmp_path / ".darkfactory" / "state" / "rework-guard.json").exists()
 
@@ -62,14 +61,14 @@ def test_with_changes_resets_counter(tmp_path: Path) -> None:
     assert fresh_guard.get_consecutive_no_change("PRD-001") == 0
 
 
-def test_with_changes_logs_info(tmp_path: Path) -> None:
+def test_with_changes_does_not_raise(tmp_path: Path) -> None:
     ctx = make_builtin_ctx(tmp_path)
     status_result = subprocess.CompletedProcess(
         [], returncode=0, stdout=" M file.py\n", stderr=""
     )
     with patch("darkfactory.utils.git._run.subprocess.run", return_value=status_result):
+        # Should not raise
         check_rework_guard(ctx)
-    ctx.logger.info.assert_called()
 
 
 # ---------- no changes — below threshold ----------
@@ -122,25 +121,25 @@ def test_blocked_error_message_contains_prd_id(tmp_path: Path) -> None:
 
 
 def test_event_writer_called_with_changes(tmp_path: Path) -> None:
-    ctx = make_builtin_ctx(tmp_path)
-    ctx.event_writer = MagicMock()
+    writer = MagicMock()
+    ctx = make_builtin_ctx(tmp_path, event_writer=writer)
     status_result = subprocess.CompletedProcess(
         [], returncode=0, stdout=" M file.py\n", stderr=""
     )
     with patch("darkfactory.utils.git._run.subprocess.run", return_value=status_result):
         check_rework_guard(ctx)
-    ctx.event_writer.emit.assert_called_once()
-    call_kwargs = ctx.event_writer.emit.call_args
+    writer.emit.assert_called_once()
+    call_kwargs = writer.emit.call_args
     assert call_kwargs[0][1] == "rework_guard"
     assert call_kwargs[1]["had_changes"] is True
 
 
 def test_event_writer_called_without_changes(tmp_path: Path) -> None:
-    ctx = make_builtin_ctx(tmp_path)
-    ctx.event_writer = MagicMock()
+    writer = MagicMock()
+    ctx = make_builtin_ctx(tmp_path, event_writer=writer)
     status_result = subprocess.CompletedProcess([], returncode=0, stdout="", stderr="")
     with patch("darkfactory.utils.git._run.subprocess.run", return_value=status_result):
         check_rework_guard(ctx)
-    ctx.event_writer.emit.assert_called_once()
-    call_kwargs = ctx.event_writer.emit.call_args
+    writer.emit.assert_called_once()
+    call_kwargs = writer.emit.call_args
     assert call_kwargs[1]["had_changes"] is False

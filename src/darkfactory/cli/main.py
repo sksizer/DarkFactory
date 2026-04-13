@@ -64,7 +64,10 @@ def main(argv: list[str] | None = None) -> int:
     # Use config-resolved paths; CLI flags (already on args) take precedence.
     if args.workflows_dir is None and resolved_config.paths.workflows_dir is not None:
         args.workflows_dir = resolved_config.paths.workflows_dir
-    if getattr(args, "operations_dir", None) is None and resolved_config.paths.operations_dir is not None:
+    if (
+        getattr(args, "operations_dir", None) is None
+        and resolved_config.paths.operations_dir is not None
+    ):
         args.operations_dir = resolved_config.paths.operations_dir
     style_config = resolve_style_config(
         config=resolved_config,

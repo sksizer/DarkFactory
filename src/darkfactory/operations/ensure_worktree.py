@@ -1,4 +1,4 @@
-"""Built-in: ensure_worktree — create or resume a git worktree for a PRD."""
+"""Built-in: ensure_worktree — create or resume a git worktree."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from pathlib import Path
 from filelock import FileLock
 from filelock import Timeout as LockTimeout
 
+from darkfactory.engine import CodeEnv, PrdWorkflowRun, WorktreeState
 from darkfactory.operations._registry import builtin
 from darkfactory.operations._shared import _log_dry_run
 from darkfactory.checks import is_resume_safe
@@ -19,50 +20,80 @@ from darkfactory.utils.git import (
     branch_exists_remote,
     git_run,
 )
-from darkfactory.workflow import ExecutionContext
+from darkfactory.workflow import RunContext
 
 _log = logging.getLogger(__name__)
 
 
-def _worktree_target(ctx: ExecutionContext) -> Path:
-    """Compute the worktree path for this PRD under ``.worktrees/``.
+def _worktree_dir_name(branch: str, prd_run: PrdWorkflowRun | None) -> str:
+    """Compute the worktree directory name.
 
-    Separated out so tests can assert the path without a whole
-    subprocess invocation.
+    For PRD runs, preserves the ``PRD-{id}-{slug}`` naming convention
+    that cleanup, reset, and rework_watch expect (they scan for
+    ``^(PRD-[\\d.]+)`` in ``.worktrees/``).
+
+    For non-PRD runs, uses the full branch name with slashes replaced.
     """
-    return ctx.repo_root / ".worktrees" / f"{ctx.prd.id}-{ctx.prd.slug}"
+    if prd_run is not None:
+        return f"{prd_run.prd.id}-{prd_run.prd.slug}"
+    return branch.replace("/", "-")
+
+
+def _worktree_target(
+    repo_root: Path, branch: str, prd_run: PrdWorkflowRun | None = None
+) -> Path:
+    """Compute the worktree path under ``.worktrees/``."""
+    return repo_root / ".worktrees" / _worktree_dir_name(branch, prd_run)
+
+
+def _lock_name(branch: str, prd_run: PrdWorkflowRun | None) -> str:
+    """Compute the lock file name (without ``.lock`` suffix).
+
+    For PRD runs, uses ``{prd.id}`` to match the convention used by
+    ``reset``, ``rework_watch``, and other lock-checking codepaths.
+
+    For non-PRD runs, uses the branch name with slashes replaced.
+    """
+    if prd_run is not None:
+        return prd_run.prd.id
+    return branch.replace("/", "-")
 
 
 @builtin("ensure_worktree")
-def ensure_worktree(ctx: ExecutionContext) -> None:
-    """Create (or resume) a git worktree for this PRD.
+def ensure_worktree(ctx: RunContext) -> None:
+    """Create (or resume) a git worktree.
 
-    Target path: ``{repo_root}/.worktrees/{prd_id}-{slug}``. Branch:
-    ``prd/{prd_id}-{slug}`` created from ``ctx.base_ref``. If the
-    worktree already exists (previous run resumed), reuses it without
-    re-creating. Sets ``ctx.worktree_path`` and ``ctx.cwd`` on success.
+    Reads ``WorktreeState`` from ``ctx.state`` for branch name and base_ref.
+    If no ``WorktreeState`` is present, raises an error (use ``name_worktree``
+    before ``ensure_worktree``).
 
-    In live mode, acquires a per-PRD advisory file lock at
-    ``.worktrees/{prd_id}.lock`` before any mutation so two concurrent
-    ``prd run`` invocations for the same PRD fail fast with a clear
-    message instead of racing. The lock is auto-released by the kernel
-    when the process exits; the runner also releases it explicitly at the
-    end of the run (see ``_release_worktree_lock``).
+    On success, replaces ``CodeEnv`` with updated ``cwd=worktree_path``
+    and replaces ``WorktreeState`` with ``worktree_path`` set.
+
+    In live mode, acquires a per-branch advisory file lock at
+    ``.worktrees/{branch_safe}.lock`` before any mutation so two concurrent
+    runs for the same branch fail fast.
     """
-    worktree_path = _worktree_target(ctx)
-    branch = ctx.branch_name
+    wt = ctx.state.get(WorktreeState)
+    env = ctx.state.get(CodeEnv)
+    repo_root = env.repo_root
+    branch = wt.branch
+    base_ref = wt.base_ref
 
-    if _log_dry_run(
-        ctx, f"git worktree add -b {branch} {worktree_path} {ctx.base_ref}"
-    ):
+    prd_run = ctx.state.get(PrdWorkflowRun) if ctx.state.has(PrdWorkflowRun) else None
+    worktree_path = _worktree_target(repo_root, branch, prd_run)
+
+    if _log_dry_run(ctx, f"git worktree add -b {branch} {worktree_path} {base_ref}"):
         # Dry-run produces no side effects, so no lock needed.
-        ctx.worktree_path = worktree_path
-        ctx.cwd = worktree_path
+        ctx.state.put(CodeEnv(repo_root=repo_root, cwd=worktree_path))
+        ctx.state.put(
+            WorktreeState(branch=branch, base_ref=base_ref, worktree_path=worktree_path)
+        )
         return
 
     # Acquire the lock BEFORE the resume-check or any mutation.
-    # The lock file lives at .worktrees/PRD-X.lock and is per-PRD.
-    lock_path = ctx.repo_root / ".worktrees" / f"{ctx.prd.id}.lock"
+    lock_file = _lock_name(branch, prd_run)
+    lock_path = repo_root / ".worktrees" / f"{lock_file}.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
 
     lock = FileLock(str(lock_path))
@@ -70,47 +101,49 @@ def ensure_worktree(ctx: ExecutionContext) -> None:
         lock.acquire(timeout=0)  # non-blocking
     except LockTimeout:
         raise RuntimeError(
-            f"{ctx.prd.id} is already being worked on by another `prd run` "
-            f"process (lock held on {lock_path}). If that process died, "
+            f"Branch {branch!r} is already being worked on by another process "
+            f"(lock held on {lock_path}). If that process died, "
             f"the lock will auto-release when its file handle is reclaimed. "
             f"On a stuck lock, delete {lock_path} manually."
         ) from None
 
+    # Store the lock on the context for the runner to release later.
     ctx._worktree_lock = lock
 
     # ---- existing logic below, now lock-protected ----
     if worktree_path.exists():
-        status = is_resume_safe(branch, ctx.repo_root)
+        status = is_resume_safe(branch, repo_root)
         if not status.safe:
             lock.release()
             ctx._worktree_lock = None
             raise RuntimeError(status.reason)
         ctx.logger.info("resuming existing worktree: %s", worktree_path)
-        ctx.worktree_path = worktree_path
-        ctx.cwd = worktree_path
+        ctx.state.put(CodeEnv(repo_root=repo_root, cwd=worktree_path))
+        ctx.state.put(
+            WorktreeState(branch=branch, base_ref=base_ref, worktree_path=worktree_path)
+        )
         return
 
-    local_exists = branch_exists_local(ctx.repo_root, branch)
-    remote_exists = branch_exists_remote(ctx.repo_root, branch)
+    local_exists = branch_exists_local(repo_root, branch)
+    remote_exists = branch_exists_remote(repo_root, branch)
     if local_exists or remote_exists:
         # Release the lock before raising so the error state is clean.
         lock.release()
         ctx._worktree_lock = None
         raise RuntimeError(
             f"branch {branch!r} already exists but worktree {worktree_path} is gone. "
-            f"Run `prd cleanup {ctx.prd.id}` to release it."
+            f"Delete the branch manually or run cleanup."
         )
 
     # git worktree add -b <branch> <path> <base>
-    # Run from the repo root, not from ctx.cwd (which may not be a git dir yet).
     match git_run(
         "worktree",
         "add",
         "-b",
         branch,
         str(worktree_path),
-        ctx.base_ref,
-        cwd=ctx.repo_root,
+        base_ref,
+        cwd=repo_root,
     ):
         case Ok():
             pass
@@ -119,5 +152,7 @@ def ensure_worktree(ctx: ExecutionContext) -> None:
         case Timeout(timeout=t):
             raise RuntimeError(f"git worktree add timed out after {t}s")
 
-    ctx.worktree_path = worktree_path
-    ctx.cwd = worktree_path
+    ctx.state.put(CodeEnv(repo_root=repo_root, cwd=worktree_path))
+    ctx.state.put(
+        WorktreeState(branch=branch, base_ref=base_ref, worktree_path=worktree_path)
+    )

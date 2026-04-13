@@ -1,8 +1,8 @@
 """Built-in: resolve_rework_context — discover worktree, PR, guard state, threads.
 
-First task in the rework workflow. Populates ``ctx.worktree_path``,
-``ctx.cwd``, and stores a :class:`ReworkState` in ``ctx.state`` with
-``pr_number`` and ``review_threads`` so that every subsequent task
+First task in the rework workflow. Populates ``WorktreeState`` and
+``CodeEnv`` payloads and stores a :class:`ReworkState` in ``ctx.state``
+with ``pr_number`` and ``review_threads`` so that every subsequent task
 can run against a concrete worktree and a concrete PR.
 
 When the CLI has already pre-discovered the rework state (the default
@@ -17,31 +17,40 @@ import logging
 from darkfactory.operations._registry import builtin
 from darkfactory.operations._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
-from darkfactory.engine import ReworkState
+from darkfactory.engine import CodeEnv, PrdWorkflowRun, ReworkState, WorktreeState
 from darkfactory.utils.github.pr.comments import CommentFilters
 from darkfactory.rework.context import ReworkError, discover_rework_context
-from darkfactory.workflow import ExecutionContext
+from darkfactory.workflow import RunContext
 
 _log = logging.getLogger(__name__)
 
 
 @builtin("resolve_rework_context")
-def resolve_rework_context(ctx: ExecutionContext) -> None:
+def resolve_rework_context(ctx: RunContext) -> None:
     """Discover rework pre-conditions and populate the context.
 
-    No-op when ``ctx.worktree_path`` is set and ``ReworkState`` has
-    ``review_threads`` populated (the CLI pre-discovered). Otherwise
-    calls :func:`~darkfactory.rework.context.discover_rework_context`
+    No-op when ``WorktreeState`` has ``worktree_path`` set and
+    ``ReworkState`` has ``review_threads`` populated (the CLI
+    pre-discovered). Otherwise calls
+    :func:`~darkfactory.rework.context.discover_rework_context`
     and stores the result in PhaseState.
     """
     rework = ctx.state.get(ReworkState, ReworkState())
+    prd_run = ctx.state.get(PrdWorkflowRun)
+    prd = prd_run.prd
 
-    if ctx.worktree_path is not None and rework.review_threads is not None:
+    wt = ctx.state.get(WorktreeState) if ctx.state.has(WorktreeState) else None
+
+    if (
+        wt is not None
+        and wt.worktree_path is not None
+        and rework.review_threads is not None
+    ):
         _log.debug(
             "resolve_rework_context: ctx already populated "
             "(%d thread(s), worktree %s) — skipping discovery",
             len(rework.review_threads),
-            ctx.worktree_path,
+            wt.worktree_path,
         )
         return
 
@@ -50,7 +59,7 @@ def resolve_rework_context(ctx: ExecutionContext) -> None:
     if _log_dry_run(
         ctx,
         f"resolve_rework_context: would discover worktree, PR, and review "
-        f"threads for {ctx.prd.id}",
+        f"threads for {prd.id}",
     ):
         if rework.review_threads is None:
             ctx.state.put(
@@ -65,7 +74,7 @@ def resolve_rework_context(ctx: ExecutionContext) -> None:
 
     try:
         discovered = discover_rework_context(
-            ctx.prd,
+            prd,
             ctx.repo_root,
             comment_filters=filters,
             reply_to_comments=rework.reply_to_comments,
@@ -73,8 +82,24 @@ def resolve_rework_context(ctx: ExecutionContext) -> None:
     except ReworkError as exc:
         raise RuntimeError(f"resolve_rework_context: {exc}") from exc
 
-    ctx.worktree_path = discovered.worktree_path
-    ctx.cwd = discovered.worktree_path
+    # Update CodeEnv with the discovered worktree as cwd.
+    env = ctx.state.get(CodeEnv)
+    ctx.state.put(CodeEnv(repo_root=env.repo_root, cwd=discovered.worktree_path))
+
+    # Update WorktreeState with the discovered worktree path.
+    existing_wt = (
+        ctx.state.get(WorktreeState)
+        if ctx.state.has(WorktreeState)
+        else WorktreeState(branch=discovered.branch_name)
+    )
+    ctx.state.put(
+        WorktreeState(
+            branch=existing_wt.branch,
+            base_ref=existing_wt.base_ref,
+            worktree_path=discovered.worktree_path,
+        )
+    )
+
     ctx.state.put(
         ReworkState(
             pr_number=discovered.pr_number,
@@ -86,7 +111,7 @@ def resolve_rework_context(ctx: ExecutionContext) -> None:
 
     _log.info(
         "resolve_rework_context: %s → worktree=%s, PR=#%d, threads=%d",
-        ctx.prd.id,
+        prd.id,
         discovered.worktree_path,
         discovered.pr_number,
         len(discovered.review_threads),
@@ -97,7 +122,7 @@ def resolve_rework_context(ctx: ExecutionContext) -> None:
         "resolve_rework_context",
         "resolve",
         detail={
-            "prd_id": ctx.prd.id,
+            "prd_id": prd.id,
             "worktree_path": str(discovered.worktree_path),
             "pr_number": discovered.pr_number,
             "thread_count": len(discovered.review_threads),

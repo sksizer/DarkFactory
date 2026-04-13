@@ -7,12 +7,13 @@ Covers ``render_rework_feedback`` and its integration with the
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
 
+from darkfactory.engine import CodeEnv, PrdWorkflowRun, WorktreeState
+from darkfactory.model import PRD
 from darkfactory.utils.github.pr.comments import ReviewComment, ReviewThread
 from darkfactory.rework.prompt import render_rework_feedback
 from darkfactory.workflow import compose_prompt, substitute_placeholders
-from darkfactory.workflow import ExecutionContext, Workflow
+from darkfactory.workflow import RunContext, Workflow
 
 
 # ---------- helpers ----------
@@ -205,29 +206,41 @@ def test_rework_feedback_inserted_via_extras(tmp_path: Path) -> None:
     wf = Workflow(name="rework", workflow_dir=tmp_path / "rework")
     feedback = render_rework_feedback([_thread(body="Fix the typo.")])
 
-    # Minimal fake ExecutionContext attributes via a simple object
-    from types import SimpleNamespace
-
-    from darkfactory.engine import PhaseState
-
-    prd = SimpleNamespace(
+    # Create a real PRD object
+    prd = PRD(
         id="PRD-225",
-        title="Rework feedback loop",
         path=Path("/prds/PRD-225.md"),
         slug="rework-feedback-loop",
+        title="Rework feedback loop",
+        kind="task",
+        status="review",
+        priority="medium",
+        effort="s",
+        capability="simple",
+        parent=None,
+        depends_on=[],
+        blocks=[],
+        impacts=[],
+        workflow=None,
+        assignee=None,
+        reviewers=[],
+        target_version=None,
+        created="2026-04-06",
+        updated="2026-04-06",
+        tags=[],
+        raw_frontmatter={},
+        body="",
     )
-    ctx = SimpleNamespace(
-        prd=prd,
-        branch_name="prd/PRD-225-rework",
-        base_ref="main",
-        worktree_path=None,
-        state=PhaseState(),
-    )
+
+    ctx = RunContext(dry_run=False)
+    ctx.state.put(CodeEnv(repo_root=tmp_path, cwd=tmp_path))
+    ctx.state.put(PrdWorkflowRun(prd=prd, workflow=wf))
+    ctx.state.put(WorktreeState(branch="prd/PRD-225-rework", base_ref="main"))
 
     result = compose_prompt(
         wf,
         ["prompts/task.md"],
-        cast(ExecutionContext, ctx),
+        ctx,
         extras={"REWORK_FEEDBACK": feedback},
     )
 

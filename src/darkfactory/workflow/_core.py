@@ -1,7 +1,7 @@
 """Declarative workflow definitions for the PRD harness.
 
 A ``Workflow`` is a named, ordered list of ``Task`` s that implement one
-kind of PRD. Three task types compose a workflow:
+kind of PRD or project operation. Three task types compose a workflow:
 
 - :class:`BuiltIn` — reference a deterministic primitive by name. The
   set is fixed by the harness package (``builtins.py``): ``ensure_worktree``,
@@ -13,11 +13,10 @@ kind of PRD. Three task types compose a workflow:
   worktree. Used for verification (``just test``, ``pnpm storybook:build``)
   with an ``on_failure`` policy.
 
-Workflows live in ``tools/prd-harness/workflows/<name>/workflow.py`` modules
+Workflows live in ``workflow/definitions/<type>/<name>/workflow.py`` modules
 that export a top-level ``workflow`` attribute. The loader discovers them
-and the runner dispatches each task in order against an
-:class:`ExecutionContext` that threads mutable state (worktree path, branch
-name, agent output, PR URL, etc.) between tasks.
+and the runner dispatches each task in order against a
+:class:`RunContext` that threads immutable PhaseState payloads between tasks.
 
 This module intentionally contains no I/O, no subprocess calls, and no
 dependency on ``prd.py`` at import time. It's pure data — the shapes that
@@ -32,6 +31,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
 from ..engine import PhaseState
+from ..engine.payloads import (
+    CodeEnv,
+    PrdWorkflowRun,
+    ProjectRun,
+    WorktreeState,
+)
 from ..utils.claude_code import EffortLevel
 
 if TYPE_CHECKING:
@@ -98,11 +103,10 @@ class Task:
 class BuiltIn(Task):
     """Reference a deterministic primitive from the ``BUILTINS`` registry.
 
-    The runner looks up ``name`` in ``darkfactory.operations.BUILTINS`` and
-    calls the registered function with ``(ctx, **kwargs)``. String values
-    in ``kwargs`` are formatted via :meth:`ExecutionContext.format_string`
-    before the call, so workflow authors can use ``{prd_id}``-style
-    placeholders.
+    The runner looks up ``name`` in the builtin registry and calls the
+    registered function with ``(ctx, **kwargs)``. String values in
+    ``kwargs`` are formatted via :meth:`RunContext.format_string` before
+    the call, so workflow authors can use ``{prd_id}``-style placeholders.
 
     Example::
 
@@ -125,7 +129,7 @@ class AgentTask(Task):
     1. Read each path in :attr:`prompts` relative to the workflow's
        directory (set by the loader) and concatenate the file contents.
     2. Substitute ``{{PRD_ID}}``/``{{PRD_TITLE}}``/``{{PRD_PATH}}``/etc.
-       placeholders against the :class:`ExecutionContext` via
+       placeholders against the :class:`RunContext` via
        ``templates.substitute_placeholders``.
     3. Pick a model: :attr:`model` if explicitly set, else map from
        ``ctx.prd.capability`` when :attr:`model_from_capability` is
@@ -159,9 +163,9 @@ class AgentTask(Task):
 class ShellTask(Task):
     """Run a deterministic shell command inside the worktree.
 
-    ``cmd`` is formatted via :meth:`ExecutionContext.format_string` before
+    ``cmd`` is formatted via :meth:`RunContext.format_string` before
     execution (so ``{worktree}`` etc. placeholders are expanded) and runs
-    with ``cwd=ctx.cwd`` (the worktree path after ``ensure_worktree``).
+    with ``cwd`` from ``CodeEnv`` (the worktree path after ``ensure_worktree``).
     ``env`` is merged into the subprocess environment.
 
     :attr:`on_failure` controls the recovery path on non-zero exit. See
@@ -206,9 +210,9 @@ def _default_applies_to(prd: "PRD", prds: dict[str, "PRD"]) -> bool:
 
 @dataclass
 class Workflow:
-    """A named recipe for implementing one kind of PRD.
+    """A named recipe for implementing one kind of PRD or project operation.
 
-    Authored in ``tools/prd-harness/workflows/<name>/workflow.py`` as a
+    Authored in ``workflow/definitions/<type>/<name>/workflow.py`` as a
     module-level ``workflow = Workflow(...)`` attribute. The loader
     discovers it, imports the module, and sets :attr:`workflow_dir` to
     the subdirectory path so AgentTask prompt paths resolve correctly.
@@ -216,6 +220,9 @@ class Workflow:
     :attr:`priority` orders workflows during assignment: higher numbers
     win when multiple predicates match. ``default`` has priority 0 and
     acts as a catchall. Ties are broken alphabetically by name.
+
+    Routing fields (:attr:`applies_to`, :attr:`priority`) are only used
+    by PRD workflows. Project workflows ignore them.
     """
 
     name: str
@@ -227,74 +234,84 @@ class Workflow:
     template_name: str | None = None
 
 
-# ---------- ExecutionContext ----------
+# ---------- RunContext ----------
 
 
 @dataclass
-class ExecutionContext:
-    """State threaded through every task during a workflow run.
+class RunContext:
+    """Unified context threaded through every task during a workflow run.
 
-    Tasks mutate this object in place as the workflow progresses:
-
-    - ``ensure_worktree`` sets :attr:`worktree_path` and :attr:`cwd`
-    - The agent invoke populates :attr:`agent_output` and
-      :attr:`agent_success`
-    - ``create_pr`` sets :attr:`pr_url`
-
-    The runner creates one context at the start of ``run_workflow`` and
-    passes it to each task in order. Tasks read from it (for formatting
-    commit messages, composing prompts, etc.) and write to it (to record
-    side effects for downstream tasks or the CLI to surface).
+    Immutable harness concerns live here. All execution state lives in
+    frozen PhaseState payloads, replaced (not mutated) as the run
+    progresses. The one mutable field is :attr:`report`, an accumulator
+    for project operations that build up output during execution.
 
     :attr:`dry_run` tells builtins, shell tasks, and the agent invoke to
     log what they WOULD do without actually invoking subprocesses, git,
-    or gh. Drives the ``prd plan`` output.
+    or gh.
     """
 
-    prd: "PRD"
-    repo_root: Path
-    workflow: Workflow
-    base_ref: str
-    branch_name: str
-    worktree_path: Path | None = None
-    cwd: Path = field(default_factory=Path.cwd)
-    pr_url: str | None = None
-    run_summary: str | None = None
     dry_run: bool = True
     logger: logging.Logger = field(
         default_factory=lambda: logging.getLogger("darkfactory")
     )
-    event_writer: "EventWriter | None" = None
     state: PhaseState = field(default_factory=PhaseState)
-
-    # Advisory process-level lock held by ensure_worktree for the
-    # lifetime of this run. Managed by builtins + runner; tests should
-    # not touch it directly.
+    event_writer: "EventWriter | None" = None
+    report: list[str] = field(default_factory=list)
     _worktree_lock: "FileLock | None" = field(default=None, repr=False)
 
+    @property
+    def cwd(self) -> Path:
+        """Current working directory from CodeEnv payload."""
+        return self.state.get(CodeEnv).cwd
+
+    @property
+    def repo_root(self) -> Path:
+        """Repository root from CodeEnv payload."""
+        return self.state.get(CodeEnv).repo_root
+
     def format_string(self, template: str) -> str:
-        """Expand ``{placeholder}`` tokens against context state.
+        """Expand ``{placeholder}`` tokens against all payloads in state.
 
-        Supported placeholders:
+        Merges placeholders from all payloads present in state. No
+        payload shares a placeholder name with another — each piece of
+        data lives in exactly one payload type. Unknown placeholders
+        pass through unchanged.
 
-        - ``{prd_id}`` — the PRD's id (e.g. ``PRD-070``)
-        - ``{prd_title}`` — the PRD's title
-        - ``{prd_slug}`` — the slug portion of the PRD filename
-        - ``{branch}`` — the current branch name
-        - ``{base_ref}`` — the base ref the branch was created from
-        - ``{worktree}`` — the worktree path as a string, or ``""`` if
-          the worktree hasn't been created yet
-
-        Unknown placeholders raise ``KeyError`` (intentionally strict —
-        workflow authors should catch typos early). Contrast with the
-        agent prompt templater in ``templates.py``, which leaves unknown
-        placeholders unchanged to allow incremental template evolution.
+        Resolves from:
+        - CodeEnv: ``{cwd}``, ``{repo_root}``
+        - PrdWorkflowRun if present: ``{prd_id}``, ``{prd_title}``, ``{prd_slug}``
+        - ProjectRun if present: ``{workflow_name}``, ``{target_count}``,
+          ``{target_prd}``
+        - WorktreeState if present: ``{branch}``, ``{base_ref}``, ``{worktree}``
         """
-        return template.format(
-            prd_id=self.prd.id,
-            prd_title=self.prd.title,
-            prd_slug=self.prd.slug,
-            branch=self.branch_name,
-            base_ref=self.base_ref,
-            worktree=str(self.worktree_path) if self.worktree_path else "",
-        )
+        replacements: dict[str, str] = {}
+
+        if self.state.has(CodeEnv):
+            env = self.state.get(CodeEnv)
+            replacements["cwd"] = str(env.cwd)
+            replacements["repo_root"] = str(env.repo_root)
+
+        if self.state.has(PrdWorkflowRun):
+            run = self.state.get(PrdWorkflowRun)
+            replacements["prd_id"] = run.prd.id
+            replacements["prd_title"] = run.prd.title
+            replacements["prd_slug"] = run.prd.slug
+
+        if self.state.has(ProjectRun):
+            proj = self.state.get(ProjectRun)
+            replacements["workflow_name"] = proj.workflow.name
+            replacements["target_count"] = str(len(proj.targets))
+            replacements["target_prd"] = proj.target_prd or ""
+
+        if self.state.has(WorktreeState):
+            wt = self.state.get(WorktreeState)
+            replacements["branch"] = wt.branch
+            replacements["base_ref"] = wt.base_ref
+            replacements["worktree"] = str(wt.worktree_path) if wt.worktree_path else ""
+
+        # Replace known placeholders, leave unknown ones unchanged.
+        result = template
+        for key, value in replacements.items():
+            result = result.replace("{" + key + "}", value)
+        return result

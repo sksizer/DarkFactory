@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Any
 from darkfactory.timestamps import now_iso_utc
 
 if TYPE_CHECKING:
-    from darkfactory.workflow import ExecutionContext
+    from darkfactory.workflow import RunContext
 
 
 def generate_session_id() -> str:
@@ -103,7 +103,7 @@ class EventWriter:
 
 
 def emit_task_event(
-    ctx: "ExecutionContext",
+    ctx: "RunContext",
     event_type: str,
     **fields: Any,
 ) -> None:
@@ -119,7 +119,7 @@ def emit_task_event(
 
 
 def emit_builtin_effect(
-    ctx: "ExecutionContext",
+    ctx: "RunContext",
     task: str,
     effect: str,
     **detail: Any,

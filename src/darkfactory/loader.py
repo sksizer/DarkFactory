@@ -1,9 +1,8 @@
-"""Dynamic workflow and operation discovery.
+"""Dynamic workflow discovery.
 
-The harness discovers workflows and operations at runtime by scanning
-directories for subdirectories that contain a ``workflow.py`` or
-``operation.py`` module. Each matching module is imported and expected
-to expose a top-level attribute (``workflow`` or ``operation``).
+The harness discovers workflows at runtime by scanning directories for
+subdirectories that contain a ``workflow.py`` module. Each matching module
+is imported and expected to expose a top-level ``workflow`` attribute.
 
 Import errors in one module don't block the others — we log the
 error and skip. Duplicate *names* across layers are a hard
@@ -18,14 +17,13 @@ import os
 import sys
 from pathlib import Path
 
-from .project import ProjectOperation
 from .workflow import Workflow
 
 logger = logging.getLogger("darkfactory.loader")
 
 
 def builtin_workflows_dir() -> Path:
-    """Return the directory containing first-party (built-in) workflows.
+    """Return the directory containing first-party (built-in) PRD workflows.
 
     These ship inside the installed ``darkfactory`` package at
     ``src/darkfactory/workflow/definitions/prd/`` and are available to
@@ -41,8 +39,8 @@ def builtin_workflows_dir() -> Path:
     return Path(__file__).resolve().parent / "workflow" / "definitions" / "prd"
 
 
-def builtin_operations_dir() -> Path:
-    """Return the directory containing first-party (built-in) project operations.
+def builtin_project_workflows_dir() -> Path:
+    """Return the directory containing first-party (built-in) project workflows.
 
     These ship inside the installed ``darkfactory`` package at
     ``src/darkfactory/workflow/definitions/project/``.
@@ -61,10 +59,9 @@ def load_workflows(
     *,
     include_builtins: bool = True,
 ) -> dict[str, Workflow]:
-    """Discover workflows across the built-in and project layers.
+    """Discover PRD workflows across the built-in and project layers.
 
-    Two layers are scanned (user-level ``~/.config/darkfactory/workflows/``
-    is planned but not yet wired up — see PRD-222.4/222.5):
+    Two layers are scanned:
 
     1. **Built-in** — bundled with the package at
        :func:`builtin_workflows_dir` (e.g. ``default``, ``extraction``,
@@ -135,13 +132,13 @@ def load_workflows(
     return workflows
 
 
-def _scan_operations_layer(
+def _scan_project_workflows_layer(
     layer_dir: Path,
-    operations: dict[str, ProjectOperation],
+    workflows: dict[str, Workflow],
 ) -> None:
-    """Scan a single layer directory for operation.py modules."""
+    """Scan a single layer directory for workflow.py modules (project workflows)."""
     if not layer_dir.exists() or not layer_dir.is_dir():
-        logger.debug("operations directory not found: %s", layer_dir)
+        logger.debug("project workflows directory not found: %s", layer_dir)
         return
 
     for subdir in sorted(layer_dir.iterdir()):
@@ -151,101 +148,85 @@ def _scan_operations_layer(
             or subdir.name.startswith(".")
         ):
             continue
-        operation_file = subdir / "operation.py"
-        if not operation_file.exists():
+
+        # Support both workflow.py (new) and operation.py (legacy)
+        workflow_file = subdir / "workflow.py"
+        if not workflow_file.exists():
+            workflow_file = subdir / "operation.py"
+        if not workflow_file.exists():
             continue
 
         try:
-            op = _load_operation_module(operation_file, subdir)
+            wf = _load_workflow_module(
+                workflow_file, subdir, module_prefix="_darkfactory_project_workflow_"
+            )
         except Exception as exc:  # noqa: BLE001
-            logger.warning("failed to load operation from %s: %s", operation_file, exc)
+            logger.warning(
+                "failed to load project workflow from %s: %s", workflow_file, exc
+            )
             continue
 
-        if op.name in operations:
-            existing = operations[op.name].operation_dir
+        if wf.name in workflows:
+            existing = workflows[wf.name].workflow_dir
             raise ValueError(
-                f"duplicate operation name {op.name!r}: "
+                f"duplicate project workflow name {wf.name!r}: "
                 f"defined in both {existing} and {subdir}"
             )
-        operations[op.name] = op
+        workflows[wf.name] = wf
 
 
-def load_operations(
-    operations_dir: Path | None = None,
+def load_project_workflows(
+    workflows_dir: Path | None = None,
     *,
     include_builtins: bool = True,
     include_user: bool = True,
-) -> dict[str, ProjectOperation]:
-    """Discover operations across built-in, user, and project layers.
+) -> dict[str, Workflow]:
+    """Discover project workflows across built-in, user, and project layers.
 
     Three layers are scanned:
 
     1. **Built-in** — bundled with the package at
-       :func:`builtin_operations_dir`. Included unless
+       :func:`builtin_project_workflows_dir`. Included unless
        ``include_builtins=False``.
     2. **User** — ``~/.config/darkfactory/operations/`` (personal
-       operations shared across projects). Included unless
+       workflows shared across projects). Included unless
        ``include_user=False``.
-    3. **Project** — ``operations_dir`` (typically
+    3. **Project** — ``workflows_dir`` (typically
        ``<project>/.darkfactory/operations/``). Optional.
 
     Name collisions across any layers raise ``ValueError``.
     Missing layers are silently skipped (not an error).
     """
-    operations: dict[str, ProjectOperation] = {}
+    workflows: dict[str, Workflow] = {}
 
     if include_builtins:
-        _scan_operations_layer(builtin_operations_dir(), operations)
+        _scan_project_workflows_layer(builtin_project_workflows_dir(), workflows)
 
     if include_user:
         from .config._paths import user_operations_dir
 
         user_dir = user_operations_dir()
-        _scan_operations_layer(user_dir, operations)
+        _scan_project_workflows_layer(user_dir, workflows)
 
-    if operations_dir is not None:
-        _scan_operations_layer(operations_dir, operations)
+    if workflows_dir is not None:
+        _scan_project_workflows_layer(workflows_dir, workflows)
 
-    return operations
-
-
-def _load_operation_module(operation_file: Path, subdir: Path) -> ProjectOperation:
-    """Import a single operation.py and return the ProjectOperation it exports.
-
-    Raises ``ImportError`` if the file can't be compiled, ``AttributeError``
-    if the module has no top-level ``operation``, and ``TypeError`` if
-    ``operation`` is not a :class:`~darkfactory.project.ProjectOperation` instance.
-    """
-    module_name = f"_darkfactory_operation_{subdir.name}"
-    spec = importlib.util.spec_from_file_location(module_name, operation_file)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"could not create import spec for {operation_file}")
-
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    try:
-        spec.loader.exec_module(module)
-    except Exception:
-        sys.modules.pop(module_name, None)
-        raise
-
-    if not hasattr(module, "operation"):
-        raise AttributeError(
-            f"{operation_file}: module does not export an 'operation' attribute"
-        )
-
-    op = module.operation
-    if not isinstance(op, ProjectOperation):
-        raise TypeError(
-            f"{operation_file}: 'operation' is not a ProjectOperation instance "
-            f"(got {type(op).__name__})"
-        )
-
-    op.operation_dir = subdir
-    return op
+    return workflows
 
 
-def _load_workflow_module(workflow_file: Path, subdir: Path) -> Workflow:
+# ---------- backward-compatibility aliases ----------
+
+# These names are used by callers that haven't been updated yet.
+builtin_operations_dir = builtin_project_workflows_dir
+load_operations = load_project_workflows
+
+
+def _load_workflow_module(
+    workflow_file: Path,
+    subdir: Path,
+    *,
+    module_prefix: str = "_darkfactory_workflow_",
+) -> Workflow:
     """Import a single workflow.py and return the Workflow instance it exports.
 
     Uses a synthetic module name derived from the subdirectory so two
@@ -256,7 +237,7 @@ def _load_workflow_module(workflow_file: Path, subdir: Path) -> Workflow:
     if the module has no top-level ``workflow``, and ``TypeError`` if
     ``workflow`` is not a :class:`Workflow` instance.
     """
-    module_name = f"_darkfactory_workflow_{subdir.name}"
+    module_name = f"{module_prefix}{subdir.name}"
     spec = importlib.util.spec_from_file_location(module_name, workflow_file)
     if spec is None or spec.loader is None:
         raise ImportError(f"could not create import spec for {workflow_file}")
@@ -270,15 +251,20 @@ def _load_workflow_module(workflow_file: Path, subdir: Path) -> Workflow:
         sys.modules.pop(module_name, None)
         raise
 
-    if not hasattr(module, "workflow"):
+    # Support both 'workflow' and 'operation' attribute names for legacy compat
+    attr_name = "workflow"
+    if not hasattr(module, "workflow") and hasattr(module, "operation"):
+        attr_name = "operation"
+
+    if not hasattr(module, attr_name):
         raise AttributeError(
             f"{workflow_file}: module does not export a 'workflow' attribute"
         )
 
-    wf = module.workflow
+    wf = getattr(module, attr_name)
     if not isinstance(wf, Workflow):
         raise TypeError(
-            f"{workflow_file}: 'workflow' is not a Workflow instance "
+            f"{workflow_file}: '{attr_name}' is not a Workflow instance "
             f"(got {type(wf).__name__})"
         )
 

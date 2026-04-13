@@ -14,7 +14,7 @@ from darkfactory.operations._registry import builtin
 from darkfactory.operations._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
 from darkfactory.utils.git import GitErr, Ok, Timeout, git_run
-from darkfactory.workflow import ExecutionContext
+from darkfactory.workflow import RunContext
 
 _log = logging.getLogger(__name__)
 
@@ -35,9 +35,7 @@ def _fetch_origin_main(cwd: Path, timeout: int) -> None:
                 "check network connectivity or increase fetch_timeout"
             )
         case GitErr(returncode=code, stderr=err):
-            raise RuntimeError(
-                f"git fetch origin main failed (exit {code}):\n{err}"
-            )
+            raise RuntimeError(f"git fetch origin main failed (exit {code}):\n{err}")
 
 
 def _get_sha(cwd: Path, ref: str) -> str:
@@ -62,7 +60,7 @@ def _get_conflicting_files(cwd: Path) -> list[str]:
 
 @builtin("rebase_onto_main")
 def rebase_onto_main(
-    ctx: ExecutionContext,
+    ctx: RunContext,
     *,
     fetch_timeout: int = _DEFAULT_FETCH_TIMEOUT,
 ) -> None:

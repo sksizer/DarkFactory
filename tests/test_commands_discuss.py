@@ -10,23 +10,20 @@ from darkfactory.utils.git._types import Ok
 from conftest import write_prd
 from darkfactory.commands.discuss import discuss_operation
 from darkfactory.commands.discuss.operation import discuss_operation as op_from_module
+from darkfactory.engine import CodeEnv, ProjectRun
 from darkfactory.model import load_all
-from darkfactory.project import ProjectContext, ProjectOperation
-from darkfactory.workflow import BuiltIn, InteractiveTask
+from darkfactory.workflow import BuiltIn, InteractiveTask, RunContext, Workflow
 
 
 def test_discuss_operation_exported() -> None:
     """AC-3: discuss_operation is exported from commands.discuss."""
-    assert isinstance(discuss_operation, ProjectOperation)
+    assert isinstance(discuss_operation, Workflow)
     assert discuss_operation is op_from_module
 
 
 def test_discuss_operation_shape() -> None:
     """AC-3: Operation has correct metadata."""
     assert discuss_operation.name == "discuss"
-    assert discuss_operation.requires_clean_main is False
-    assert discuss_operation.creates_pr is False
-    assert discuss_operation.accepts_target is True
     assert len(discuss_operation.tasks) == 4
 
 
@@ -95,15 +92,17 @@ def test_chain_executes_in_order(tmp_path: Path) -> None:
         / "discuss"
     )
     op = discuss_operation
-    op.operation_dir = pkg_dir
+    op.workflow_dir = pkg_dir
 
-    ctx = ProjectContext(
-        repo_root=tmp_path,
-        prds=prds,
-        operation=op,
-        cwd=tmp_path,
-        dry_run=False,
-        target_prd="PRD-070",
+    ctx = RunContext(dry_run=False)
+    ctx.state.put(CodeEnv(repo_root=tmp_path, cwd=tmp_path))
+    ctx.state.put(
+        ProjectRun(
+            workflow=op,
+            prds=prds,
+            targets=tuple(prds.keys()),
+            target_prd="PRD-070",
+        )
     )
 
     call_order: list[str] = []
@@ -155,15 +154,17 @@ def test_nonzero_exit_does_not_abort_chain(tmp_path: Path) -> None:
         / "discuss"
     )
     op = discuss_operation
-    op.operation_dir = pkg_dir
+    op.workflow_dir = pkg_dir
 
-    ctx = ProjectContext(
-        repo_root=tmp_path,
-        prds=prds,
-        operation=op,
-        cwd=tmp_path,
-        dry_run=False,
-        target_prd="PRD-070",
+    ctx = RunContext(dry_run=False)
+    ctx.state.put(CodeEnv(repo_root=tmp_path, cwd=tmp_path))
+    ctx.state.put(
+        ProjectRun(
+            workflow=op,
+            prds=prds,
+            targets=tuple(prds.keys()),
+            target_prd="PRD-070",
+        )
     )
 
     with patch("darkfactory.runner.spawn_claude", return_value=130):

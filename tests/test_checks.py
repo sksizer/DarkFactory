@@ -127,9 +127,7 @@ def test_is_resume_safe_merged_pr_returns_not_safe(tmp_path: Path) -> None:
     with (
         patch(
             "darkfactory.checks.get_resume_pr_state",
-            return_value=_Ok(
-                [{"state": "MERGED", "mergedAt": "2026-01-01T00:00:00Z"}]
-            ),
+            return_value=_Ok([{"state": "MERGED", "mergedAt": "2026-01-01T00:00:00Z"}]),
         ),
         patch("darkfactory.checks.git_run", return_value=_GIT_REF_NOT_FOUND),
     ):
@@ -177,9 +175,7 @@ def test_is_resume_safe_no_gh_degrades_gracefully(
                 "darkfactory.checks.get_resume_pr_state",
                 return_value=_GhErr(-1, "", "gh not found", ["gh"]),
             ),
-            patch(
-                "darkfactory.checks.git_run", return_value=_GIT_REF_NOT_FOUND
-            ),
+            patch("darkfactory.checks.git_run", return_value=_GIT_REF_NOT_FOUND),
         ):
             status = is_resume_safe("prd/PRD-001-my-feat", tmp_path)
 
@@ -203,9 +199,7 @@ def test_is_resume_safe_diverged_warns_but_allows(
                 "darkfactory.checks.get_resume_pr_state",
                 return_value=_Ok([]),
             ),
-            patch(
-                "darkfactory.checks.git_run", side_effect=git_responses
-            ),
+            patch("darkfactory.checks.git_run", side_effect=git_responses),
         ):
             status = is_resume_safe("prd/PRD-001-my-feat", tmp_path)
 

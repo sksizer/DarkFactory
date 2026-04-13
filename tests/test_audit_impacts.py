@@ -11,9 +11,10 @@ from darkfactory.operations.project_builtins import (
     SYSTEM_BUILTINS,
     audit_impacts_check,
 )
+from darkfactory.engine import CodeEnv, ProjectRun
 from darkfactory.loader import load_operations
 from darkfactory.model import PRD, parse_prd
-from darkfactory.project import ProjectContext, ProjectOperation
+from darkfactory.workflow import RunContext, Workflow
 from darkfactory.runner import run_project_operation
 
 from tests.conftest import write_prd
@@ -22,8 +23,8 @@ from tests.conftest import write_prd
 # ---------- helpers ----------
 
 
-def _make_op() -> ProjectOperation:
-    return ProjectOperation(name="test-op", description="test", tasks=[])
+def _make_op() -> Workflow:
+    return Workflow(name="test-op", description="test", tasks=[])
 
 
 def _make_ctx(
@@ -31,14 +32,17 @@ def _make_ctx(
     prds: dict[str, PRD] | None = None,
     *,
     dry_run: bool = False,
-) -> ProjectContext:
-    return ProjectContext(
-        repo_root=tmp_path,
-        prds=prds or {},
-        operation=_make_op(),
-        cwd=tmp_path,
-        dry_run=dry_run,
+) -> RunContext:
+    ctx = RunContext(dry_run=dry_run)
+    ctx.state.put(CodeEnv(repo_root=tmp_path, cwd=tmp_path))
+    ctx.state.put(
+        ProjectRun(
+            workflow=_make_op(),
+            prds=prds or {},
+            targets=tuple((prds or {}).keys()),
+        )
     )
+    return ctx
 
 
 def _write_and_parse(tmp_path: Path, prd_id: str, slug: str, **kwargs: Any) -> PRD:
@@ -259,8 +263,6 @@ def test_operation_loads_correctly(tmp_path: Path) -> None:
     assert "audit-impacts" in operations
 
     op = operations["audit-impacts"]
-    assert op.creates_pr is False
-    assert op.requires_clean_main is False
     assert len(op.tasks) == 1
 
 
@@ -272,7 +274,7 @@ def test_operation_via_runner_clean(tmp_path: Path) -> None:
 
     from darkfactory.workflow import BuiltIn
 
-    op = ProjectOperation(
+    op = Workflow(
         name="audit-impacts",
         description="test",
         tasks=[BuiltIn("audit_impacts_check")],
@@ -280,12 +282,14 @@ def test_operation_via_runner_clean(tmp_path: Path) -> None:
     prd = _write_and_parse(
         tmp_path, "PRD-020", "ok", status="done", impacts=["src/foo.py"]
     )
-    ctx = ProjectContext(
-        repo_root=tmp_path,
-        prds={"PRD-020": prd},
-        operation=op,
-        cwd=tmp_path,
-        dry_run=False,
+    ctx = RunContext(dry_run=False)
+    ctx.state.put(CodeEnv(repo_root=tmp_path, cwd=tmp_path))
+    ctx.state.put(
+        ProjectRun(
+            workflow=op,
+            prds={"PRD-020": prd},
+            targets=tuple(["PRD-020"]),
+        )
     )
 
     from darkfactory.operations.project_builtins import (
@@ -303,7 +307,7 @@ def test_operation_via_runner_missing(tmp_path: Path) -> None:
     """Operation returns failure when completed PRDs have missing impact paths."""
     from darkfactory.workflow import BuiltIn
 
-    op = ProjectOperation(
+    op = Workflow(
         name="audit-impacts",
         description="test",
         tasks=[BuiltIn("audit_impacts_check")],
@@ -311,12 +315,14 @@ def test_operation_via_runner_missing(tmp_path: Path) -> None:
     prd = _write_and_parse(
         tmp_path, "PRD-021", "missing", status="done", impacts=["ghost.py"]
     )
-    ctx = ProjectContext(
-        repo_root=tmp_path,
-        prds={"PRD-021": prd},
-        operation=op,
-        cwd=tmp_path,
-        dry_run=False,
+    ctx = RunContext(dry_run=False)
+    ctx.state.put(CodeEnv(repo_root=tmp_path, cwd=tmp_path))
+    ctx.state.put(
+        ProjectRun(
+            workflow=op,
+            prds={"PRD-021": prd},
+            targets=tuple(["PRD-021"]),
+        )
     )
 
     result = run_project_operation(op, ctx)
@@ -328,7 +334,7 @@ def test_operation_via_runner_warning_only(tmp_path: Path) -> None:
     """Operation returns success when only incomplete PRDs have missing impacts."""
     from darkfactory.workflow import BuiltIn
 
-    op = ProjectOperation(
+    op = Workflow(
         name="audit-impacts",
         description="test",
         tasks=[BuiltIn("audit_impacts_check")],
@@ -336,12 +342,14 @@ def test_operation_via_runner_warning_only(tmp_path: Path) -> None:
     prd = _write_and_parse(
         tmp_path, "PRD-022", "ready-warn", status="ready", impacts=["future.py"]
     )
-    ctx = ProjectContext(
-        repo_root=tmp_path,
-        prds={"PRD-022": prd},
-        operation=op,
-        cwd=tmp_path,
-        dry_run=False,
+    ctx = RunContext(dry_run=False)
+    ctx.state.put(CodeEnv(repo_root=tmp_path, cwd=tmp_path))
+    ctx.state.put(
+        ProjectRun(
+            workflow=op,
+            prds={"PRD-022": prd},
+            targets=tuple(["PRD-022"]),
+        )
     )
 
     result = run_project_operation(op, ctx)

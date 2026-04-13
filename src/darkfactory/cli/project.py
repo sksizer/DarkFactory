@@ -7,9 +7,17 @@ import argparse
 from darkfactory.event_log import generate_session_id
 from darkfactory.loader import load_operations
 from darkfactory.runner import run_project_operation
+from darkfactory.engine import CodeEnv, ProjectRun
 from darkfactory.style import Element, Styler
-from darkfactory.project import ProjectContext
-from darkfactory.workflow import AgentTask, BuiltIn, InteractiveTask, ShellTask, Task
+from darkfactory.workflow import (
+    AgentTask,
+    BuiltIn,
+    InteractiveTask,
+    RunContext,
+    ShellTask,
+    Task,
+    Workflow,
+)
 
 from darkfactory.cli._shared import _emit_json, _find_repo_root, _load
 
@@ -50,9 +58,6 @@ def cmd_project_list(args: argparse.Namespace) -> int:
                     "name": op.name,
                     "description": op.description,
                     "task_count": len(op.tasks),
-                    "creates_pr": op.creates_pr,
-                    "requires_clean_main": op.requires_clean_main,
-                    "accepts_target": op.accepts_target,
                 }
                 for op in sorted_ops
             ]
@@ -80,11 +85,6 @@ def cmd_project_describe(args: argparse.Namespace) -> int:
             {
                 "name": op.name,
                 "description": op.description,
-                "requires_clean_main": op.requires_clean_main,
-                "creates_pr": op.creates_pr,
-                "pr_title": op.pr_title,
-                "pr_body": op.pr_body,
-                "accepts_target": op.accepts_target,
                 "tasks": [_describe_project_task(t) for t in op.tasks],
             }
         )
@@ -94,18 +94,15 @@ def cmd_project_describe(args: argparse.Namespace) -> int:
     if op.description:
         print(f"  {op.description}")
         print()
-    print(f"  requires_clean_main: {op.requires_clean_main}")
-    print(f"  creates_pr:          {op.creates_pr}")
-    print(f"  accepts_target:      {op.accepts_target}")
-    if op.pr_title:
-        print(f"  pr_title:            {op.pr_title}")
-    if op.pr_body:
-        print(f"  pr_body:             {op.pr_body}")
-    print()
     print(f"  tasks ({len(op.tasks)}):")
     for i, task in enumerate(op.tasks, start=1):
         print(f"    {i:>2}. {_describe_project_task(task)}")
     return 0
+
+
+def _has_builtin(wf: Workflow, name: str) -> bool:
+    """Check if a workflow contains a BuiltIn task with the given name."""
+    return any(isinstance(t, BuiltIn) and t.name == name for t in wf.tasks)
 
 
 def cmd_project_run(args: argparse.Namespace) -> int:
@@ -116,16 +113,7 @@ def cmd_project_run(args: argparse.Namespace) -> int:
 
     operation = operations[args.name]
 
-    # Validate --target against accepts_target.
     target_prd: str | None = getattr(args, "target", None)
-    if target_prd is not None and not operation.accepts_target:
-        raise SystemExit(
-            f"operation {args.name!r} does not accept a --target (accepts_target=False)"
-        )
-    if target_prd is None and operation.accepts_target:
-        raise SystemExit(
-            f"operation {args.name!r} requires --target (accepts_target=True)"
-        )
 
     repo_root = _find_repo_root(args.data_dir)
     dry_run = not getattr(args, "execute", False)
@@ -151,13 +139,17 @@ def cmd_project_run(args: argparse.Namespace) -> int:
 
     prds = _load(args.data_dir) if (args.data_dir / "prds").exists() else {}
 
-    ctx = ProjectContext(
-        repo_root=repo_root,
-        prds=prds,
-        operation=operation,
-        cwd=repo_root,
+    ctx = RunContext(
         dry_run=dry_run,
-        target_prd=target_prd,
+    )
+    ctx.state.put(CodeEnv(repo_root=repo_root, cwd=repo_root))
+    ctx.state.put(
+        ProjectRun(
+            workflow=operation,
+            prds=prds,
+            targets=tuple(prds.keys()),
+            target_prd=target_prd,
+        )
     )
 
     header_label = "Dry-run" if dry_run else "Executing"
@@ -199,10 +191,11 @@ def cmd_project_run(args: argparse.Namespace) -> int:
         for line in ctx.report:
             print(f"    {line}")
 
-    if ctx.targets:
+    proj = ctx.state.get(ProjectRun)
+    if proj.targets:
         print()
-        print(f"  Targets ({len(ctx.targets)}):")
-        for t in ctx.targets:
+        print(f"  Targets ({len(proj.targets)}):")
+        for t in proj.targets:
             print(f"    {t}")
 
     print()

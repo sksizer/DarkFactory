@@ -27,9 +27,17 @@ def _is_ancestor(sha: str, branch: str = "main") -> bool:
 
 def main() -> int:
     # Fetch all merged PRs via gh CLI
-    match gh_json("pr", "list", "--state", "merged", "--limit", "200",
-                  "--json", "number,title,mergeCommit,mergedAt",
-                  cwd=Path.cwd()):
+    match gh_json(
+        "pr",
+        "list",
+        "--state",
+        "merged",
+        "--limit",
+        "200",
+        "--json",
+        "number,title,mergeCommit,mergedAt",
+        cwd=Path.cwd(),
+    ):
         case Ok(value=prs):
             pass
         case _:

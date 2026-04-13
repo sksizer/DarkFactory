@@ -49,27 +49,20 @@ def _write_operation(
     name: str,
     *,
     description: str = "A fixture operation",
-    creates_pr: bool = False,
-    requires_clean_main: bool = True,
-    accepts_target: bool = False,
     tasks_code: str = "tasks=[BuiltIn('_noop')]",
 ) -> Path:
-    """Create a minimal operation.py under ``ops_dir/<name>/``."""
+    """Create a minimal workflow.py under ``ops_dir/<name>/``."""
     op_dir = ops_dir / name
     op_dir.mkdir(parents=True, exist_ok=True)
-    op_file = op_dir / "operation.py"
+    op_file = op_dir / "workflow.py"
     op_file.write_text(
-        f'''"""Fixture operation {name}."""
-from darkfactory.project import ProjectOperation
-from darkfactory.workflow import BuiltIn
+        f'''"""Fixture workflow {name}."""
+from darkfactory.workflow import Workflow, BuiltIn
 
-operation = ProjectOperation(
+workflow = Workflow(
     name={name!r},
     description={description!r},
     {tasks_code},
-    creates_pr={creates_pr!r},
-    requires_clean_main={requires_clean_main!r},
-    accepts_target={accepts_target!r},
 )
 '''
     )
@@ -150,7 +143,6 @@ def test_project_describe_known_operation(
         ops_dir,
         "reconcile-status",
         description="Reconcile PRD statuses",
-        creates_pr=True,
     )
 
     exit_code = main(_base_args(tmp_path, ops_dir) + ["describe", "reconcile-status"])
@@ -158,9 +150,7 @@ def test_project_describe_known_operation(
     out = capsys.readouterr().out
     assert "reconcile-status" in out
     assert "Reconcile PRD statuses" in out
-    assert "creates_pr" in out
-    assert "requires_clean_main" in out
-    assert "accepts_target" in out
+    assert "tasks" in out
 
 
 def test_project_describe_unknown_operation(tmp_path: Path) -> None:
@@ -179,7 +169,6 @@ def test_project_describe_json(
         ops_dir,
         "audit",
         description="Audit",
-        accepts_target=True,
     )
 
     args = [
@@ -196,7 +185,6 @@ def test_project_describe_json(
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["name"] == "audit"
-    assert payload["accepts_target"] is True
     assert "tasks" in payload
 
 
@@ -209,12 +197,11 @@ def test_project_run_dry_run_default(
     """prd project run defaults to dry-run and prints report output."""
     _prd_dir, ops_dir = _setup_project(tmp_path)
     (ops_dir / "audit").mkdir(parents=True, exist_ok=True)
-    (ops_dir / "audit" / "operation.py").write_text(
-        '''"""Fixture audit operation."""
-from darkfactory.project import ProjectOperation
-from darkfactory.workflow import ShellTask
+    (ops_dir / "audit" / "workflow.py").write_text(
+        '''"""Fixture audit workflow."""
+from darkfactory.workflow import Workflow, ShellTask
 
-operation = ProjectOperation(
+workflow = Workflow(
     name="audit",
     description="Audit the repo",
     tasks=[ShellTask("check", cmd="echo hello")],
@@ -237,16 +224,14 @@ def test_project_run_execute_flag(
     """prd project run --execute dispatches with dry_run=False."""
     _prd_dir, ops_dir = _setup_project(tmp_path)
     (ops_dir / "audit").mkdir(parents=True, exist_ok=True)
-    (ops_dir / "audit" / "operation.py").write_text(
-        '''"""Fixture audit operation."""
-from darkfactory.project import ProjectOperation
-from darkfactory.workflow import ShellTask
+    (ops_dir / "audit" / "workflow.py").write_text(
+        '''"""Fixture audit workflow."""
+from darkfactory.workflow import Workflow, ShellTask
 
-operation = ProjectOperation(
+workflow = Workflow(
     name="audit",
     description="Audit the repo",
     tasks=[ShellTask("check", cmd="true")],
-    requires_clean_main=False,
 )
 '''
     )
@@ -269,16 +254,14 @@ def test_project_run_builtin_failure_exits_nonzero(
     """A failing task causes exit code 1."""
     _prd_dir, ops_dir = _setup_project(tmp_path)
     (ops_dir / "bad-op").mkdir(parents=True, exist_ok=True)
-    (ops_dir / "bad-op" / "operation.py").write_text(
-        '''"""Fixture bad operation."""
-from darkfactory.project import ProjectOperation
-from darkfactory.workflow import ShellTask
+    (ops_dir / "bad-op" / "workflow.py").write_text(
+        '''"""Fixture bad workflow."""
+from darkfactory.workflow import Workflow, ShellTask
 
-operation = ProjectOperation(
+workflow = Workflow(
     name="bad-op",
     description="Always fails",
     tasks=[ShellTask("fail", cmd="false")],
-    requires_clean_main=False,
 )
 '''
     )
@@ -291,36 +274,16 @@ operation = ProjectOperation(
     assert exit_code == 1
 
 
-# ---------- AC-5: --target rejected when accepts_target=False ----------
+# ---------- --target flag ----------
 
 
-def test_project_run_target_rejected(tmp_path: Path) -> None:
-    """--target is rejected for operations with accepts_target=False."""
-    _prd_dir, ops_dir = _setup_project(tmp_path)
-    _write_operation(ops_dir, "audit", accepts_target=False)
-
-    with pytest.raises(SystemExit) as exc:
-        main(_base_args(tmp_path, ops_dir) + ["run", "audit", "--target", "PRD-001"])
-    assert exc.value.code != 0
-
-
-def test_project_run_target_accepted(
+def test_project_run_target_passed_through(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """--target is allowed for operations with accepts_target=True."""
+    """--target is passed through to the ProjectRun payload."""
     _prd_dir, ops_dir = _setup_project(tmp_path)
-    (ops_dir / "plan-op").mkdir(parents=True, exist_ok=True)
-    (ops_dir / "plan-op" / "operation.py").write_text(
-        '''"""Fixture plan operation."""
-from darkfactory.project import ProjectOperation
-
-operation = ProjectOperation(
-    name="plan-op",
-    description="Plans something",
-    tasks=[],
-    accepts_target=True,
-)
-'''
+    _write_operation(
+        ops_dir, "plan-op", description="Plans something", tasks_code="tasks=[]"
     )
 
     exit_code = main(
@@ -337,16 +300,15 @@ def test_project_run_report_displayed(
 ) -> None:
     """Report lines accumulated by builtins are displayed after the run."""
     from darkfactory.operations.project_builtins import SYSTEM_BUILTINS
-    from darkfactory.project import ProjectContext
+    from darkfactory.workflow import RunContext
 
     _prd_dir, ops_dir = _setup_project(tmp_path)
     (ops_dir / "reporter").mkdir(parents=True, exist_ok=True)
-    (ops_dir / "reporter" / "operation.py").write_text(
-        '''"""Fixture reporter operation."""
-from darkfactory.project import ProjectOperation
-from darkfactory.workflow import BuiltIn
+    (ops_dir / "reporter" / "workflow.py").write_text(
+        '''"""Fixture reporter workflow."""
+from darkfactory.workflow import Workflow, BuiltIn
 
-operation = ProjectOperation(
+workflow = Workflow(
     name="reporter",
     description="Adds to report",
     tasks=[BuiltIn("_test_report_builtin")],
@@ -354,7 +316,7 @@ operation = ProjectOperation(
 '''
     )
 
-    def report_builtin(ctx: ProjectContext, **kwargs: object) -> None:
+    def report_builtin(ctx: RunContext, **kwargs: object) -> None:
         ctx.report.append("found 3 items")
 
     SYSTEM_BUILTINS["_test_report_builtin"] = report_builtin

@@ -154,7 +154,9 @@ def test_worktree_exists_returns_false_when_not_found(tmp_path: Path) -> None:
 
 def test_worktree_exists_returns_false_on_git_error(tmp_path: Path) -> None:
     with patch("darkfactory.cli.rework_watch.git_run") as mock_run:
-        mock_run.return_value = _GitErr(1, "", "", ["git", "worktree", "list", "--porcelain"])
+        mock_run.return_value = _GitErr(
+            1, "", "", ["git", "worktree", "list", "--porcelain"]
+        )
         assert _worktree_exists("PRD-1", tmp_path) is False
 
 
@@ -186,10 +188,12 @@ def test_check_missing_worktrees_detects_missing(tmp_path: Path) -> None:
 
 def test_fetch_open_prd_prs_filters_non_prd_branches(tmp_path: Path) -> None:
     with patch("darkfactory.cli.rework_watch.gh_json") as mock_gh:
-        mock_gh.return_value = _Ok([
-            {"number": 1, "headRefName": "prd/PRD-1-feat"},
-            {"number": 2, "headRefName": "feature/other"},
-        ])
+        mock_gh.return_value = _Ok(
+            [
+                {"number": 1, "headRefName": "prd/PRD-1-feat"},
+                {"number": 2, "headRefName": "feature/other"},
+            ]
+        )
         result = fetch_open_prd_prs(tmp_path)
     assert len(result) == 1
     assert result[0]["number"] == 1
@@ -208,14 +212,16 @@ def test_fetch_open_prd_prs_returns_empty_on_failure(tmp_path: Path) -> None:
 def test_has_new_comments_detects_new(tmp_path: Path) -> None:
     pr_state = PRWatchState(last_seen_comment_ids={"id1"})
     with patch("darkfactory.cli.rework_watch.gh_json") as mock_gh:
-        mock_gh.return_value = _Ok({
-            "reviewThreads": [
-                {"comments": [{"id": "id1"}], "isResolved": False},
-                {"comments": [{"id": "id2"}], "isResolved": False},
-            ],
-            "reviews": [],
-            "comments": [],
-        })
+        mock_gh.return_value = _Ok(
+            {
+                "reviewThreads": [
+                    {"comments": [{"id": "id1"}], "isResolved": False},
+                    {"comments": [{"id": "id2"}], "isResolved": False},
+                ],
+                "reviews": [],
+                "comments": [],
+            }
+        )
         has_new, current_ids = _has_new_unresolved_comments(1, pr_state, tmp_path)
     assert has_new is True
     assert "id2" in current_ids
@@ -224,13 +230,15 @@ def test_has_new_comments_detects_new(tmp_path: Path) -> None:
 def test_has_new_comments_no_new(tmp_path: Path) -> None:
     pr_state = PRWatchState(last_seen_comment_ids={"id1"})
     with patch("darkfactory.cli.rework_watch.gh_json") as mock_gh:
-        mock_gh.return_value = _Ok({
-            "reviewThreads": [
-                {"comments": [{"id": "id1"}], "isResolved": False},
-            ],
-            "reviews": [],
-            "comments": [],
-        })
+        mock_gh.return_value = _Ok(
+            {
+                "reviewThreads": [
+                    {"comments": [{"id": "id1"}], "isResolved": False},
+                ],
+                "reviews": [],
+                "comments": [],
+            }
+        )
         has_new, current_ids = _has_new_unresolved_comments(1, pr_state, tmp_path)
     assert has_new is False
 

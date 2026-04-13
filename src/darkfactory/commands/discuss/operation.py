@@ -1,16 +1,12 @@
-"""Discuss operation definition — the ProjectOperation for ``prd discuss``."""
+"""Discuss operation definition — the Workflow for ``prd discuss``."""
 
 from __future__ import annotations
 
-from darkfactory.project import ProjectOperation
-from darkfactory.workflow import BuiltIn, InteractiveTask
+from darkfactory.workflow import BuiltIn, InteractiveTask, Workflow
 
-discuss_operation = ProjectOperation(
+discuss_operation = Workflow(
     name="discuss",
     description="Interactive PRD discussion chain — gather, discuss, critique, commit.",
-    requires_clean_main=False,
-    creates_pr=False,
-    accepts_target=True,
     tasks=[
         BuiltIn("gather_prd_context"),
         # Discussion phases use Claude Code's highest adaptive-reasoning

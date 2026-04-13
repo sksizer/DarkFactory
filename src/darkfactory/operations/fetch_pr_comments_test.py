@@ -14,10 +14,10 @@ from unittest.mock import patch
 import pytest
 
 from darkfactory.operations.fetch_pr_comments import fetch_pr_comments as builtin_fn
-from darkfactory.engine import ReworkState
+from darkfactory.engine import CodeEnv, PrdWorkflowRun, ReworkState, WorktreeState
 from darkfactory.utils.github.pr.comments import ReviewThread
 from darkfactory.model import PRD
-from darkfactory.workflow import ExecutionContext, Workflow
+from darkfactory.workflow import RunContext, Workflow
 
 
 def _make_prd(prd_id: str = "PRD-001", slug: str = "my-feature") -> PRD:
@@ -67,15 +67,12 @@ def _make_ctx(
     pr_number: int | None = None,
     review_threads: list[ReviewThread] | None = None,
     dry_run: bool = False,
-) -> ExecutionContext:
-    ctx = ExecutionContext(
-        prd=_make_prd(),
-        repo_root=tmp_path,
-        workflow=Workflow(name="rework", tasks=[]),
-        base_ref="main",
-        branch_name="prd/PRD-001-my-feature",
-        dry_run=dry_run,
-    )
+) -> RunContext:
+    prd = _make_prd()
+    ctx = RunContext(dry_run=dry_run)
+    ctx.state.put(CodeEnv(repo_root=tmp_path, cwd=tmp_path))
+    ctx.state.put(PrdWorkflowRun(prd=prd, workflow=Workflow(name="rework", tasks=[])))
+    ctx.state.put(WorktreeState(branch="prd/PRD-001-my-feature", base_ref="main"))
     ctx.state.put(
         ReworkState(
             pr_number=pr_number,
@@ -86,7 +83,7 @@ def _make_ctx(
 
 
 def test_noop_when_preloaded(tmp_path: Path) -> None:
-    """No-op when ``ctx.review_threads`` is already populated."""
+    """No-op when ``review_threads`` is already populated."""
     threads = [_thread()]
     ctx = _make_ctx(tmp_path, review_threads=threads)
 

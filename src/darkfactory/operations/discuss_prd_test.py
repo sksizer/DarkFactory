@@ -10,7 +10,7 @@ import pytest
 from conftest import make_project_ctx, make_project_op
 from darkfactory.operations.discuss_prd import discuss_prd
 from darkfactory.engine import PrdContext
-from darkfactory.project import ProjectContext
+from darkfactory.workflow import RunContext
 from darkfactory.utils.claude_code import EffortLevel
 from darkfactory.utils.tui import print_phase_banner
 
@@ -27,7 +27,7 @@ def _make_discuss_ctx(
     tmp_path: Path,
     operation_dir: Path | None = None,
     prd_context: str = "test context",
-) -> ProjectContext:
+) -> RunContext:
     op = make_project_op(name="discuss", operation_dir=operation_dir)
     ctx = make_project_ctx(tmp_path, target_prd="PRD-070", operation=op)
     ctx.state.put(PrdContext(summary="", body=prd_context))

@@ -18,10 +18,14 @@ from darkfactory.utils.github import GhErr, gh_json, gh_run
 def _get_merged_prd_prs(repo_root: Path) -> list[dict[str, Any]]:
     """Return merged PRs whose head branch matches ``prd/PRD-*``."""
     match gh_json(
-        "pr", "list",
-        "--state", "merged",
-        "--json", "headRefName,mergedAt,mergeCommit,number",
-        "--limit", "200",
+        "pr",
+        "list",
+        "--state",
+        "merged",
+        "--json",
+        "headRefName,mergedAt,mergeCommit,number",
+        "--limit",
+        "200",
         cwd=repo_root,
     ):
         case Ok(value=prs):
@@ -146,9 +150,12 @@ def _create_reconcile_pr(
         case GitErr(returncode=code, stderr=err):
             raise RuntimeError(f"git push failed (exit {code}):\n{err}")
     match gh_run(
-        "pr", "create",
-        "--title", msg,
-        "--body", "Auto-reconciled by `prd reconcile`",
+        "pr",
+        "create",
+        "--title",
+        msg,
+        "--body",
+        "Auto-reconciled by `prd reconcile`",
         cwd=repo_root,
     ):
         case Ok():

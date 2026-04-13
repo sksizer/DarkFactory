@@ -147,9 +147,12 @@ def fetch_open_prd_prs(repo_root: Path) -> list[dict[str, Any]]:
     Returns an empty list if ``gh`` is unavailable or fails.
     """
     match gh_json(
-        "pr", "list",
-        "--state", "open",
-        "--json", "number,headRefName",
+        "pr",
+        "list",
+        "--state",
+        "open",
+        "--json",
+        "number,headRefName",
         cwd=repo_root,
     ):
         case Ok(value=prs):
@@ -194,9 +197,11 @@ def check_missing_worktrees(prs: list[dict[str, Any]], repo_root: Path) -> list[
 def _fetch_comment_ids(pr_number: int, repo_root: Path) -> set[str]:
     """Return the set of all comment/thread IDs for ``pr_number``."""
     match gh_json(
-        "pr", "view",
+        "pr",
+        "view",
         str(pr_number),
-        "--json", "comments,reviews,reviewThreads",
+        "--json",
+        "comments,reviews,reviewThreads",
         cwd=repo_root,
     ):
         case Ok(value=raw):
@@ -403,7 +408,9 @@ def run_poll_loop(
                 state.prs[pr_key] = PRWatchState()
             pr_state = state.prs[pr_key]
 
-            has_new, current_ids = _has_new_unresolved_comments(pr_number, pr_state, repo_root)
+            has_new, current_ids = _has_new_unresolved_comments(
+                pr_number, pr_state, repo_root
+            )
 
             if has_new:
                 if is_rate_limited(pr_state, max_reworks_per_hour, now):

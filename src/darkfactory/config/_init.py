@@ -36,21 +36,20 @@ _REQUIRED_DIRS = [
     ".darkfactory/transcripts",
 ]
 
-_SEED_OPERATION = '''\
-"""Sample project operation — delete or replace this directory with your own.
+_SEED_WORKFLOW = '''\
+"""Sample project workflow — delete or replace this directory with your own.
 
-Project operations run across the whole repository (not per-PRD).
+Project workflows run across the whole repository (not per-PRD).
 Run with: prd project run hello
 """
 
-from darkfactory.project import ProjectOperation
-from darkfactory.workflow import ShellTask
+from darkfactory.workflow import ShellTask, Workflow
 
-operation = ProjectOperation(
+workflow = Workflow(
     name="hello",
-    description="Sample operation — replace with your own.",
+    description="Sample workflow — replace with your own.",
     tasks=[
-        ShellTask("greet", cmd="echo \'Hello from darkfactory operations\'", on_failure="fail"),
+        ShellTask("greet", cmd="echo \'Hello from darkfactory workflows\'", on_failure="fail"),
     ],
 )
 '''
@@ -103,12 +102,12 @@ def init_project(target: Path) -> str:
     if not config_path.exists():
         config_path.write_text(CONFIG_SKELETON, encoding="utf-8")
 
-    # Seed a sample operation if operations dir is empty
+    # Seed a sample workflow if operations dir is empty
     ops_dir = target / ".darkfactory" / "operations"
     hello_dir = ops_dir / "hello"
     if not hello_dir.exists():
         hello_dir.mkdir(parents=True, exist_ok=True)
-        (hello_dir / "operation.py").write_text(_SEED_OPERATION, encoding="utf-8")
+        (hello_dir / "workflow.py").write_text(_SEED_WORKFLOW, encoding="utf-8")
 
     # Update .gitignore
     _update_gitignore(target)

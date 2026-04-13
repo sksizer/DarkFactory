@@ -18,14 +18,14 @@ from darkfactory.operations._shared import _log_dry_run
 from darkfactory.event_log import emit_builtin_effect
 from darkfactory.engine import AgentResult, ReworkState
 from darkfactory.utils.git import GitErr, Ok, Timeout, git_run
-from darkfactory.workflow import ExecutionContext
+from darkfactory.workflow import RunContext
 
 _log = logging.getLogger(__name__)
 
 
-def _get_head_sha(cwd: str) -> str | None:
+def _get_head_sha(cwd: Path) -> str | None:
     """Return the short SHA of HEAD, or None on failure."""
-    match git_run("rev-parse", "--short", "HEAD", cwd=Path(cwd)):
+    match git_run("rev-parse", "--short", "HEAD", cwd=cwd):
         case Ok(stdout=output):
             return output.strip()
         case GitErr() as err:
@@ -37,7 +37,7 @@ def _get_head_sha(cwd: str) -> str | None:
 
 
 @builtin("reply_pr_comments")
-def reply_pr_comments(ctx: ExecutionContext) -> None:
+def reply_pr_comments(ctx: RunContext) -> None:
     """Post bot replies to addressed PR comment threads.
 
     No-op when:
@@ -84,7 +84,7 @@ def reply_pr_comments(ctx: ExecutionContext) -> None:
             )
         return
 
-    commit_sha = _get_head_sha(str(ctx.cwd)) or "unknown"
+    commit_sha = _get_head_sha(ctx.cwd) or "unknown"
 
     results = post_comment_replies(
         pr_number=rework.pr_number,

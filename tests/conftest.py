@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable, NamedTuple
-from unittest.mock import MagicMock
-
+from typing import TYPE_CHECKING, Callable, NamedTuple
 import pytest
+
+if TYPE_CHECKING:
+    from darkfactory.workflow import RunContext
 
 from conftest import write_prd as write_prd  # noqa: F401
 from darkfactory.model import PRD, load_all
@@ -165,11 +166,11 @@ def make_workflow(tmp_path: Path) -> Callable[..., Workflow]:
 
 
 @pytest.fixture
-def make_execution_context() -> Callable[..., MagicMock]:
-    """Return a factory that creates a mock ``ExecutionContext``.
+def make_execution_context(tmp_path: Path) -> Callable[..., "RunContext"]:
+    """Return a factory that creates a ``RunContext`` with seeded payloads.
 
-    The returned factory creates a ``MagicMock`` pre-populated with the
-    fields most commonly accessed in workflow and builtin tests::
+    The returned factory creates a ``RunContext`` pre-populated with
+    CodeEnv, PrdWorkflowRun, and WorktreeState::
 
         make_execution_context(
             *,
@@ -180,8 +181,11 @@ def make_execution_context() -> Callable[..., MagicMock]:
             cwd: Path | None = None,
             repo_root: Path | None = None,
             worktree_path: Path | None = None,
-        ) -> MagicMock
+        ) -> RunContext
     """
+    from darkfactory.engine import CodeEnv, PrdWorkflowRun, WorktreeState
+    from darkfactory.workflow import RunContext, Workflow
+    from darkfactory.model import PRD
 
     def _factory(
         *,
@@ -192,16 +196,43 @@ def make_execution_context() -> Callable[..., MagicMock]:
         cwd: Path | None = None,
         repo_root: Path | None = None,
         worktree_path: Path | None = None,
-    ) -> MagicMock:
-        ctx = MagicMock()
-        ctx.dry_run = dry_run
-        ctx.prd.id = prd_id
-        ctx.branch_name = branch_name
-        ctx.base_ref = base_ref
-        ctx.cwd = cwd
-        ctx.repo_root = repo_root
-        ctx.worktree_path = worktree_path
-        ctx.format_string.side_effect = lambda s: s
+    ) -> "RunContext":
+        effective_root = repo_root or tmp_path
+        effective_cwd = cwd or effective_root
+        prd = PRD(
+            id=prd_id,
+            path=effective_root / ".darkfactory" / "prds" / f"{prd_id}-stub.md",
+            slug="stub",
+            title="Test PRD",
+            kind="task",
+            status="ready",
+            priority="medium",
+            effort="s",
+            capability="simple",
+            parent=None,
+            depends_on=[],
+            blocks=[],
+            impacts=[],
+            workflow=None,
+            assignee=None,
+            reviewers=[],
+            target_version=None,
+            created="2026-04-06",
+            updated="2026-04-06",
+            tags=[],
+            raw_frontmatter={},
+            body="",
+        )
+        ctx = RunContext(dry_run=dry_run)
+        ctx.state.put(CodeEnv(repo_root=effective_root, cwd=effective_cwd))
+        ctx.state.put(PrdWorkflowRun(prd=prd, workflow=Workflow(name="test", tasks=[])))
+        ctx.state.put(
+            WorktreeState(
+                branch=branch_name,
+                base_ref=base_ref,
+                worktree_path=worktree_path,
+            )
+        )
         return ctx
 
     return _factory

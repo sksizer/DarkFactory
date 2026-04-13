@@ -1,17 +1,16 @@
-"""Tests for the workflow dataclasses and ExecutionContext."""
+"""Tests for the workflow dataclasses and RunContext."""
 
 from __future__ import annotations
 
 import logging
 from pathlib import Path
 
-import pytest
-
+from darkfactory.engine import CodeEnv, PrdWorkflowRun, WorktreeState
 from darkfactory.model import load_all
 from darkfactory.workflow import (
     AgentTask,
     BuiltIn,
-    ExecutionContext,
+    RunContext,
     ShellTask,
     Task,
     Workflow,
@@ -155,26 +154,33 @@ def test_default_applies_to_returns_false(tmp_data_dir: Path) -> None:
     assert _default_applies_to(prds["PRD-070"], prds) is False
 
 
-# ---------- ExecutionContext ----------
+# ---------- RunContext ----------
 
 
-def _make_ctx(tmp_data_dir: Path) -> ExecutionContext:
+def _make_ctx(tmp_data_dir: Path) -> RunContext:
     write_prd(tmp_data_dir / "prds", "PRD-070", "tera-filter-obsidian-link")
     prds = load_all(tmp_data_dir)
-    return ExecutionContext(
-        prd=prds["PRD-070"],
-        repo_root=tmp_data_dir,
-        workflow=Workflow(name="default"),
-        base_ref="main",
-        branch_name="prd/PRD-070-tera-filter-obsidian-link",
-        worktree_path=tmp_data_dir / ".worktrees" / "PRD-070-tera-filter-obsidian-link",
+    ctx = RunContext(dry_run=True)
+    ctx.state.put(CodeEnv(repo_root=tmp_data_dir, cwd=tmp_data_dir))
+    ctx.state.put(
+        PrdWorkflowRun(prd=prds["PRD-070"], workflow=Workflow(name="default"))
     )
+    ctx.state.put(
+        WorktreeState(
+            branch="prd/PRD-070-tera-filter-obsidian-link",
+            base_ref="main",
+            worktree_path=tmp_data_dir
+            / ".worktrees"
+            / "PRD-070-tera-filter-obsidian-link",
+        )
+    )
+    return ctx
 
 
 def test_execution_context_defaults(tmp_data_dir: Path) -> None:
     ctx = _make_ctx(tmp_data_dir)
-    assert ctx.base_ref == "main"
-    assert ctx.pr_url is None
+    wt = ctx.state.get(WorktreeState)
+    assert wt.base_ref == "main"
     assert ctx.dry_run is True
     assert isinstance(ctx.logger, logging.Logger)
     from darkfactory.engine import PhaseState
@@ -198,20 +204,28 @@ def test_format_string_expands_branch_refs(tmp_data_dir: Path) -> None:
 
 def test_format_string_expands_worktree(tmp_data_dir: Path) -> None:
     ctx = _make_ctx(tmp_data_dir)
-    worktree_str = str(ctx.worktree_path)
+    wt = ctx.state.get(WorktreeState)
+    worktree_str = str(wt.worktree_path)
     assert worktree_str in ctx.format_string("cd {worktree}")
 
 
 def test_format_string_empty_worktree_when_unset(tmp_data_dir: Path) -> None:
     ctx = _make_ctx(tmp_data_dir)
-    ctx.worktree_path = None
+    ctx.state.put(
+        WorktreeState(
+            branch="prd/PRD-070-tera-filter-obsidian-link",
+            base_ref="main",
+            worktree_path=None,
+        )
+    )
     assert ctx.format_string("{worktree}") == ""
 
 
-def test_format_string_unknown_placeholder_raises(tmp_data_dir: Path) -> None:
+def test_format_string_unknown_placeholder_passes_through(tmp_data_dir: Path) -> None:
     ctx = _make_ctx(tmp_data_dir)
-    with pytest.raises(KeyError):
-        ctx.format_string("{nonexistent}")
+    # RunContext.format_string leaves unknown placeholders unchanged
+    result = ctx.format_string("{nonexistent}")
+    assert result == "{nonexistent}"
 
 
 def test_format_string_composite_commit_message(tmp_data_dir: Path) -> None:

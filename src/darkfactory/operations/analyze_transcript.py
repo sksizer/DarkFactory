@@ -9,7 +9,7 @@ Two-stage pipeline:
 2. **Stage 2** -- LLM narrative (Haiku or Sonnet, config-driven).
    Fires only when Stage 1 finds issues above the configured severity
    threshold. Writes a short markdown retro alongside the transcript
-   and appends a summary to ``ctx.run_summary``.
+   and appends a summary to the run_summary.
 
 Failure of either stage is logged as a warning and the workflow
 continues -- analysis is advisory, never fatal.
@@ -22,6 +22,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from darkfactory.engine import PrdWorkflowRun
 from darkfactory.operations._registry import builtin
 from darkfactory.operations._shared import _log_dry_run
 from darkfactory.config import load_section
@@ -32,7 +33,7 @@ from darkfactory.operations.analyze_transcript_detectors import (
 from darkfactory.utils.claude_code import claude_print
 from darkfactory.utils.git import GitErr, Ok, git_run
 from darkfactory.utils.secrets import redact
-from darkfactory.workflow import ExecutionContext
+from darkfactory.workflow import RunContext
 
 _log = logging.getLogger(__name__)
 
@@ -40,24 +41,13 @@ _PROMPT_PATH = Path(__file__).parent / "analyze_transcript_prompt.md"
 _EXCERPT_CAP = 4000  # characters
 
 _SEVERITY_ORDER: dict[str, int] = {"info": 0, "warning": 1, "error": 2}
-"""Numeric ordering for severity strings. Higher = more severe."""
 
 
 # ---------- Config helpers ----------
 
 
 def _load_analysis_config(repo_root: Path) -> dict[str, str]:
-    """Return analysis config from ``.darkfactory/config.toml``.
-
-    Reads from ``[workflow.analysis]`` section. Falls back to ``[analysis]``
-    for backwards compatibility.
-
-    Config keys:
-        commit          -- "true" to stage analysis files for commit (default: false)
-        min_severity    -- minimum severity to trigger Stage 2 LLM (default: "warning")
-        model_default   -- model for warning-severity runs (default: "haiku")
-        model_severe    -- model for error-severity runs (default: "sonnet")
-    """
+    """Return analysis config from ``.darkfactory/config.toml``."""
     config_path = repo_root / ".darkfactory" / "config.toml"
     try:
         cfg = load_section(config_path, "analysis")
@@ -70,15 +60,17 @@ def _load_analysis_config(repo_root: Path) -> dict[str, str]:
 # ---------- Transcript discovery ----------
 
 
-def _find_transcript(ctx: ExecutionContext) -> Path | None:
+def _find_transcript(ctx: RunContext) -> Path | None:
     """Return the path to the most recent committed transcript, or None."""
+    prd_run = ctx.state.get(PrdWorkflowRun)
+    prd_id = prd_run.prd.id
     transcript_dir = ctx.cwd / ".darkfactory" / "transcripts"
     if transcript_dir.exists():
-        matches = sorted(transcript_dir.glob(f"{ctx.prd.id}-*.jsonl"))
+        matches = sorted(transcript_dir.glob(f"{prd_id}-*.jsonl"))
         if matches:
             return matches[-1]
     # Fallback: the harness-level source (outside any worktree)
-    src = ctx.repo_root / ".harness-transcripts" / f"{ctx.prd.id}.jsonl"
+    src = ctx.repo_root / ".harness-transcripts" / f"{prd_id}.jsonl"
     if src.exists():
         return src
     return None
@@ -88,13 +80,8 @@ def _find_transcript(ctx: ExecutionContext) -> Path | None:
 
 
 def _parse_transcript(path: Path) -> list[dict[str, Any]]:
-    """Parse a transcript JSONL file into a flat list of events.
-
-    Each line in the file is a JSON object representing one event.
-    Lines that fail to parse are silently skipped.
-    """
+    """Parse a transcript JSONL file into a flat list of events."""
     events: list[dict[str, Any]] = []
-
     with open(path, encoding="utf-8") as fh:
         for raw in fh:
             stripped = raw.strip()
@@ -104,7 +91,6 @@ def _parse_transcript(path: Path) -> list[dict[str, Any]]:
                 events.append(json.loads(stripped))
             except json.JSONDecodeError:
                 pass
-
     return events
 
 
@@ -123,7 +109,6 @@ def _run_stage1(events: list[dict[str, Any]]) -> list[Finding]:
 
 
 def _max_severity(findings: list[Finding]) -> str | None:
-    """Return the highest-severity string, or None if the list is empty."""
     if not findings:
         return None
     return max(findings, key=lambda f: _SEVERITY_ORDER.get(f.severity, 0)).severity
@@ -133,7 +118,6 @@ def _max_severity(findings: list[Finding]) -> str | None:
 
 
 def _build_excerpt(events: list[dict[str, Any]], findings: list[Finding]) -> str:
-    """Build a capped JSONL excerpt from events near finding line numbers."""
     flagged: set[int] = set()
     for f in findings:
         if f.line is not None:
@@ -141,8 +125,6 @@ def _build_excerpt(events: list[dict[str, Any]], findings: list[Finding]) -> str
                 idx = f.line + delta
                 if 0 <= idx < len(events):
                     flagged.add(idx)
-
-    # When no line numbers are recorded, sample head + tail
     if not flagged:
         sample = list(events[:5]) + list(events[-5:])
     else:
@@ -156,12 +138,10 @@ def _build_excerpt(events: list[dict[str, Any]], findings: list[Finding]) -> str
             break
         lines.append(serialized)
         total += len(serialized)
-
     return "\n".join(lines)
 
 
 def _format_findings(findings: list[Finding]) -> str:
-    """Format findings as a markdown bullet list."""
     if not findings:
         return "(none)"
     parts: list[str] = []
@@ -177,14 +157,6 @@ def _call_llm(
     cwd: Path,
     logger: logging.Logger,
 ) -> str | None:
-    """Call ``claude --print`` for a plain-text narrative response.
-
-    Uses the same ``pnpm dlx @anthropic-ai/claude-code`` plumbing as the
-    agent runner but without stream-json formatting -- we just want the
-    final text blob. Tools are restricted to ``Read`` only.
-
-    Returns the stripped stdout on success, or ``None`` on any failure.
-    """
     try:
         result = claude_print(
             prompt,
@@ -196,7 +168,6 @@ def _call_llm(
     except Exception as exc:
         logger.warning("analyze_transcript: LLM subprocess failed: %s", exc)
         return None
-
     if result.returncode != 0 or not result.stdout.strip():
         logger.warning(
             "analyze_transcript: LLM call returned exit_code=%d", result.returncode
@@ -209,22 +180,14 @@ def _call_llm(
 
 
 @builtin("analyze_transcript")
-def analyze_transcript(ctx: ExecutionContext) -> None:
-    """Analyze the agent run transcript for problems and write a retro.
+def analyze_transcript(ctx: RunContext) -> None:
+    """Analyze the agent run transcript for problems and write a retro."""
+    prd_run = ctx.state.get(PrdWorkflowRun)
+    prd_id = prd_run.prd.id
 
-    Stage 1 runs deterministic detectors over the transcript JSONL.
-    Stage 2 calls an LLM (Haiku/Sonnet, config-driven) only when Stage 1
-    finds issues above the configured severity threshold.
-
-    Writes ``.darkfactory/transcripts/{prd_id}-{ts}.analysis.md`` and
-    appends a short summary to ``ctx.run_summary``.
-
-    Missing transcript, scanner failure, or LLM failure all log a warning
-    and return cleanly -- analysis is advisory.
-    """
     if _log_dry_run(
         ctx,
-        f"analyze_transcript: would scan transcript for {ctx.prd.id} and write analysis",
+        f"analyze_transcript: would scan transcript for {prd_id} and write analysis",
     ):
         return
 
@@ -232,7 +195,7 @@ def analyze_transcript(ctx: ExecutionContext) -> None:
     transcript_path = _find_transcript(ctx)
     if transcript_path is None:
         ctx.logger.warning(
-            "analyze_transcript: no transcript found for %s; skipping", ctx.prd.id
+            "analyze_transcript: no transcript found for %s; skipping", prd_id
         )
         return
 
@@ -262,7 +225,6 @@ def analyze_transcript(ctx: ExecutionContext) -> None:
 
     if max_sev is not None and max_sev_order >= min_sev_order:
         model_used = model_severe if max_sev == "error" else model_default
-
         try:
             template = _PROMPT_PATH.read_text(encoding="utf-8")
             excerpt = _build_excerpt(events, findings)
@@ -283,7 +245,7 @@ def analyze_transcript(ctx: ExecutionContext) -> None:
     model_note = f" (model: {model_used})" if model_used else ""
 
     body_parts = [
-        f"# Transcript analysis: {ctx.prd.id}",
+        f"# Transcript analysis: {prd_id}",
         "",
         f"**Transcript:** `{transcript_path.name}`",
         f"**Findings:** {len(findings)} ({', '.join(categories) or 'none'})",
@@ -306,7 +268,7 @@ def analyze_transcript(ctx: ExecutionContext) -> None:
 
     file_content = "\n".join(body_parts) + "\n"
 
-    # --- Secrets filtering (always on) ---
+    # --- Secrets filtering ---
     redaction = redact(file_content)
     if redaction.redaction_count > 0:
         ctx.logger.info(
@@ -325,8 +287,6 @@ def analyze_transcript(ctx: ExecutionContext) -> None:
 
         analysis_path.write_text(file_content, encoding="utf-8")
 
-        # Only stage for commit if configured — transcripts may contain
-        # sensitive information and should not be committed by default.
         commit_analysis = analysis_cfg.get("commit", "false").lower() in (
             "true",
             "1",
@@ -337,9 +297,7 @@ def analyze_transcript(ctx: ExecutionContext) -> None:
                 case Ok():
                     pass
                 case GitErr(returncode=code, stderr=err):
-                    raise RuntimeError(
-                        f"git add -f failed (exit {code}):\n{err}"
-                    )
+                    raise RuntimeError(f"git add -f failed (exit {code}):\n{err}")
             ctx.logger.info(
                 "analyze_transcript: staged %s", analysis_path.relative_to(ctx.cwd)
             )
@@ -353,7 +311,7 @@ def analyze_transcript(ctx: ExecutionContext) -> None:
             "analyze_transcript: failed to write/stage analysis: %s", exc
         )
 
-    # --- Augment ctx.run_summary ---
+    # --- Augment run_summary ---
     summary_lines = [
         "",
         "## Transcript analysis",
@@ -372,7 +330,12 @@ def analyze_transcript(ctx: ExecutionContext) -> None:
         pass
 
     addendum = "\n".join(summary_lines)
-    if ctx.run_summary:
-        ctx.run_summary = ctx.run_summary + "\n" + addendum
-    else:
-        ctx.run_summary = addendum
+    existing_summary = prd_run.run_summary or ""
+    new_summary = existing_summary + "\n" + addendum if existing_summary else addendum
+    ctx.state.put(
+        PrdWorkflowRun(
+            prd=prd_run.prd,
+            workflow=prd_run.workflow,
+            run_summary=new_summary,
+        )
+    )

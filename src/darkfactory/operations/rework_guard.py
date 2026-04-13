@@ -14,20 +14,21 @@ from pathlib import Path
 from darkfactory.operations._registry import builtin
 from darkfactory.operations._shared import _log_dry_run
 from darkfactory.event_log import emit_task_event
+from darkfactory.engine import PrdWorkflowRun
 from darkfactory.rework.guard import ReworkGuard
 from darkfactory.utils.git import GitErr, Ok, Timeout, git_run
-from darkfactory.workflow import ExecutionContext
+from darkfactory.workflow import RunContext
 
 _log = logging.getLogger(__name__)
 
 
-def _has_changes(cwd: str) -> bool:
+def _has_changes(cwd: Path) -> bool:
     """Return True if there are any staged or unstaged changes in the worktree.
 
     Returns False if the directory is not a git worktree or git errors for any
     reason, preserving the original non-raising semantics.
     """
-    match git_run("status", "--porcelain", cwd=Path(cwd)):
+    match git_run("status", "--porcelain", cwd=cwd):
         case Ok(stdout=output):
             return bool(output.strip())
         case GitErr() | Timeout():
@@ -35,7 +36,7 @@ def _has_changes(cwd: str) -> bool:
 
 
 @builtin("check_rework_guard")
-def check_rework_guard(ctx: ExecutionContext) -> None:
+def check_rework_guard(ctx: RunContext) -> None:
     """Detect no-change rework loops and block after N consecutive attempts.
 
     Runs ``git status --porcelain`` to determine whether the rework cycle
@@ -49,20 +50,23 @@ def check_rework_guard(ctx: ExecutionContext) -> None:
     if _log_dry_run(ctx, "check_rework_guard: would check git status"):
         return
 
-    had_changes = _has_changes(str(ctx.cwd))
+    prd_run = ctx.state.get(PrdWorkflowRun)
+    prd_id = prd_run.prd.id
+
+    had_changes = _has_changes(ctx.cwd)
 
     guard = ReworkGuard(ctx.repo_root)
-    outcome = guard.record_outcome(ctx.prd.id, had_changes=had_changes)
+    outcome = guard.record_outcome(prd_id, had_changes=had_changes)
 
     if had_changes:
         ctx.logger.info(
             "check_rework_guard: %s produced changes, guard counter reset",
-            ctx.prd.id,
+            prd_id,
         )
         emit_task_event(
             ctx,
             "rework_guard",
-            prd_id=ctx.prd.id,
+            prd_id=prd_id,
             had_changes=True,
             blocked=False,
             consecutive_no_change=0,
@@ -79,7 +83,7 @@ def check_rework_guard(ctx: ExecutionContext) -> None:
     emit_task_event(
         ctx,
         "rework_guard",
-        prd_id=ctx.prd.id,
+        prd_id=prd_id,
         had_changes=False,
         blocked=outcome.blocked,
         consecutive_no_change=outcome.consecutive_no_change,
@@ -88,7 +92,7 @@ def check_rework_guard(ctx: ExecutionContext) -> None:
 
     if outcome.blocked:
         raise RuntimeError(
-            f"REWORK LOOP BLOCKED: {ctx.prd.id} has {outcome.consecutive_no_change} "
+            f"REWORK LOOP BLOCKED: {prd_id} has {outcome.consecutive_no_change} "
             f"consecutive rework cycle(s) with no changes. "
             f"Manual intervention required."
         )

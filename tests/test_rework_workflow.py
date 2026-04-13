@@ -5,7 +5,7 @@ Covers:
 - Task sequence: starts with ``resolve_rework_context`` and skips
   ``ensure_worktree`` / ``set_status`` / ``create_pr``.
 - Commit message format.
-- ``run_workflow`` applies ``context_overrides`` to the ExecutionContext
+- ``run_workflow`` applies ``phase_state_init`` to the RunContext
   before dispatch so the resolve builtin is a no-op.
 """
 
@@ -14,15 +14,13 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from darkfactory.loader import load_workflows
 from darkfactory.utils.github.pr.comments import ReviewThread
 from darkfactory.runner import run_workflow
 from darkfactory.workflow import (
     AgentTask,
     BuiltIn,
-    ExecutionContext,
+    RunContext,
     Workflow,
 )
 
@@ -189,19 +187,19 @@ def _make_rework_workflow(tmp_path: Path) -> Workflow:
     )
 
 
-def test_run_workflow_applies_context_overrides(tmp_path: Path) -> None:
-    """context_overrides values appear on the ExecutionContext for every task."""
+def test_run_workflow_applies_phase_state_init(tmp_path: Path) -> None:
+    """phase_state_init values appear on the RunContext for every task."""
     from darkfactory.utils.claude_code import InvokeResult
-    from darkfactory.engine import ReworkState
+    from darkfactory.engine import CodeEnv, ReworkState, WorktreeState
 
     prd = _make_prd(tmp_path)
     worktree = tmp_path / "worktree"
     worktree.mkdir()
     threads = [_thread()]
 
-    captured_ctx: list[ExecutionContext] = []
+    captured_ctx: list[RunContext] = []
 
-    def _fake_builtin(ctx: ExecutionContext, **kwargs: object) -> None:
+    def _fake_builtin(ctx: RunContext, **kwargs: object) -> None:
         captured_ctx.append(ctx)
 
     fake_invoke = InvokeResult(
@@ -216,6 +214,14 @@ def test_run_workflow_applies_context_overrides(tmp_path: Path) -> None:
         pr_number=42,
         review_threads=threads,
     )
+
+    # Override CodeEnv to set worktree as cwd, and WorktreeState with worktree_path
+    worktree_state = WorktreeState(
+        branch="prd/PRD-001-my-feature",
+        base_ref="main",
+        worktree_path=worktree,
+    )
+    code_env = CodeEnv(repo_root=tmp_path, cwd=worktree)
 
     from darkfactory.operations._registry import BUILTINS
 
@@ -236,37 +242,19 @@ def test_run_workflow_applies_context_overrides(tmp_path: Path) -> None:
             tmp_path,
             "main",
             dry_run=False,
-            context_overrides={
-                "worktree_path": worktree,
-                "cwd": worktree,
-            },
-            phase_state_init=[rework_state],
+            phase_state_init=[rework_state, worktree_state, code_env],
         )
 
     assert result.success
     assert captured_ctx[0].state.get(ReworkState).review_threads == threads
     assert captured_ctx[0].state.get(ReworkState).pr_number == 42
-    assert captured_ctx[0].worktree_path == worktree
+    assert captured_ctx[0].state.get(WorktreeState).worktree_path == worktree
     assert captured_ctx[0].cwd == worktree
-
-
-def test_run_workflow_rejects_unknown_override_key(tmp_path: Path) -> None:
-    """Unknown context_overrides keys raise ValueError instead of silently dropping."""
-    prd = _make_prd(tmp_path)
-    with pytest.raises(ValueError, match="unknown ExecutionContext field"):
-        run_workflow(
-            prd,  # type: ignore[arg-type]
-            _make_rework_workflow(tmp_path),
-            tmp_path,
-            "main",
-            dry_run=True,
-            context_overrides={"not_a_real_field": "value"},
-        )
 
 
 def test_run_workflow_commit_message_uses_prd_id(tmp_path: Path) -> None:
     """The commit message for rework is formatted with the PRD id."""
-    from darkfactory.engine import ReworkState
+    from darkfactory.engine import CodeEnv, ReworkState, WorktreeState
 
     prd = _make_prd(tmp_path, "PRD-007")
     worktree = tmp_path / "worktree"
@@ -275,7 +263,7 @@ def test_run_workflow_commit_message_uses_prd_id(tmp_path: Path) -> None:
 
     commit_messages: list[str] = []
 
-    def _fake_commit(ctx: ExecutionContext, *, message: str) -> None:
+    def _fake_commit(ctx: RunContext, *, message: str) -> None:
         commit_messages.append(ctx.format_string(message))
 
     from darkfactory.utils.claude_code import InvokeResult
@@ -292,6 +280,13 @@ def test_run_workflow_commit_message_uses_prd_id(tmp_path: Path) -> None:
         pr_number=42,
         review_threads=threads,
     )
+
+    worktree_state = WorktreeState(
+        branch="prd/PRD-007-my-feature",
+        base_ref="main",
+        worktree_path=worktree,
+    )
+    code_env = CodeEnv(repo_root=tmp_path, cwd=worktree)
 
     from darkfactory.operations._registry import BUILTINS
 
@@ -312,11 +307,7 @@ def test_run_workflow_commit_message_uses_prd_id(tmp_path: Path) -> None:
             tmp_path,
             "main",
             dry_run=False,
-            context_overrides={
-                "worktree_path": worktree,
-                "cwd": worktree,
-            },
-            phase_state_init=[rework_state],
+            phase_state_init=[rework_state, worktree_state, code_env],
         )
 
     assert commit_messages == ["chore(prd): PRD-007 address review feedback"]
