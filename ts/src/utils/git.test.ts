@@ -63,21 +63,40 @@ describe("gitRun", () => {
 
 describe("branchExistsLocal", () => {
   it("returns Ok(true) for the current branch", async () => {
-    // Get current branch name first
-    const branchResult = await gitRun(["rev-parse", "--abbrev-ref", "HEAD"], {
-      cwd: REPO_ROOT,
-    });
-    if (branchResult.kind === "err") return; // skip if git fails
+    // Find any existing local branch to test against. CI checkouts are often
+    // detached HEAD, so `rev-parse --abbrev-ref HEAD` returns "HEAD" — not a
+    // real branch. List local branches and pick the first.
+    const listResult = await gitRun(
+      ["for-each-ref", "--format=%(refname:short)", "refs/heads/"],
+      { cwd: REPO_ROOT }
+    );
+    if (listResult.kind === "err") {
+      throw new Error(
+        `git for-each-ref failed: kind=${listResult.error.kind} stderr=${"stderr" in listResult.error ? listResult.error.stderr : ""}`
+      );
+    }
 
-    const branch = branchResult.stdout.trim();
+    const branches = listResult.stdout
+      .split("\n")
+      .filter((b) => b.trim() !== "");
+    const firstBranch = branches[0];
+    if (firstBranch === undefined) {
+      throw new Error(
+        `no local branches found in ${REPO_ROOT}; raw stdout=${JSON.stringify(listResult.stdout)}`
+      );
+    }
+
+    const branch = firstBranch.trim();
     const result = await branchExistsLocal(REPO_ROOT, branch);
 
     match(result)
       .with({ kind: "ok" }, (r) => {
         expect(r.value).toBe(true);
       })
-      .with({ kind: "err" }, () => {
-        throw new Error("expected ok");
+      .with({ kind: "err" }, (r) => {
+        throw new Error(
+          `expected ok for branch "${branch}", got err: kind=${r.error.kind} returncode=${String(r.error.returncode)} stderr=${r.error.stderr}`
+        );
       })
       .exhaustive();
   });
