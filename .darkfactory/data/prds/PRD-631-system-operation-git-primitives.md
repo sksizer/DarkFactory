@@ -10,15 +10,15 @@ parent:
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/workflow/_core.py
-  - src/darkfactory/project.py
-  - src/darkfactory/runner.py
-  - src/darkfactory/operations/project_builtins.py
-  - src/darkfactory/operations/ensure_worktree.py
-  - src/darkfactory/operations/commit.py
-  - src/darkfactory/operations/push_branch.py
-  - src/darkfactory/operations/create_pr.py
-  - src/darkfactory/engine/payloads.py
+  - python/darkfactory/workflow/_core.py
+  - python/darkfactory/project.py
+  - python/darkfactory/runner.py
+  - python/darkfactory/operations/project_builtins.py
+  - python/darkfactory/operations/ensure_worktree.py
+  - python/darkfactory/operations/commit.py
+  - python/darkfactory/operations/push_branch.py
+  - python/darkfactory/operations/create_pr.py
+  - python/darkfactory/engine/payloads.py
 workflow:
 assignee:
 reviewers: []
@@ -212,9 +212,9 @@ Suggested task ordering:
 
 ## References
 
-- `src/darkfactory/workflow/_core.py` — `ExecutionContext`, `Workflow`
-- `src/darkfactory/project.py` — `ProjectContext`, `ProjectOperation`
-- `src/darkfactory/runner.py` — `RunContext` protocol, construction paths, task dispatch
-- `src/darkfactory/operations/project_builtins.py` — project operation registry (`PROJECT_BUILTINS`)
-- `src/darkfactory/operations/_registry.py` — workflow operation registry (`BUILTINS`)
-- `src/darkfactory/engine/phase_state.py` — PhaseState registry
+- `python/darkfactory/workflow/_core.py` — `ExecutionContext`, `Workflow`
+- `python/darkfactory/project.py` — `ProjectContext`, `ProjectOperation`
+- `python/darkfactory/runner.py` — `RunContext` protocol, construction paths, task dispatch
+- `python/darkfactory/operations/project_builtins.py` — project operation registry (`PROJECT_BUILTINS`)
+- `python/darkfactory/operations/_registry.py` — workflow operation registry (`BUILTINS`)
+- `python/darkfactory/engine/phase_state.py` — PhaseState registry

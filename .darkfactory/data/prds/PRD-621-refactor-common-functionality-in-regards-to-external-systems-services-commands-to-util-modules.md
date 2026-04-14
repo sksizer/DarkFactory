@@ -287,13 +287,13 @@ match create_pr(ctx.base_ref, title, body_path, ctx.cwd):
 
 ## References
 
-- `src/darkfactory/pr_comments.py` — GitHub comment logic (~510 lines, 3 `gh` subprocess calls)
-- `src/darkfactory/checks.py` — PR state checks (~350 lines, 3 `gh` calls + 3 `git` calls in `is_resume_safe`)
-- `src/darkfactory/builtins/create_pr.py` — PR creation builtin (1 `gh` call)
-- `src/darkfactory/utils/github/__init__.py` — existing `list_open_prs`, `close_pr` (2 `gh` calls)
-- `src/darkfactory/invoke.py` — Claude Code invocation (~688 lines, 1 Popen call)
-- `src/darkfactory/utils/claude_code.py` — `spawn_claude` (~38 lines, 1 subprocess call)
-- `src/darkfactory/runner.py:580-599` — shell runner (duplicated)
-- `src/darkfactory/system_runner.py:356-373` — shell runner (duplicate)
+- `python/darkfactory/pr_comments.py` — GitHub comment logic (~510 lines, 3 `gh` subprocess calls)
+- `python/darkfactory/checks.py` — PR state checks (~350 lines, 3 `gh` calls + 3 `git` calls in `is_resume_safe`)
+- `python/darkfactory/builtins/create_pr.py` — PR creation builtin (1 `gh` call)
+- `python/darkfactory/utils/github/__init__.py` — existing `list_open_prs`, `close_pr` (2 `gh` calls)
+- `python/darkfactory/invoke.py` — Claude Code invocation (~688 lines, 1 Popen call)
+- `python/darkfactory/utils/claude_code.py` — `spawn_claude` (~38 lines, 1 subprocess call)
+- `python/darkfactory/runner.py:580-599` — shell runner (duplicated)
+- `python/darkfactory/system_runner.py:356-373` — shell runner (duplicate)
 
   

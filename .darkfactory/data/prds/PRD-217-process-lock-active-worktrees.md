@@ -11,9 +11,9 @@ depends_on:
   - "[[PRD-215-prd-concurrency-guard]]"
 blocks: []
 impacts:
-  - src/darkfactory/builtins.py
-  - src/darkfactory/runner.py
-  - src/darkfactory/workflow.py
+  - python/darkfactory/builtins.py
+  - python/darkfactory/runner.py
+  - python/darkfactory/workflow.py
   - tests/test_builtins.py
   - pyproject.toml
 workflow: null
@@ -77,7 +77,7 @@ dependencies = [
 
 ### ExecutionContext gains a lock handle
 
-`src/darkfactory/workflow.py`:
+`python/darkfactory/workflow.py`:
 
 ```python
 from dataclasses import dataclass, field
@@ -97,7 +97,7 @@ class ExecutionContext:
 
 ### `ensure_worktree` acquires the lock
 
-`src/darkfactory/builtins.py`:
+`python/darkfactory/builtins.py`:
 
 ```python
 from filelock import FileLock, Timeout
@@ -154,7 +154,7 @@ def ensure_worktree(ctx: ExecutionContext) -> None:
 
 ### Runner releases on exit
 
-`src/darkfactory/runner.py`:
+`python/darkfactory/runner.py`:
 
 ```python
 def run_tasks(ctx: ExecutionContext) -> TaskOutcome:

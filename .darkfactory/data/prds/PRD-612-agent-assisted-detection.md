@@ -11,8 +11,8 @@ depends_on:
   - "[[PRD-608-project-toolchain-setup]]"
 blocks: []
 impacts:
-  - src/darkfactory/toolchain/__init__.py
-  - src/darkfactory/cli/setup.py
+  - python/darkfactory/toolchain/__init__.py
+  - python/darkfactory/cli/setup.py
 workflow:
 assignee:
 reviewers: []

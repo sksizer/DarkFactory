@@ -27,7 +27,14 @@ def _find_operations_dir() -> Path:
     """
     here = Path(__file__).resolve().parent
     for candidate in [here.parent, here.parent.parent]:
-        ops = candidate / "src" / "darkfactory" / "workflow" / "definitions" / "project"
+        ops = (
+            candidate
+            / "python"
+            / "darkfactory"
+            / "workflow"
+            / "definitions"
+            / "project"
+        )
         if ops.exists():
             return ops
     raise FileNotFoundError(

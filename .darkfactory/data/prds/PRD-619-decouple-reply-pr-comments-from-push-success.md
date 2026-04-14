@@ -10,8 +10,8 @@ parent: null
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/workflows/rework/workflow.py
-  - src/darkfactory/runner.py
+  - python/darkfactory/workflows/rework/workflow.py
+  - python/darkfactory/runner.py
 workflow: null
 assignee: null
 reviewers: []
@@ -126,8 +126,8 @@ parallel graph execution).
 
 - PRD-617: `fast_forward_branch` — addresses the root cause of
   the most common push failure.
-- `src/darkfactory/runner.py:242-245`: halt-on-failure loop.
-- `src/darkfactory/workflows/rework/workflow.py`: current task
+- `python/darkfactory/runner.py:242-245`: halt-on-failure loop.
+- `python/darkfactory/workflows/rework/workflow.py`: current task
   order.
 - PRD-551: parallel graph execution — the full DAG-based
   approach that would subsume this fix.

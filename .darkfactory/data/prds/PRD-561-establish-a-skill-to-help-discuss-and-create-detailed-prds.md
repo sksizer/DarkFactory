@@ -10,9 +10,9 @@ parent: null
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/cli/
-  - src/darkfactory/data/commands/
-  - src/darkfactory/workflows/prd-authoring/
+  - python/darkfactory/cli/
+  - python/darkfactory/data/commands/
+  - python/darkfactory/workflows/prd-authoring/
   - .claude/commands/
 workflow: null
 assignee: null
@@ -94,7 +94,7 @@ Without this skill, every new PRD is a coin flip between "ready for execution" a
 7. **Project initialization (`prd init`)** — slash commands are installed as part of project setup:
    a. `prd init` bootstraps the `.claude/` directory structure in the project root, including `.claude/commands/prd-create.md` and `.claude/commands/prd-refine.md`. (`prd init` already exists and scaffolds `.darkfactory/data/prds/` and `.darkfactory/data/archive/`; this PRD adds the `.claude/commands/` bootstrap on top.)
    b. If `.claude/commands/` already exists, only missing command files are added — existing files are never overwritten.
-   c. Slash command files are bundled with the `darkfactory` package as package data (e.g. `src/darkfactory/data/commands/`) and copied into the project on init.
+   c. Slash command files are bundled with the `darkfactory` package as package data (e.g. `python/darkfactory/data/commands/`) and copied into the project on init.
    d. `prd init` is idempotent — running it multiple times on the same project is safe and only adds what's missing.
    e. Prints a summary of what was created/skipped so the user knows what changed.
 
@@ -123,7 +123,7 @@ Without this skill, every new PRD is a coin flip between "ready for execution" a
 
 ### DarkFactory workflow (`prd-authoring`)
 
-- New directory: `src/darkfactory/workflows/prd-authoring/`
+- New directory: `python/darkfactory/workflows/prd-authoring/`
   - `workflow.py` — exports a `Workflow` with `applies_to` matching `workflow: prd-authoring`.
   - `prompts/role.md` — frames the agent as a PRD quality reviewer.
   - `prompts/task.md` — injects the target PRD content and rubric, instructs agent to propose improvements.
@@ -137,8 +137,8 @@ Without this skill, every new PRD is a coin flip between "ready for execution" a
 
 ### Project initialization (`prd init`)
 
-- Extend the existing `prd init` subcommand in `src/darkfactory/cli/init_cmd.py` (backed by `src/darkfactory/init.py`). The command already creates `.darkfactory/data/prds/` and `.darkfactory/data/archive/`; this PRD adds the `.claude/commands/` bootstrap.
-- Slash command source files are stored as package data in `src/darkfactory/data/commands/prd-create.md` and `src/darkfactory/data/commands/prd-refine.md`.
+- Extend the existing `prd init` subcommand in `python/darkfactory/cli/init_cmd.py` (backed by `python/darkfactory/init.py`). The command already creates `.darkfactory/data/prds/` and `.darkfactory/data/archive/`; this PRD adds the `.claude/commands/` bootstrap.
+- Slash command source files are stored as package data in `python/darkfactory/data/commands/prd-create.md` and `python/darkfactory/data/commands/prd-refine.md`.
 - Included in the package via `pyproject.toml` package-data configuration.
 - `prd init` additions:
   1. Create `.claude/commands/` if missing.
@@ -158,7 +158,7 @@ Without this skill, every new PRD is a coin flip between "ready for execution" a
 - [ ] AC-3: `/prd-create` suggests `depends_on`/`blocks` relationships based on existing PRDs and does not reference non-existent PRD IDs.
 - [ ] AC-4: `/prd-refine PRD-X` reads the target PRD, evaluates it against the quality rubric, and reports a structured pass/fail checklist.
 - [ ] AC-5: `/prd-refine` can interactively fix flagged issues with user approval and transition status to `ready` when all criteria pass.
-- [ ] AC-6: The `prd-authoring` workflow exists at `src/darkfactory/workflows/prd-authoring/` and can be invoked via `prd run`.
+- [ ] AC-6: The `prd-authoring` workflow exists at `python/darkfactory/workflows/prd-authoring/` and can be invoked via `prd run`.
 - [ ] AC-7: The workflow produces a PR with proposed PRD improvements and a rubric report in the PR description.
 - [ ] AC-8: Generated PRDs match the formatting, frontmatter schema, and section ordering of existing project PRDs (validated by `prd validate`).
 - [ ] AC-9: Running `/prd-refine` on a PRD that already meets all rubric criteria reports "all criteria pass" and makes no changes.
@@ -182,8 +182,8 @@ Without this skill, every new PRD is a coin flip between "ready for execution" a
 - PRD-224 (harness invariants) — example of detailed motivation with incident-driven requirements
 - PRD-541 (color output) — example of a complete feature-level PRD
 - PRD-510 (prd new subcommand) — the existing `prd new` implementation this skill builds on
-- `src/darkfactory/workflows/planning/` — existing planning workflow, pattern reference for the new workflow
-- `src/darkfactory/workflows/default/` — default workflow, structural reference
+- `python/darkfactory/workflows/planning/` — existing planning workflow, pattern reference for the new workflow
+- `python/darkfactory/workflows/default/` — default workflow, structural reference
 
 ## Assessment (2026-04-11)
 
@@ -203,7 +203,7 @@ Without this skill, every new PRD is a coin flip between "ready for execution" a
 - **Gaps to fully implement**:
   - Author `/prd-create` and `/prd-refine` skill files (markdown).
   - Bundle them as package data under
-    `src/darkfactory/data/commands/`.
+    `python/darkfactory/data/commands/`.
   - Extend `prd init` (or `init_cmd.py`) to copy them into
     `.claude/commands/`.
   - Create `workflows/prd-authoring/` with role/task/verify prompts.

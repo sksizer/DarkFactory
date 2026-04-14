@@ -81,7 +81,7 @@ And follow-ups that depend on the extraction:
 
 ## Acceptance Criteria
 
-- [ ] AC-1: `darkfactory/src/darkfactory/` exists with all modules renamed from `prd_harness`.
+- [ ] AC-1: `darkfactory/python/darkfactory/` exists with all modules renamed from `prd_harness`.
 - [ ] AC-2: `darkfactory/tests/` has all tests passing.
 - [ ] AC-3: `darkfactory/workflows/default/` exists with the default workflow.
 - [ ] AC-4: `darkfactory/prds/` contains the extracted dev-PRDs.

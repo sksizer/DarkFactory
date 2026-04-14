@@ -10,7 +10,7 @@ parent:
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/builtins.py
+  - python/darkfactory/builtins.py
   - tests/test_builtins.py
   - workflows/default/workflow.py
   - workflows/extraction/workflow.py
@@ -53,7 +53,7 @@ A post-build, pre-push guard is the right place: it catches drift from any sourc
 
 ## Acceptance criteria
 
-- [x] New builtin `lint_attribution` registered in `src/darkfactory/builtins.py`
+- [x] New builtin `lint_attribution` registered in `python/darkfactory/builtins.py`
 - [x] Scans every commit in `{base_ref}..HEAD` using `git log --format=%H%x00%B%x1e` (robust against newlines in commit bodies)
 - [x] Scans `ctx.run_summary` when non-empty
 - [x] `commit` builtin inline-scans the formatted commit message before writing

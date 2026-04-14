@@ -43,7 +43,7 @@ can't do so cleanly without this foundation.
 
 ### Functional
 
-1. Create `src/darkfactory/config/` package; preserve `from darkfactory.config
+1. Create `python/darkfactory/config/` package; preserve `from darkfactory.config
    import resolve_config, Config` as the stable public surface.
 2. Move `config.py` content into `config/__init__.py` (or `config/_config.py`
    with re-exports from `__init__.py`).
@@ -71,7 +71,7 @@ can't do so cleanly without this foundation.
 Resulting structure:
 
 ```
-src/darkfactory/config/
+python/darkfactory/config/
     __init__.py        # re-exports: resolve_config, Config, ToolsConfig, …
     _config.py         # dataclasses + resolve_config implementation
     _discovery.py      # find_darkfactory_dir, resolve_project_root

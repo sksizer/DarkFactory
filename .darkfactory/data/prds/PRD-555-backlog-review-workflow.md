@@ -10,13 +10,13 @@ parent:
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/workflows/backlog_review/workflow.py
-  - src/darkfactory/workflows/backlog_review/prompts/role.md
-  - src/darkfactory/workflows/backlog_review/prompts/task.md
-  - src/darkfactory/workflows/backlog_review/prompts/verify.md
-  - src/darkfactory/cli/review_backlog.py
-  - src/darkfactory/cli/review_backlog_test.py
-  - src/darkfactory/cli/_parser.py
+  - python/darkfactory/workflows/backlog_review/workflow.py
+  - python/darkfactory/workflows/backlog_review/prompts/role.md
+  - python/darkfactory/workflows/backlog_review/prompts/task.md
+  - python/darkfactory/workflows/backlog_review/prompts/verify.md
+  - python/darkfactory/cli/review_backlog.py
+  - python/darkfactory/cli/review_backlog_test.py
+  - python/darkfactory/cli/_parser.py
   - tests/test_backlog_review_workflow.py
 workflow:
 assignee:
@@ -42,7 +42,7 @@ A new workflow that walks every `draft`/`ready`/`in-progress` PRD in the repo an
 
 The PRD set drifts constantly:
 
-- **`impacts:` rot.** A PRD written against `src/darkfactory/builtins.py` (when it was a single file) becomes wrong the moment PRD-549 splits that file into a package. No automatic detection today.
+- **`impacts:` rot.** A PRD written against `python/darkfactory/builtins.py` (when it was a single file) becomes wrong the moment PRD-549 splits that file into a package. No automatic detection today.
 - **Obsolete PRDs.** Work gets done via a different route, the problem disappears, or the approach is superseded by a later PRD. Without review, these linger in `ready` forever.
 - **Stale technical approaches.** A PRD cites specific line numbers, function signatures, or file layouts that have since changed. Running the PRD against today's code would produce a wrong-shaped diff.
 - **Missing `depends_on` edges.** A PRD that didn't know about PRD-X when it was written might now be blocked on it.
@@ -55,10 +55,10 @@ Today the only mechanism for this is "read every PRD by hand periodically." That
 
 ### Workflow shape
 
-Sibling of `src/darkfactory/workflows/planning/` — same directory convention, same `workflow.py` + `prompts/` structure.
+Sibling of `python/darkfactory/workflows/planning/` — same directory convention, same `workflow.py` + `prompts/` structure.
 
 ```
-src/darkfactory/workflows/backlog_review/
+python/darkfactory/workflows/backlog_review/
 ├── __init__.py
 ├── workflow.py
 └── prompts/
@@ -67,7 +67,7 @@ src/darkfactory/workflows/backlog_review/
     └── verify.md
 ```
 
-The new CLI subcommand lives at `src/darkfactory/cli/review_backlog.py` with a peer `review_backlog_test.py`, registered via `cli/_parser.py` (the CLI has been modularized per PRD-556 — there is no monolithic `cli.py` anymore).
+The new CLI subcommand lives at `python/darkfactory/cli/review_backlog.py` with a peer `review_backlog_test.py`, registered via `cli/_parser.py` (the CLI has been modularized per PRD-556 — there is no monolithic `cli.py` anymore).
 
 ### Entry point
 
@@ -117,8 +117,8 @@ A single structured report written to `.backlog-review/YYYY-MM-DD.md` (git-ignor
 
 ## PRD-123 — Some title [stale-impacts]
 **Status:** ready
-**Issue:** `src/darkfactory/builtins.py` was split into `src/darkfactory/builtins/` as of PRD-549.
-**Recommendation:** Update impacts to `src/darkfactory/builtins/<specific-file>.py`.
+**Issue:** `python/darkfactory/builtins.py` was split into `python/darkfactory/builtins/` as of PRD-549.
+**Recommendation:** Update impacts to `python/darkfactory/builtins/<specific-file>.py`.
 **Auto-fix applied:** no (ambiguous — multiple new files).
 
 ## PRD-456 — Another title [likely-obsolete]
@@ -145,7 +145,7 @@ Plus, for PRDs where the fix is unambiguous (file renames, trivial path updates)
 
 ## Acceptance criteria
 
-- [ ] AC-1: `src/darkfactory/workflows/backlog_review/` exists with the canonical workflow + prompts structure.
+- [ ] AC-1: `python/darkfactory/workflows/backlog_review/` exists with the canonical workflow + prompts structure.
 - [ ] AC-2: `prd review-backlog` (or equivalent CLI entry point) runs the workflow over all draft/ready/in-progress PRDs.
 - [ ] AC-3: For each PRD the workflow produces a per-PRD verdict from the documented set (`clean`, `stale-impacts`, `stale-body`, `likely-obsolete`, `missing-deps`, `broken-refs`).
 - [ ] AC-4: `impacts:` fixes where a file was cleanly renamed are applied automatically and committed.

@@ -30,10 +30,10 @@ tags:
 # Architectural Review and Code Quality Roadmap
 
 > **Snapshot note (2026-04-11):** This review was written against the repo state on 2026-04-09. Several structural findings in the analysis below have since been partially or fully addressed:
-> - **CLI god module** (Hotspot 1, risk 4): `cli/__init__.py` has been decomposed to ~11 lines; all 15 command handlers have been extracted into `src/darkfactory/cli/<name>.py` modules (reconcile, run, plan, rework, new, etc.), including peer tests. See PRD-556.
-> - **`prd.py` monolith** (489 LOC, referenced throughout sections 2–6): replaced by the `src/darkfactory/model/` package (`model/_prd.py`, `model/_persistence.py`, `model/__init__.py` re-exports) as part of PRD-622. All `from darkfactory.prd import ...` references should now read `from darkfactory.model import ...`.
+> - **CLI god module** (Hotspot 1, risk 4): `cli/__init__.py` has been decomposed to ~11 lines; all 15 command handlers have been extracted into `python/darkfactory/cli/<name>.py` modules (reconcile, run, plan, rework, new, etc.), including peer tests. See PRD-556.
+> - **`prd.py` monolith** (489 LOC, referenced throughout sections 2–6): replaced by the `python/darkfactory/model/` package (`model/_prd.py`, `model/_persistence.py`, `model/__init__.py` re-exports) as part of PRD-622. All `from darkfactory.prd import ...` references should now read `from darkfactory.model import ...`.
 > - **Directory layout**: `.darkfactory/prds/` is now `.darkfactory/data/prds/` with an added `.darkfactory/data/archive/` for terminal PRDs. The `archive` command and deterministic frontmatter serialization were delivered by PRD-622.
-> - **Version single-sourcing** (section 3, row 5): `[tool.hatch.version]` now reads from `src/darkfactory/__init__.py:__version__` — so PRD-600.2.4 is effectively done.
+> - **Version single-sourcing** (section 3, row 5): `[tool.hatch.version]` now reads from `python/darkfactory/__init__.py:__version__` — so PRD-600.2.4 is effectively done.
 >
 > The high/critical safety findings (reconcile crash recovery, shell-escape, setattr side channel, ruff in CI) are still open and tracked by PRD-600.1.x.
 
@@ -53,7 +53,7 @@ DarkFactory is a well-architected Python CLI tool (~10.5K LOC production, ~13.5K
 
 ```
 DarkFactory/
-├── src/darkfactory/                  # Main package (10,461 LOC prod)
+├── python/darkfactory/                  # Main package (10,461 LOC prod)
 │   ├── cli/                          # CLI package (2,453 LOC) -- 15/21 handlers still in __init__.py
 │   ├── builtins/                     # Built-in task primitives (1,339 LOC)
 │   ├── workflows/                    # 4 built-in workflow definitions (336 LOC + 13 prompt templates)
@@ -565,7 +565,7 @@ is the value; the backlog is the deliverable.
   focused sprints. Effort for the recommended do-now subset (below):
   m across maybe 8 child PRDs.
 - **Current state**: partially landed. PRD-600.2.7 (delete dead cli stub)
-  is already done (survey confirms `src/darkfactory/cli.py` is gone).
+  is already done (survey confirms `python/darkfactory/cli.py` is gone).
   PRD-600.2.4 (single-source version) is landed via PRD-622's
   `[tool.hatch.version]` configuration — supersede. Nothing else in
   the 600.x tree has landed.

@@ -76,7 +76,7 @@ When a PR does a structural rewrite (e.g. moving a module into a package, renami
 
 ### Module-per-concern with peer tests
 
-New functionality should be decomposed into small, focused module files rather than growing existing files. Each module should have a peer test file in the same directory (e.g., `_python.py` / `_python_test.py`). This fights file bloat and keeps context small — for both humans and AI agents working on the codebase. See `src/darkfactory/cli/` and `src/darkfactory/builtins/` for the established patterns.
+New functionality should be decomposed into small, focused module files rather than growing existing files. Each module should have a peer test file in the same directory (e.g., `_python.py` / `_python_test.py`). This fights file bloat and keeps context small — for both humans and AI agents working on the codebase. See `python/darkfactory/cli/` and `python/darkfactory/builtins/` for the established patterns.
 
 ### Parse errors at the boundary, trust types internally
 

@@ -1,6 +1,6 @@
 ---
 id: PRD-556
-title: Split src/darkfactory/cli.py into a package of per-subcommand modules with colocated tests
+title: Split python/darkfactory/cli.py into a package of per-subcommand modules with colocated tests
 kind: epic
 status: in-progress
 priority: medium
@@ -42,11 +42,11 @@ tags:
   - cli
 ---
 
-# Split `src/darkfactory/cli.py` into a package of per-subcommand modules
+# Split `python/darkfactory/cli.py` into a package of per-subcommand modules
 
 ## Summary
 
-`src/darkfactory/cli.py` is 1423 lines and holds 14 subcommand implementations plus all the argparse wiring and a dozen shared helpers. It's by far the largest module in `src/darkfactory/` and growing — every new feature (PRD-220 alone added ~200 lines) makes it worse.
+`python/darkfactory/cli.py` is 1423 lines and holds 14 subcommand implementations plus all the argparse wiring and a dozen shared helpers. It's by far the largest module in `python/darkfactory/` and growing — every new feature (PRD-220 alone added ~200 lines) makes it worse.
 
 Apply the PRD-549 convention: turn `cli.py` into a package, one submodule per subcommand, colocated unit tests, shared helpers in `_shared.py`, argparse wiring in `_parser.py`. The public entry point stays `darkfactory.cli:main`.
 
@@ -65,7 +65,7 @@ This is an **epic**, decomposable into parallel children the same way PRD-549 wa
 ## Target layout
 
 ```
-src/darkfactory/
+python/darkfactory/
 ├── cli/
 │   ├── __init__.py              # re-exports main, build_parser
 │   ├── _parser.py               # build_parser() — all argparse wiring
@@ -123,7 +123,7 @@ Same pattern as PRD-549:
 
 ## Acceptance criteria
 
-- [ ] AC-1: `src/darkfactory/cli/` exists as a package, `__init__.py` re-exports `main` and `build_parser`.
+- [ ] AC-1: `python/darkfactory/cli/` exists as a package, `__init__.py` re-exports `main` and `build_parser`.
 - [ ] AC-2: Every `cmd_<name>` function lives in its own submodule with a colocated `*_test.py`.
 - [ ] AC-3: `build_parser()` lives in `cli/_parser.py` and is the single source of subcommand wiring.
 - [ ] AC-4: `uv run prd <subcommand>` behavior is identical for every subcommand — no regressions.
@@ -134,7 +134,7 @@ Same pattern as PRD-549:
 
 ## Open questions
 
-- [ ] Does `tests/test_cli_run.py` get split into colocated tests under `src/darkfactory/cli/run_test.py`, or stay as an integration test file? Recommend: move the unit-y tests (args parsing, routing) to colocated; keep end-to-end happy-paths in `tests/`.
+- [ ] Does `tests/test_cli_run.py` get split into colocated tests under `python/darkfactory/cli/run_test.py`, or stay as an integration test file? Recommend: move the unit-y tests (args parsing, routing) to colocated; keep end-to-end happy-paths in `tests/`.
 - [ ] `_parser.py` size. If `build_parser()` is still 200+ lines after the move, consider per-subcommand parser fragments that each module registers itself. Optional v2 cleanup.
 - [ ] Interaction with PRD-549 — if 549 lands first and establishes the colocated-test convention, this PRD is cheaper. Ordering matters.
 
@@ -144,15 +144,15 @@ Same pattern as PRD-549:
 - [[PRD-545-harness-driven-rebase-and-conflict-resolution]] — conflict handling across parallel children.
 - [[PRD-552-merge-upstream-task]] — same.
 - [[PRD-557-modularize-runner]] — sibling modularization.
-- Current `src/darkfactory/cli.py` — 1423 lines, 14 subcommand implementations.
+- Current `python/darkfactory/cli.py` — 1423 lines, 14 subcommand implementations.
 
 ## Assessment (2026-04-11)
 
 - **Value**: 4/5 — large readability and diff-noise win every feature touch.
 - **Effort remaining**: xs — only PRD-556.18 (final cleanup) is left.
 - **Current state**: drift / essentially done. The state survey confirms
-  `src/darkfactory/cli.py` (the monolith) is absent and every command has
-  its own submodule with a colocated `*_test.py` under `src/darkfactory/cli/`.
+  `python/darkfactory/cli.py` (the monolith) is absent and every command has
+  its own submodule with a colocated `*_test.py` under `python/darkfactory/cli/`.
   `cli/__init__.py` is re-export only. Status `in-progress` is stale.
 - **Gaps to fully implement**:
   - Close PRD-556.18 (dead-reference grep + duplicate-test cleanup).

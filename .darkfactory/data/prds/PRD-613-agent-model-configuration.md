@@ -10,10 +10,10 @@ parent:
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/invoke.py
-  - src/darkfactory/runner.py
-  - src/darkfactory/config.py
-  - src/darkfactory/workflow.py
+  - python/darkfactory/invoke.py
+  - python/darkfactory/runner.py
+  - python/darkfactory/config.py
+  - python/darkfactory/workflow.py
 workflow:
 assignee:
 reviewers: []

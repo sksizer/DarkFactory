@@ -10,14 +10,14 @@ parent:
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/init.py
-  - src/darkfactory/toolchain/__init__.py
-  - src/darkfactory/cli/main.py
-  - src/darkfactory/cli/setup.py
-  - src/darkfactory/templates_builtin.py
-  - src/darkfactory/runner.py
-  - src/darkfactory/workflow.py
-  - src/darkfactory/config.py
+  - python/darkfactory/init.py
+  - python/darkfactory/toolchain/__init__.py
+  - python/darkfactory/cli/main.py
+  - python/darkfactory/cli/setup.py
+  - python/darkfactory/templates_builtin.py
+  - python/darkfactory/runner.py
+  - python/darkfactory/workflow.py
+  - python/darkfactory/config.py
 workflow:
 assignee:
 reviewers: []
@@ -139,7 +139,7 @@ A detection engine that statically analyzes the project to identify tools. Struc
 
 **Package structure:**
 ```
-src/darkfactory/toolchain/
+python/darkfactory/toolchain/
     __init__.py          # ToolchainDetector, DetectionResult, public API
     _python.py           # Python ecosystem detector
     _python_test.py      # Python detector tests
@@ -327,7 +327,7 @@ These are explicitly out of scope but queued as separate PRDs:
   validation, `SdlcSlotTask` runner support, per-ecosystem detector
   package, interactive wizard, migration of all built-in workflows
   off hardcoded `just` commands.
-- **Current state**: greenfield. `src/darkfactory/toolchain/` doesn't
+- **Current state**: greenfield. `python/darkfactory/toolchain/` doesn't
   exist. `SdlcSlotTask` isn't a task type. `[sdlc-slots]` isn't in
   config schema. `cli/init_cmd.py` exists but is scaffold-only — no
   wizard, no detection. Built-in workflows still use hardcoded

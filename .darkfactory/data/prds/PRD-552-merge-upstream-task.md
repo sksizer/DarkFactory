@@ -12,8 +12,8 @@ depends_on:
 blocks:
   - "[[PRD-220-graph-execution]]"
 impacts:
-  - src/darkfactory/builtins/merge_upstream.py
-  - src/darkfactory/runner.py
+  - python/darkfactory/builtins/merge_upstream.py
+  - python/darkfactory/runner.py
   - workflows/
   - tests/test_merge_upstream.py
 workflow:
@@ -63,7 +63,7 @@ PRD-220 asks: "if D has `depends_on: [A, B]`, what branch does D's worktree base
 
 ## Technical approach
 
-- Builtin lives at `src/darkfactory/builtins/merge_upstream.py` (aligns with PRD-549's per-builtin-module convention if that lands first).
+- Builtin lives at `python/darkfactory/builtins/merge_upstream.py` (aligns with PRD-549's per-builtin-module convention if that lands first).
 - Conflict payload structure: `{"files": [...], "hunks": {path: [<hunk>]}}` — enough for an agent to understand the scope without re-reading git state.
 - Agent prompt template lives under `workflows/` as a reusable fragment.
 - Test strategy: fixture repos with pre-scripted conflicts (clean 3-way merge, trivial conflict, unresolvable conflict, test-breaking merge).

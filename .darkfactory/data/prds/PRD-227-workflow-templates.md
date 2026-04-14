@@ -176,8 +176,8 @@ A composed workflow exposes a `.template_name` field so the runner can later ass
 **Effort:** s. ~80 LOC + tests.
 
 **Impacts:**
-- `src/darkfactory/templates.py` (new module, distinct from the existing `templates.py` which handles prompts — may need a rename to avoid collision; recommendation: prompts module renamed to `prompts.py`, new module is `templates.py`)
-- `src/darkfactory/workflow.py` (Workflow gains a `template_name: str | None` field)
+- `python/darkfactory/templates.py` (new module, distinct from the existing `templates.py` which handles prompts — may need a rename to avoid collision; recommendation: prompts module renamed to `prompts.py`, new module is `templates.py`)
+- `python/darkfactory/workflow.py` (Workflow gains a `template_name: str | None` field)
 - `tests/test_workflow_templates.py` (new file)
 
 ### PRD-227.2 — Provide `PRD_IMPLEMENTATION_TEMPLATE`
@@ -193,7 +193,7 @@ Document the template in the harness README so workflow authors know what they g
 **Effort:** xs. The template is mostly declarative; the BuiltIns it references either already exist or are introduced by PRD-224.
 
 **Impacts:**
-- `src/darkfactory/templates_builtin.py` (new module with the bundled templates)
+- `python/darkfactory/templates_builtin.py` (new module with the bundled templates)
 - README
 
 ### PRD-227.3 — Migrate the default workflow to use `PRD_IMPLEMENTATION_TEMPLATE`

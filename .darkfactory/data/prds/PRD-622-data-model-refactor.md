@@ -37,11 +37,11 @@ There is no way to know which version of DarkFactory last wrote a file, making f
 
 ### Functional
 
-1. **Model module extraction** — Create `src/darkfactory/model/` package:
+1. **Model module extraction** — Create `python/darkfactory/model/` package:
    - `_prd.py` — PRD dataclass and domain logic (wikilink parsing, sort helpers, containment, regex constants)
    - `_persistence.py` — Frontmatter read/write, file discovery, auto-migration
    - `__init__.py` — Public API re-exporting the above
-   - Delete `src/darkfactory/prd.py`. No re-exports or backwards-compat shims.
+   - Delete `python/darkfactory/prd.py`. No re-exports or backwards-compat shims.
    - Update all callsites to import from `darkfactory.model`.
 
    **Public API signatures** (re-exported from `__init__.py`):
@@ -71,7 +71,7 @@ There is no way to know which version of DarkFactory last wrote a file, making f
 4. **App version stamping** — All writes through the model's public API (`save`, `set_status`, `set_workflow`, `archive`) stamp `app_version: X.Y.Z` in YAML frontmatter. Since `set_status`, `set_workflow`, and `archive` all delegate to `save`, stamping is enforced in one place. Exception: `set_status_at` (worktree variant) does not stamp — worktree writes are ephemeral. Version sourced from `__version__` in `__init__.py` (single source of truth). Configure hatchling to read version from code:
    ```toml
    [tool.hatch.version]
-   path = "src/darkfactory/__init__.py"
+   path = "python/darkfactory/__init__.py"
    ```
 
 5. **Archive command** — `darkfactory archive PRD-NNN`:
@@ -87,7 +87,7 @@ There is no way to know which version of DarkFactory last wrote a file, making f
    - `load_one(data_dir, prd_id)` defaults to `include_archived=True` because single-PRD lookups are typically reference resolution (following a link from one PRD to another, where the target may have been archived).
    - Archived PRDs may drift from current data model over time; links are maintained but full model conformance is not guaranteed for old archived files. Document this as a known constraint.
 
-7. **Callsite migration** — All imports and references to `prd.py` updated to `model`. No shims. This includes ~12 source files in `src/darkfactory/` and ~20 test files in `tests/` and peer test files.
+7. **Callsite migration** — All imports and references to `prd.py` updated to `model`. No shims. This includes ~12 source files in `python/darkfactory/` and ~20 test files in `tests/` and peer test files.
 
 8. **Remove `--prd-dir` CLI flag** — Delete the `--prd-dir` argument from `_parser.py`. It is unused externally and creates an unnecessary maintenance surface. The `--directory` / `DARKFACTORY_DIR` discovery mechanism is sufficient. Internal `args.prd_dir` references become `args.data_dir`.
 
@@ -115,7 +115,7 @@ There is no way to know which version of DarkFactory last wrote a file, making f
 ### Module layout
 
 ```
-src/darkfactory/
+python/darkfactory/
   model/
     __init__.py        # public API: load_all, load_one, save, archive
     _prd.py            # PRD dataclass, domain helpers (from old prd.py)
@@ -125,7 +125,7 @@ src/darkfactory/
 
 ### Version sourcing
 
-Keep `__version__ = "0.1.0"` in `src/darkfactory/__init__.py` as the single source of truth. Add `[tool.hatch.version]` to `pyproject.toml` so hatchling reads it from code at build time — eliminates the duplication between `pyproject.toml` and `__init__.py`.
+Keep `__version__ = "0.1.0"` in `python/darkfactory/__init__.py` as the single source of truth. Add `[tool.hatch.version]` to `pyproject.toml` so hatchling reads it from code at build time — eliminates the duplication between `pyproject.toml` and `__init__.py`.
 
 ### Deterministic frontmatter serialization
 
@@ -170,8 +170,8 @@ Keeping paths in their own nested dataclass mirrors how `model` and `style` are 
 
 ## Acceptance Criteria
 
-- [ ] AC-1: `src/darkfactory/model/` package exists with `_prd.py`, `_persistence.py`, `__init__.py`
-- [ ] AC-2: `src/darkfactory/prd.py` is deleted — no re-exports or shims
+- [ ] AC-1: `python/darkfactory/model/` package exists with `_prd.py`, `_persistence.py`, `__init__.py`
+- [ ] AC-2: `python/darkfactory/prd.py` is deleted — no re-exports or shims
 - [ ] AC-3: All callsites import from `darkfactory.model`
 - [ ] AC-4: `.darkfactory/data/prds/` is the default location for active PRDs
 - [ ] AC-5: `.darkfactory/data/archive/` exists and `darkfactory archive PRD-NNN` moves eligible PRDs there
@@ -206,7 +206,7 @@ Keeping paths in their own nested dataclass mirrors how `model` and `style` are 
 
 ## References
 
-- Current `prd.py`: `src/darkfactory/prd.py`
-- Config resolution: `src/darkfactory/config.py`
-- CLI entry: `src/darkfactory/cli/main.py`
+- Current `prd.py`: `python/darkfactory/prd.py`
+- Config resolution: `python/darkfactory/config.py`
+- CLI entry: `python/darkfactory/cli/main.py`
 - Prior decomposition (deleted): PRD-623, PRD-624, PRD-625

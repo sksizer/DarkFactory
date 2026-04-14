@@ -211,7 +211,7 @@ match git_probe("ls-remote", "--exit-code", "origin", ref, cwd=root):
 
 ## Acceptance Criteria
 
-- [ ] AC-1: `src/darkfactory/git_ops.py` does not exist.
+- [ ] AC-1: `python/darkfactory/git_ops.py` does not exist.
 - [ ] AC-2: `utils/git/_types.py` exports `Ok`, `GitErr`, `GitTimeout`, `GitResult`, `CheckResult`, `ProbeResult`.
 - [ ] AC-3: `utils/git/_run.py` exports `git_run → CheckResult` and `git_probe → ProbeResult`. `git_check` does not exist.
 - [ ] AC-4: `utils/git/_operations.py` exports `run_add → CheckResult`, `run_commit → CheckResult`, `diff_quiet → CheckResult`, `status_other_dirty → GitResult[list[str]]`, `diff_show → None`.
@@ -236,8 +236,8 @@ match git_probe("ls-remote", "--exit-code", "origin", ref, cwd=root):
 
 ## References
 
-- `src/darkfactory/git_ops.py` — source module being deleted
-- `src/darkfactory/utils/git/__init__.py` — operations being moved to `_operations.py`
-- `src/darkfactory/utils/git/branch.py` — internal caller, import needs updating
-- `src/darkfactory/utils/git/worktree.py` — internal caller, import needs updating
-- `src/darkfactory/builtins/commit_prd_changes.py` — operations caller, call sites need updating for Result types
+- `python/darkfactory/git_ops.py` — source module being deleted
+- `python/darkfactory/utils/git/__init__.py` — operations being moved to `_operations.py`
+- `python/darkfactory/utils/git/branch.py` — internal caller, import needs updating
+- `python/darkfactory/utils/git/worktree.py` — internal caller, import needs updating
+- `python/darkfactory/builtins/commit_prd_changes.py` — operations caller, call sites need updating for Result types

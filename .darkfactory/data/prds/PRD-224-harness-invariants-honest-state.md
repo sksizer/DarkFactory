@@ -83,8 +83,8 @@ The function takes injected dependencies (`prds` dict, `git_state` adapter) so i
 **Effort:** xs. ~50 LOC: the check function (~30) + the validate-command wiring (~10) + tests (~10).
 
 **Impacts:**
-- `src/darkfactory/checks.py` (new module with the function)
-- `src/darkfactory/cli.py` (validate command calls it)
+- `python/darkfactory/checks.py` (new module with the function)
+- `python/darkfactory/cli.py` (validate command calls it)
 - `tests/test_checks.py` (new file)
 
 ### PRD-224.2 — `ensure_worktree` refuses to resume on stale state `[safety contract]`
@@ -101,8 +101,8 @@ The actual *check logic* is still extracted into a function (`darkfactory.checks
 **Effort:** s. ~50 LOC plus tests for the gh-merged, gh-closed, and diverged-from-origin paths.
 
 **Impacts:**
-- `src/darkfactory/checks.py` (`is_resume_safe` function)
-- `src/darkfactory/builtins.py` (`ensure_worktree` calls it)
+- `python/darkfactory/checks.py` (`is_resume_safe` function)
+- `python/darkfactory/builtins.py` (`ensure_worktree` calls it)
 - `tests/test_builtins.py`, `tests/test_checks.py`
 
 **Open question:** what if `gh` isn't installed or auth'd? Fallback: log a warning and proceed with the local-only check (branch existence). Don't hard-fail just because `gh` is missing — that breaks anyone who hasn't set it up.
@@ -137,9 +137,9 @@ The summary content is the same as before:
 **Effort:** s. The harness already has `InvokeResult.stdout` parsed by `_summarize_stream_event`. Need a count aggregator + the new BuiltIn + minor `create_pr` change.
 
 **Impacts:**
-- `src/darkfactory/builtins.py` (new `summarize_agent_run`, modified `create_pr`)
-- `src/darkfactory/invoke.py` (expose tool-call counts in `InvokeResult`)
-- `src/darkfactory/workflow.py` (`ExecutionContext.run_summary` field)
+- `python/darkfactory/builtins.py` (new `summarize_agent_run`, modified `create_pr`)
+- `python/darkfactory/invoke.py` (expose tool-call counts in `InvokeResult`)
+- `python/darkfactory/workflow.py` (`ExecutionContext.run_summary` field)
 - `workflows/default/workflow.py` (insert `summarize_agent_run` before `create_pr`)
 - `tests/test_builtins.py`
 
@@ -158,8 +158,8 @@ The summary content is the same as before:
 **Effort:** s+. New subcommand + status surface.
 
 **Impacts:**
-- `src/darkfactory/cli.py` (new `cmd_cleanup`, `cmd_status` hygiene line)
-- `src/darkfactory/checks.py` (new `find_stale_worktrees`, `is_safe_to_remove`)
+- `python/darkfactory/cli.py` (new `cmd_cleanup`, `cmd_status` hygiene line)
+- `python/darkfactory/checks.py` (new `find_stale_worktrees`, `is_safe_to_remove`)
 - `tests/test_cli_cleanup.py` (new file)
 
 **Critical constraint:** the cleanup must NOT remove a worktree whose PR is still open. That would break rework loops (PRD-225). The check is `gh pr list --head <branch> --json state` — only `merged` or `closed` qualifies for removal.
@@ -254,7 +254,7 @@ The user explicitly wanted compute on local hardware where possible, so the loca
 **Effort:** s. Reuses the same pattern PR #18's manual sed command did, but properly via `update_frontmatter_field_at`.
 
 **Impacts:**
-- `src/darkfactory/cli.py` (new cmd_reconcile)
+- `python/darkfactory/cli.py` (new cmd_reconcile)
 - `tests/test_cli_reconcile.py` (new file)
 
 **Open questions:**
@@ -277,8 +277,8 @@ One file per agent invocation, timestamped, never overwritten. Lands in main whe
 **Effort:** s.
 
 **Impacts:**
-- `src/darkfactory/runner.py` (transcript path + multi-file)
-- `src/darkfactory/workflow.py` (commit step picks up the transcript dir)
+- `python/darkfactory/runner.py` (transcript path + multi-file)
+- `python/darkfactory/workflow.py` (commit step picks up the transcript dir)
 - `.gitignore` — make sure `.darkfactory/transcripts/` is NOT excluded
 - `.gitattributes` — mark `*.log` under transcripts as `linguist-generated=true` so GitHub collapses them in PR views
 

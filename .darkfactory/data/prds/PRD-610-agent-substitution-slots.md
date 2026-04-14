@@ -11,9 +11,9 @@ depends_on:
   - "[[PRD-608-project-toolchain-setup]]"
 blocks: []
 impacts:
-  - src/darkfactory/workflow.py
-  - src/darkfactory/runner.py
-  - src/darkfactory/templates_builtin.py
+  - python/darkfactory/workflow.py
+  - python/darkfactory/runner.py
+  - python/darkfactory/templates_builtin.py
 workflow:
 assignee:
 reviewers: []

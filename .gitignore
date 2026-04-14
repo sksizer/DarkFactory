@@ -29,3 +29,8 @@ build/
 
 .darkfactory/data/.obsidian
 .idea
+
+# Node / TypeScript
+ts/node_modules/
+ts/dist/
+ts/coverage/

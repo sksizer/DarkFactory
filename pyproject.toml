@@ -27,10 +27,10 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.version]
-path = "src/darkfactory/__init__.py"
+path = "python/darkfactory/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/darkfactory"]
+packages = ["python/darkfactory"]
 exclude = ["**/*_test.py", "**/conftest.py", "**/_test_helpers.py"]
 
 [tool.mypy]
@@ -38,9 +38,9 @@ strict = true
 warn_unused_ignores = true
 disallow_untyped_defs = true
 no_implicit_optional = true
-files = ["src", "tests"]
+files = ["python", "tests"]
 
 [tool.pytest.ini_options]
-testpaths = ["src", "tests"]
+testpaths = ["python", "tests"]
 python_files = ["test_*.py", "*_test.py"]
 addopts = "--import-mode=importlib"

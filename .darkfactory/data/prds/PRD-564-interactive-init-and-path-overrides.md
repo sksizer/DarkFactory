@@ -11,11 +11,11 @@ depends_on:
   - "[[PRD-222-general-purpose-tool]]"
 blocks: []
 impacts:
-  - src/darkfactory/init.py
-  - src/darkfactory/cli/init_cmd.py
-  - src/darkfactory/config.py
-  - src/darkfactory/discovery.py
-  - src/darkfactory/paths.py
+  - python/darkfactory/init.py
+  - python/darkfactory/cli/init_cmd.py
+  - python/darkfactory/config.py
+  - python/darkfactory/discovery.py
+  - python/darkfactory/paths.py
   - tests/test_init.py
   - tests/test_config.py
   - tests/test_discovery.py
@@ -44,10 +44,10 @@ Enhance `prd init` so that a first-time project setup prompts the user for where
 
 PRD-622 merged a data-model refactor that partially overlaps with the original scope of this PRD:
 
-- `Config` now has a nested `PathsConfig` (`config.paths.project_dir`, `data_dir`, `prds_dir`, `archive_dir`) in `src/darkfactory/config.py` + `src/darkfactory/paths.py`.
+- `Config` now has a nested `PathsConfig` (`config.paths.project_dir`, `data_dir`, `prds_dir`, `archive_dir`) in `python/darkfactory/config.py` + `python/darkfactory/paths.py`.
 - `prd init` now scaffolds `.darkfactory/data/prds/` and `.darkfactory/data/archive/` (not the old `.darkfactory/prds/`).
 - The `--prd-dir` CLI flag was **removed**. `--directory` / `DARKFACTORY_DIR` is the only runtime override for the project root.
-- `cli.py` was split into the `src/darkfactory/cli/` package; init logic lives in `cli/init_cmd.py` delegating to `src/darkfactory/init.py`.
+- `cli.py` was split into the `python/darkfactory/cli/` package; init logic lives in `cli/init_cmd.py` delegating to `python/darkfactory/init.py`.
 - An `ensure_data_layout()` migration runs on every CLI entry and prompts to move legacy `.darkfactory/prds/` → `.darkfactory/data/prds/`.
 
 The remaining novel scope of this PRD is: (1) **interactive prompting** for PRD/workflow locations during `prd init`, and (2) **honoring repo-root-relative path overrides** (e.g. `prds = "prds"`) written into `config.toml [paths]` so that all subcommands find PRDs outside `.darkfactory/`. Discovery itself still anchors on `.darkfactory/`.
@@ -85,7 +85,7 @@ The default `.darkfactory/` layout buries PRDs under a hidden directory, which i
 
 ### Discovery and path resolution
 
-11. Extend `resolve_config()` (see `src/darkfactory/config.py`) to read `[paths] prds = …` / `workflows = …` from `config.toml` and populate `Config.paths` with resolved absolute paths. Today `PathsConfig` is computed from `project_dir`; after this PRD the `prds_dir` / `workflows_dir` values become the resolved override (or the default `project_dir/data/prds` / `project_dir/workflows` if no override).
+11. Extend `resolve_config()` (see `python/darkfactory/config.py`) to read `[paths] prds = …` / `workflows = …` from `config.toml` and populate `Config.paths` with resolved absolute paths. Today `PathsConfig` is computed from `project_dir`; after this PRD the `prds_dir` / `workflows_dir` values become the resolved override (or the default `project_dir/data/prds` / `project_dir/workflows` if no override).
 12. Replace all remaining callers of the old `.darkfactory/prds/` or `.darkfactory/data/prds/` hardcoding in the CLI glue with `config.paths.prds_dir` / `config.paths.workflows_dir`. (Most load-sites already use `args.data_dir` from `cli/_shared.py`; those need to become paths-aware.)
 13. The `--prd-dir` CLI flag was removed in PRD-622 and is NOT reintroduced. CLI override for the project root stays as `--directory` / `DARKFACTORY_DIR`. There is no per-invocation `--prds` flag outside `prd init` itself.
 14. Resolution order (later wins): built-in defaults → user config `[paths]` → project config `[paths]` → env vars (`DARKFACTORY_PATHS_PRDS`, `DARKFACTORY_PATHS_WORKFLOWS`).
@@ -101,7 +101,7 @@ The default `.darkfactory/` layout buries PRDs under a hidden directory, which i
 
 ## Technical Approach
 
-### `src/darkfactory/init.py` — add interactive prompting on top of the existing scaffolder
+### `python/darkfactory/init.py` — add interactive prompting on top of the existing scaffolder
 
 ```python
 from dataclasses import dataclass
@@ -134,7 +134,7 @@ def init_project(
     ...
 ```
 
-### `src/darkfactory/config.py` / `src/darkfactory/paths.py` — extension
+### `python/darkfactory/config.py` / `python/darkfactory/paths.py` — extension
 
 `PathsConfig` already exists (added in PRD-622). Today it is derived from a single `project_dir` argument. This PRD adds optional override fields plus a resolver that honors repo-relative or absolute values read from `config.toml [paths]`:
 
@@ -157,9 +157,9 @@ def resolve_paths(
     ...
 ```
 
-The `resolve_config()` function (in `src/darkfactory/config.py`) merges `[paths]` override keys from each layer the same way it already merges `[model]` and `[style]`, then feeds them into `resolve_paths()`.
+The `resolve_config()` function (in `python/darkfactory/config.py`) merges `[paths]` override keys from each layer the same way it already merges `[model]` and `[style]`, then feeds them into `resolve_paths()`.
 
-### `src/darkfactory/discovery.py` and `cli/_shared.py` — caller changes
+### `python/darkfactory/discovery.py` and `cli/_shared.py` — caller changes
 
 Discovery itself still finds `.darkfactory/`. The CLI glue in `cli/main.py` / `cli/_shared.py` currently derives `args.data_dir = darkfactory_dir / "data"` and then passes it down as `load_all(data_dir=...)`. After this PRD:
 

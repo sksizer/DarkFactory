@@ -12,7 +12,7 @@ depends_on:
 blocks:
   - "[[PRD-206-list-workflows-assign-cli]]"
 impacts:
-  - src/darkfactory/loader.py
+  - python/darkfactory/loader.py
   - tests/test_loader.py
 workflow: null
 target_version: null

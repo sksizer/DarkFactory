@@ -8,13 +8,13 @@ test:
     uv run pytest
 
 typecheck:
-    uv run mypy src tests
+    uv run mypy python tests
 
 format:
-    uv run ruff format src tests
+    uv run ruff format python tests
 
 lint:
-    uv run ruff check src tests
+    uv run ruff check python tests
 
 format-check:
-    uv run ruff format --check src tests
+    uv run ruff format --check python tests

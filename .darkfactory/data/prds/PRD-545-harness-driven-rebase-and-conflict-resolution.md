@@ -11,10 +11,10 @@ depends_on: []
 blocks:
   - "[[PRD-549-builtins-package-split]]"
 impacts:
-  - src/darkfactory/runner.py
-  - src/darkfactory/impacts.py
-  - src/darkfactory/builtins/**
-  - src/darkfactory/cli/**
+  - python/darkfactory/runner.py
+  - python/darkfactory/impacts.py
+  - python/darkfactory/builtins/**
+  - python/darkfactory/cli/**
 workflow:
 assignee:
 reviewers: []
@@ -125,11 +125,11 @@ None of those are satisfying. The harness should handle at least the common case
 
 ### Module sketch
 
-- **`src/darkfactory/scheduler.py`** (new) — consumes `impacts.find_conflicts()` output + `depends_on` edges, produces a DAG, yields execution waves. Pure function of PRD metadata; no side effects.
-- **`src/darkfactory/rebase.py`** (new) — wraps git rebase, detects conflicts, runs post-rebase verification (`just test` etc.), returns a structured result (`Rebased` | `ConflictsDetected(files)` | `TestsFailed(output)`).
-- **`src/darkfactory/runner.py`** — gains a top-level `run_epic(epic)` entry point that invokes the scheduler, walks the waves, and dispatches to rebase and conflict resolution as needed.
-- **`src/darkfactory/workflows/resolve_conflict/`** (new built-in workflow) — the workflow that the conflict-resolution agent runs. Defines its own role, prompts, and verification step. Reuses the existing agent invocation machinery.
-- **`src/darkfactory/state.py`** — extended to track per-PRD execution state across harness invocations.
+- **`python/darkfactory/scheduler.py`** (new) — consumes `impacts.find_conflicts()` output + `depends_on` edges, produces a DAG, yields execution waves. Pure function of PRD metadata; no side effects.
+- **`python/darkfactory/rebase.py`** (new) — wraps git rebase, detects conflicts, runs post-rebase verification (`just test` etc.), returns a structured result (`Rebased` | `ConflictsDetected(files)` | `TestsFailed(output)`).
+- **`python/darkfactory/runner.py`** — gains a top-level `run_epic(epic)` entry point that invokes the scheduler, walks the waves, and dispatches to rebase and conflict resolution as needed.
+- **`python/darkfactory/workflows/resolve_conflict/`** (new built-in workflow) — the workflow that the conflict-resolution agent runs. Defines its own role, prompts, and verification step. Reuses the existing agent invocation machinery.
+- **`python/darkfactory/state.py`** — extended to track per-PRD execution state across harness invocations.
 
 ### Integration with existing `impacts` system
 
@@ -172,9 +172,9 @@ A follow-up could run a "declared vs actual impacts" check after each PRD merges
 
 ## References
 
-- Prior art: `src/darkfactory/impacts.py` — the static conflict detector this PRD builds on.
-- Prior art: `src/darkfactory/containment.py` — parent/child relationships.
-- Prior art: `prd conflicts <ID>` CLI command in `src/darkfactory/cli/conflicts.py`.
+- Prior art: `python/darkfactory/impacts.py` — the static conflict detector this PRD builds on.
+- Prior art: `python/darkfactory/containment.py` — parent/child relationships.
+- Prior art: `prd conflicts <ID>` CLI command in `python/darkfactory/cli/conflicts.py`.
 - Originating incident: [[PRD-549-builtins-package-split]] — the epic whose nine-parallel-children design exposed this gap. AC-12 of this PRD explicitly targets re-running that design without the `_legacy.py` workaround.
 - [[PRD-543-harness-pr-creation-hardening]] — overlaps in spirit: both are "the harness needs to surface and act on information it already has."
 
@@ -189,8 +189,8 @@ A follow-up could run a "declared vs actual impacts" check after each PRD merges
   piece.
 - **Effort**: l-to-xl as scoped. Realistically this is a multi-sprint
   initiative and should never land as a single PR.
-- **Current state**: greenfield. `src/darkfactory/scheduler.py` and
-  `src/darkfactory/rebase.py` don't exist. `run_epic` entry point
+- **Current state**: greenfield. `python/darkfactory/scheduler.py` and
+  `python/darkfactory/rebase.py` don't exist. `run_epic` entry point
   doesn't exist. The `resolve_conflict` workflow doesn't exist.
   `workflows/` has no conflict-resolution template. PRD-220's executor
   doesn't reason about conflicts at all.

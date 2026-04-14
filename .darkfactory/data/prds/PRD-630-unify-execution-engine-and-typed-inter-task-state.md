@@ -10,24 +10,24 @@ parent:
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/workflow.py
-  - src/darkfactory/system.py
-  - src/darkfactory/runner.py
-  - src/darkfactory/system_runner.py
-  - src/darkfactory/templates.py
-  - src/darkfactory/templates_builtin.py
-  - src/darkfactory/loader.py
-  - src/darkfactory/invoke.py
-  - src/darkfactory/builtins/__init__.py
-  - src/darkfactory/builtins/_registry.py
-  - src/darkfactory/builtins/system_builtins.py
-  - src/darkfactory/builtins/gather_prd_context.py
-  - src/darkfactory/builtins/discuss_prd.py
-  - src/darkfactory/builtins/resolve_rework_context.py
-  - src/darkfactory/commands/discuss/operation.py
-  - src/darkfactory/cli/run.py
-  - src/darkfactory/cli/discuss.py
-  - src/darkfactory/cli/system.py
+  - python/darkfactory/workflow.py
+  - python/darkfactory/system.py
+  - python/darkfactory/runner.py
+  - python/darkfactory/system_runner.py
+  - python/darkfactory/templates.py
+  - python/darkfactory/templates_builtin.py
+  - python/darkfactory/loader.py
+  - python/darkfactory/invoke.py
+  - python/darkfactory/builtins/__init__.py
+  - python/darkfactory/builtins/_registry.py
+  - python/darkfactory/builtins/system_builtins.py
+  - python/darkfactory/builtins/gather_prd_context.py
+  - python/darkfactory/builtins/discuss_prd.py
+  - python/darkfactory/builtins/resolve_rework_context.py
+  - python/darkfactory/commands/discuss/operation.py
+  - python/darkfactory/cli/run.py
+  - python/darkfactory/cli/discuss.py
+  - python/darkfactory/cli/system.py
 workflow:
 assignee:
 reviewers: []
@@ -237,7 +237,7 @@ builtins.
 
 ### Functional
 
-1. **PhaseState module** — `src/darkfactory/phase_state.py` with
+1. **PhaseState module** — `python/darkfactory/phase_state.py` with
    `PhaseState` class, `put`/`get`/`has` methods, and `@overload`
    signatures that give mypy full type inference on `get()`.
 

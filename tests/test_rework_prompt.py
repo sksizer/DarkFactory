@@ -255,7 +255,7 @@ def test_role_md_contains_sentinel_contract() -> None:
     """The role.md template must include the sentinel contract."""
     role_path = (
         Path(__file__).parent.parent
-        / "src"
+        / "python"
         / "darkfactory"
         / "workflow"
         / "definitions"

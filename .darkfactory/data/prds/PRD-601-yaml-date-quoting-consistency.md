@@ -10,8 +10,8 @@ parent: null
 depends_on: []
 blocks: []
 impacts:
-  - "src/darkfactory/cli/new.py"
-  - "src/darkfactory/model/_persistence.py"
+  - "python/darkfactory/cli/new.py"
+  - "python/darkfactory/model/_persistence.py"
 workflow: null
 target_version: null
 created: '2026-04-09'
@@ -25,7 +25,7 @@ tags:
 
 ## Superseded by
 
-PRD-622 (Data Model Refactor, now merged) delivered a deterministic frontmatter serializer in `src/darkfactory/model/_persistence.py`. `_format_scalar` now explicitly single-quotes `date` objects and any string matching `\d{4}-\d{2}-\d{2}` (dates), and double-quotes wikilinks. Every `save()` path goes through this serializer, so all `created`/`updated` fields written by the harness are consistently quoted. `prd new` uses the same write path, and existing PRDs are re-serialized on their next write. This PRD's scope is fully delivered.
+PRD-622 (Data Model Refactor, now merged) delivered a deterministic frontmatter serializer in `python/darkfactory/model/_persistence.py`. `_format_scalar` now explicitly single-quotes `date` objects and any string matching `\d{4}-\d{2}-\d{2}` (dates), and double-quotes wikilinks. Every `save()` path goes through this serializer, so all `created`/`updated` fields written by the harness are consistently quoted. `prd new` uses the same write path, and existing PRDs are re-serialized on their next write. This PRD's scope is fully delivered.
 
 ## Problem
 
@@ -53,7 +53,7 @@ This was surfaced across multiple PR reviews:
 - **Value**: n/a — the condition is already met by a different route.
 - **Effort**: xs (just flip status)
 - **Current state**: drift / done. PRD-622's deterministic serializer
-  in `src/darkfactory/model/_persistence.py` writes all date fields as
+  in `python/darkfactory/model/_persistence.py` writes all date fields as
   quoted strings by construction. A grep across the 220 active PRD files
   shows every `created:` and `updated:` field is string-quoted. The
   round-trip test that would be required to close this PRD is implicitly

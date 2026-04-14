@@ -16,7 +16,7 @@ blocks:
   - "[[PRD-208-agent-invoke]]"
   - "[[PRD-210-runner]]"
 impacts:
-  - src/darkfactory/workflow.py
+  - python/darkfactory/workflow.py
   - tests/test_workflow.py
 workflow: null
 target_version: null

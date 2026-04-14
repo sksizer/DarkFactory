@@ -120,7 +120,7 @@ The skill is a single markdown file at `.claude/skills/prd-triage/SKILL.md` foll
 ## References
 
 - Existing skills: `~/.claude/skills/prd-work/SKILL.md`, `~/.claude/skills/prd-driven-tasks/SKILL.md`
-- PRD statuses and lifecycle: defined in the `src/darkfactory/model/` package (`model/_prd.py`, `model/_persistence.py`) frontmatter schema
+- PRD statuses and lifecycle: defined in the `python/darkfactory/model/` package (`model/_prd.py`, `model/_persistence.py`) frontmatter schema
 - CLI commands useful for triage: `prd status`, `prd next`, `prd validate`, `prd tree`, `prd undecomposed`
 - Example well-formed draft: `.darkfactory/data/prds/PRD-226-status-derived-from-events.md`
 - Example stub draft needing work: `.darkfactory/data/prds/PRD-300-.md`

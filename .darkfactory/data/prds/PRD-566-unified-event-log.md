@@ -10,10 +10,10 @@ parent:
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/runner.py
-  - src/darkfactory/graph_execution.py
-  - src/darkfactory/invoke.py
-  - src/darkfactory/builtins/commit_transcript.py
+  - python/darkfactory/runner.py
+  - python/darkfactory/graph_execution.py
+  - python/darkfactory/invoke.py
+  - python/darkfactory/builtins/commit_transcript.py
   - .darkfactory/events/
 workflow:
 assignee:
@@ -125,7 +125,7 @@ This is especially critical before parallel execution (PRD-551) lands — debugg
 
 ## Technical Approach
 
-### EventWriter (new module: `src/darkfactory/event_log.py`)
+### EventWriter (new module: `python/darkfactory/event_log.py`)
 
 ```python
 class EventWriter:

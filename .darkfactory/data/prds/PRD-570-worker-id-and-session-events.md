@@ -11,10 +11,10 @@ depends_on: []
 blocks: []
 refines: "[[PRD-566-unified-event-log]]"
 impacts:
-  - src/darkfactory/event_log.py
-  - src/darkfactory/graph_execution.py
-  - src/darkfactory/runner.py
-  - src/darkfactory/cli/run.py
+  - python/darkfactory/event_log.py
+  - python/darkfactory/graph_execution.py
+  - python/darkfactory/runner.py
+  - python/darkfactory/cli/run.py
 workflow:
 assignee:
 reviewers: []

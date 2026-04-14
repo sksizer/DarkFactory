@@ -37,7 +37,9 @@ def build_parser() -> argparse.ArgumentParser:
         cmd_project_run,
     )
 
-    parser = argparse.ArgumentParser(prog="prd", description="DarkFactory PRD harness CLI")
+    parser = argparse.ArgumentParser(
+        prog="prd", description="DarkFactory PRD harness CLI"
+    )
     parser.add_argument(
         "--directory",
         "-C",

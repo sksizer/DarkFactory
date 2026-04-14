@@ -11,7 +11,7 @@ depends_on:
   - PRD-616
 blocks: []
 impacts:
-  - src/darkfactory/workflows/planning/
+  - python/darkfactory/workflows/planning/
 workflow:
 assignee:
 reviewers: []

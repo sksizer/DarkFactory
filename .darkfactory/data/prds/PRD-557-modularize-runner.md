@@ -1,6 +1,6 @@
 ---
 id: PRD-557
-title: Split src/darkfactory/runner.py into per-dispatcher modules with colocated tests
+title: Split python/darkfactory/runner.py into per-dispatcher modules with colocated tests
 kind: epic
 status: draft
 priority: low
@@ -11,7 +11,7 @@ depends_on:
   - "[[PRD-549-builtins-package-split]]"
 blocks: []
 impacts:
-  - src/darkfactory/runner.py
+  - python/darkfactory/runner.py
   - tests/test_runner.py
 workflow:
 assignee:
@@ -26,11 +26,11 @@ tags:
   - runner
 ---
 
-# Split `src/darkfactory/runner.py` into per-dispatcher modules
+# Split `python/darkfactory/runner.py` into per-dispatcher modules
 
 ## Summary
 
-`src/darkfactory/runner.py` is 465 lines and holds the workflow execution engine — entry point, task dispatch, three per-task-kind runners (builtin, agent, shell), the retry-on-failure path, worktree-lock bookkeeping, and the result dataclasses. It's moderately sized, not yet urgent, but following it is a natural sibling refactor to PRD-549 and PRD-556.
+`python/darkfactory/runner.py` is 465 lines and holds the workflow execution engine — entry point, task dispatch, three per-task-kind runners (builtin, agent, shell), the retry-on-failure path, worktree-lock bookkeeping, and the result dataclasses. It's moderately sized, not yet urgent, but following it is a natural sibling refactor to PRD-549 and PRD-556.
 
 Apply the same package-of-submodules convention. Lower priority than PRD-556 (CLI is bigger and more frequently touched), but worth capturing so the pattern is consistent across all large modules.
 
@@ -44,7 +44,7 @@ Apply the same package-of-submodules convention. Lower priority than PRD-556 (CL
 ## Target layout
 
 ```
-src/darkfactory/
+python/darkfactory/
 ├── runner/
 │   ├── __init__.py              # re-exports run_workflow, RunResult, TaskStep
 │   ├── _shared.py               # _task_name, _task_kind, _release_worktree_lock, _pick_model
@@ -78,7 +78,7 @@ Smaller fan-out than PRD-549 (4 real children instead of 9), less parallel oppor
 
 ## Acceptance criteria
 
-- [ ] AC-1: `src/darkfactory/runner/` exists as a package, `__init__.py` re-exports `run_workflow`, `RunResult`, `TaskStep`.
+- [ ] AC-1: `python/darkfactory/runner/` exists as a package, `__init__.py` re-exports `run_workflow`, `RunResult`, `TaskStep`.
 - [ ] AC-2: Each of builtin/agent/shell dispatchers lives in its own submodule with colocated `*_test.py`.
 - [ ] AC-3: The retry-agent path has dedicated unit tests at `shell_test.py` — the hardest-to-isolate logic gets the most focused coverage.
 - [ ] AC-4: All existing tests pass. No behavior changes.
@@ -96,7 +96,7 @@ Smaller fan-out than PRD-549 (4 real children instead of 9), less parallel oppor
 - [[PRD-549-builtins-package-split]] — the template this epic follows.
 - [[PRD-556-modularize-cli]] — sibling modularization of the other large module.
 - [[PRD-552-merge-upstream-task]] — likely future dispatcher consumer.
-- Current `src/darkfactory/runner.py` — 465 lines.
+- Current `python/darkfactory/runner.py` — 465 lines.
 
 ## Assessment (2026-04-11)
 

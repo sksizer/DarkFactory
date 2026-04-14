@@ -48,7 +48,7 @@ Clone the empty darkfactory repo locally and set up the top-level scaffolding: `
 1. Clone: `gh repo clone sksizer/darkfactory ~/Developer/darkfactory` (or reuse the existing clone at DarkFactory/).
 2. Write `pyproject.toml` derived from `tools/prd-harness/pyproject.toml` with:
    - `name = "darkfactory"` (was `prd-harness`)
-   - `[tool.hatch.build.targets.wheel] packages = ["src/darkfactory"]`
+   - `[tool.hatch.build.targets.wheel] packages = ["python/darkfactory"]`
    - Description updated to reference the standalone tool
 3. Write `mise.toml`:
    ```toml

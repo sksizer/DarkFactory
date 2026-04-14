@@ -10,10 +10,10 @@ parent:
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/graph_execution.py
-  - src/darkfactory/impacts.py
-  - src/darkfactory/cli/_parser.py
-  - src/darkfactory/cli/run.py
+  - python/darkfactory/graph_execution.py
+  - python/darkfactory/impacts.py
+  - python/darkfactory/cli/_parser.py
+  - python/darkfactory/cli/run.py
   - tests/test_graph_execution.py
 workflow:
 assignee:
@@ -38,7 +38,7 @@ When an epic decomposes into N sibling children that all touch the same file(s),
 
 ## Motivation
 
-Concrete incident (2026-04-09): PRD-549 decomposed into 9 children (PRD-549.3–549.11), each moving one builtin from `src/darkfactory/builtins/__init__.py` into its own submodule. Every child deletes a different function from the same file and adds a `from .<name> import <func>` line to the same import block. Git's 3-way merge handles the non-overlapping deletions *most* of the time, but the import-block edits collide reliably, so each child-after-the-first needs a hand-resolved rebase. The resolutions are mechanical — always the same shape — but doing it nine times is exhausting.
+Concrete incident (2026-04-09): PRD-549 decomposed into 9 children (PRD-549.3–549.11), each moving one builtin from `python/darkfactory/builtins/__init__.py` into its own submodule. Every child deletes a different function from the same file and adds a `from .<name> import <func>` line to the same import block. Git's 3-way merge handles the non-overlapping deletions *most* of the time, but the import-block edits collide reliably, so each child-after-the-first needs a hand-resolved rebase. The resolutions are mechanical — always the same shape — but doing it nine times is exhausting.
 
 PRD-556 (cli.py split) has **18 children** with the same structure. PRD-557 (runner.py split) has 4. Every future modularization epic will look the same. Without a general fix, the cost of "split a big file into a package" scales with `O(n)` hand-rebases where `n` is the fan-out.
 
@@ -187,7 +187,7 @@ None of this is settled. The open questions below need discussion before committ
 - [[PRD-552-merge-upstream-task]] — handles the multi-dep case which this PRD doesn't.
 - [[PRD-556-modularize-cli]] — 18-way fan-out, next victim of the pattern.
 - [[PRD-557-modularize-runner]] — 4-way fan-out, also affected.
-- `src/darkfactory/impacts.py` — existing overlap-detection helper.
+- `python/darkfactory/impacts.py` — existing overlap-detection helper.
 
 ## Assessment (2026-04-11)
 

@@ -10,7 +10,7 @@ parent: null
 depends_on: []
 blocks: []
 impacts:
-  - src/darkfactory/builtins.py
+  - python/darkfactory/builtins.py
   - tests/test_builtins.py
 workflow: null
 target_version: null

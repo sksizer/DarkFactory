@@ -10,8 +10,8 @@ parent: null
 depends_on: []
 blocks: []
 impacts:
-  - "src/darkfactory/builtins/analyze_transcript.py"
-  - "src/darkfactory/builtins/analyze_transcript_detectors.py"
+  - "python/darkfactory/builtins/analyze_transcript.py"
+  - "python/darkfactory/builtins/analyze_transcript_detectors.py"
 workflow: null
 target_version: null
 created: '2026-04-09'

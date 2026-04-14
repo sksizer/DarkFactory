@@ -12,7 +12,7 @@ depends_on:
 blocks:
   - "[[PRD-210-runner]]"
 impacts:
-  - src/darkfactory/invoke.py
+  - python/darkfactory/invoke.py
   - tests/test_invoke.py
 workflow: null
 target_version: null

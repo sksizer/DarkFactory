@@ -11,11 +11,11 @@ depends_on: []
 blocks:
   - "[[PRD-220-graph-execution]]"
 impacts:
-  - src/darkfactory/workflows/planning/prompts/decomposition-guide.md
-  - src/darkfactory/workflows/planning/prompts/task.md
-  - src/darkfactory/workflows/planning/prompts/role.md
-  - src/darkfactory/workflows/planning/prompts/verify.md
-  - src/darkfactory/workflows/planning/workflow.py
+  - python/darkfactory/workflows/planning/prompts/decomposition-guide.md
+  - python/darkfactory/workflows/planning/prompts/task.md
+  - python/darkfactory/workflows/planning/prompts/role.md
+  - python/darkfactory/workflows/planning/prompts/verify.md
+  - python/darkfactory/workflows/planning/workflow.py
   - tests/test_planning_workflow.py
 workflow:
 assignee:
@@ -34,7 +34,7 @@ tags:
 
 ## Summary
 
-The planning workflow (`src/darkfactory/workflows/planning/`) auto-decomposes a ready epic/feature into child task PRDs via an opus agent. A review against the PRD-220 graph executor's needs surfaced several gaps that will produce subtly-wrong children — broken `impacts:` fields, silently-dropped parent `blocks:` updates, dead template references, missing conflict warnings. A subsequent concrete failure (running the workflow against PRD-549 on 2026-04-08) exposed two more: the agent faithfully copies invalid PRD IDs out of a parent's body, and the role prompt doesn't enumerate what the tool allowlist actually permits — so the agent wastes its whole task budget discovering permissions live. This PRD tightens the prompts so decomposition output is executable without a human polish pass.
+The planning workflow (`python/darkfactory/workflows/planning/`) auto-decomposes a ready epic/feature into child task PRDs via an opus agent. A review against the PRD-220 graph executor's needs surfaced several gaps that will produce subtly-wrong children — broken `impacts:` fields, silently-dropped parent `blocks:` updates, dead template references, missing conflict warnings. A subsequent concrete failure (running the workflow against PRD-549 on 2026-04-08) exposed two more: the agent faithfully copies invalid PRD IDs out of a parent's body, and the role prompt doesn't enumerate what the tool allowlist actually permits — so the agent wastes its whole task budget discovering permissions live. This PRD tightens the prompts so decomposition output is executable without a human polish pass.
 
 ## Motivation
 
@@ -139,7 +139,7 @@ Each improvement below is a prompt edit + (where applicable) a verification step
 
 ## References
 
-- `src/darkfactory/workflows/planning/prompts/` — current state.
+- `python/darkfactory/workflows/planning/prompts/` — current state.
 - `docs/agent-verification-model.md` — architectural preference that shaped requirements 5b and AC-9 (no permission grants; verify from the harness).
 - [[PRD-220-graph-execution]] — the consumer of decomposition output.
 - [[PRD-546-impact-declaration-drift-detection]] — needs accurate `impacts:`.
