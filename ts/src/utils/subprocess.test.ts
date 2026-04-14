@@ -1,17 +1,23 @@
 import { describe, expect, it } from "bun:test";
 import { match } from "ts-pattern";
-import { type ExecResult, ProcessTimeoutError, exec, execShell, isBun } from "./subprocess.js";
+import {
+  type ExecResult,
+  ProcessTimeoutError,
+  exec,
+  execShell,
+  isBun,
+} from "./subprocess.js";
 
 describe("exec", () => {
   it("runs a simple command and returns stdout", async () => {
     const result = await exec(["echo", "hello"]);
 
-    const message = match(result as ExecResult)
+    const message = match(result)
       .when(
         (r) => r.exitCode === 0,
-        (r) => `ok:${r.stdout.trim()}`,
+        (r) => `ok:${r.stdout.trim()}`
       )
-      .otherwise((r) => `fail:${r.exitCode}`);
+      .otherwise((r) => `fail:${String(r.exitCode)}`);
 
     expect(message).toBe("ok:hello");
     expect(result.exitCode).toBe(0);
@@ -71,10 +77,10 @@ describe("execShell", () => {
   it("runs a shell command string", async () => {
     const result = await execShell("echo hello from shell");
 
-    const label = match(result as ExecResult)
+    const label = match(result)
       .when(
         (r) => r.exitCode === 0,
-        (r) => r.stdout.trim(),
+        (r) => r.stdout.trim()
       )
       .otherwise(() => "failed");
 

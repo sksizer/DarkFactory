@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { match } from "ts-pattern";
-import { type ExecErr } from "./subprocess.js";
-import { type Result } from "./result.js";
+import type { Result } from "./result.js";
 import { runForeground, runShell } from "./shell.js";
+import type { ExecErr } from "./subprocess.js";
 
 describe("runShell", () => {
   it("runs a shell command and captures output", async () => {
@@ -11,7 +11,7 @@ describe("runShell", () => {
     const label = match(result)
       .when(
         (r) => r.exitCode === 0,
-        (r) => r.stdout.trim(),
+        (r) => r.stdout.trim()
       )
       .otherwise(() => "failed");
 
@@ -46,8 +46,8 @@ describe("runForeground", () => {
   it("returns exit code as Result<number, ExecErr>", async () => {
     const result = await runForeground(["true"]);
 
-    const label = match(result as Result<number, ExecErr>)
-      .with({ kind: "ok" }, (r) => `exit:${r.value}`)
+    const label = match(result)
+      .with({ kind: "ok" }, (r) => `exit:${String(r.value)}`)
       .with({ kind: "err" }, (r) => `err:${r.error.kind}`)
       .exhaustive();
 
@@ -57,7 +57,7 @@ describe("runForeground", () => {
   it("returns non-zero exit code for failing command", async () => {
     const result = await runForeground(["false"]);
 
-    match(result as Result<number, ExecErr>)
+    match(result)
       .with({ kind: "ok" }, (r) => {
         expect(r.value).not.toBe(0);
       })
@@ -68,9 +68,11 @@ describe("runForeground", () => {
   });
 
   it("returns ExecErr for spawn failure", async () => {
-    const result = await runForeground(["definitely-nonexistent-command-xyz-abc"]);
+    const result = await runForeground([
+      "definitely-nonexistent-command-xyz-abc",
+    ]);
 
-    match(result as Result<number, ExecErr>)
+    match(result)
       .with({ kind: "ok" }, (r) => {
         // Some systems return a non-zero exit code instead of throwing
         expect(r.value).not.toBe(0);

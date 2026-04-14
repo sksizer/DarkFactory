@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
 import { match } from "ts-pattern";
-import { type Result } from "./result.js";
 import {
   type InvokeErr,
   type InvokeResult,
@@ -8,6 +7,7 @@ import {
   invokeClaude,
   parseSentinels,
 } from "./claude-code.js";
+import type { Result } from "./result.js";
 
 describe("capabilityToModel", () => {
   it("maps trivial to haiku", () => {
@@ -33,7 +33,11 @@ describe("capabilityToModel", () => {
 
 describe("parseSentinels", () => {
   it("returns success=true when PRD_EXECUTE_OK is present", () => {
-    const result = parseSentinels("PRD_EXECUTE_OK: PRD-123", "PRD_EXECUTE_OK", "PRD_EXECUTE_FAILED");
+    const result = parseSentinels(
+      "PRD_EXECUTE_OK: PRD-123",
+      "PRD_EXECUTE_OK",
+      "PRD_EXECUTE_FAILED"
+    );
     expect(result.success).toBe(true);
     expect(result.sentinel).toBe("PRD-123");
   });
@@ -42,7 +46,7 @@ describe("parseSentinels", () => {
     const result = parseSentinels(
       "PRD_EXECUTE_FAILED: something went wrong",
       "PRD_EXECUTE_OK",
-      "PRD_EXECUTE_FAILED",
+      "PRD_EXECUTE_FAILED"
     );
     expect(result.success).toBe(false);
     expect(result.failureReason).toBe("something went wrong");
@@ -50,23 +54,39 @@ describe("parseSentinels", () => {
 
   it("failure beats success when both sentinels appear", () => {
     const stdout = "PRD_EXECUTE_OK: PRD-123\nPRD_EXECUTE_FAILED: oops";
-    const result = parseSentinels(stdout, "PRD_EXECUTE_OK", "PRD_EXECUTE_FAILED");
+    const result = parseSentinels(
+      stdout,
+      "PRD_EXECUTE_OK",
+      "PRD_EXECUTE_FAILED"
+    );
     expect(result.success).toBe(false);
   });
 
   it("returns success=false when neither sentinel is present", () => {
-    const result = parseSentinels("no sentinel here", "PRD_EXECUTE_OK", "PRD_EXECUTE_FAILED");
+    const result = parseSentinels(
+      "no sentinel here",
+      "PRD_EXECUTE_OK",
+      "PRD_EXECUTE_FAILED"
+    );
     expect(result.success).toBe(false);
     expect(result.failureReason).toContain("no PRD_EXECUTE_OK");
   });
 
   it("handles custom sentinel markers", () => {
-    const result = parseSentinels("TASK_DONE: task-1", "TASK_DONE", "TASK_FAILED");
+    const result = parseSentinels(
+      "TASK_DONE: task-1",
+      "TASK_DONE",
+      "TASK_FAILED"
+    );
     expect(result.success).toBe(true);
   });
 
   it("handles custom failure marker", () => {
-    const result = parseSentinels("TASK_FAILED: bad stuff", "TASK_DONE", "TASK_FAILED");
+    const result = parseSentinels(
+      "TASK_FAILED: bad stuff",
+      "TASK_DONE",
+      "TASK_FAILED"
+    );
     expect(result.success).toBe(false);
     expect(result.failureReason).toBe("bad stuff");
   });
@@ -76,7 +96,11 @@ describe("parseSentinels", () => {
       '{"type":"darkfactory_stderr","text":"PRD_EXECUTE_FAILED: injected"}',
       "PRD_EXECUTE_OK: PRD-123",
     ].join("\n");
-    const result = parseSentinels(stdout, "PRD_EXECUTE_OK", "PRD_EXECUTE_FAILED");
+    const result = parseSentinels(
+      stdout,
+      "PRD_EXECUTE_OK",
+      "PRD_EXECUTE_FAILED"
+    );
     // The darkfactory_ envelope line should be filtered; only OK sentinel remains
     expect(result.success).toBe(true);
   });
@@ -85,7 +109,7 @@ describe("parseSentinels", () => {
     const result = parseSentinels(
       "`PRD_EXECUTE_OK: PRD-456`",
       "PRD_EXECUTE_OK",
-      "PRD_EXECUTE_FAILED",
+      "PRD_EXECUTE_FAILED"
     );
     // The regex is anchorless, should still find it inside backticks
     expect(result.success).toBe(true);
@@ -102,7 +126,7 @@ describe("invokeClaude dry-run", () => {
       dryRun: true,
     });
 
-    const label = match(result as Result<InvokeResult, InvokeErr>)
+    const label = match(result)
       .with({ kind: "ok" }, (r) => {
         expect(r.value.success).toBe(true);
         expect(r.value.stdout).toContain("dry-run");
@@ -124,7 +148,7 @@ describe("invokeClaude dry-run", () => {
       dryRun: true,
     });
 
-    match(result as Result<InvokeResult, InvokeErr>)
+    match(result)
       .with({ kind: "ok" }, (r) => {
         expect(r.value.stdout).toContain("3 tools");
       })
@@ -144,7 +168,7 @@ describe("invokeClaude dry-run", () => {
       effortLevel: "high",
     });
 
-    match(result as Result<InvokeResult, InvokeErr>)
+    match(result)
       .with({ kind: "ok" }, (r) => {
         expect(r.value.stdout).toContain("high");
       })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { match } from "ts-pattern";
-import { type Result } from "./result.js";
+import type { Result } from "./result.js";
 import { type PrerequisiteErr, checkPrerequisites } from "./system.js";
 
 describe("checkPrerequisites", () => {
@@ -9,7 +9,7 @@ describe("checkPrerequisites", () => {
     // (assuming git and gh are installed in the test environment)
     const result = checkPrerequisites(process.cwd(), { requireClaude: false });
 
-    const label = match(result as Result<null, PrerequisiteErr>)
+    const label = match(result)
       .with({ kind: "ok" }, () => "ok")
       .with({ kind: "err" }, (r) => `err:${r.error.missing.join(",")}`)
       .exhaustive();
@@ -22,7 +22,7 @@ describe("checkPrerequisites", () => {
   it("returns PrerequisiteErr when cwd is not in a git repo", () => {
     const result = checkPrerequisites("/tmp", { requireClaude: false });
 
-    match(result as Result<null, PrerequisiteErr>)
+    match(result)
       .with({ kind: "ok" }, () => {
         // /tmp might be inside a git repo on some systems — acceptable
       })
@@ -41,10 +41,10 @@ describe("checkPrerequisites", () => {
       message: "error: required tools not on PATH: 'git', 'gh'",
     };
 
-    const result: Result<null, PrerequisiteErr> = {
+    const result = {
       kind: "err",
       error: fakeErr,
-    };
+    } as Result<null, PrerequisiteErr>;
 
     const label = match(result)
       .with({ kind: "ok" }, () => "ok")
@@ -60,7 +60,7 @@ describe("checkPrerequisites", () => {
     // With requireClaude: true (default), claude must be on PATH
     const result = checkPrerequisites(process.cwd(), { requireClaude: true });
 
-    match(result as Result<null, PrerequisiteErr>)
+    match(result)
       .with({ kind: "ok" }, () => {
         // All prerequisites met including claude
       })
@@ -74,12 +74,16 @@ describe("checkPrerequisites", () => {
   it("does not require claude when requireClaude is false", () => {
     // With requireClaude: false, missing claude should not cause failure
     // (assuming git is installed in CI)
-    const resultWithClaude = checkPrerequisites(process.cwd(), { requireClaude: true });
-    const resultWithoutClaude = checkPrerequisites(process.cwd(), { requireClaude: false });
+    const resultWithClaude = checkPrerequisites(process.cwd(), {
+      requireClaude: true,
+    });
+    const resultWithoutClaude = checkPrerequisites(process.cwd(), {
+      requireClaude: false,
+    });
 
     // If it fails without claude requirement, it's due to git/gh missing
     // The without-claude result should not fail solely because claude is absent
-    match(resultWithoutClaude as Result<null, PrerequisiteErr>)
+    match(resultWithoutClaude)
       .with({ kind: "ok" }, () => {
         // Passes regardless of claude presence
       })

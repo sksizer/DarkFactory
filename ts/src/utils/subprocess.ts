@@ -28,7 +28,7 @@ export class ProcessTimeoutError extends Error {
   readonly timeoutMs: number;
 
   constructor(cmd: readonly string[], timeoutMs: number) {
-    super(`Command timed out after ${timeoutMs}ms: ${cmd.join(" ")}`);
+    super(`Command timed out after ${String(timeoutMs)}ms: ${cmd.join(" ")}`);
     this.name = "ProcessTimeoutError";
     this.cmd = cmd;
     this.timeoutMs = timeoutMs;
@@ -48,7 +48,7 @@ export const isBun = typeof globalThis.Bun !== "undefined";
 // ---------- Bun-specific type helpers ----------
 
 interface BunSpawnOptions {
-  readonly cwd?: string;
+  readonly cwd?: string | undefined;
   readonly env?: Record<string, string | undefined>;
   readonly stdin?: "pipe" | "inherit" | null | Uint8Array;
   readonly stdout: "pipe";
@@ -74,7 +74,10 @@ function getBun(): BunGlobal {
 
 // ---------- Bun implementation ----------
 
-async function execBun(cmd: readonly string[], options?: ExecOptions): Promise<ExecResult> {
+async function execBun(
+  cmd: readonly string[],
+  options?: ExecOptions
+): Promise<ExecResult> {
   const bun = getBun();
   const stdinData =
     options?.stdin !== undefined ? Buffer.from(options.stdin) : null;
@@ -92,13 +95,13 @@ async function execBun(cmd: readonly string[], options?: ExecOptions): Promise<E
     stderr: "pipe",
   });
 
-  let killed = false;
+  const state = { killed: false };
   let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
   if (options?.timeout !== undefined) {
     const timeoutMs = options.timeout;
     timeoutHandle = setTimeout(() => {
-      killed = true;
+      state.killed = true;
       proc.kill();
     }, timeoutMs);
   }
@@ -111,7 +114,7 @@ async function execBun(cmd: readonly string[], options?: ExecOptions): Promise<E
 
   if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
 
-  if (killed) {
+  if (state.killed) {
     throw new ProcessTimeoutError(cmd, options?.timeout ?? 0);
   }
 
@@ -120,13 +123,19 @@ async function execBun(cmd: readonly string[], options?: ExecOptions): Promise<E
 
 // ---------- Node.js implementation ----------
 
-async function execNode(cmd: readonly string[], options?: ExecOptions): Promise<ExecResult> {
+async function execNode(
+  cmd: readonly string[],
+  options?: ExecOptions
+): Promise<ExecResult> {
   const [file, ...args] = cmd as string[];
   if (file === undefined) {
     return { stdout: "", stderr: "empty command", exitCode: 1 };
   }
 
-  const mergedEnv: NodeJS.ProcessEnv = { ...process.env, ...(options?.env ?? {}) };
+  const mergedEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    ...(options?.env ?? {}),
+  };
 
   return new Promise<ExecResult>((resolve) => {
     let killed = false;
@@ -152,7 +161,7 @@ async function execNode(cmd: readonly string[], options?: ExecOptions): Promise<
               : 1
             : 0;
         resolve({ stdout, stderr, exitCode });
-      },
+      }
     );
 
     if (options?.stdin !== undefined) {
@@ -178,8 +187,14 @@ async function execNode(cmd: readonly string[], options?: ExecOptions): Promise<
   });
 }
 
-async function execShellNode(cmd: string, options?: ExecOptions): Promise<ExecResult> {
-  const mergedEnv: NodeJS.ProcessEnv = { ...process.env, ...(options?.env ?? {}) };
+async function execShellNode(
+  cmd: string,
+  options?: ExecOptions
+): Promise<ExecResult> {
+  const mergedEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    ...(options?.env ?? {}),
+  };
 
   return new Promise<ExecResult>((resolve) => {
     let killed = false;
@@ -204,7 +219,7 @@ async function execShellNode(cmd: string, options?: ExecOptions): Promise<ExecRe
               : 1
             : 0;
         resolve({ stdout, stderr, exitCode });
-      },
+      }
     );
 
     if (options?.stdin !== undefined) {
@@ -225,7 +240,10 @@ async function execShellNode(cmd: string, options?: ExecOptions): Promise<ExecRe
   });
 }
 
-async function execShellBun(cmd: string, options?: ExecOptions): Promise<ExecResult> {
+async function execShellBun(
+  cmd: string,
+  options?: ExecOptions
+): Promise<ExecResult> {
   // For shell commands, spawn via sh -c
   return execBun(["sh", "-c", cmd], options);
 }
@@ -236,7 +254,10 @@ async function execShellBun(cmd: string, options?: ExecOptions): Promise<ExecRes
  * Run command as argv array — preferred for git/gh/claude calls.
  * Throws ProcessTimeoutError if timeout is exceeded.
  */
-export async function exec(cmd: readonly string[], options?: ExecOptions): Promise<ExecResult> {
+export async function exec(
+  cmd: readonly string[],
+  options?: ExecOptions
+): Promise<ExecResult> {
   return isBun ? execBun(cmd, options) : execNode(cmd, options);
 }
 
@@ -244,7 +265,10 @@ export async function exec(cmd: readonly string[], options?: ExecOptions): Promi
  * Run shell command string — for user-defined shell tasks.
  * Throws ProcessTimeoutError if timeout is exceeded.
  */
-export async function execShell(cmd: string, options?: ExecOptions): Promise<ExecResult> {
+export async function execShell(
+  cmd: string,
+  options?: ExecOptions
+): Promise<ExecResult> {
   return isBun ? execShellBun(cmd, options) : execShellNode(cmd, options);
 }
 
@@ -252,19 +276,21 @@ export async function execShell(cmd: string, options?: ExecOptions): Promise<Exe
  * Run command with stdio inherited (for interactive/foreground use).
  * Returns exit code.
  */
-export async function execForeground(cmd: readonly string[], cwd?: string): Promise<number> {
+export async function execForeground(
+  cmd: readonly string[],
+  cwd?: string
+): Promise<number> {
   if (isBun) {
-    const bun = getBun();
     // Bun foreground: spawn with inherit stdio
-    const bunForeground = globalThis.Bun as {
+    const bunForeground = globalThis.Bun as unknown as {
       spawn: (
         cmd: readonly string[],
         opts: {
-          cwd?: string;
+          cwd?: string | undefined;
           stdin: "inherit";
           stdout: "inherit";
           stderr: "inherit";
-        },
+        }
       ) => { exited: Promise<number> };
     };
     const proc = bunForeground.spawn(cmd, {

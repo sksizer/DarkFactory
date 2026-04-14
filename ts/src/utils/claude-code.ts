@@ -5,8 +5,8 @@
  * All fallible operations return Result types — never throws.
  */
 
-import { ProcessTimeoutError, exec, execForeground } from "./subprocess.js";
 import { type Result, err, ok } from "./result.js";
+import { ProcessTimeoutError, exec, execForeground } from "./subprocess.js";
 
 // ---------- Types ----------
 
@@ -71,7 +71,7 @@ const _SENTINEL_FAILURE_RE = /PRD_EXECUTE_FAILED:\s*(\S[^\n`]*)/;
 export function parseSentinels(
   stdout: string,
   success: string,
-  failure: string,
+  failure: string
 ): { success: boolean; sentinel?: string; failureReason?: string } {
   // Pre-filter: remove darkfactory envelope lines to avoid false sentinel matches
   const filtered = stdout
@@ -81,7 +81,10 @@ export function parseSentinels(
       if (!stripped.startsWith("{")) return true;
       try {
         const parsed = JSON.parse(stripped) as { type?: string };
-        if (typeof parsed.type === "string" && parsed.type.startsWith("darkfactory_")) {
+        if (
+          typeof parsed.type === "string" &&
+          parsed.type.startsWith("darkfactory_")
+        ) {
           return false;
         }
       } catch {
@@ -99,7 +102,10 @@ export function parseSentinels(
       for (const line of filtered.split("\n")) {
         if (line.startsWith(`${failure}:`)) {
           const reason = line.slice(failure.length + 1).trim();
-          return { success: false, failureReason: reason || "unspecified failure" };
+          return {
+            success: false,
+            failureReason: reason !== "" ? reason : "unspecified failure",
+          };
         }
       }
       return { success: false, failureReason: "unspecified failure" };
@@ -116,17 +122,24 @@ export function parseSentinels(
   // Default marker path: use precompiled regexes
   const failureMatch = _SENTINEL_FAILURE_RE.exec(filtered);
   if (failureMatch !== null) {
-    return { success: false, failureReason: failureMatch[1]?.trim() };
+    const reason = failureMatch[1]?.trim();
+    return reason !== undefined
+      ? { success: false, failureReason: reason }
+      : { success: false };
   }
 
   const successMatch = _SENTINEL_SUCCESS_RE.exec(filtered);
   if (successMatch !== null) {
-    return { success: true, sentinel: successMatch[1]?.trim() };
+    const sentinel = successMatch[1]?.trim();
+    return sentinel !== undefined
+      ? { success: true, sentinel }
+      : { success: true };
   }
 
   return {
     success: false,
-    failureReason: "agent output contained no PRD_EXECUTE_OK or PRD_EXECUTE_FAILED sentinel",
+    failureReason:
+      "agent output contained no PRD_EXECUTE_OK or PRD_EXECUTE_FAILED sentinel",
   };
 }
 
@@ -164,17 +177,16 @@ function extractToolCounts(stdout: string): ReadonlyMap<string, number> {
  * Returns Result<InvokeResult, InvokeErr>.
  */
 export async function invokeClaude(
-  options: InvokeOptions,
+  options: InvokeOptions
 ): Promise<Result<InvokeResult, InvokeErr>> {
   const sentinelSuccess = options.sentinelSuccess ?? "PRD_EXECUTE_OK";
   const sentinelFailure = options.sentinelFailure ?? "PRD_EXECUTE_FAILED";
   const timeoutMs = options.timeout ?? 600_000;
 
   if (options.dryRun === true) {
-    const dryRunMsg =
-      `[dry-run] would invoke claude with model=${options.model}, ` +
-      `${options.tools.length} tools, prompt=${options.prompt.length} chars` +
-      (options.effortLevel !== undefined ? `, effort=${options.effortLevel}` : "");
+    const dryRunMsg = `[dry-run] would invoke claude with model=${options.model}, ${String(options.tools.length)} tools, prompt=${String(options.prompt.length)} chars${
+      options.effortLevel !== undefined ? `, effort=${options.effortLevel}` : ""
+    }`;
     return ok({
       stdout: dryRunMsg,
       stderr: "",
@@ -214,7 +226,11 @@ export async function invokeClaude(
     });
 
     const toolCounts = extractToolCounts(result.stdout);
-    const parsed = parseSentinels(result.stdout, sentinelSuccess, sentinelFailure);
+    const parsed = parseSentinels(
+      result.stdout,
+      sentinelSuccess,
+      sentinelFailure
+    );
 
     let success = parsed.success;
     let failureReason = parsed.failureReason;
@@ -222,20 +238,19 @@ export async function invokeClaude(
     // Non-zero exit overrides a success sentinel
     if (result.exitCode !== 0 && success) {
       success = false;
-      failureReason =
-        `claude exited non-zero (${result.exitCode}) despite success sentinel; ` +
-        `stderr: ${result.stderr.trim().slice(0, 200)}`;
+      failureReason = `claude exited non-zero (${String(result.exitCode)}) despite success sentinel; stderr: ${result.stderr.trim().slice(0, 200)}`;
     }
 
-    return ok({
+    const invokeResult: InvokeResult = {
       stdout: result.stdout,
       stderr: result.stderr,
       exitCode: result.exitCode,
       success,
-      failureReason: failureReason ?? undefined,
       toolCounts,
-      sentinel: parsed.sentinel,
-    });
+      ...(failureReason !== undefined ? { failureReason } : {}),
+      ...(parsed.sentinel !== undefined ? { sentinel: parsed.sentinel } : {}),
+    };
+    return ok(invokeResult);
   } catch (e) {
     if (e instanceof ProcessTimeoutError) {
       return ok({
@@ -243,7 +258,7 @@ export async function invokeClaude(
         stderr: "",
         exitCode: -1,
         success: false,
-        failureReason: `timeout after ${timeoutMs}ms`,
+        failureReason: `timeout after ${String(timeoutMs)}ms`,
         toolCounts: new Map(),
       });
     }
@@ -263,7 +278,7 @@ export async function invokeClaude(
 export async function spawnClaude(
   prompt: string,
   cwd: string,
-  effortLevel?: EffortLevel,
+  effortLevel?: EffortLevel
 ): Promise<Result<number, InvokeErr>> {
   const cmd: string[] = ["claude"];
   if (effortLevel !== undefined) {

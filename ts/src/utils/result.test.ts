@@ -25,7 +25,13 @@ describe("ok / err constructors", () => {
   });
 
   it("err sets kind=err and error", () => {
-    const r = err({ kind: "git-err" as const, returncode: 1, stdout: "", stderr: "oops", cmd: [] });
+    const r = err({
+      kind: "git-err" as const,
+      returncode: 1,
+      stdout: "",
+      stderr: "oops",
+      cmd: [],
+    });
     expect(r.kind).toBe("err");
     expect(r.error.returncode).toBe(1);
   });
@@ -47,7 +53,10 @@ describe("isOk / isErr type guards", () => {
 
 describe("ts-pattern exhaustive matching on Result", () => {
   it("matches Ok branch", () => {
-    const result: Result<string, { kind: "git-err" }> = ok("output", "stdout text");
+    const result = ok("output", "stdout text") as Result<
+      string,
+      { kind: "git-err" }
+    >;
 
     const message = match(result)
       .with({ kind: "ok" }, (r) => `clean: ${r.stdout}`)
@@ -58,63 +67,72 @@ describe("ts-pattern exhaustive matching on Result", () => {
   });
 
   it("matches Err branch", () => {
-    const result: Result<string, { kind: "git-err"; returncode: number }> = err({
-      kind: "git-err",
+    const result = err({
+      kind: "git-err" as const,
       returncode: 128,
-    });
+    }) as Result<string, { kind: "git-err"; returncode: number }>;
 
     const message = match(result)
       .with({ kind: "ok" }, () => "ok")
-      .with({ kind: "err" }, (r) => `failed: ${r.error.returncode}`)
+      .with({ kind: "err" }, (r) => `failed: ${String(r.error.returncode)}`)
       .exhaustive();
 
     expect(message).toBe("failed: 128");
   });
 
   it("matches GitErr vs Timeout in CheckResult", () => {
-    const gitErrResult: CheckResult = err({
-      kind: "git-err",
+    const gitErrResult = err({
+      kind: "git-err" as const,
       returncode: 1,
       stdout: "",
       stderr: "not a repo",
       cmd: ["git", "status"],
-    });
+    }) as CheckResult;
 
     const label = match(gitErrResult)
       .with({ kind: "ok" }, () => "ok")
-      .with({ kind: "err", error: { kind: "git-err" } }, (r) => `git-err:${r.error.returncode}`)
+      .with(
+        { kind: "err", error: { kind: "git-err" } },
+        (r) => `git-err:${String(r.error.returncode)}`
+      )
       .with({ kind: "err", error: { kind: "timeout" } }, () => "timeout")
       .exhaustive();
 
     expect(label).toBe("git-err:1");
 
-    const timeoutResult: CheckResult = err({
-      kind: "timeout",
+    const timeoutResult = err({
+      kind: "timeout" as const,
       cmd: ["git", "fetch"],
       timeout: 5000,
-    });
+    }) as CheckResult;
 
     const label2 = match(timeoutResult)
       .with({ kind: "ok" }, () => "ok")
       .with({ kind: "err", error: { kind: "git-err" } }, () => "git-err")
-      .with({ kind: "err", error: { kind: "timeout" } }, (r) => `timeout:${r.error.timeout}`)
+      .with(
+        { kind: "err", error: { kind: "timeout" } },
+        (r) => `timeout:${String(r.error.timeout)}`
+      )
       .exhaustive();
 
     expect(label2).toBe("timeout:5000");
   });
 
   it("matches GhErr vs Timeout in GhCheckResult", () => {
-    const ghErrResult: GhCheckResult = err({
-      kind: "gh-err",
+    const ghErrResult = err({
+      kind: "gh-err" as const,
       returncode: 1,
       stdout: "",
       stderr: "gh: not found",
       cmd: ["gh", "pr", "list"],
-    });
+    }) as GhCheckResult;
 
     const label = match(ghErrResult)
       .with({ kind: "ok" }, () => "ok")
-      .with({ kind: "err", error: { kind: "gh-err" } }, (r) => `gh-err:${r.error.returncode}`)
+      .with(
+        { kind: "err", error: { kind: "gh-err" } },
+        (r) => `gh-err:${String(r.error.returncode)}`
+      )
       .with({ kind: "err", error: { kind: "timeout" } }, () => "timeout")
       .exhaustive();
 
@@ -122,7 +140,7 @@ describe("ts-pattern exhaustive matching on Result", () => {
   });
 
   it("matches GitResult<boolean>", () => {
-    const r: GitResult<boolean> = ok(true, "");
+    const r = ok(true, "") as GitResult<boolean>;
 
     const msg = match(r)
       .with({ kind: "ok" }, (result) => `exists:${String(result.value)}`)

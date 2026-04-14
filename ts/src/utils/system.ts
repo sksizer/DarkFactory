@@ -6,8 +6,8 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { which } from "./subprocess.js";
 import { type Result, err, ok } from "./result.js";
+import { which } from "./subprocess.js";
 
 export interface PrerequisiteErr {
   readonly kind: "prerequisite-err";
@@ -23,7 +23,7 @@ export interface PrerequisiteErr {
  */
 export function checkPrerequisites(
   cwd: string,
-  options?: { requireClaude?: boolean },
+  options?: { requireClaude?: boolean }
 ): Result<null, PrerequisiteErr> {
   const missing: string[] = [];
 

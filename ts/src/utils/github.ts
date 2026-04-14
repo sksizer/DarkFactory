@@ -5,7 +5,6 @@
  * and return Result types. Never throws.
  */
 
-import { ProcessTimeoutError, exec } from "./subprocess.js";
 import {
   type GhCheckResult,
   type GhErr,
@@ -14,6 +13,7 @@ import {
   err,
   ok,
 } from "./result.js";
+import { ProcessTimeoutError, exec } from "./subprocess.js";
 
 // ---------- Supporting types ----------
 
@@ -74,13 +74,13 @@ function makeGhErr(
   returncode: number,
   stdout: string,
   stderr: string,
-  cmd: readonly string[],
+  cmd: readonly string[]
 ): GhErr {
   return { kind: "gh-err", returncode, stdout, stderr, cmd };
 }
 
 function timeoutToGhErr(t: Timeout): GhErr {
-  return makeGhErr(-1, "", `timed out after ${t.timeout}ms`, t.cmd);
+  return makeGhErr(-1, "", `timed out after ${String(t.timeout)}ms`, t.cmd);
 }
 
 // ---------- Gateway ----------
@@ -91,13 +91,13 @@ function timeoutToGhErr(t: Timeout): GhErr {
  */
 export async function ghRun(
   args: readonly string[],
-  options: { cwd: string; timeout?: number },
+  options: { cwd: string; timeout?: number }
 ): Promise<GhCheckResult> {
   const cmd = ["gh", ...args] as const;
   try {
     const result = await exec(cmd, {
       cwd: options.cwd,
-      timeout: options.timeout,
+      ...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
     });
     if (result.exitCode !== 0) {
       return err(makeGhErr(result.exitCode, result.stdout, result.stderr, cmd));
@@ -116,20 +116,22 @@ export async function ghRun(
  */
 export async function ghJson<T>(
   args: readonly string[],
-  options: { cwd: string; timeout?: number },
+  options: { cwd: string; timeout?: number }
 ): Promise<GhResult<T>> {
   const result = await ghRun(args, options);
   if (result.kind === "err") {
     if (result.error.kind === "timeout") {
       return err(timeoutToGhErr(result.error));
     }
-    return result;
+    return err(result.error);
   }
   try {
     const parsed = JSON.parse(result.stdout) as T;
     return ok(parsed, result.stdout);
   } catch {
-    return err(makeGhErr(-1, result.stdout, "invalid JSON in stdout", ["gh", ...args]));
+    return err(
+      makeGhErr(-1, result.stdout, "invalid JSON in stdout", ["gh", ...args])
+    );
   }
 }
 
@@ -140,11 +142,11 @@ export async function ghJson<T>(
  */
 export async function getPrState(
   branch: string,
-  repoRoot: string,
+  repoRoot: string
 ): Promise<GhResult<PrState>> {
   const result = await ghJson<Array<{ state: string }>>(
     ["pr", "list", "--head", branch, "--state", "all", "--json", "state"],
-    { cwd: repoRoot },
+    { cwd: repoRoot }
   );
   if (result.kind === "err") return result;
   const prs = result.value;
@@ -159,27 +161,43 @@ export async function getPrState(
  * Fetch PR states for all branches in a single gh call.
  * Returns a Map from headRefName to PrState with precedence MERGED > CLOSED > OPEN.
  */
-export async function fetchAllPrStates(repoRoot: string): Promise<GhResult<Map<string, PrState>>> {
+export async function fetchAllPrStates(
+  repoRoot: string
+): Promise<GhResult<Map<string, PrState>>> {
   const result = await ghJson<Array<{ headRefName: string; state: string }>>(
-    ["pr", "list", "--state", "all", "--limit", "500", "--json", "headRefName,state"],
-    { cwd: repoRoot },
+    [
+      "pr",
+      "list",
+      "--state",
+      "all",
+      "--limit",
+      "500",
+      "--json",
+      "headRefName,state",
+    ],
+    { cwd: repoRoot }
   );
   if (result.kind === "err") return result;
   const prs = result.value;
   if (!Array.isArray(prs)) {
     return err(
-      makeGhErr(-1, result.stdout, "unexpected response format", ["gh", "pr", "list"]),
+      makeGhErr(-1, result.stdout, "unexpected response format", [
+        "gh",
+        "pr",
+        "list",
+      ])
     );
   }
   const priority: Record<string, number> = { MERGED: 2, CLOSED: 1, OPEN: 0 };
   const states = new Map<string, PrState>();
   for (const pr of prs) {
-    const branch = pr.headRefName ?? "";
-    const state = pr.state ?? "";
-    if (!branch || !state) continue;
+    const branch = pr.headRefName;
+    const state = pr.state;
+    if (branch === "" || state === "") continue;
     const existing = states.get(branch);
     const newPriority = priority[state] ?? -1;
-    const existingPriority = existing !== undefined ? (priority[existing] ?? -1) : -2;
+    const existingPriority =
+      existing !== undefined ? (priority[existing] ?? -1) : -2;
     if (newPriority > existingPriority) {
       states.set(branch, state as PrState);
     }
@@ -190,16 +208,27 @@ export async function fetchAllPrStates(repoRoot: string): Promise<GhResult<Map<s
 /**
  * Create a PR via gh pr create. Returns the PR URL on success.
  */
-export async function createPr(options: CreatePrOptions): Promise<GhResult<string>> {
+export async function createPr(
+  options: CreatePrOptions
+): Promise<GhResult<string>> {
   const result = await ghRun(
-    ["pr", "create", "--base", options.base, "--title", options.title, "--body", options.body],
-    { cwd: options.cwd },
+    [
+      "pr",
+      "create",
+      "--base",
+      options.base,
+      "--title",
+      options.title,
+      "--body",
+      options.body,
+    ],
+    { cwd: options.cwd }
   );
   if (result.kind === "err") {
     if (result.error.kind === "timeout") {
       return err(timeoutToGhErr(result.error));
     }
-    return result;
+    return err(result.error);
   }
   const urlLine = result.stdout.trim().split("\n").pop() ?? "";
   return ok(urlLine, result.stdout);
@@ -210,22 +239,35 @@ export async function createPr(options: CreatePrOptions): Promise<GhResult<strin
  */
 export async function listOpenPrs(
   repoRoot: string,
-  limit = 100,
+  limit = 100
 ): Promise<GhResult<PrInfo[]>> {
   const result = await ghJson<Array<{ number: number; headRefName: string }>>(
-    ["pr", "list", "--state", "open", "--limit", String(limit), "--json", "number,headRefName"],
-    { cwd: repoRoot },
+    [
+      "pr",
+      "list",
+      "--state",
+      "open",
+      "--limit",
+      String(limit),
+      "--json",
+      "number,headRefName",
+    ],
+    { cwd: repoRoot }
   );
   if (result.kind === "err") return result;
   const prs = result.value;
   if (!Array.isArray(prs)) {
     return err(
-      makeGhErr(-1, result.stdout, "unexpected response format", ["gh", "pr", "list"]),
+      makeGhErr(-1, result.stdout, "unexpected response format", [
+        "gh",
+        "pr",
+        "list",
+      ])
     );
   }
   const infos: PrInfo[] = prs.map((pr) => ({
-    number: Number(pr.number),
-    headRefName: String(pr.headRefName),
+    number: pr.number,
+    headRefName: pr.headRefName,
   }));
   return ok(infos, result.stdout);
 }
@@ -236,32 +278,38 @@ export async function listOpenPrs(
 export async function closePr(
   prNumber: number,
   repoRoot: string,
-  comment?: string,
+  comment?: string
 ): Promise<GhCheckResult> {
   const args: string[] = ["pr", "close", String(prNumber)];
-  if (comment) args.push("--comment", comment);
+  if (comment !== undefined && comment !== "") args.push("--comment", comment);
   return ghRun(args, { cwd: repoRoot });
 }
 
 /**
  * Return { owner, name } for the current repo via gh repo view.
  */
-export async function repoNwo(cwd: string): Promise<GhResult<{ owner: string; name: string }>> {
+export async function repoNwo(
+  cwd: string
+): Promise<GhResult<{ owner: string; name: string }>> {
   const result = await ghRun(
     ["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
-    { cwd },
+    { cwd }
   );
   if (result.kind === "err") {
     if (result.error.kind === "timeout") {
       return err(timeoutToGhErr(result.error));
     }
-    return result;
+    return err(result.error);
   }
   const nwo = result.stdout.trim();
   const slashIdx = nwo.indexOf("/");
   if (slashIdx === -1) {
     return err(
-      makeGhErr(-1, result.stdout, "unexpected nameWithOwner format", ["gh", "repo", "view"]),
+      makeGhErr(-1, result.stdout, "unexpected nameWithOwner format", [
+        "gh",
+        "repo",
+        "view",
+      ])
     );
   }
   const owner = nwo.slice(0, slashIdx);
@@ -277,7 +325,7 @@ export async function repoNwo(cwd: string): Promise<GhResult<{ owner: string; na
 export async function graphqlFetch(
   query: string,
   variables: Record<string, string>,
-  cwd: string,
+  cwd: string
 ): Promise<GhResult<unknown>> {
   const args: string[] = ["api", "graphql"];
   for (const [key, value] of Object.entries(variables)) {
@@ -293,9 +341,11 @@ export async function graphqlFetch(
 export async function postReply(
   endpoint: string,
   body: string,
-  cwd: string,
+  cwd: string
 ): Promise<GhCheckResult> {
-  return ghRun(["api", "--method", "POST", endpoint, "-f", `body=${body}`], { cwd });
+  return ghRun(["api", "--method", "POST", endpoint, "-f", `body=${body}`], {
+    cwd,
+  });
 }
 
 // ---------- PR comment fetching ----------
@@ -405,7 +455,7 @@ function parseThreads(raw: {
       body: c.body ?? "",
       postedAt: c.createdAt ?? "",
     }));
-    const threadId = first.id ?? `rt-${idx}`;
+    const threadId = first.id ?? `rt-${String(idx)}`;
     const replyTargetId =
       first.databaseId !== undefined ? String(first.databaseId) : null;
     threads.push({
@@ -427,11 +477,11 @@ function parseThreads(raw: {
     const rev = raw.reviews[idx];
     if (rev === undefined) continue;
     const body = rev.body ?? "";
-    if (!body.trim()) continue; // skip empty reviews
+    if (body.trim() === "") continue; // skip empty reviews
     const author = rev.author?.login ?? "";
     const postedAt = rev.submittedAt ?? "";
     const state = rev.state ?? null;
-    const threadId = rev.id ?? `review-${idx}`;
+    const threadId = rev.id ?? `review-${String(idx)}`;
     threads.push({
       threadId,
       author,
@@ -453,7 +503,7 @@ function parseThreads(raw: {
     const body = c.body ?? "";
     const author = c.author?.login ?? "";
     const postedAt = c.createdAt ?? "";
-    const threadId = c.id ?? `comment-${idx}`;
+    const threadId = c.id ?? `comment-${String(idx)}`;
     threads.push({
       threadId,
       author,
@@ -471,14 +521,17 @@ function parseThreads(raw: {
   return threads;
 }
 
-function applyFilters(threads: ReviewThread[], filters: CommentFilters): ReviewThread[] {
+function applyFilters(
+  threads: ReviewThread[],
+  filters: CommentFilters
+): ReviewThread[] {
   if (filters.singleCommentId !== undefined) {
     return threads.filter((t) => t.threadId === filters.singleCommentId);
   }
 
   let result = [...threads];
 
-  if (!filters.includeResolved) {
+  if (filters.includeResolved !== true) {
     result = result.filter((t) => !t.isResolved);
   }
 
@@ -505,7 +558,7 @@ function applyFilters(threads: ReviewThread[], filters: CommentFilters): ReviewT
 export async function fetchPrComments(
   prNumber: number,
   cwd: string,
-  filters?: CommentFilters,
+  filters?: CommentFilters
 ): Promise<GhResult<ReviewThread[]>> {
   const nwoResult = await repoNwo(cwd);
   if (nwoResult.kind === "err") return nwoResult;
@@ -521,9 +574,15 @@ export async function fetchPrComments(
   if (gqlResult.kind === "err") return gqlResult;
 
   const payload = gqlResult.value as GhPrData;
-  const pr = payload?.data?.repository?.pullRequest;
+  const pr = payload.data?.repository?.pullRequest;
   if (pr === undefined) {
-    return err(makeGhErr(-1, "", "unexpected GraphQL response shape", ["gh", "api", "graphql"]));
+    return err(
+      makeGhErr(-1, "", "unexpected GraphQL response shape", [
+        "gh",
+        "api",
+        "graphql",
+      ])
+    );
   }
 
   const rawData = {
@@ -546,10 +605,10 @@ export async function postCommentReplies(
   replies: CommentReply[],
   threads: ReviewThread[],
   commitSha: string,
-  cwd: string,
+  cwd: string
 ): Promise<GhResult<ReplyResult[]>> {
   const targetByThreadId = new Map(
-    threads.map((t) => [t.threadId, t.replyTargetId]),
+    threads.map((t) => [t.threadId, t.replyTargetId])
   );
 
   const results: ReplyResult[] = [];
@@ -563,7 +622,7 @@ export async function postCommentReplies(
 
     const prefix = `[harness] addressed in ${commitSha}: `;
     const body = prefix + reply.body;
-    const endpoint = `repos/{owner}/{repo}/pulls/${prNumber}/comments/${targetId}/replies`;
+    const endpoint = `repos/{owner}/{repo}/pulls/${String(prNumber)}/comments/${targetId}/replies`;
 
     const postResult = await postReply(endpoint, body, cwd);
     results.push({

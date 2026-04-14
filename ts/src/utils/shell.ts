@@ -4,8 +4,13 @@
  * Both functions delegate to utils/subprocess.ts.
  */
 
-import { type ExecErr, type ExecResult, execForeground, execShell } from "./subprocess.js";
 import { type Result, err, ok } from "./result.js";
+import {
+  type ExecErr,
+  type ExecResult,
+  execForeground,
+  execShell,
+} from "./subprocess.js";
 
 export type { ExecResult };
 
@@ -15,9 +20,9 @@ export type { ExecResult };
 export async function runShell(
   cmd: string,
   cwd: string,
-  env?: Record<string, string>,
+  env?: Record<string, string>
 ): Promise<ExecResult> {
-  return execShell(cmd, { cwd, env });
+  return execShell(cmd, env !== undefined ? { cwd, env } : { cwd });
 }
 
 /**
@@ -26,7 +31,7 @@ export async function runShell(
  */
 export async function runForeground(
   cmd: readonly string[],
-  cwd?: string,
+  cwd?: string
 ): Promise<Result<number, ExecErr>> {
   try {
     const exitCode = await execForeground(cmd, cwd);

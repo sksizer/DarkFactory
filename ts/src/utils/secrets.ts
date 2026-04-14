@@ -22,7 +22,7 @@ function register(name: string, source: string, flags = ""): void {
 register("aws_access_key", "(?<![A-Z0-9])(AKIA[0-9A-Z]{16})(?![A-Z0-9])");
 register(
   "aws_secret_key",
-  "(?<![A-Za-z0-9/+=])([A-Za-z0-9/+=]{40})(?![A-Za-z0-9/+=])",
+  "(?<![A-Za-z0-9/+=])([A-Za-z0-9/+=]{40})(?![A-Za-z0-9/+=])"
 );
 
 // GitHub tokens
@@ -38,21 +38,17 @@ register("anthropic_api_key", "(sk-ant-[A-Za-z0-9\\-_]{40,})");
 register(
   "generic_api_key",
   "(?:api[_-]?key|api[_-]?secret|access[_-]?token|auth[_-]?token|secret[_-]?key)\\s*[:=]\\s*['\"]?([A-Za-z0-9\\-_.]{20,})['\"]?",
-  "i",
+  "i"
 );
 
 // Private keys
-register(
-  "private_key",
-  "(-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----)",
-  "m",
-);
+register("private_key", "(-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----)", "m");
 
 // Connection strings
 register(
   "connection_string",
   "((?:postgres|mysql|mongodb|redis)://[^\\s'\"]+)",
-  "i",
+  "i"
 );
 
 // Bearer tokens in headers
@@ -73,11 +69,15 @@ export interface RedactionResult {
 export function scan(text: string): Array<{ pattern: string; match: string }> {
   const hits: Array<{ pattern: string; match: string }> = [];
   for (const { name, pattern } of _PATTERNS) {
-    const re = new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : pattern.flags + "g");
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(text)) !== null) {
+    const re = new RegExp(
+      pattern.source,
+      pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`
+    );
+    let m: RegExpExecArray | null = re.exec(text);
+    while (m !== null) {
       const matched = m[1] !== undefined ? m[1] : m[0];
       hits.push({ pattern: name, match: matched });
+      m = re.exec(text);
     }
   }
   return hits;
@@ -92,7 +92,10 @@ export function redact(text: string): RedactionResult {
   const matched: string[] = [];
 
   for (const { name, pattern } of _PATTERNS) {
-    const re = new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : pattern.flags + "g");
+    const re = new RegExp(
+      pattern.source,
+      pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`
+    );
     const before = result;
     result = result.replace(re, `[REDACTED:${name}]`);
     if (result !== before) {

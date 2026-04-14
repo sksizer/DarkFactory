@@ -3,7 +3,7 @@ import { match } from "ts-pattern";
 import {
   add,
   branchExistsLocal,
-  branchExistsRemote,
+  type branchExistsRemote,
   diffQuiet,
   findLocalBranches,
   gitRun,
@@ -46,7 +46,9 @@ describe("gitRun", () => {
   });
 
   it("captures stdout on success", async () => {
-    const result = await gitRun(["rev-parse", "--show-toplevel"], { cwd: REPO_ROOT });
+    const result = await gitRun(["rev-parse", "--show-toplevel"], {
+      cwd: REPO_ROOT,
+    });
 
     match(result)
       .with({ kind: "ok" }, (r) => {
@@ -62,7 +64,9 @@ describe("gitRun", () => {
 describe("branchExistsLocal", () => {
   it("returns Ok(true) for the current branch", async () => {
     // Get current branch name first
-    const branchResult = await gitRun(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: REPO_ROOT });
+    const branchResult = await gitRun(["rev-parse", "--abbrev-ref", "HEAD"], {
+      cwd: REPO_ROOT,
+    });
     if (branchResult.kind === "err") return; // skip if git fails
 
     const branch = branchResult.stdout.trim();
@@ -81,7 +85,7 @@ describe("branchExistsLocal", () => {
   it("returns Ok(false) for a nonexistent branch", async () => {
     const result = await branchExistsLocal(
       REPO_ROOT,
-      "definitely-does-not-exist-xyz-abc-123",
+      "definitely-does-not-exist-xyz-abc-123"
     );
 
     match(result)
@@ -99,11 +103,11 @@ describe("branchExistsRemote", () => {
   it("returns GitResult<boolean> type structure (no network call)", () => {
     // branchExistsRemote uses git ls-remote which requires network.
     // Verify the return type contract with a constructed value.
-    const okResult: Awaited<ReturnType<typeof branchExistsRemote>> = {
+    const okResult = {
       kind: "ok",
       value: false,
       stdout: "",
-    };
+    } as Awaited<ReturnType<typeof branchExistsRemote>>;
 
     match(okResult)
       .with({ kind: "ok" }, (r) => {
@@ -131,7 +135,10 @@ describe("findLocalBranches", () => {
   });
 
   it("returns empty array when no branches match", async () => {
-    const result = await findLocalBranches("definitely-no-match-xyz-*", REPO_ROOT);
+    const result = await findLocalBranches(
+      "definitely-no-match-xyz-*",
+      REPO_ROOT
+    );
 
     match(result)
       .with({ kind: "ok" }, (r) => {
@@ -196,7 +203,10 @@ describe("resolveCommitTimestamp", () => {
   });
 
   it("returns GitErr for an invalid ref", async () => {
-    const result = await resolveCommitTimestamp("definitely-invalid-sha-xyz", REPO_ROOT);
+    const result = await resolveCommitTimestamp(
+      "definitely-invalid-sha-xyz",
+      REPO_ROOT
+    );
 
     match(result)
       .with({ kind: "ok" }, () => {

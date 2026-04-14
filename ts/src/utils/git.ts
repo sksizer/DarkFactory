@@ -5,7 +5,6 @@
  * and return Result types. Never throws.
  */
 
-import { ProcessTimeoutError, exec } from "./subprocess.js";
 import {
   type CheckResult,
   type GitErr,
@@ -14,6 +13,7 @@ import {
   err,
   ok,
 } from "./result.js";
+import { ProcessTimeoutError, exec } from "./subprocess.js";
 
 // ---------- Types ----------
 
@@ -29,7 +29,7 @@ function makeGitErr(
   returncode: number,
   stdout: string,
   stderr: string,
-  cmd: readonly string[],
+  cmd: readonly string[]
 ): GitErr {
   return { kind: "git-err", returncode, stdout, stderr, cmd };
 }
@@ -46,16 +46,18 @@ function makeTimeout(cmd: readonly string[], timeout: number): Timeout {
  */
 export async function gitRun(
   args: readonly string[],
-  options: { cwd: string; timeout?: number },
+  options: { cwd: string; timeout?: number }
 ): Promise<CheckResult> {
   const cmd = ["git", ...args] as const;
   try {
     const result = await exec(cmd, {
       cwd: options.cwd,
-      timeout: options.timeout,
+      ...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
     });
     if (result.exitCode !== 0) {
-      return err(makeGitErr(result.exitCode, result.stdout, result.stderr, cmd));
+      return err(
+        makeGitErr(result.exitCode, result.stdout, result.stderr, cmd)
+      );
     }
     return ok(null, result.stdout);
   } catch (e) {
@@ -74,20 +76,30 @@ export async function gitRun(
  */
 export async function branchExistsLocal(
   repoRoot: string,
-  branch: string,
+  branch: string
 ): Promise<GitResult<boolean>> {
   const result = await gitRun(
     ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`],
-    { cwd: repoRoot },
+    { cwd: repoRoot }
   );
   if (result.kind === "ok") {
     return ok(true, result.stdout);
   }
+  if (result.error.kind === "timeout") {
+    return err(
+      makeGitErr(
+        -1,
+        "",
+        `timed out after ${String(result.error.timeout)}ms`,
+        result.error.cmd
+      )
+    );
+  }
   // Git returns exit 1 when the ref doesn't exist — that's "false", not an error
-  if (result.error.kind === "git-err" && result.error.returncode === 1) {
+  if (result.error.returncode === 1) {
     return ok(false, "");
   }
-  return result;
+  return err(result.error);
 }
 
 /**
@@ -96,20 +108,30 @@ export async function branchExistsLocal(
  */
 export async function branchExistsRemote(
   repoRoot: string,
-  branch: string,
+  branch: string
 ): Promise<GitResult<boolean>> {
   const result = await gitRun(
     ["ls-remote", "--exit-code", "origin", `refs/heads/${branch}`],
-    { cwd: repoRoot, timeout: 10_000 },
+    { cwd: repoRoot, timeout: 10_000 }
   );
   if (result.kind === "ok") {
     return ok(true, result.stdout);
   }
-  if (result.error.kind === "git-err" && result.error.returncode === 2) {
+  if (result.error.kind === "timeout") {
+    return err(
+      makeGitErr(
+        -1,
+        "",
+        `timed out after ${String(result.error.timeout)}ms`,
+        result.error.cmd
+      )
+    );
+  }
+  if (result.error.returncode === 2) {
     // ls-remote --exit-code returns 2 when ref not found
     return ok(false, "");
   }
-  return result;
+  return err(result.error);
 }
 
 /**
@@ -117,16 +139,21 @@ export async function branchExistsRemote(
  */
 export async function findLocalBranches(
   pattern: string,
-  repoRoot: string,
+  repoRoot: string
 ): Promise<GitResult<string[]>> {
   const result = await gitRun(["branch", "--list", pattern], { cwd: repoRoot });
   if (result.kind === "err") {
     if (result.error.kind === "timeout") {
       return err(
-        makeGitErr(-1, "", `timed out after ${result.error.timeout}ms`, result.error.cmd),
+        makeGitErr(
+          -1,
+          "",
+          `timed out after ${String(result.error.timeout)}ms`,
+          result.error.cmd
+        )
       );
     }
-    return result;
+    return err(result.error);
   }
   const branches = result.stdout
     .split("\n")
@@ -140,7 +167,7 @@ export async function findLocalBranches(
  */
 export async function findRemoteBranches(
   pattern: string,
-  repoRoot: string,
+  repoRoot: string
 ): Promise<GitResult<string[]>> {
   const result = await gitRun(["branch", "-r", "--list", `origin/${pattern}`], {
     cwd: repoRoot,
@@ -148,10 +175,15 @@ export async function findRemoteBranches(
   if (result.kind === "err") {
     if (result.error.kind === "timeout") {
       return err(
-        makeGitErr(-1, "", `timed out after ${result.error.timeout}ms`, result.error.cmd),
+        makeGitErr(
+          -1,
+          "",
+          `timed out after ${String(result.error.timeout)}ms`,
+          result.error.cmd
+        )
       );
     }
-    return result;
+    return err(result.error);
   }
   const branches = result.stdout
     .split("\n")
@@ -168,7 +200,10 @@ export async function add(paths: string[], cwd: string): Promise<CheckResult> {
 }
 
 /** Create a commit with the given message. */
-export async function commit(message: string, cwd: string): Promise<CheckResult> {
+export async function commit(
+  message: string,
+  cwd: string
+): Promise<CheckResult> {
   return gitRun(["commit", "-m", message], { cwd });
 }
 
@@ -177,7 +212,10 @@ export async function commit(message: string, cwd: string): Promise<CheckResult>
 /**
  * Return Ok(null) if there are NO changes (clean), Err(GitErr) if dirty.
  */
-export async function diffQuiet(paths: string[], cwd: string): Promise<CheckResult> {
+export async function diffQuiet(
+  paths: string[],
+  cwd: string
+): Promise<CheckResult> {
   return gitRun(["diff", "--quiet", "--", ...paths], { cwd });
 }
 
@@ -186,16 +224,21 @@ export async function diffQuiet(paths: string[], cwd: string): Promise<CheckResu
  */
 export async function statusOtherDirty(
   paths: string[],
-  cwd: string,
+  cwd: string
 ): Promise<GitResult<string[]>> {
   const result = await gitRun(["status", "--porcelain"], { cwd });
   if (result.kind === "err") {
     if (result.error.kind === "timeout") {
       return err(
-        makeGitErr(-1, "", `timed out after ${result.error.timeout}ms`, result.error.cmd),
+        makeGitErr(
+          -1,
+          "",
+          `timed out after ${String(result.error.timeout)}ms`,
+          result.error.cmd
+        )
       );
     }
-    return result;
+    return err(result.error);
   }
   const pathSet = new Set(paths);
   const dirty = result.stdout
@@ -209,16 +252,21 @@ export async function statusOtherDirty(
 /** Resolve a commit SHA or ref to an ISO-8601 author timestamp. */
 export async function resolveCommitTimestamp(
   commit: string,
-  cwd: string,
+  cwd: string
 ): Promise<GitResult<string>> {
   const result = await gitRun(["log", "-1", "--format=%aI", commit], { cwd });
   if (result.kind === "err") {
     if (result.error.kind === "timeout") {
       return err(
-        makeGitErr(-1, "", `timed out after ${result.error.timeout}ms`, result.error.cmd),
+        makeGitErr(
+          -1,
+          "",
+          `timed out after ${String(result.error.timeout)}ms`,
+          result.error.cmd
+        )
       );
     }
-    return result;
+    return err(result.error);
   }
   return ok(result.stdout.trim(), result.stdout);
 }
@@ -228,15 +276,24 @@ export async function resolveCommitTimestamp(
 /**
  * List all registered worktrees. Parses git worktree list --porcelain output.
  */
-export async function worktreeList(repoRoot: string): Promise<GitResult<WorktreeEntry[]>> {
-  const result = await gitRun(["worktree", "list", "--porcelain"], { cwd: repoRoot });
+export async function worktreeList(
+  repoRoot: string
+): Promise<GitResult<WorktreeEntry[]>> {
+  const result = await gitRun(["worktree", "list", "--porcelain"], {
+    cwd: repoRoot,
+  });
   if (result.kind === "err") {
     if (result.error.kind === "timeout") {
       return err(
-        makeGitErr(-1, "", `timed out after ${result.error.timeout}ms`, result.error.cmd),
+        makeGitErr(
+          -1,
+          "",
+          `timed out after ${String(result.error.timeout)}ms`,
+          result.error.cmd
+        )
       );
     }
-    return result;
+    return err(result.error);
   }
 
   const entries: WorktreeEntry[] = [];
@@ -255,8 +312,16 @@ export async function worktreeList(repoRoot: string): Promise<GitResult<Worktree
     } else if (line.startsWith("branch ")) {
       currentBranch = line.slice("branch ".length).replace("refs/heads/", "");
     } else if (line === "") {
-      if (currentPath !== null && currentHead !== null && currentBranch !== null) {
-        entries.push({ path: currentPath, branch: currentBranch, head: currentHead });
+      if (
+        currentPath !== null &&
+        currentHead !== null &&
+        currentBranch !== null
+      ) {
+        entries.push({
+          path: currentPath,
+          branch: currentBranch,
+          head: currentHead,
+        });
       }
       currentPath = null;
       currentHead = null;
@@ -265,7 +330,11 @@ export async function worktreeList(repoRoot: string): Promise<GitResult<Worktree
   }
   // Handle last entry (no trailing blank line)
   if (currentPath !== null && currentHead !== null && currentBranch !== null) {
-    entries.push({ path: currentPath, branch: currentBranch, head: currentHead });
+    entries.push({
+      path: currentPath,
+      branch: currentBranch,
+      head: currentHead,
+    });
   }
 
   return ok(entries, result.stdout);
@@ -275,12 +344,15 @@ export async function worktreeList(repoRoot: string): Promise<GitResult<Worktree
 export async function worktreeAdd(
   wtPath: string,
   branch: string,
-  repoRoot: string,
+  repoRoot: string
 ): Promise<CheckResult> {
   return gitRun(["worktree", "add", wtPath, branch], { cwd: repoRoot });
 }
 
 /** Remove a worktree (force). */
-export async function worktreeRemove(wtPath: string, repoRoot: string): Promise<CheckResult> {
+export async function worktreeRemove(
+  wtPath: string,
+  repoRoot: string
+): Promise<CheckResult> {
   return gitRun(["worktree", "remove", "--force", wtPath], { cwd: repoRoot });
 }
