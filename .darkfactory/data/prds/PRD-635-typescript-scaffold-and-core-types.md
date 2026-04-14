@@ -42,6 +42,7 @@ Before porting any application code, the TypeScript project needs a solid founda
 
 ```
 ts/
+  .gitignore            # node_modules/, dist/, *.tsbuildinfo
   package.json          # Bun-first, Node-compatible
   tsconfig.json         # Strict, cutting-edge TS 5.8+
   biome.json            # Linting + formatting
@@ -82,16 +83,19 @@ Bun as the default tooling. `just` recipes are convenience wrappers that delegat
     "lint:eslint": "eslint .",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "build": "bun build src/index.ts --compile --outfile dist/darkfactory"
+    "build": "bun build src/index.ts --compile --outfile dist/darkfactory",
+    "build:lib": "tsc"
   }
 }
 ```
 
 Dependencies:
-- Runtime: `js-yaml`, `proper-lockfile`, `ts-pattern`
-- Dev: `typescript`, `@biomejs/biome`, `eslint`, `typescript-eslint`, `@types/js-yaml`, `@types/proper-lockfile`, `@types/bun`
+- Runtime: `js-yaml`
+- Dev: `typescript`, `@biomejs/biome`, `eslint`, `typescript-eslint`, `jiti`, `@types/js-yaml`, `@types/bun`
 
 No vitest, no prettier — Bun's test runner covers testing, Biome covers formatting.
+
+`bun.lock` (text lockfile, Bun 1.2+ default) must be committed to the repository for reproducible installs.
 
 ### `tsconfig.json` — maximum strictness
 
@@ -137,7 +141,7 @@ Key type-aware rules to enable:
 - `@typescript-eslint/await-thenable` — flag awaiting non-promise values
 - `@typescript-eslint/require-await` — flag async functions that don't await
 - `@typescript-eslint/no-unnecessary-type-assertion` — remove dead `as` casts
-- `@typescript-eslint/strict-boolean-expressions` — prevent truthy checks on non-booleans (Rust-friendly: explicit comparisons)
+- `@typescript-eslint/strict-boolean-expressions` — prevent truthy checks on non-booleans (Rust-friendly: explicit comparisons). Start with no relaxation options; tune if friction is excessive during PRD-636.
 
 Disable all formatting and syntactic rules — those are Biome's job. Use `typescript-eslint`'s `strictTypeChecked` preset as a starting point, then turn off anything Biome already covers.
 
@@ -176,6 +180,8 @@ Add a `test-ts` job to `.github/workflows/ci.yml`, parallel to the existing Pyth
       - run: cd ts && bun test
 ```
 
+The `test-ts` job should only run when `ts/**` files change. Since the Python `test` job must still run unconditionally, use per-job path filtering (e.g., `dorny/paths-filter`) or split into a separate workflow file with `paths: ['ts/**']` on its trigger. Implementation decides the mechanism.
+
 ### `ts/ARCHITECTURE.md` — Rust-friendly design principles
 
 Establish the architectural direction for the TypeScript codebase. This project is a waypoint — the long-term target is Rust. All TypeScript code should use patterns that translate naturally to Rust:
@@ -202,11 +208,9 @@ A single `src/index.test.ts` that imports from the package entry point and asser
 - [ ] `eslint.config.ts` enables type-aware rules only, no overlap with Biome
 - [ ] `bun run build` produces a compiled binary at `ts/dist/darkfactory`
 - [ ] `just ts-test`, `just ts-typecheck`, `just ts-lint`, `just ts-build` all work
-- [ ] No `any` types anywhere
 - [ ] `tsconfig.json` has `erasableSyntaxOnly: true` — no enums, no parameter properties, no namespaces
 - [ ] Source code contains no Bun-specific APIs (standard TS only)
 - [ ] `ts/ARCHITECTURE.md` documents Rust-friendly design principles
-- [ ] `ts-pattern` listed as runtime dependency
 - [ ] `test-ts` CI job added to `.github/workflows/ci.yml`
 - [ ] CI job runs typecheck, lint, and test using Bun
 
@@ -214,4 +218,6 @@ A single `src/index.test.ts` that imports from the package entry point and asser
 
 - Application types (PhaseState, payloads, Result) — see [[PRD-636-typescript-utils-layer]]
 - CLI commands — see [[PRD-637-typescript-workflow-engine]]
+- Runtime dependencies `ts-pattern` and `proper-lockfile` — deferred to [[PRD-636-typescript-utils-layer]] where they are first used
+- "No `any` types anywhere" enforcement — deferred to [[PRD-637-typescript-workflow-engine]] when real application code exists
 - npm publishing
