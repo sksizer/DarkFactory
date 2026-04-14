@@ -63,42 +63,36 @@ describe("gitRun", () => {
 
 describe("branchExistsLocal", () => {
   it("returns Ok(true) for the current branch", async () => {
-    // Find any existing local branch to test against. CI checkouts are often
-    // detached HEAD, so `rev-parse --abbrev-ref HEAD` returns "HEAD" — not a
-    // real branch. List local branches and pick the first.
-    const listResult = await gitRun(
-      ["for-each-ref", "--format=%(refname:short)", "refs/heads/"],
-      { cwd: REPO_ROOT }
-    );
-    if (listResult.kind === "err") {
+    // CI checkouts (actions/checkout) produce a detached HEAD with no local
+    // branches at all, so we can't rely on finding an existing branch.
+    // Create a throwaway branch pointing at HEAD, run the check, then clean up.
+    const branch = `darkfactory-test-branch-${String(process.pid)}-${String(Date.now())}`;
+
+    const createResult = await gitRun(["branch", branch, "HEAD"], {
+      cwd: REPO_ROOT,
+    });
+    if (createResult.kind === "err") {
       throw new Error(
-        `git for-each-ref failed: kind=${listResult.error.kind} stderr=${"stderr" in listResult.error ? listResult.error.stderr : ""}`
+        `failed to create test branch "${branch}": kind=${createResult.error.kind} stderr=${"stderr" in createResult.error ? createResult.error.stderr : ""}`
       );
     }
 
-    const branches = listResult.stdout
-      .split("\n")
-      .filter((b) => b.trim() !== "");
-    const firstBranch = branches[0];
-    if (firstBranch === undefined) {
-      throw new Error(
-        `no local branches found in ${REPO_ROOT}; raw stdout=${JSON.stringify(listResult.stdout)}`
-      );
+    try {
+      const result = await branchExistsLocal(REPO_ROOT, branch);
+      match(result)
+        .with({ kind: "ok" }, (r) => {
+          expect(r.value).toBe(true);
+        })
+        .with({ kind: "err" }, (r) => {
+          throw new Error(
+            `expected ok for branch "${branch}", got err: kind=${r.error.kind} returncode=${String(r.error.returncode)} stderr=${r.error.stderr}`
+          );
+        })
+        .exhaustive();
+    } finally {
+      // Best-effort cleanup; ignore errors
+      await gitRun(["branch", "-D", branch], { cwd: REPO_ROOT });
     }
-
-    const branch = firstBranch.trim();
-    const result = await branchExistsLocal(REPO_ROOT, branch);
-
-    match(result)
-      .with({ kind: "ok" }, (r) => {
-        expect(r.value).toBe(true);
-      })
-      .with({ kind: "err" }, (r) => {
-        throw new Error(
-          `expected ok for branch "${branch}", got err: kind=${r.error.kind} returncode=${String(r.error.returncode)} stderr=${r.error.stderr}`
-        );
-      })
-      .exhaustive();
   });
 
   it("returns Ok(false) for a nonexistent branch", async () => {
