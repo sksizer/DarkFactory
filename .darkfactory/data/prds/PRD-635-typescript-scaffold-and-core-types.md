@@ -2,7 +2,7 @@
 id: PRD-635
 title: TypeScript scaffold with Bun tooling
 kind: task
-status: review
+status: done
 priority: high
 effort: s
 capability: simple

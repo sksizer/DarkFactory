@@ -2,7 +2,7 @@
 id: PRD-636
 title: TypeScript utils layer — subprocess, git, gh, claude, Result types
 kind: task
-status: review
+status: done
 priority: high
 effort: m
 capability: moderate
