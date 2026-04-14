@@ -14,7 +14,8 @@
     "build:lib": "tsc"
   },
   "dependencies": {
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.0",
+    "ts-pattern": "^5.6.2"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
