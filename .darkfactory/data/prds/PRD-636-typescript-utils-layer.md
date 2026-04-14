@@ -2,7 +2,7 @@
 id: PRD-636
 title: TypeScript utils layer — subprocess, git, gh, claude, Result types
 kind: task
-status: draft
+status: ready
 priority: high
 effort: m
 capability: moderate
@@ -18,7 +18,7 @@ assignee:
 reviewers: []
 target_version:
 created: 2026-04-13
-updated: '2026-04-13'
+updated: 2026-04-13
 tags:
   - infrastructure
   - typescript
