@@ -2,7 +2,7 @@
 id: PRD-637
 title: TypeScript workflow engine and security-review workflow
 kind: task
-status: ready
+status: in-progress
 priority: high
 effort: l
 capability: complex
@@ -19,7 +19,7 @@ assignee:
 reviewers: []
 target_version:
 created: 2026-04-13
-updated: 2026-04-14
+updated: '2026-04-14'
 tags:
   - infrastructure
   - typescript
