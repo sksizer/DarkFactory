@@ -27,9 +27,7 @@ describe("discoverWorkflows", () => {
   });
 
   it("handles nonexistent project directory gracefully", async () => {
-    const workflows = await discoverWorkflows(
-      "/nonexistent/path/to/workflows"
-    );
+    const workflows = await discoverWorkflows("/nonexistent/path/to/workflows");
     expect(workflows.length).toBeGreaterThanOrEqual(1);
   });
 

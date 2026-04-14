@@ -62,8 +62,7 @@ export function agentTask(config: {
           if (hasSentinelConfig) {
             const failureMarker =
               config.sentinelFailure ?? "PRD_EXECUTE_FAILED";
-            const successMarker =
-              config.sentinelSuccess ?? "PRD_EXECUTE_OK";
+            const successMarker = config.sentinelSuccess ?? "PRD_EXECUTE_OK";
 
             if (inv.stdout.includes(failureMarker)) {
               return {

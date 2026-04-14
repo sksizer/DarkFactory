@@ -34,7 +34,10 @@ export async function runTasks(
 
   for (const wrapped of tasks) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const resolve: InputResolver = <T>(cls: new (...args: any[]) => T, id?: string): T => {
+    const resolve: InputResolver = <T>(
+      cls: new (...args: any[]) => T,
+      id?: string
+    ): T => {
       if (id != null) return state.get(cls, id);
       const mapped = wrapped.inputMapping?.[cls.name];
       if (mapped != null) {

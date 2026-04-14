@@ -4,9 +4,11 @@ import { main } from "./index.js";
 describe("CLI", () => {
   it("list-workflows prints available workflows", async () => {
     const logs: string[] = [];
-    const spy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
-      logs.push(args.map(String).join(" "));
-    });
+    const spy = spyOn(console, "log").mockImplementation(
+      (...args: unknown[]) => {
+        logs.push(args.map(String).join(" "));
+      }
+    );
 
     await main(["list-workflows"]);
     spy.mockRestore();

@@ -15,7 +15,11 @@ function sanitizeBranch(branch: string): string {
   return branch.replace(/\//g, "-");
 }
 
-function gitErrMsg(error: { kind: string; stderr?: string; timeout?: number }): string {
+function gitErrMsg(error: {
+  kind: string;
+  stderr?: string;
+  timeout?: number;
+}): string {
   if (error.kind === "git-err") {
     return (error as { stderr: string }).stderr;
   }
@@ -59,10 +63,9 @@ export function createWorktree(): Task<
       }
 
       if (!existsResult.value) {
-        const createResult = await gitRun(
-          ["branch", ws.branch, ws.baseRef],
-          { cwd: codeEnv.repoRoot }
-        );
+        const createResult = await gitRun(["branch", ws.branch, ws.baseRef], {
+          cwd: codeEnv.repoRoot,
+        });
         if (createResult.kind === "err") {
           return {
             success: false,
@@ -73,11 +76,7 @@ export function createWorktree(): Task<
 
       await mkdir(join(codeEnv.repoRoot, ".worktrees"), { recursive: true });
 
-      const addResult = await worktreeAdd(
-        wtPath,
-        ws.branch,
-        codeEnv.repoRoot
-      );
+      const addResult = await worktreeAdd(wtPath, ws.branch, codeEnv.repoRoot);
       if (addResult.kind === "err") {
         return {
           success: false,
@@ -177,15 +176,13 @@ export function pushBranch(): Task<"WorktreeState", never> {
       if (ws.worktreePath === undefined) {
         return {
           success: false,
-          failureReason:
-            "pushBranch: WorktreeState has no worktreePath",
+          failureReason: "pushBranch: WorktreeState has no worktreePath",
         };
       }
 
-      const result = await gitRun(
-        ["push", "-u", "origin", ws.branch],
-        { cwd: ws.worktreePath }
-      );
+      const result = await gitRun(["push", "-u", "origin", ws.branch], {
+        cwd: ws.worktreePath,
+      });
       if (result.kind === "err") {
         return {
           success: false,
@@ -198,10 +195,7 @@ export function pushBranch(): Task<"WorktreeState", never> {
   };
 }
 
-export function createPr(): Task<
-  "PrRequest" | "WorktreeState",
-  "PrResult"
-> {
+export function createPr(): Task<"PrRequest" | "WorktreeState", "PrResult"> {
   return {
     name: "create-pr",
     reads: [PrRequest, WorktreeState] as const,

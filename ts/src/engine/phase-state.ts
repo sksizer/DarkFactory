@@ -16,9 +16,7 @@ export class PhaseState {
     const value = this._store.get(key);
     if (value !== undefined) return value as T;
     if (arguments.length >= 3) return defaultValue as T;
-    throw new Error(
-      `PhaseState: no value for ${cls.name}:${id ?? "default"}`
-    );
+    throw new Error(`PhaseState: no value for ${cls.name}:${id ?? "default"}`);
   }
 
   has(cls: PayloadClass, id?: string): boolean {

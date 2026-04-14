@@ -47,7 +47,11 @@ describe("WorkflowBuilder", () => {
   });
 
   it("named sets outputId on task", () => {
-    const task = fakeTask<"CodeEnv", "AgentResult">("agent", [CodeEnv], AgentResult);
+    const task = fakeTask<"CodeEnv", "AgentResult">(
+      "agent",
+      [CodeEnv],
+      AgentResult
+    );
     const wf = workflow("test", "desc")
       .seed(new CodeEnv({ repoRoot: "/r", cwd: "/r" }))
       .named("scan", task)
@@ -68,7 +72,11 @@ describe("WorkflowBuilder", () => {
   it("chains seed and add correctly", () => {
     const env = new CodeEnv({ repoRoot: "/r", cwd: "/r" });
     const ws = new WorktreeState({ branch: "b", baseRef: "main" });
-    const t1 = fakeTask<"CodeEnv", "WorktreeState">("t1", [CodeEnv], WorktreeState);
+    const t1 = fakeTask<"CodeEnv", "WorktreeState">(
+      "t1",
+      [CodeEnv],
+      WorktreeState
+    );
     const t2 = fakeTask<"WorktreeState", never>("t2", [WorktreeState]);
 
     const wf = workflow("chain", "chained workflow")

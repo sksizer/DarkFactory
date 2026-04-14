@@ -9,13 +9,18 @@ export interface DiscoveredWorkflow {
   readonly resolve: (cwd: string) => Workflow;
 }
 
-function validateWorkflow(wf: unknown, dirName: string): asserts wf is Workflow {
+function validateWorkflow(
+  wf: unknown,
+  dirName: string
+): asserts wf is Workflow {
   const obj = wf as Record<string, unknown>;
   if (typeof obj.name !== "string" || obj.name === "") {
     throw new Error(`Workflow in ${dirName} has invalid or missing name`);
   }
   if (typeof obj.description !== "string" || obj.description === "") {
-    throw new Error(`Workflow in ${dirName} has invalid or missing description`);
+    throw new Error(
+      `Workflow in ${dirName} has invalid or missing description`
+    );
   }
   if (!Array.isArray(obj.tasks) || obj.tasks.length === 0) {
     throw new Error(`Workflow in ${dirName} has no tasks`);

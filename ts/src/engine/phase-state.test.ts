@@ -47,7 +47,7 @@ describe("PhaseState", () => {
   it("get throws for missing key", () => {
     const state = new PhaseState();
     expect(() => state.get(FakePayload)).toThrow(
-      'PhaseState: no value for FakePayload:default'
+      "PhaseState: no value for FakePayload:default"
     );
   });
 
@@ -55,7 +55,7 @@ describe("PhaseState", () => {
     const state = new PhaseState();
     state.put(new FakePayload("hello"));
     expect(() => state.get(FakePayload, "nonexistent")).toThrow(
-      'PhaseState: no value for FakePayload:nonexistent'
+      "PhaseState: no value for FakePayload:nonexistent"
     );
   });
 

@@ -6,12 +6,7 @@ import {
   pushBranch,
   createPr,
 } from "./git-tasks.js";
-import {
-  CodeEnv,
-  WorktreeState,
-  PrRequest,
-  PrResult,
-} from "../payloads.js";
+import { CodeEnv, WorktreeState, PrRequest, PrResult } from "../payloads.js";
 import type { InputResolver } from "../task.js";
 import { PhaseState } from "../phase-state.js";
 
@@ -55,7 +50,13 @@ describe("enterWorktree", () => {
 
   it("dry-run returns CodeEnv", async () => {
     const state = new PhaseState();
-    state.put(new WorktreeState({ branch: "b", baseRef: "main", worktreePath: "/tmp/wt" }));
+    state.put(
+      new WorktreeState({
+        branch: "b",
+        baseRef: "main",
+        worktreePath: "/tmp/wt",
+      })
+    );
 
     const task = enterWorktree();
     const result = await task.run({ dryRun: true }, makeResolver(state));

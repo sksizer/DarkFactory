@@ -41,7 +41,10 @@ describe("shellTask", () => {
       onFailure: "fail",
     });
 
-    const codeEnv = new CodeEnv({ repoRoot: process.cwd(), cwd: process.cwd() });
+    const codeEnv = new CodeEnv({
+      repoRoot: process.cwd(),
+      cwd: process.cwd(),
+    });
     const result = await task.run({ dryRun: false }, makeResolver(codeEnv));
     expect(result.success).toBe(true);
   });
@@ -53,7 +56,10 @@ describe("shellTask", () => {
       onFailure: "fail",
     });
 
-    const codeEnv = new CodeEnv({ repoRoot: process.cwd(), cwd: process.cwd() });
+    const codeEnv = new CodeEnv({
+      repoRoot: process.cwd(),
+      cwd: process.cwd(),
+    });
     const result = await task.run({ dryRun: false }, makeResolver(codeEnv));
     expect(result.success).toBe(false);
     expect(result.failureReason).toContain("exit 1");
@@ -66,7 +72,10 @@ describe("shellTask", () => {
       onFailure: "ignore",
     });
 
-    const codeEnv = new CodeEnv({ repoRoot: process.cwd(), cwd: process.cwd() });
+    const codeEnv = new CodeEnv({
+      repoRoot: process.cwd(),
+      cwd: process.cwd(),
+    });
     const result = await task.run({ dryRun: false }, makeResolver(codeEnv));
     expect(result.success).toBe(true);
   });
