@@ -2,7 +2,7 @@
 id: PRD-637
 title: TypeScript workflow engine and security-review workflow
 kind: task
-status: draft
+status: ready
 priority: high
 effort: l
 capability: complex
@@ -13,14 +13,13 @@ blocks: []
 impacts:
   - ts/src/engine/
   - ts/src/workflow/
-  - ts/src/operations/
   - ts/src/cli/
 workflow: task
 assignee:
 reviewers: []
 target_version:
 created: 2026-04-13
-updated: '2026-04-13'
+updated: 2026-04-14
 tags:
   - infrastructure
   - typescript
@@ -34,9 +33,9 @@ Build the generic workflow execution engine on top of the utils layer ([[PRD-636
 
 ## Motivation
 
-The Python architecture cleanly separates the workflow engine from SDLC concepts. The engine (`run_tasks`, `PhaseState`, task dispatch) knows nothing about PRDs — adapters seed the context and plug in domain-specific builtins. Porting the engine first validates the TypeScript architecture with a real, useful workflow before layering SDLC modeling on top.
+The workflow engine is the core orchestration layer. It must be generic — know nothing about PRDs or SDLC status. Domain-specific adapters seed context and plug in specialized task factories later. Building the engine first with a real workflow validates the TypeScript architecture before layering SDLC modeling on top.
 
-The `security-review` workflow exercises the full pipeline — discovery, loading, agent invocation, git operations, shell verification, PR creation — while being independently useful.
+The `security-review` workflow exercises the full pipeline — discovery, loading, worktree creation, agent invocation, git operations, shell verification, PR creation — while being independently useful.
 
 ## Architecture overview
 
@@ -46,317 +45,478 @@ The `security-review` workflow exercises the full pipeline — discovery, loadin
 ├─────────────────────────────────────────────────┤
 │  Discovery: scan dirs for workflow.ts modules    │
 ├─────────────────────────────────────────────────┤
-│  Engine: runTasks() dispatch loop                │
-│  ┌──────────┐ ┌──────────┐ ┌──────────────────┐ │
-│  │ BuiltIn  │ │AgentTask │ │   ShellTask      │ │
-│  │ dispatch │ │ compose  │ │   exec + policy  │ │
-│  └──────────┘ └──────────┘ └──────────────────┘ │
+│  WorkflowBuilder: compile-time context wiring    │
 ├─────────────────────────────────────────────────┤
-│  PhaseState: type-keyed inter-task registry      │
+│  Engine: runTasks() — resolve inputs, dispatch,  │
+│          store outputs, short-circuit on failure  │
+├─────────────────────────────────────────────────┤
+│  Task<TReads, TWrites> factories:                │
+│  createWorktree, enterWorktree, agentTask,       │
+│  shellTask, commitTask, pushBranch, createPr     │
+├─────────────────────────────────────────────────┤
+│  Branded payloads + PhaseState registry          │
 ├─────────────────────────────────────────────────┤
 │  utils/ (PRD-636): subprocess, git, gh, claude   │
 └─────────────────────────────────────────────────┘
 ```
 
-SDLC modeling (PRD model, status tracking, predicate routing) is **not in this PRD** — it layers on top via the same adapter pattern Python uses.
+SDLC modeling (PRD model, status tracking, predicate routing) is **not in this PRD** — it layers on top via adapters that seed context and provide domain-specific task factories.
+
+## Design
+
+### Branded payloads with compile-time context validation
+
+Every payload class carries a phantom `_brand` type (erased at runtime, enforced at compile time via `declare readonly`). The `WorkflowBuilder` accumulates brands as tasks are added. TypeScript enforces at compile time that every task's reads are satisfied by the accumulated context — a missing dependency is a compile error, not a runtime crash.
+
+```typescript
+// Compile error — agentTask reads "CodeEnv" but nothing provides it
+const bad = workflow("broken", "")
+  .add(agentTask({ name: "x", prompt: "...", tools: [] }))  // ERROR: "CodeEnv" not in never
+  .build();
+```
+
+`declare readonly _brand` fields are compatible with `erasableSyntaxOnly: true` — they are phantom types that exist only in TypeScript's type system, not emitted to JavaScript.
+
+### Unified Task interface with single-output decomposition
+
+All tasks implement `Task<TReads, TWrites>` — a single interface with branded phantom type parameters. Each task type is a **factory function** that returns a `Task` with typed config captured in the closure. The engine doesn't dispatch by type — it resolves inputs from declared `reads`, calls `task.run()`, and stores outputs via declared `writes`.
+
+This eliminates class hierarchies, runtime registries, `instanceof` dispatch, and untyped kwargs bags. A missing import is a compile error.
+
+Each task factory has a **single output type**. Operations that would write multiple payload types are decomposed into separate single-output tasks (e.g., `createWorktree()` + `enterWorktree()` instead of a combined `ensureWorktree()`), keeping the builder's type algebra simple.
 
 ## Requirements
 
 ### 1. Core types
 
-#### `engine/phase-state.ts` — type-keyed registry
+#### `engine/phase-state.ts` — composite-keyed registry
 
-Class-constructor-keyed registry. Uses `new (...args: any[]) => T` as key type so TypeScript infers return type from the constructor argument.
+Constructor-keyed registry with optional string id for disambiguation. Id defaults to `"default"` so single-instance payloads need no ceremony.
 
-Methods matching Python semantics:
-- `put(value)` — store value keyed by its constructor
-- `get(key)` — return typed value or throw
-- `get(key, default)` — return typed value or default
-- `has(key)` — boolean check
+Internal store: `Map<string, unknown>` keyed by `${constructor.name}:${id}`. This is the one place `any` is permitted.
 
-The `Map<Function, unknown>` internal store is the one place `any` is permitted.
+Methods:
+- `put(value, id?)` — store value keyed by constructor + id. **Overwrites** if a value for that composite key already exists. Id defaults to `"default"`.
+- `get(key, id?)` — return typed value or throw. Id defaults to `"default"`.
+- `get(key, id?, default)` — return typed value or default.
+- `has(key, id?)` — boolean check. Id defaults to `"default"`.
 
-#### `engine/payloads.ts` — engine-level payloads only
+Uses `new (...args: any[]) => T` as key type so TypeScript infers return type from the constructor argument.
 
-Only the payloads the engine needs — no SDLC-specific types:
+#### `engine/payloads.ts` — branded engine-level payloads
 
-| Class | Purpose | Fields |
-|-------|---------|--------|
-| `CodeEnv` | Execution environment | `repoRoot: string`, `cwd: string` |
-| `WorktreeState` | Git branch context | `branch: string`, `baseRef: string`, `worktreePath?: string` |
-| `PrRequest` | PR creation input | `title: string`, `body: string` |
-| `PrResult` | PR creation output | `url?: string` |
-| `AgentResult` | Agent invocation result | `stdout`, `stderr`, `exitCode`, `success`, `failureReason?`, `toolCounts`, `sentinel?`, `model`, `invokeCount` |
+Only the payloads the engine needs — no SDLC-specific types. All classes use `declare readonly _brand` phantom types and manual field assignment in the constructor (compatible with `erasableSyntaxOnly`).
 
-All classes: `readonly` fields, constructed via constructor args.
+```typescript
+class CodeEnv {
+  declare readonly _brand: "CodeEnv";
+  readonly repoRoot: string;
+  readonly cwd: string;
+  constructor(init: { repoRoot: string; cwd: string }) {
+    this.repoRoot = init.repoRoot;
+    this.cwd = init.cwd;
+  }
+}
+```
+
+| Class | Brand | Purpose | Fields |
+|-------|-------|---------|--------|
+| `CodeEnv` | `"CodeEnv"` | Execution environment | `repoRoot: string`, `cwd: string` |
+| `WorktreeState` | `"WorktreeState"` | Git branch context | `branch: string`, `baseRef: string`, `worktreePath?: string` |
+| `PrRequest` | `"PrRequest"` | PR creation input | `title: string`, `body: string` |
+| `PrResult` | `"PrResult"` | PR creation output | `url?: string` |
+| `AgentResult` | `"AgentResult"` | Agent invocation result | `stdout: string`, `stderr: string`, `exitCode: number`, `success: boolean`, `failureReason?: string`, `toolCounts: Readonly<Record<string, number>>`, `sentinel?: string`, `model: string`, `invokeCount: number` |
 
 SDLC payloads (`PrdWorkflowRun`, `ProjectRun`, `PrdContext`, `CandidateList`, `ReworkState`) are deferred to the SDLC modeling PRD.
 
-### 2. Workflow types
-
-#### `workflow/core.ts` — task types and workflow definition
-
-Port from Python's `workflow/_core.py`. Pure data, no I/O.
-
-**Task types:**
-
-| Type | Key fields |
-|------|-----------|
-| `BuiltIn` | `name`, `kwargs: Record<string, unknown>` |
-| `AgentTask` | `name`, `prompts: string[]`, `tools: string[]`, `model?`, `retries`, `verifyPrompts`, `sentinelSuccess`, `sentinelFailure` |
-| `ShellTask` | `name`, `cmd`, `onFailure: "fail" \| "ignore"`, `env: Record<string, string>` |
-
-Defer `InteractiveTask` — not needed for the security-review workflow.
-
-Defer `onFailure: "retry_agent"` — start with `"fail"` and `"ignore"` only.
-
-**Workflow:**
+#### `engine/types.ts` — execution and wiring types
 
 ```typescript
-class Workflow {
-  readonly name: string;
-  readonly description: string;
-  readonly tasks: readonly Task[];
-  workflowDir?: string;  // set by loader at discovery time
-}
-```
-
-The `appliesTo` predicate and `priority` fields are SDLC-specific (predicate routing) — defer them.
-
-**RunContext:**
-
-```typescript
-class RunContext {
+interface TaskEnv {
   readonly dryRun: boolean;
-  readonly state: PhaseState;
-  readonly report: string[];
+}
 
-  get cwd(): string       // from CodeEnv
-  get repoRoot(): string  // from CodeEnv
+interface TaskOutput<T = void> {
+  readonly success: boolean;
+  readonly failureReason?: string;
+  readonly value?: T;
+}
 
-  formatString(template: string): string  // expand {placeholder} tokens
+interface TaskStepResult {
+  readonly name: string;
+  readonly success: boolean;
+  readonly failureReason?: string;
+}
+
+interface RunResult {
+  readonly success: boolean;
+  readonly failureReason?: string;
+  readonly steps: readonly TaskStepResult[];
+}
+
+type InputMapping = Record<string, string | ((state: PhaseState) => string)>;
+
+interface WrappedTask {
+  readonly task: Task;
+  readonly inputMapping?: InputMapping;
+  readonly outputId?: string;
 }
 ```
 
-`formatString` resolves from all registered payloads: `{cwd}`, `{repo_root}`, `{branch}`, `{base_ref}`, `{worktree}`.
+`RunResult.steps` is `readonly` in the public interface. The engine builds a mutable array internally and returns it — standard TypeScript widening.
 
-### 3. Engine
+### 2. Task interface and factories
 
-#### `engine/runner.ts` — task dispatch loop
-
-The engine walks a task list and dispatches each task by type. It does **not** know what kind of workflow it's running — prompt composition and model selection are injected as callbacks so the same engine serves any workflow type.
-
-**Callback signatures:**
+#### `engine/task.ts` — unified task interface
 
 ```typescript
-// How to turn an AgentTask's prompt file list into a final prompt string
-type ComposePromptFn = (
-  task: AgentTask,
-  ctx: RunContext,
-  extras?: Record<string, string>,
-) => string;
+type PayloadClass<T = unknown> = new (...args: any[]) => T;
 
-// How to decide which Claude model to use for an AgentTask
-type PickModelFn = (task: AgentTask, override?: string) => string;
+type BrandOf<T> = T extends { readonly _brand: infer B extends string } ? B : never;
+
+// Type-safe resolver — generic on the class constructor
+type InputResolver = <T>(cls: PayloadClass<T>, id?: string) => T;
+
+interface Task<
+  TReads extends string = string,
+  TWrites extends string = never,
+> {
+  readonly name: string;
+  readonly reads: readonly PayloadClass[];
+  readonly writes?: PayloadClass;
+  run(env: TaskEnv, resolve: InputResolver): Promise<TaskOutput>;
+}
 ```
 
-**The dispatch loop:**
+`TReads` and `TWrites` are phantom type parameters — they exist purely for the builder's compile-time constraint checking. The engine uses the runtime `reads` and `writes` fields for pre-validation.
+
+Tasks pull inputs via `resolve(Class)`, which returns a value typed by the class constructor's return type. The engine builds the resolver from `PhaseState` + the task's `inputMapping` (from `from()`). Resolution order:
+
+1. Task passes explicit `id` → use it directly
+2. `inputMapping` has entry for this class → use mapped id
+3. Neither → `"default"`
+
+This eliminates positional ordering bugs — tasks resolve inputs by type, not position.
+
+#### Task factory functions
+
+Individual files under `engine/tasks/` with a barrel `index.ts`:
+
+```
+engine/tasks/
+  index.ts              # re-exports all factories
+  agent-task.ts
+  agent-task.test.ts
+  shell-task.ts
+  shell-task.test.ts
+  git-tasks.ts          # createWorktree, enterWorktree, commitTask, pushBranch, createPr
+  git-tasks.test.ts
+```
+
+All task factories:
+- Return correctly branded `Task<TReads, TWrites>`
+- Honor `env.dryRun` (log what they would do, return success)
+- Call through the utils layer — never import `child_process` or `Bun` directly
+- Handle `Result` values from utils-layer calls explicitly (via `ts-pattern` or type guards) — no ignored error paths
+
+| Factory | Config | Reads (brands) | Writes (brand) |
+|---------|--------|----------------|----------------|
+| `createWorktree()` | — | `"WorktreeState" \| "CodeEnv"` | `"WorktreeState"` |
+| `enterWorktree()` | — | `"WorktreeState"` | `"CodeEnv"` |
+| `agentTask({...})` | `name`, `prompt`, `tools`, `model?`, `sentinelSuccess?`, `sentinelFailure?` | `"CodeEnv"` | `"AgentResult"` |
+| `shellTask({...})` | `name`, `cmd`, `onFailure: "fail" \| "ignore"`, `env?` | `"CodeEnv"` | `never` |
+| `commitTask({...})` | `message`, `files?: string[]` (defaults to `["."]`) | `"CodeEnv"` | `never` |
+| `pushBranch()` | — | `"WorktreeState"` | `never` |
+| `createPr()` | — | `"PrRequest" \| "WorktreeState"` | `"PrResult"` |
+
+**`agentTask` — representative implementation:**
 
 ```typescript
-function runTasks(
-  tasks: readonly Task[],
-  ctx: RunContext,
-  builtins: Map<string, BuiltinFn>,
-  composePrompt: ComposePromptFn,
-  pickModel: PickModelFn,
-): RunResult {
-  const result: RunResult = { success: true, steps: [] };
+function agentTask(config: {
+  name: string;
+  prompt: string;
+  tools: string[];
+  model?: string;
+  sentinelSuccess?: string;
+  sentinelFailure?: string;
+}): Task<"CodeEnv", "AgentResult"> {
+  return {
+    name: config.name,
+    reads: [CodeEnv] as const,
+    writes: AgentResult,
+    async run(env, resolve) {
+      const codeEnv = resolve(CodeEnv);
+      if (env.dryRun) {
+        return { success: true, value: /* dry-run AgentResult */ };
+      }
 
-  for (const task of tasks) {
-    if (task instanceof BuiltIn) {
-      // Look up name in registry, call with ctx + formatted kwargs
-      const fn = builtins.get(task.name);
-      if (!fn) { /* fail with "no builtin registered" */ }
-      const formattedKwargs = formatKwargs(task.kwargs, ctx);
-      fn(ctx, formattedKwargs);
-    }
-
-    else if (task instanceof AgentTask) {
-      // Delegate prompt/model decisions to the injected callbacks
-      const prompt = composePrompt(task, ctx);
-      const model = pickModel(task);
-
-      // Invoke claude via utils/claude-code.ts
-      const invokeResult = await invokeClaude({
-        prompt,
-        model,
-        tools: task.tools,
-        cwd: ctx.cwd,
-        dryRun: ctx.dryRun,
+      const result = await invokeClaude({
+        cwd: codeEnv.cwd,
+        prompt: config.prompt,
+        tools: config.tools,
+        model: config.model,
       });
 
-      // Match on Result from the utils layer
-      match(invokeResult)
-        .with({ kind: "ok" }, ({ value }) => {
-          ctx.state.put(new AgentResult({ /* ...from value */ }));
+      return match(result)
+        .with({ kind: "ok" }, ({ value: inv }) => {
+          const sentinels = parseSentinels(inv.stdout, {
+            success: config.sentinelSuccess,
+            failure: config.sentinelFailure,
+          });
+
+          // Failure sentinel wins over success sentinel
+          if (sentinels.failure) {
+            return {
+              success: false,
+              failureReason: "Failure sentinel found in agent output",
+              value: new AgentResult({ ...inv, success: false }),
+            };
+          }
+          if (sentinels.success) {
+            return {
+              success: true,
+              value: new AgentResult({ ...inv, success: true }),
+            };
+          }
+
+          // No sentinels matched — fall back to exit code
+          const ok = inv.exitCode === 0;
+          return {
+            success: ok,
+            failureReason: ok ? undefined : `Agent exited with code ${inv.exitCode}`,
+            value: new AgentResult({ ...inv, success: ok }),
+          };
         })
-        .with({ kind: "err" }, ({ error }) => {
-          result.success = false;
-          result.failureReason = error.reason;
-        })
+        .with({ kind: "err" }, ({ error }) => ({
+          success: false,
+          failureReason: `Agent invocation failed: ${error.message}`,
+        }))
         .exhaustive();
-    }
-
-    else if (task instanceof ShellTask) {
-      const cmd = ctx.formatString(task.cmd);
-      const shellResult = await runShell(cmd, ctx.cwd, task.env);
-      if (shellResult.exitCode !== 0) {
-        if (task.onFailure === "ignore") { continue; }
-        result.success = false;
-        break;
-      }
-    }
-
-    result.steps.push({ name: task.name, kind: taskKind(task), success: true });
-  }
-
-  return result;
-}
-```
-
-**Why callbacks instead of hardcoded logic?** Different workflow types compose prompts differently. The engine doesn't need to know the differences — callers inject the right strategy:
-
-**For this PRD — default (non-SDLC) implementations:**
-
-```typescript
-// Default prompt composer: load files, substitute basic placeholders.
-// This is what the `run` CLI command uses for generic workflows.
-function defaultComposePrompt(
-  task: AgentTask,
-  ctx: RunContext,
-  extras?: Record<string, string>,
-): string {
-  // Read prompt files relative to the workflow's directory on disk
-  // e.g., task.prompts = ["scan.md"], workflowDir = ".../security-review/"
-  // → reads and concatenates ".../security-review/scan.md"
-  const raw = loadPromptFiles(ctx.workflowDir, task.prompts);
-
-  // Replace {{PLACEHOLDER}} tokens with context values
-  return substitutePlaceholders(raw, {
-    REPO_ROOT: ctx.repoRoot,
-    CWD: ctx.cwd,
-    ...extras,
-  });
-}
-
-// Default model picker: explicit model on task, or fall back to sonnet.
-function defaultPickModel(task: AgentTask, override?: string): string {
-  if (override) return override;
-  if (task.model) return task.model;
-  return "sonnet";
-}
-```
-
-**Future (SDLC layer, NOT in this PRD) — PRD-aware implementations:**
-
-```typescript
-// PRD-aware prompt composer — injected by the future SDLC adapter.
-// Same signature, different behavior. Engine code does not change.
-function prdComposePrompt(
-  task: AgentTask,
-  ctx: RunContext,
-  extras?: Record<string, string>,
-): string {
-  const raw = loadPromptFiles(ctx.workflowDir, task.prompts);
-  const prdRun = ctx.state.get(PrdWorkflowRun);  // SDLC payload
-
-  const context: Record<string, string> = {
-    PRD_ID: prdRun.prd.id,
-    PRD_TITLE: prdRun.prd.title,
-    PRD_BODY: prdRun.prd.body,
-    ...extras,
+    },
   };
+}
+```
 
-  // Inject review feedback if this is a rework cycle
-  if (ctx.state.has(ReworkState)) {
-    context.REWORK_FEEDBACK = renderReviewThreads(
-      ctx.state.get(ReworkState).reviewThreads,
-    );
+**Sentinel resolution order:**
+1. `sentinelFailure` found → **failure** (wins over sentinelSuccess)
+2. `sentinelSuccess` found → **success**
+3. Neither found, exit code 0 → **success**
+4. Neither found, exit code non-zero → **failure**
+5. No sentinels configured → exit code determines outcome
+
+**`commitTask` — representative git task:**
+
+```typescript
+function commitTask(config: {
+  message: string;
+  files?: string[];
+}): Task<"CodeEnv", never> {
+  const filesToStage = config.files ?? ["."];
+  return {
+    name: "commit",
+    reads: [CodeEnv] as const,
+    async run(env, resolve) {
+      const codeEnv = resolve(CodeEnv);
+      if (env.dryRun) return { success: true };
+
+      const addResult = await gitAdd(filesToStage, { cwd: codeEnv.cwd });
+      if (isErr(addResult)) {
+        return { success: false, failureReason: `git add failed: ${addResult.error.message}` };
+      }
+
+      const commitResult = await gitCommit(config.message, { cwd: codeEnv.cwd });
+      if (isErr(commitResult)) {
+        return { success: false, failureReason: `git commit failed: ${commitResult.error.message}` };
+      }
+
+      return { success: true };
+    },
+  };
+}
+```
+
+`gitAdd(".")` is the correct default for workflow-managed worktrees — the worktree exists solely for the workflow's changes. The optional `files` config supports selective staging when needed.
+
+Defer `InteractiveTask` and `onFailure: "retry_agent"`.
+
+### 3. Workflow interface
+
+#### `workflow/core.ts`
+
+```typescript
+interface Workflow {
+  readonly name: string;
+  readonly description: string;
+  readonly seeds: readonly unknown[];
+  readonly tasks: readonly WrappedTask[];
+}
+```
+
+`seeds` carries the raw payload values accumulated by the builder. The runner creates a `PhaseState`, puts each seed, then executes tasks. This keeps `Workflow` a plain data object — no methods, no state ownership.
+
+### 4. WorkflowBuilder
+
+#### `workflow/builder.ts`
+
+The builder tracks available payload brands as a type parameter. Each `.seed()` and `.add()` returns a new builder with the brand union extended. `.add()` enforces at compile time that all task reads are a subset of the accumulated context.
+
+```typescript
+class WorkflowBuilder<Ctx extends string = never> {
+  private readonly _name: string;
+  private readonly _description: string;
+  private readonly _seeds: Array<{ value: unknown }>;
+  private readonly _tasks: WrappedTask[];
+
+  constructor(name: string, description: string) { ... }
+
+  // Seed initial context — adds the value's brand to Ctx
+  seed<T extends { readonly _brand: string }>(
+    value: T,
+  ): WorkflowBuilder<Ctx | BrandOf<T>> {
+    this._seeds.push({ value });
+    return this as unknown as WorkflowBuilder<Ctx | BrandOf<T>>;
   }
 
-  return substitutePlaceholders(raw, context);
+  // Add a task — TReads must be a subset of Ctx
+  add<R extends Ctx, W extends string>(
+    task: Task<R, W>,
+  ): WorkflowBuilder<Ctx | W> {
+    this._tasks.push({ task, inputMapping: undefined, outputId: undefined });
+    return this as unknown as WorkflowBuilder<Ctx | W>;
+  }
+
+  // Add a task with named output — for disambiguation when multiple
+  // tasks produce the same payload type
+  named<R extends Ctx, W extends string>(
+    id: string,
+    task: Task<R, W>,
+  ): WorkflowBuilder<Ctx | `${W}:${string}`> {
+    this._tasks.push({ task, inputMapping: undefined, outputId: id });
+    return this as unknown as WorkflowBuilder<Ctx | `${W}:${string}`>;
+  }
+
+  // Add a task with explicit input mapping — resolves reads from
+  // specific named ids instead of "default"
+  from<R extends Ctx, W extends string>(
+    mapping: InputMapping,
+    task: Task<R, W>,
+  ): WorkflowBuilder<Ctx | W> {
+    this._tasks.push({ task, inputMapping: mapping, outputId: undefined });
+    return this as unknown as WorkflowBuilder<Ctx | W>;
+  }
+
+  build(): Workflow {
+    return {
+      name: this._name,
+      description: this._description,
+      seeds: this._seeds.map((s) => s.value),
+      tasks: this._tasks,
+    };
+  }
 }
 
-// PRD-aware model picker — derives model from PRD capability field.
-function prdPickModel(task: AgentTask, override?: string): string {
-  if (override) return override;
-  if (task.model) return task.model;
-  // "complex" → opus, "simple" → haiku, default → sonnet
-  return capabilityToModel(ctx.state.get(PrdWorkflowRun).prd.capability);
+// Convenience entry point
+function workflow(name: string, description: string): WorkflowBuilder<never> {
+  return new WorkflowBuilder(name, description);
 }
 ```
 
-**Wiring it together — the `run` CLI command:**
+**Multi-agent example — named outputs and `from()`:**
 
 ```typescript
-// cli/run.ts — what happens when user runs `darkfactory run security-review`
-const workflow = discoverWorkflows().get("security-review");
-
-const ctx = new RunContext({ dryRun: options.dryRun });
-ctx.state.put(new CodeEnv({ repoRoot: cwd, cwd }));
-ctx.state.put(new WorktreeState({
-  branch: `security-review/${today()}`,
-  baseRef: "main",
-}));
-ctx.state.put(new PrRequest({
-  title: `Security Review — ${today()}`,
-  body: "Automated security scan findings",
-}));
-
-const result = runTasks(
-  workflow.tasks,
-  ctx,
-  GIT_BUILTINS,          // only git builtins available
-  defaultComposePrompt,   // simple file-loading strategy
-  defaultPickModel,       // task.model ?? "sonnet"
-);
-// Future SDLC `run-prd-workflow` would pass prdComposePrompt,
-// prdPickModel, and { ...GIT_BUILTINS, ...SDLC_BUILTINS } instead.
+export function create(cwd: string): Workflow {
+  return workflow("scan-and-fix", "Scan, fix, verify")
+    .seed(new CodeEnv({ repoRoot: cwd, cwd }))
+    .seed(new WorktreeState({ branch: `scan-fix/${today()}`, baseRef: "main" }))
+    .seed(new PrRequest({ title: "Security Fixes", body: "Automated scan and fix" }))
+    .add(createWorktree())
+    .add(enterWorktree())
+    .named("scan", agentTask({ name: "scan", prompt: scanPrompt, tools: readOnlyTools }))
+    .named("fix",  agentTask({ name: "fix",  prompt: fixPrompt,  tools: editTools }))
+    .add(shellTask({ name: "verify", cmd: "just test", onFailure: "fail" }))
+    .add(commitTask({ message: "security fixes" }))
+    .add(pushBranch())
+    .add(createPr())
+    .build();
+}
 ```
 
-### 4. Builtin registry and git operations
-
-#### `operations/registry.ts` — registration mechanism
+Both `AgentResult` values coexist in state under ids `"scan"` and `"fix"`. A downstream task can read from a specific id:
 
 ```typescript
-type BuiltinFn = (ctx: RunContext, kwargs: Record<string, unknown>) => void | Promise<void>;
+// Static: always read AgentResult from id "fix"
+.from({ AgentResult: "fix" }, customTask({ name: "summarize" }))
 
-const BUILTINS = new Map<string, BuiltinFn>();
-
-function registerBuiltin(name: string, fn: BuiltinFn): void;
+// Dynamic: resolve id at runtime based on state
+.from(
+  { AgentResult: (state) => state.has(AgentResult, "fix") ? "fix" : "scan" },
+  customTask({ name: "report" }),
+)
 ```
 
-#### Git builtins
+`from()` mappings are validated at runtime only — the builder cannot verify at compile time that a named id exists. The engine raises a clear error if a `from()` mapping references a nonexistent id.
 
-These are the generic git operations shared between both Python registries. They call through `utils/git.ts` and `utils/github.ts` (from [[PRD-636-typescript-utils-layer]]) and read/write engine-level payloads only — no SDLC dependencies:
+### 5. Engine
 
-| Builtin | Reads from state | Writes to state | Calls |
-|---------|-----------------|----------------|-------|
-| `ensure_worktree` | `WorktreeState` | `WorktreeState` (updates `worktreePath`), `CodeEnv` (updates `cwd`) | `utils/git.worktreeAdd` |
-| `commit` | `CodeEnv` | — | `utils/git.add`, `utils/git.commit` |
-| `push_branch` | `WorktreeState` | — | `utils/git.gitRun(["push", ...])` |
-| `create_pr` | `PrRequest`, `WorktreeState` | `PrResult` | `utils/github.createPr` |
+#### `engine/runner.ts`
 
-All builtins must honor `ctx.dryRun`. All subprocess calls go through the utils layer — builtins never call `subprocess.exec` directly.
+`runWorkflow` creates a `PhaseState` from the workflow's seeds, then delegates to `runTasks` which resolves inputs, dispatches, stores outputs, and short-circuits on failure.
 
-### 5. Prompt composition
+```typescript
+async function runWorkflow(
+  wf: Workflow,
+  env: TaskEnv,
+): Promise<RunResult> {
+  const state = new PhaseState();
+  for (const seed of wf.seeds) {
+    state.put(seed);
+  }
+  return runTasks(wf.tasks, state, env);
+}
 
-#### `workflow/prompts.ts`
+async function runTasks(
+  tasks: readonly WrappedTask[],
+  state: PhaseState,
+  env: TaskEnv,
+): Promise<RunResult> {
+  const steps: TaskStepResult[] = [];
 
-- `loadPromptFiles(workflowDir, filenames)` — read and concatenate prompt files relative to workflow directory
-- `substitutePlaceholders(raw, context)` — replace `{{PLACEHOLDER}}` tokens with values from a context object
+  for (const wrapped of tasks) {
+    // 1. Build resolver with inputMapping baked in
+    const resolve: InputResolver = (cls, id) => {
+      if (id != null) return state.get(cls, id);
+      const mapped = wrapped.inputMapping?.[cls.name];
+      if (mapped != null) {
+        const resolvedId = typeof mapped === "function" ? mapped(state) : mapped;
+        return state.get(cls, resolvedId);
+      }
+      return state.get(cls, "default");
+    };
 
-The `{{PLACEHOLDER}}` syntax (double-brace) is for prompt templates. The `{placeholder}` syntax (single-brace) is for `RunContext.formatString()` in shell commands and builtin kwargs. Keep them distinct as Python does.
+    // 2. Run task — it pulls what it needs via resolve()
+    const output = await wrapped.task.run(env, resolve);
+    steps.push({
+      name: wrapped.task.name,
+      success: output.success,
+      failureReason: output.failureReason,
+    });
+
+    // 3. Store output in state if task declares writes
+    if (output.value != null && wrapped.task.writes != null) {
+      state.put(output.value, wrapped.outputId ?? "default");
+    }
+
+    // 4. Short-circuit on failure
+    if (!output.success) {
+      return { success: false, failureReason: output.failureReason, steps };
+    }
+  }
+
+  return { success: true, steps };
+}
+```
+
+Input resolution errors (missing payload for a `reads` entry, or `from()` mapping referencing a nonexistent id) cause the task to fail with a descriptive error message naming the task, the expected payload type, and the missing key.
 
 ### 6. Workflow discovery
 
@@ -367,15 +527,21 @@ Scan directories for `workflow.ts` modules. Two layers:
 1. **Built-in** — shipped with the package at `ts/src/workflow/definitions/`
 2. **Project** — `<project>/.darkfactory/workflows/` (or configurable path)
 
-Each direct subdirectory containing a `workflow.ts` that exports a `workflow` constant is loaded via dynamic `import()`. Loader sets `workflow.workflowDir` for prompt path resolution.
+Each direct subdirectory containing a `workflow.ts` is loaded via dynamic `import()`. The loader checks for:
+- A `create(cwd: string): Workflow` factory function export (preferred), or
+- A `workflow` constant export
+
+The loader validates at runtime that the resolved workflow has `name` (string), `description` (string), and `tasks` (non-empty array).
 
 Name collisions across layers raise an error. Import failures log a warning and skip.
 
-Defer the user layer (`~/.config/darkfactory/workflows/`) — two layers are sufficient to validate the pattern.
+Uses `import.meta.dirname` for built-in path resolution (compatible with Bun and Node 21.2+).
+
+Defer user-layer discovery (`~/.config/darkfactory/workflows/`) — two layers are sufficient.
 
 ### 7. CLI
 
-Two working commands:
+Two commands, manual `process.argv` parsing (no CLI library dependency):
 
 #### `list-workflows`
 
@@ -388,83 +554,209 @@ Available workflows:
 #### `run <workflow> [--dry-run]`
 
 1. Discover workflows
-2. Look up by name
-3. Seed `PhaseState` with `CodeEnv` (from cwd) and `WorktreeState` (branch derived from workflow name + date)
-4. Seed default `PrRequest` from workflow name/description
-5. Call `runTasks()` with default prompt composer and model picker
-6. Report result
+2. Look up by name — fail with error and exit 1 if not found
+3. If workflow module exports `create`, call `create(process.cwd())` to get a `Workflow` with seeds populated
+4. Call `runWorkflow(workflow, { dryRun: options.dryRun })`
+5. Report result
 
-CLI parser: use a lightweight library or Bun's `process.argv` parsing. Keep it minimal.
+For constant exports (no `create`), the CLI constructs the `Workflow` directly, providing seeds for `CodeEnv` (from cwd) and `WorktreeState` (from workflow name + date).
 
 ### 8. Security-review workflow
 
-A built-in workflow at `ts/src/workflow/definitions/security-review/`:
+Built-in workflow at `ts/src/workflow/definitions/security-review/`:
 
 ```
 security-review/
-  workflow.ts       # Workflow definition
+  workflow.ts       # Workflow definition (exports create)
   scan.md           # Agent prompt
 ```
 
-**Task list:**
-1. `BuiltIn("ensure_worktree")` — create worktree on `security-review/<date>` branch
-2. `AgentTask("scan")` — load `scan.md`, invoke Claude with Read/Glob/Grep/Write/Edit tools
-3. `ShellTask("verify")` — run project tests (`just test` or equivalent), `onFailure: "ignore"` (findings may not have tests)
-4. `BuiltIn("commit", { message: "chore: security review findings" })`
-5. `BuiltIn("push_branch")`
-6. `BuiltIn("create_pr")`
+**Workflow definition (`workflow.ts`):**
+
+```typescript
+import { readFileSync } from "fs";
+import { join } from "path";
+import { workflow } from "../../workflow/builder";
+import {
+  createWorktree, enterWorktree, agentTask, shellTask,
+  commitTask, pushBranch, createPr,
+} from "../../engine/tasks";
+import { CodeEnv, WorktreeState, PrRequest } from "../../engine/payloads";
+import type { Workflow } from "../../workflow/core";
+
+const scanPrompt = readFileSync(join(import.meta.dirname, "scan.md"), "utf-8");
+
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function create(cwd: string): Workflow {
+  return workflow(
+    "security-review",
+    "Scan codebase for security issues, propose fixes, open a PR",
+  )
+    .seed(new CodeEnv({ repoRoot: cwd, cwd }))
+    .seed(new WorktreeState({
+      branch: `security-review/${today()}`,
+      baseRef: "main",
+    }))
+    .seed(new PrRequest({
+      title: `Security Review — ${today()}`,
+      body: "Automated security scan findings",
+    }))
+    .add(createWorktree())
+    .add(enterWorktree())
+    .add(agentTask({
+      name: "scan",
+      prompt: scanPrompt,
+      tools: ["Read", "Glob", "Grep", "Write", "Edit"],
+      sentinelSuccess: "PRD_EXECUTE_OK",
+    }))
+    .add(shellTask({ name: "verify", cmd: "just test", onFailure: "ignore" }))
+    .add(commitTask({ message: "chore: security review findings" }))
+    .add(pushBranch())
+    .add(createPr())
+    .build();
+}
+```
+
+Note: the `verify` step uses `just test` which assumes the project uses `just` as a task runner. `onFailure: "ignore"` makes this best-effort — the workflow proceeds regardless.
 
 **Prompt (`scan.md`):**
 
-Instruct the agent to:
-- Scan all source files for OWASP Top 10 vulnerabilities
-- Check for hardcoded secrets, injection vectors, auth gaps
-- For each finding: identify location, describe the issue, apply a fix
-- Emit `PRD_EXECUTE_OK` on completion
+```markdown
+# Security Review
 
-This workflow validates: discovery → loading → worktree creation → agent invocation → shell verification → git commit → push → PR creation. The full engine pipeline.
+Scan this codebase for security vulnerabilities. Focus on:
+
+## OWASP Top 10
+
+- **Injection** — SQL injection, command injection, template injection in any language
+- **Broken Authentication** — hardcoded credentials, weak token generation, missing auth checks
+- **Sensitive Data Exposure** — secrets in source, unencrypted storage, verbose error messages leaking internals
+- **XML External Entities (XXE)** — unsafe XML parsing configurations
+- **Broken Access Control** — missing authorization checks, IDOR vulnerabilities, privilege escalation paths
+- **Security Misconfiguration** — debug modes enabled, default credentials, overly permissive CORS
+- **Cross-Site Scripting (XSS)** — unsanitized user input in HTML/template output
+- **Insecure Deserialization** — untrusted data passed to deserializers (pickle, yaml.load, JSON.parse with reviver)
+- **Using Components with Known Vulnerabilities** — check dependency files for known-vulnerable versions
+- **Insufficient Logging & Monitoring** — sensitive operations without audit trails
+
+## Additional checks
+
+- Hardcoded secrets: API keys, passwords, tokens, private keys in source files
+- Path traversal: user-controlled input used in file paths without sanitization
+- Race conditions: TOCTOU bugs, shared mutable state without synchronization
+- Subprocess injection: shell commands built from user input
+
+## Instructions
+
+1. Use Glob to discover all source files
+2. Use Grep to search for vulnerability patterns
+3. Use Read to examine suspicious files in detail
+4. For each confirmed finding:
+   - Identify the file and line number
+   - Describe the vulnerability and its severity (critical/high/medium/low)
+   - Apply a fix using Edit or Write
+5. If no findings are discovered, that is a valid outcome — report it
+
+Emit `PRD_EXECUTE_OK` when the scan is complete.
+```
 
 ### 9. Tests
 
-Colocated `.test.ts` for every module. Engine tests use `ts-pattern` matching on Results from the utils layer.
+Colocated `.test.ts` for every module. All tests use `ts-pattern` matching on `Result` values where applicable.
 
 | Test file | Coverage |
 |-----------|----------|
-| `engine/phase-state.test.ts` | put/get/has, type inference, missing key throws, default |
-| `engine/payloads.test.ts` | construction, readonly, PhaseState round-trip |
-| `workflow/core.test.ts` | task construction, workflow creation |
-| `engine/runner.test.ts` | dispatch with mock builtins, dry-run, failure handling, ts-pattern on AgentTask results |
-| `operations/registry.test.ts` | register, lookup, missing builtin error |
-| `workflow/prompts.test.ts` | file loading, placeholder substitution |
-| `workflow/loader.test.ts` | discovery from fixture directories, name collision |
+| `engine/phase-state.test.ts` | put/get/has, put overwrites, type inference, missing key throws, default, composite keys with explicit id, default id fallback |
+| `engine/payloads.test.ts` | construction, readonly, brand phantom types, PhaseState round-trip |
+| `engine/runner.test.ts` | resolver builds correctly per task, inputMapping precedence, explicit id override, output storage via writes, failure short-circuits, step recording, missing-key error messages |
+| `engine/tasks/agent-task.test.ts` | invokeClaude call, ts-pattern on Result, sentinel resolution (all 5 cases), AgentResult stored in state, dry-run |
+| `engine/tasks/shell-task.test.ts` | command execution, onFailure "fail" vs "ignore", dry-run |
+| `engine/tasks/git-tasks.test.ts` | createWorktree, enterWorktree, commitTask (default + explicit files), pushBranch, createPr — dry-run behavior, state reads/writes, Result handling |
+| `workflow/builder.test.ts` | seed/add/named/from/build, compile-time constraint errors (manual type assertions) |
+| `workflow/core.test.ts` | Workflow interface conformance |
+| `workflow/loader.test.ts` | discovery from fixture directories, create() vs constant, name collision, malformed export |
 | `cli/index.test.ts` | list-workflows output, run with dry-run |
 
-Git builtins are tested via dry-run mode — they log what they would do without executing. Integration testing of actual git operations deferred.
+Task factory tests pass a mock or real `InputResolver` — no positional arg ordering to validate.
 
 ## Acceptance criteria
 
-- [ ] `PhaseState` implements type-keyed registry with generic get
-- [ ] All 5 engine-level payload classes with readonly fields
-- [ ] `BuiltIn`, `AgentTask`, `ShellTask` task types
-- [ ] `Workflow` and `RunContext` types
-- [ ] `runTasks()` dispatch loop handles all three task types
-- [ ] `runTasks` uses `ts-pattern` matching on `Result` values from utils layer
-- [ ] Prompt file loading and `{{PLACEHOLDER}}` substitution
-- [ ] Builtin registry with 4 git operations registered
-- [ ] All git builtins honor dry-run and call through utils layer
+### Core types
+- [ ] All payload classes use `declare readonly _brand` phantom types for compile-time tracking
+- [ ] Payload construction via manual field assignment (compatible with `erasableSyntaxOnly`)
+- [ ] `PhaseState` implements composite-keyed registry (`constructor.name:id`), `put`/`get`/`has` with optional id (defaults to `"default"`)
+- [ ] `RunResult` and `TaskStepResult` types with `readonly` public interface
+- [ ] `TaskEnv` carries `dryRun` flag only
+- [ ] `TaskOutput<T>` carries `success`, `failureReason?`, `value?: T`
+
+### Task system
+- [ ] `Task<TReads, TWrites>` interface with branded phantom type parameters and `run(env, resolve)` signature
+- [ ] `InputResolver` type: generic `<T>(cls: PayloadClass<T>, id?: string) => T`
+- [ ] Factory functions: `agentTask()`, `shellTask()`, `createWorktree()`, `enterWorktree()`, `commitTask()`, `pushBranch()`, `createPr()`
+- [ ] All task factories have typed config (no `Record<string, unknown>` kwargs)
+- [ ] Each task factory has single output type (multi-write decomposed into separate tasks)
+- [ ] All task factories honor `env.dryRun` and call through utils layer
+- [ ] All task factories resolve inputs via `resolve(Class)` — no positional parameter contracts
+- [ ] All task factories handle `Result` values from utils-layer calls explicitly — no ignored error paths
+- [ ] `agentTask` uses `ts-pattern` exhaustive matching on `Result` and sentinel logic
+- [ ] Sentinel behavior: failure sentinel wins, exit code fallback when no sentinels configured
+- [ ] `commitTask` accepts optional `files?: string[]`, defaults to `["."]`
+- [ ] Task factories in individual files under `engine/tasks/` with barrel `index.ts`
+
+### Builder
+- [ ] `WorkflowBuilder<Ctx>` accumulates payload brands via `.seed()` and `.add()`
+- [ ] `.add()` enforces `R extends Ctx` — compile error if task reads unsatisfied context
+- [ ] `.named(id, task)` stores output under specific id
+- [ ] `.from(mapping, task)` resolves inputs from specific ids (static string or dynamic function)
+- [ ] `.build()` returns `Workflow` with seeds and tasks populated
+
+### Workflow and engine
+- [ ] `Workflow` as plain interface with `name`, `description`, `seeds: readonly unknown[]`, `tasks: readonly WrappedTask[]`
+- [ ] `runWorkflow()` creates `PhaseState` from seeds, delegates to `runTasks()`
+- [ ] `runTasks()` engine loop builds `InputResolver` per task (incorporating `inputMapping`), calls `task.run(env, resolve)`, stores outputs via `writes`, short-circuits on failure
+- [ ] Resolver precedence: explicit id arg > `inputMapping` entry > `"default"`
+- [ ] Engine raises clear error when resolution fails — message names the task, expected payload type, and missing key
 - [ ] Workflow discovery from built-in and project layers
-- [ ] `list-workflows` CLI shows discovered workflows
-- [ ] `run security-review --dry-run` executes full pipeline in dry-run
+- [ ] Loader supports `create(cwd)` factory function or `workflow` constant export
+- [ ] Loader validates exports at runtime (name, description, tasks array)
+- [ ] Name collisions across layers raise error
+- [ ] Uses `import.meta.dirname` (Bun + Node compatible)
+
+### CLI
+- [ ] `list-workflows` shows discovered workflows
+- [ ] `run <name> [--dry-run]` executes full pipeline
+- [ ] Manual `process.argv` parsing, no CLI library dependency
+- [ ] `run security-review --dry-run` exercises full pipeline in dry-run
+
+### Security-review workflow
+- [ ] `scan.md` prompt with full OWASP Top 10 coverage
+- [ ] Workflow defined via builder: `seed → createWorktree → enterWorktree → agentTask → shellTask → commitTask → pushBranch → createPr`
+- [ ] Exported as `create(cwd)` factory function
+
+### Quality
 - [ ] `bun test` and `bun run typecheck` pass
 - [ ] No `any` types except PhaseState internals
+- [ ] Colocated `.test.ts` for every module
 
 ## Deferred
 
-- `InteractiveTask` — add when discussion workflows are ported
+- `InteractiveTask` factory — add when discussion workflows are ported
 - `onFailure: "retry_agent"` — add when verification retry is needed
 - `WorkflowTemplate` (open/middle/close enforcement) — add when multiple workflows share structure
 - Event logging (`EventWriter`) — add when observability is needed
+- Worktree cleanup and locking — add when real (non-dry-run) execution is primary use case
+- Sync task support — `run()` currently async-only, may support sync later
 - User-layer workflow discovery (`~/.config/darkfactory/workflows/`)
 - SDLC payloads, PRD model, predicate routing, status tracking — separate PRD
+- SDLC-aware task factories (`prdAgentTask` etc.) — separate PRD
+- Prompt template infrastructure (`{{PLACEHOLDER}}` substitution) — add as utility if workflows need it
 - Integration tests for actual git/gh operations
 - Timeout configuration system
+- Pre-run wiring validation (`validateWiring()`) — compile-time builder checking handles the common case; runtime validation adds defense-in-depth for dynamically loaded project workflows
+
+## Dependencies
+
+- [[PRD-636-typescript-utils-layer]]: subprocess, git, gh, claude, Result types, `ts-pattern` matching
