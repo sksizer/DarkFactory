@@ -9,8 +9,7 @@
  * 5. Commits, pushes, and opens a PR
  */
 
-import { execFileSync } from "node:child_process";
-import { loadConfig } from "../../../config/index.js";
+import { tryLoadConfig } from "../../../config/index.js";
 import {
   CodeEnv,
   PrRequest,
@@ -30,27 +29,7 @@ import {
 } from "../../../core/workflow/engine/tasks/index.js";
 import { workflow } from "../../../core/workflow/builder.js";
 import type { Workflow } from "../../../core/workflow/types.js";
-
-function currentBranch(cwd: string): string {
-  try {
-    return execFileSync("git", ["branch", "--show-current"], {
-      cwd,
-      encoding: "utf-8",
-    }).trim();
-  } catch {
-    return "unknown";
-  }
-}
-
-function tryLoadConfig(
-  cwd: string
-): import("../../../config/types.js").DarkFactoryConfig {
-  try {
-    return loadConfig(cwd);
-  } catch {
-    return { v1: { code: { quality: {} } } };
-  }
-}
+import { currentBranch } from "../../../utils/exec/git.js";
 
 function qualityFixPrompt(resolve: import("../../../core/workflow/engine/task.js").InputResolver): string {
   const qr = resolve(QualityResult);
@@ -73,7 +52,11 @@ Focus only on fixing the reported issues. Do not refactor or improve unrelated c
 }
 
 export function create(cwd: string): Workflow {
-  const branch = currentBranch(cwd);
+  const branchResult = currentBranch(cwd);
+  if (branchResult.kind === "err") {
+    throw new Error(`Cannot determine current branch: ${branchResult.error.stderr}`);
+  }
+  const branch = branchResult.value;
   const config = tryLoadConfig(cwd);
 
   return workflow(

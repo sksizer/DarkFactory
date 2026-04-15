@@ -17,3 +17,16 @@ export function loadConfig(projectRoot: string): DarkFactoryConfig {
   const raw = parse(text);
   return DarkFactoryConfigSchema.parse(raw);
 }
+
+const EMPTY_CONFIG: DarkFactoryConfig = { v1: { code: { quality: {} } } };
+
+/**
+ * Load config, returning a safe default if the file is missing or invalid.
+ */
+export function tryLoadConfig(projectRoot: string): DarkFactoryConfig {
+  try {
+    return loadConfig(projectRoot);
+  } catch {
+    return EMPTY_CONFIG;
+  }
+}

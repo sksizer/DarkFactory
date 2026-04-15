@@ -5,6 +5,7 @@
  * and return Result types. Never throws.
  */
 
+import { execFileSync } from "node:child_process";
 import { type Result, err, ok } from "../result.js";
 import { type Timeout, ProcessTimeoutError, exec } from "./subprocess.js";
 
@@ -360,4 +361,23 @@ export async function worktreeRemove(
   repoRoot: string
 ): Promise<CheckResult> {
   return gitRun(["worktree", "remove", "--force", wtPath], { cwd: repoRoot });
+}
+
+// ---------- Sync helpers ----------
+
+/** Return the current branch name. Sync. */
+export function currentBranch(cwd: string): GitResult<string> {
+  try {
+    const branch = execFileSync("git", ["branch", "--show-current"], {
+      cwd,
+      encoding: "utf-8",
+    }).trim();
+    if (branch === "") {
+      return err(makeGitErr(0, "", "detached HEAD — no current branch", ["git", "branch", "--show-current"]));
+    }
+    return ok(branch);
+  } catch (e) {
+    const stderr = e instanceof Error ? e.message : String(e);
+    return err(makeGitErr(-1, "", stderr, ["git", "branch", "--show-current"]));
+  }
 }

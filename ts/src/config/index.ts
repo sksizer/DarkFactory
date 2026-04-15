@@ -5,4 +5,4 @@ export type {
   QualityCheck,
 } from "./types.js";
 export { DarkFactoryConfigSchema } from "./types.js";
-export { loadConfig } from "./loader.js";
+export { loadConfig, tryLoadConfig } from "./loader.js";
