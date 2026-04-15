@@ -26,6 +26,7 @@ workflow authors and the runner both plug into.
 from __future__ import annotations
 
 import logging
+import shlex
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal
@@ -270,7 +271,7 @@ class RunContext:
         """Repository root from CodeEnv payload."""
         return self.state.get(CodeEnv).repo_root
 
-    def format_string(self, template: str) -> str:
+    def format_string(self, template: str, *, shell_escape: bool = False) -> str:
         """Expand ``{placeholder}`` tokens against all payloads in state.
 
         Merges placeholders from all payloads present in state. No
@@ -284,6 +285,14 @@ class RunContext:
         - ProjectRun if present: ``{workflow_name}``, ``{target_count}``,
           ``{target_prd}``
         - WorktreeState if present: ``{branch}``, ``{base_ref}``, ``{worktree}``
+
+        Args:
+            template: The template string with ``{placeholder}`` tokens.
+            shell_escape: When ``True``, each substituted value is passed
+                through :func:`shlex.quote` before insertion.  Set this
+                whenever the result will be executed by a shell (i.e. via
+                ``run_shell``), so that PRD-controlled values cannot inject
+                arbitrary shell commands.
         """
         replacements: dict[str, str] = {}
 
@@ -309,6 +318,9 @@ class RunContext:
             replacements["branch"] = wt.branch
             replacements["base_ref"] = wt.base_ref
             replacements["worktree"] = str(wt.worktree_path) if wt.worktree_path else ""
+
+        if shell_escape:
+            replacements = {k: shlex.quote(v) for k, v in replacements.items()}
 
         # Replace known placeholders, leave unknown ones unchanged.
         result = template

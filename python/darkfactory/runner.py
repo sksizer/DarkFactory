@@ -398,7 +398,7 @@ def _run_shell(
     timeout_frontmatter: int | None = None,
 ) -> TaskStep:
     """Run a shell command, handling on_failure policy with agent retry if configured."""
-    cmd = ctx.format_string(task.cmd)
+    cmd = ctx.format_string(task.cmd, shell_escape=True)
 
     if ctx.dry_run:
         ctx.logger.info("[dry-run] %s", cmd)
