@@ -1,25 +1,36 @@
 /**
- * Typed configuration matching .darkfactory/config.toml structure.
+ * Config schema — single source of truth for .darkfactory/config.toml structure.
+ * Types are derived from the schema via z.infer.
  */
 
-export interface QualityCheck {
-  readonly name: string;
-  /** Commands to run — all must pass. Single string or array. */
-  readonly cmds: readonly string[];
-}
+import { z } from "zod/v4";
 
-export interface CodeConfig {
-  readonly dev?: string;
-  readonly quality: Readonly<Record<string, QualityCheck>>;
-}
+const QualityCheckSchema = z.object({
+  name: z.string(),
+  cmds: z
+    .union([z.string(), z.array(z.string())])
+    .transform((v) => (typeof v === "string" ? [v] : v)),
+});
 
-export interface ConfigV1 {
-  readonly code: CodeConfig;
-  readonly workflow?: {
-    readonly directories?: readonly string[];
-  };
-}
+const CodeConfigSchema = z.object({
+  dev: z.string().optional(),
+  quality: z.record(z.string(), QualityCheckSchema).default({}),
+});
 
-export interface DarkFactoryConfig {
-  readonly v1: ConfigV1;
-}
+const ConfigV1Schema = z.object({
+  code: CodeConfigSchema.default({ quality: {} }),
+  workflow: z
+    .object({
+      directories: z.array(z.string()).optional(),
+    })
+    .optional(),
+});
+
+export const DarkFactoryConfigSchema = z.object({
+  v1: ConfigV1Schema.default({ code: { quality: {} } }),
+});
+
+export type QualityCheck = z.infer<typeof QualityCheckSchema>;
+export type CodeConfig = z.infer<typeof CodeConfigSchema>;
+export type ConfigV1 = z.infer<typeof ConfigV1Schema>;
+export type DarkFactoryConfig = z.infer<typeof DarkFactoryConfigSchema>;
