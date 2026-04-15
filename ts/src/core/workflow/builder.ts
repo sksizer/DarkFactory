@@ -1,5 +1,5 @@
 import type { BrandOf, Task } from "./engine/task.js";
-import type { InputMapping, WrappedTask } from "./engine/types.js";
+import type { FailureHandler, InputMapping, WrappedTask } from "./engine/types.js";
 import type { Workflow } from "./types.js";
 
 export class WorkflowBuilder<Ctx extends string = never> {
@@ -30,9 +30,15 @@ export class WorkflowBuilder<Ctx extends string = never> {
   }
 
   add<R extends Ctx, W extends string>(
-    task: Task<R, W>
+    task: Task<R, W>,
+    options?: { onFailure?: FailureHandler },
   ): WorkflowBuilder<Ctx | W> {
-    this._tasks.push({ task, inputMapping: undefined, outputId: undefined });
+    this._tasks.push({
+      task,
+      inputMapping: undefined,
+      outputId: undefined,
+      onFailure: options?.onFailure,
+    });
     return this as unknown as WorkflowBuilder<Ctx | W>;
   }
 

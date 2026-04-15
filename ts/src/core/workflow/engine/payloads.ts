@@ -42,6 +42,32 @@ export class PrResult {
   }
 }
 
+export class ProjectConfig {
+  declare readonly _brand: "ProjectConfig";
+  readonly config: import("../../../config/types.js").DarkFactoryConfig;
+  constructor(config: import("../../../config/types.js").DarkFactoryConfig) {
+    this.config = config;
+  }
+}
+
+export interface QualityCheckOutcome {
+  readonly name: string;
+  readonly success: boolean;
+  readonly exitCode: number;
+  readonly cmd: string;
+  readonly stderr: string;
+}
+
+export class QualityResult {
+  declare readonly _brand: "QualityResult";
+  readonly checks: readonly QualityCheckOutcome[];
+  readonly allPassed: boolean;
+  constructor(checks: readonly QualityCheckOutcome[]) {
+    this.checks = checks;
+    this.allPassed = checks.every((c) => c.success);
+  }
+}
+
 export class AgentResult {
   declare readonly _brand: "AgentResult";
   readonly stdout: string;

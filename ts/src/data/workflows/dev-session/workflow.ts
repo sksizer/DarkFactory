@@ -2,39 +2,71 @@
  * dev-session workflow — interactive Claude session with quality gates and optional PR.
  *
  * 1. Opens an interactive Claude session (hands terminal to user)
- * 2. Runs quality checks (format, test, lint) — non-blocking
+ * 2. Runs quality checks from project config — if any fail, an agent
+ *    attempts to fix them (up to 3 retries)
  * 3. Checks for uncommitted changes — stops if clean
  * 4. Asks user whether to create a PR — stops if declined
  * 5. Commits, pushes, and opens a PR
  */
 
 import { execFileSync } from "node:child_process";
+import { loadConfig } from "../../../config/index.js";
 import {
   CodeEnv,
   PrRequest,
+  ProjectConfig,
   WorktreeState,
 } from "../../../core/workflow/engine/payloads.js";
 import {
+  agentTask,
+  codeQualityTask,
   commitTask,
   confirmTask,
   createPr,
   diffCheckTask,
   interactiveClaudeTask,
   pushBranch,
-  shellTask,
 } from "../../../core/workflow/engine/tasks/index.js";
 import { workflow } from "../../../core/workflow/builder.js";
 import type { Workflow } from "../../../core/workflow/types.js";
 
 function currentBranch(cwd: string): string {
-  return execFileSync("git", ["branch", "--show-current"], {
-    cwd,
-    encoding: "utf-8",
-  }).trim();
+  try {
+    return execFileSync("git", ["branch", "--show-current"], {
+      cwd,
+      encoding: "utf-8",
+    }).trim();
+  } catch {
+    return "unknown";
+  }
 }
+
+function tryLoadConfig(
+  cwd: string
+): import("../../../config/types.js").DarkFactoryConfig {
+  try {
+    return loadConfig(cwd);
+  } catch {
+    return { v1: { code: { quality: {} } } };
+  }
+}
+
+const qualityFixPrompt = `You are a code quality fixer. The quality checks for this project have failed.
+
+Read the QualityResult from the workflow state to understand what failed.
+Look at the failing commands, their exit codes, and stderr output.
+
+Fix the issues by editing the relevant source files. Common fixes:
+- Format errors: run the formatter or fix formatting manually
+- Type errors: fix type annotations, imports, or missing types
+- Test failures: fix broken tests or the code they test
+- Lint errors: fix the specific lint violations reported
+
+Focus only on fixing the reported issues. Do not refactor or improve unrelated code.`;
 
 export function create(cwd: string): Workflow {
   const branch = currentBranch(cwd);
+  const config = tryLoadConfig(cwd);
 
   return workflow(
     "dev-session",
@@ -42,6 +74,7 @@ export function create(cwd: string): Workflow {
     "dev"
   )
     .seed(new CodeEnv({ repoRoot: cwd, cwd }))
+    .seed(new ProjectConfig(config))
     .seed(
       new WorktreeState({
         branch,
@@ -56,9 +89,16 @@ export function create(cwd: string): Workflow {
       })
     )
     .add(interactiveClaudeTask({ name: "claude-session" }))
-    .add(shellTask({ name: "format", cmd: "just format", onFailure: "ignore" }))
-    .add(shellTask({ name: "test", cmd: "just test", onFailure: "ignore" }))
-    .add(shellTask({ name: "lint", cmd: "just lint", onFailure: "ignore" }))
+    .add(codeQualityTask(), {
+      onFailure: {
+        task: agentTask({
+          name: "fix-quality",
+          prompt: qualityFixPrompt,
+          tools: ["Read", "Glob", "Grep", "Write", "Edit", "Bash"],
+        }),
+        retry: 3,
+      },
+    })
     .add(diffCheckTask())
     .add(
       confirmTask({
@@ -66,7 +106,7 @@ export function create(cwd: string): Workflow {
         message: "Create a PR with these changes?",
       })
     )
-    .add(commitTask({ message: `feat: dev session changes` }))
+    .add(commitTask({ message: "feat: dev session changes" }))
     .add(pushBranch())
     .add(createPr())
     .build();
