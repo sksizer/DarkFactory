@@ -1,11 +1,8 @@
-type ConfigV1 = {
-    workflow: {
-        directories: string[]
-    }
-}
-
-type Configuration = {
-    v1: ConfigV1
-}
-
-export {};
+export type {
+  DarkFactoryConfig,
+  ConfigV1,
+  CodeConfig,
+  QualityCheck,
+} from "./types.js";
+export { DarkFactoryConfigSchema } from "./types.js";
+export { loadConfig, tryLoadConfig } from "./loader.js";

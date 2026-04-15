@@ -276,16 +276,16 @@ export async function invokeClaude(
  * Returns the exit code on success, InvokeErr on spawn failure.
  */
 export async function spawnClaude(
-  prompt: string,
   cwd: string,
-  effortLevel?: EffortLevel
+  options?: { prompt?: string; effortLevel?: EffortLevel }
 ): Promise<Result<number, InvokeErr>> {
   const cmd: string[] = ["claude"];
-  if (effortLevel !== undefined) {
-    cmd.push("--effort", effortLevel);
+  if (options?.effortLevel !== undefined) {
+    cmd.push("--effort", options.effortLevel);
   }
-  // For interactive mode, we pass the prompt as a positional argument
-  cmd.push(prompt);
+  if (options?.prompt !== undefined && options.prompt !== "") {
+    cmd.push(options.prompt);
+  }
 
   try {
     const exitCode = await execForeground(cmd, cwd);
