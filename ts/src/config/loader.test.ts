@@ -17,12 +17,14 @@ describe("loadConfig", () => {
     const config = loadConfig(PROJECT_ROOT);
     const quality = config.v1.code.quality;
 
-    expect(quality.test).toBeDefined();
-    expect(quality.test.name).toBe("test");
-    expect(quality.test.cmds.length).toBeGreaterThan(0);
+    const test = quality.test;
+    expect(test).toBeDefined();
+    expect(test!.name).toBe("test");
+    expect(test!.cmds.length).toBeGreaterThan(0);
 
-    expect(quality.format).toBeDefined();
-    expect(quality.format.name).toBe("format");
+    const format = quality.format;
+    expect(format).toBeDefined();
+    expect(format!.name).toBe("format");
   });
 
   it("throws on missing config file", () => {
