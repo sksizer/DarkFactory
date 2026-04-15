@@ -15,6 +15,7 @@ import {
   CodeEnv,
   PrRequest,
   ProjectConfig,
+  QualityResult,
   WorktreeState,
 } from "../../../core/workflow/engine/payloads.js";
 import {
@@ -51,10 +52,16 @@ function tryLoadConfig(
   }
 }
 
-const qualityFixPrompt = `You are a code quality fixer. The quality checks for this project have failed.
+function qualityFixPrompt(resolve: import("../../../core/workflow/engine/task.js").InputResolver): string {
+  const qr = resolve(QualityResult);
+  const failures = qr.checks
+    .filter((c) => !c.success)
+    .map((c) => `- ${c.name}: \`${c.cmd}\` exited ${String(c.exitCode)}\n  stderr: ${c.stderr.slice(0, 500)}`)
+    .join("\n");
 
-Read the QualityResult from the workflow state to understand what failed.
-Look at the failing commands, their exit codes, and stderr output.
+  return `You are a code quality fixer. The following quality checks failed:
+
+${failures}
 
 Fix the issues by editing the relevant source files. Common fixes:
 - Format errors: run the formatter or fix formatting manually
@@ -63,6 +70,7 @@ Fix the issues by editing the relevant source files. Common fixes:
 - Lint errors: fix the specific lint violations reported
 
 Focus only on fixing the reported issues. Do not refactor or improve unrelated code.`;
+}
 
 export function create(cwd: string): Workflow {
   const branch = currentBranch(cwd);
