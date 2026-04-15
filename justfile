@@ -19,6 +19,9 @@ lint:
 format-check:
     uv run ruff format --check python tests
 
+df *ARGS:
+    cd ts && bun run src/cli/bin.ts {{ARGS}}
+
 ts-install:
     cd ts && bun install
 

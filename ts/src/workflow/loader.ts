@@ -4,6 +4,7 @@ import type { Workflow } from "./core.js";
 
 export interface DiscoveredWorkflow {
   readonly name: string;
+  readonly category: string | undefined;
   readonly description: string;
   readonly source: "builtin" | "project";
   readonly resolve: (cwd: string) => Workflow;
@@ -66,6 +67,7 @@ async function scanLayer(
         validateWorkflow(probe, entry);
         results.push({
           name: probe.name,
+          category: probe.category,
           description: probe.description,
           source,
           resolve: createFn,
@@ -75,6 +77,7 @@ async function scanLayer(
         validateWorkflow(wf, entry);
         results.push({
           name: wf.name,
+          category: wf.category,
           description: wf.description,
           source,
           resolve: () => wf,

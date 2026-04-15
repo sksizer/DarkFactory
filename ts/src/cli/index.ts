@@ -7,9 +7,23 @@ export async function listWorkflows(): Promise<void> {
     join(process.cwd(), ".darkfactory", "workflows")
   );
 
-  console.log("Available workflows:");
+  const grouped = new Map<string, typeof workflows>();
   for (const wf of workflows) {
-    console.log(`  ${wf.name.padEnd(20)} ${wf.description}`);
+    const cat = wf.category ?? "uncategorized";
+    const list = grouped.get(cat);
+    if (list !== undefined) {
+      list.push(wf);
+    } else {
+      grouped.set(cat, [wf]);
+    }
+  }
+
+  console.log("Available workflows:");
+  for (const [category, wfs] of grouped) {
+    console.log(`\n  ${category}`);
+    for (const wf of wfs) {
+      console.log(`    ${wf.name.padEnd(20)} ${wf.description}`);
+    }
   }
 }
 

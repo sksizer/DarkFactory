@@ -5,14 +5,21 @@ import type { Workflow } from "./core.js";
 export class WorkflowBuilder<Ctx extends string = never> {
   private readonly _name: string;
   private readonly _description: string;
+  private _category: string;
   private readonly _seeds: Array<{ value: unknown }>;
   private readonly _tasks: WrappedTask[];
 
-  constructor(name: string, description: string) {
+  constructor(name: string, description: string, category: string) {
     this._name = name;
     this._description = description;
+    this._category = category;
     this._seeds = [];
     this._tasks = [];
+  }
+
+  cat(category: string): this {
+    this._category = category;
+    return this;
   }
 
   seed<T extends { readonly _brand: string }>(
@@ -46,15 +53,20 @@ export class WorkflowBuilder<Ctx extends string = never> {
   }
 
   build(): Workflow {
-    return {
+    const base = {
       name: this._name,
       description: this._description,
+      category: this._category,
       seeds: this._seeds.map((s) => s.value),
       tasks: this._tasks,
     };
+    if (this._category !== undefined) {
+      return { ...base, category: this._category };
+    }
+    return base;
   }
 }
 
-export function workflow(name: string, description: string): WorkflowBuilder {
-  return new WorkflowBuilder(name, description);
+export function workflow(name: string, description: string, category?: string): WorkflowBuilder {
+  return new WorkflowBuilder(name, description, category ?? "default");
 }

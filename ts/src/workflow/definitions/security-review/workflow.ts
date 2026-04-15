@@ -12,6 +12,7 @@ import {
 } from "../../../engine/tasks/index.js";
 import { workflow } from "../../builder.js";
 import type { Workflow } from "../../core.js";
+import {capabilityToModel} from "../../../utils/index.js";
 
 const scanPrompt = readFileSync(join(import.meta.dirname, "scan.md"), "utf-8");
 
@@ -22,7 +23,8 @@ function today(): string {
 export function create(cwd: string): Workflow {
   return workflow(
     "security-review",
-    "Scan codebase for security issues, propose fixes, open a PR"
+    "Scan codebase for security issues, propose fixes, open a PR",
+      "project"
   )
     .seed(new CodeEnv({ repoRoot: cwd, cwd }))
     .seed(
