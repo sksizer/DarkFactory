@@ -45,8 +45,16 @@ describe("runWorkflow", () => {
         description: "test",
         seeds: [],
         tasks: [
-          { task: succeedingTask("a"), inputMapping: undefined, outputId: undefined },
-          { task: succeedingTask("b"), inputMapping: undefined, outputId: undefined },
+          {
+            task: succeedingTask("a"),
+            inputMapping: undefined,
+            outputId: undefined,
+          },
+          {
+            task: succeedingTask("b"),
+            inputMapping: undefined,
+            outputId: undefined,
+          },
         ],
       },
       dryRunOff
@@ -63,9 +71,21 @@ describe("runWorkflow", () => {
         description: "test",
         seeds: [],
         tasks: [
-          { task: succeedingTask("a"), inputMapping: undefined, outputId: undefined },
-          { task: failingTask("b", "broke"), inputMapping: undefined, outputId: undefined },
-          { task: succeedingTask("c"), inputMapping: undefined, outputId: undefined },
+          {
+            task: succeedingTask("a"),
+            inputMapping: undefined,
+            outputId: undefined,
+          },
+          {
+            task: failingTask("b", "broke"),
+            inputMapping: undefined,
+            outputId: undefined,
+          },
+          {
+            task: succeedingTask("c"),
+            inputMapping: undefined,
+            outputId: undefined,
+          },
         ],
       },
       dryRunOff
@@ -113,7 +133,11 @@ describe("onFailure recovery", () => {
             outputId: undefined,
             onFailure: { task: recoveryTask, retry: 3 },
           },
-          { task: succeedingTask("after"), inputMapping: undefined, outputId: undefined },
+          {
+            task: succeedingTask("after"),
+            inputMapping: undefined,
+            outputId: undefined,
+          },
         ],
       },
       dryRunOff

@@ -26,16 +26,12 @@ export async function runWorkflow(
   return runTasks(wf.tasks, state, env);
 }
 
-function makeResolver(
-  wrapped: WrappedTask,
-  state: PhaseState
-): InputResolver {
+function makeResolver(wrapped: WrappedTask, state: PhaseState): InputResolver {
   return <T>(cls: PayloadClass<T>, id?: string): T => {
     if (id != null) return state.get(cls, id);
     const mapped = wrapped.inputMapping?.[cls.name];
     if (mapped != null) {
-      const resolvedId =
-        typeof mapped === "function" ? mapped(state) : mapped;
+      const resolvedId = typeof mapped === "function" ? mapped(state) : mapped;
       return state.get(cls, resolvedId);
     }
     return state.get(cls);

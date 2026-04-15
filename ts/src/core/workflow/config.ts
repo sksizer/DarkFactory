@@ -1,2 +1,1 @@
-type WorkflowConfig = {
-};
+type WorkflowConfig = {};

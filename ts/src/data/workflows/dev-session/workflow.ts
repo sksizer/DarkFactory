@@ -31,11 +31,16 @@ import { workflow } from "../../../core/workflow/builder.js";
 import type { Workflow } from "../../../core/workflow/types.js";
 import { currentBranch } from "../../../utils/exec/git.js";
 
-function qualityFixPrompt(resolve: import("../../../core/workflow/engine/task.js").InputResolver): string {
+function qualityFixPrompt(
+  resolve: import("../../../core/workflow/engine/task.js").InputResolver
+): string {
   const qr = resolve(QualityResult);
   const failures = qr.checks
     .filter((c) => !c.success)
-    .map((c) => `- ${c.name}: \`${c.cmd}\` exited ${String(c.exitCode)}\n  stderr: ${c.stderr.slice(0, 500)}`)
+    .map(
+      (c) =>
+        `- ${c.name}: \`${c.cmd}\` exited ${String(c.exitCode)}\n  stderr: ${c.stderr.slice(0, 500)}`
+    )
     .join("\n");
 
   return `You are a code quality fixer. The following quality checks failed:
@@ -54,7 +59,9 @@ Focus only on fixing the reported issues. Do not refactor or improve unrelated c
 export function create(cwd: string): Workflow {
   const branchResult = currentBranch(cwd);
   if (branchResult.kind === "err") {
-    throw new Error(`Cannot determine current branch: ${branchResult.error.stderr}`);
+    throw new Error(
+      `Cannot determine current branch: ${branchResult.error.stderr}`
+    );
   }
   const branch = branchResult.value;
   const config = tryLoadConfig(cwd);

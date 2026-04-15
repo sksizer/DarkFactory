@@ -373,7 +373,13 @@ export function currentBranch(cwd: string): GitResult<string> {
       encoding: "utf-8",
     }).trim();
     if (branch === "") {
-      return err(makeGitErr(0, "", "detached HEAD — no current branch", ["git", "branch", "--show-current"]));
+      return err(
+        makeGitErr(0, "", "detached HEAD — no current branch", [
+          "git",
+          "branch",
+          "--show-current",
+        ])
+      );
     }
     return ok(branch);
   } catch (e) {
