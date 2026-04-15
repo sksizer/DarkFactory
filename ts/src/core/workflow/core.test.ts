@@ -1,10 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import type { Workflow } from "./core.js";
+import type { Workflow } from "./types.js";
 
 describe("Workflow interface", () => {
   it("accepts a conforming plain object", () => {
     const wf: Workflow = {
       name: "test",
+      category: "test",
       description: "A test workflow",
       seeds: [{ value: 1 }],
       tasks: [
@@ -30,6 +31,7 @@ describe("Workflow interface", () => {
   it("enforces readonly seeds and tasks arrays", () => {
     const wf: Workflow = {
       name: "ro",
+      category: "readonly",
       description: "readonly",
       seeds: [],
       tasks: [],

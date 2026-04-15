@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CodeEnv, PrRequest, WorktreeState } from "../../../engine/payloads.js";
+import { CodeEnv, PrRequest, WorktreeState } from "../../../core/workflow/engine/payloads.js";
 import {
   agentTask,
   commitTask,
@@ -9,9 +9,9 @@ import {
   enterWorktree,
   pushBranch,
   shellTask,
-} from "../../../engine/tasks/index.js";
-import { workflow } from "../../builder.js";
-import type { Workflow } from "../../core.js";
+} from "../../../core/workflow/engine/tasks/index.js";
+import { workflow } from "../../../core/workflow/builder.js";
+import type { Workflow } from "../../../core/workflow/types.js";
 import {capabilityToModel} from "../../../utils/index.js";
 
 const scanPrompt = readFileSync(join(import.meta.dirname, "scan.md"), "utf-8");

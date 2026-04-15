@@ -1,12 +1,14 @@
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
-import type { Workflow } from "./core.js";
+import type { Workflow } from "./types.js";
+
+type WorkflowSource = "builtin" | "user" | "project";
 
 export interface DiscoveredWorkflow {
   readonly name: string;
   readonly category: string | undefined;
   readonly description: string;
-  readonly source: "builtin" | "project";
+  readonly source: WorkflowSource;
   readonly resolve: (cwd: string) => Workflow;
 }
 
@@ -100,7 +102,7 @@ async function scanLayer(
 export async function discoverWorkflows(
   projectDir?: string
 ): Promise<DiscoveredWorkflow[]> {
-  const builtinDir = join(import.meta.dirname, "definitions");
+  const builtinDir = join(import.meta.dirname, "..", "..", "data", "workflows");
   const builtins = await scanLayer(builtinDir, "builtin");
   const results = [...builtins];
 

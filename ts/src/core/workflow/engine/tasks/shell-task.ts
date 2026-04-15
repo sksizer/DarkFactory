@@ -1,4 +1,4 @@
-import { runShell } from "../../utils/exec/shell.js";
+import { runShell } from "../../../../utils/exec/shell.js";
 import { CodeEnv } from "../payloads.js";
 import type { Task } from "../task.js";
 

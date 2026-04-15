@@ -1,4 +1,4 @@
-import type { WrappedTask } from "../engine/types.js";
+import type { WrappedTask } from "./engine/types.js";
 
 export interface Workflow {
   readonly name: string;

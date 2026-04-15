@@ -1,6 +1,6 @@
-import type { BrandOf, Task } from "../engine/task.js";
-import type { InputMapping, WrappedTask } from "../engine/types.js";
-import type { Workflow } from "./core.js";
+import type { BrandOf, Task } from "./engine/task.js";
+import type { InputMapping, WrappedTask } from "./engine/types.js";
+import type { Workflow } from "./types.js";
 
 export class WorkflowBuilder<Ctx extends string = never> {
   private readonly _name: string;
@@ -53,17 +53,13 @@ export class WorkflowBuilder<Ctx extends string = never> {
   }
 
   build(): Workflow {
-    const base = {
+    return {
       name: this._name,
       description: this._description,
       category: this._category,
       seeds: this._seeds.map((s) => s.value),
       tasks: this._tasks,
     };
-    if (this._category !== undefined) {
-      return { ...base, category: this._category };
-    }
-    return base;
   }
 }
 

@@ -341,7 +341,7 @@ Defer `InteractiveTask` and `onFailure: "retry_agent"`.
 
 ### 3. Workflow interface
 
-#### `workflow/core.ts`
+#### `workflow/types.ts`
 
 ```typescript
 interface Workflow {
