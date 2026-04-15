@@ -12,7 +12,7 @@ describe("Workflow interface", () => {
           task: {
             name: "noop",
             reads: [],
-            async run() {
+            run() {
               return { success: true };
             },
           },

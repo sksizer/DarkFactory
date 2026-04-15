@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { WorkflowBuilder, workflow } from "./builder.js";
-import { CodeEnv, WorktreeState, AgentResult } from "../engine/payloads.js";
+import { AgentResult, CodeEnv, WorktreeState } from "../engine/payloads.js";
 import type { PayloadClass, Task } from "../engine/task.js";
+import { WorkflowBuilder, workflow } from "./builder.js";
 
 function fakeTask<R extends string, W extends string>(
   name: string,
@@ -12,7 +12,7 @@ function fakeTask<R extends string, W extends string>(
     name,
     reads,
     writes,
-    async run() {
+    run() {
       return { success: true };
     },
   } as Task<R, W>;

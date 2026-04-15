@@ -1,8 +1,9 @@
 import { PhaseState } from "./phase-state.js";
-import type { InputResolver } from "./task.js";
+import type { InputResolver, PayloadClass } from "./task.js";
 import type {
   RunResult,
   TaskEnv,
+  TaskOutput,
   TaskStepResult,
   WrappedTask,
 } from "./types.js";
@@ -33,9 +34,8 @@ export async function runTasks(
   const steps: TaskStepResult[] = [];
 
   for (const wrapped of tasks) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const resolve: InputResolver = <T>(
-      cls: new (...args: any[]) => T,
+      cls: PayloadClass<T>,
       id?: string
     ): T => {
       if (id != null) return state.get(cls, id);
@@ -48,7 +48,7 @@ export async function runTasks(
       return state.get(cls);
     };
 
-    let output;
+    let output: TaskOutput;
     try {
       output = await wrapped.task.run(env, resolve);
     } catch (e) {

@@ -1,7 +1,7 @@
 import type { TaskEnv, TaskOutput } from "./types.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type PayloadClass<T = unknown> = new (...args: any[]) => T;
+// biome-ignore lint/suspicious/noExplicitAny: construct-signature variance requires any[] here — unknown[] breaks assignability from concrete class types
+export type PayloadClass<T = unknown> = new (...args: any[]) => T; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 export type BrandOf<T> = T extends { readonly _brand: infer B extends string }
   ? B
@@ -16,5 +16,5 @@ export interface Task<
   readonly name: string;
   readonly reads: readonly PayloadClass[];
   readonly writes?: PayloadClass | undefined;
-  run(env: TaskEnv, resolve: InputResolver): Promise<TaskOutput>;
+  run(env: TaskEnv, resolve: InputResolver): Promise<TaskOutput> | TaskOutput;
 }

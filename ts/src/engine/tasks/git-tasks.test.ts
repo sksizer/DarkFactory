@@ -1,14 +1,14 @@
 import { describe, expect, it } from "bun:test";
+import { CodeEnv, PrRequest, PrResult, WorktreeState } from "../payloads.js";
+import { PhaseState } from "../phase-state.js";
+import type { InputResolver } from "../task.js";
 import {
+  commitTask,
+  createPr,
   createWorktree,
   enterWorktree,
-  commitTask,
   pushBranch,
-  createPr,
 } from "./git-tasks.js";
-import { CodeEnv, WorktreeState, PrRequest, PrResult } from "../payloads.js";
-import type { InputResolver } from "../task.js";
-import { PhaseState } from "../phase-state.js";
 
 function makeResolver(state: PhaseState): InputResolver {
   return <T>(cls: new (...args: unknown[]) => T, id?: string): T => {

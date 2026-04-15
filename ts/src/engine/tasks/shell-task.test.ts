@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { shellTask } from "./shell-task.js";
 import { CodeEnv } from "../payloads.js";
 import type { InputResolver } from "../task.js";
+import { shellTask } from "./shell-task.js";
 
 function makeResolver(codeEnv: CodeEnv): InputResolver {
   return <T>(cls: new (...args: unknown[]) => T): T => {

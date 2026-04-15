@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { agentTask } from "./agent-task.js";
-import { CodeEnv, AgentResult } from "../payloads.js";
+import { AgentResult, CodeEnv } from "../payloads.js";
 import type { InputResolver } from "../task.js";
+import { agentTask } from "./agent-task.js";
 
 function makeResolver(codeEnv: CodeEnv): InputResolver {
   return <T>(cls: new (...args: unknown[]) => T): T => {

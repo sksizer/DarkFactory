@@ -42,7 +42,7 @@ async function scanLayer(
 
   for (const entry of entries) {
     const subdir = join(dir, entry);
-    let s;
+    let s: Awaited<ReturnType<typeof stat>>;
     try {
       s = await stat(subdir);
     } catch {
@@ -95,7 +95,7 @@ async function scanLayer(
 }
 
 export async function discoverWorkflows(
-  projectDir?: string | undefined
+  projectDir?: string
 ): Promise<DiscoveredWorkflow[]> {
   const builtinDir = join(import.meta.dirname, "definitions");
   const builtins = await scanLayer(builtinDir, "builtin");

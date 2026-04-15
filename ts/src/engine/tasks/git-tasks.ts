@@ -1,15 +1,15 @@
-import { join } from "node:path";
 import { mkdir } from "node:fs/promises";
-import { CodeEnv, WorktreeState, PrRequest, PrResult } from "../payloads.js";
-import type { Task } from "../task.js";
+import { join } from "node:path";
 import {
+  add,
   branchExistsLocal,
+  commit,
   gitRun,
   worktreeAdd,
-  add,
-  commit,
 } from "../../utils/git.js";
 import { createPr as ghCreatePr } from "../../utils/github.js";
+import { CodeEnv, PrRequest, PrResult, WorktreeState } from "../payloads.js";
+import type { Task } from "../task.js";
 
 function sanitizeBranch(branch: string): string {
   return branch.replace(/\//g, "-");
@@ -101,7 +101,7 @@ export function enterWorktree(): Task<"WorktreeState", "CodeEnv"> {
     name: "enter-worktree",
     reads: [WorktreeState] as const,
     writes: CodeEnv,
-    async run(env, resolve) {
+    run(env, resolve) {
       const ws = resolve(WorktreeState);
       if (env.dryRun) {
         return {
@@ -135,7 +135,7 @@ export function enterWorktree(): Task<"WorktreeState", "CodeEnv"> {
 export function commitTask(config: {
   message: string;
   files?: string[] | undefined;
-}): Task<"CodeEnv", never> {
+}): Task<"CodeEnv"> {
   const filesToStage = config.files ?? ["."];
   return {
     name: "commit",
@@ -165,7 +165,7 @@ export function commitTask(config: {
   };
 }
 
-export function pushBranch(): Task<"WorktreeState", never> {
+export function pushBranch(): Task<"WorktreeState"> {
   return {
     name: "push-branch",
     reads: [WorktreeState] as const,

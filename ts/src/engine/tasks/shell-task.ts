@@ -1,13 +1,13 @@
+import { runShell } from "../../utils/shell.js";
 import { CodeEnv } from "../payloads.js";
 import type { Task } from "../task.js";
-import { runShell } from "../../utils/shell.js";
 
 export function shellTask(config: {
   name: string;
   cmd: string;
   onFailure: "fail" | "ignore";
   env?: Record<string, string> | undefined;
-}): Task<"CodeEnv", never> {
+}): Task<"CodeEnv"> {
   return {
     name: config.name,
     reads: [CodeEnv] as const,

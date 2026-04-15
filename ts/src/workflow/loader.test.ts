@@ -18,9 +18,9 @@ describe("discoverWorkflows", () => {
   it("security-review resolve returns a valid workflow", async () => {
     const workflows = await discoverWorkflows();
     const sr = workflows.find((w) => w.name === "security-review");
-    expect(sr).toBeDefined();
+    if (sr === undefined) throw new Error("security-review workflow not found");
 
-    const wf = sr!.resolve(process.cwd());
+    const wf = sr.resolve(process.cwd());
     expect(wf.name).toBe("security-review");
     expect(wf.tasks.length).toBeGreaterThan(0);
     expect(wf.seeds.length).toBeGreaterThan(0);

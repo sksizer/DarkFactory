@@ -1,6 +1,6 @@
 import { join } from "node:path";
-import { discoverWorkflows } from "../workflow/loader.js";
 import { runWorkflow } from "../engine/runner.js";
+import { discoverWorkflows } from "../workflow/loader.js";
 
 export async function listWorkflows(): Promise<void> {
   const workflows = await discoverWorkflows(
