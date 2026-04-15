@@ -51,6 +51,7 @@ export async function run(name: string, dryRun: boolean): Promise<void> {
 }
 
 export async function main(args: string[]): Promise<void> {
+  console.log("DarkFactory CLI");
   const command = args[0];
 
   if (command === "list-workflows") {

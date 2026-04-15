@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { match } from "ts-pattern";
-import type { Result } from "./result.js";
+import type { Result } from "../result.js";
 import { runForeground, runShell } from "./shell.js";
 import type { ExecErr } from "./subprocess.js";
 

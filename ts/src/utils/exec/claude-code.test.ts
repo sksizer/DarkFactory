@@ -7,7 +7,7 @@ import {
   invokeClaude,
   parseSentinels,
 } from "./claude-code.js";
-import type { Result } from "./result.js";
+import type { Result } from "../result.js";
 
 describe("capabilityToModel", () => {
   it("maps trivial to haiku", () => {

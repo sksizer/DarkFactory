@@ -5,15 +5,22 @@
  * and return Result types. Never throws.
  */
 
-import {
-  type GhCheckResult,
-  type GhErr,
-  type GhResult,
-  type Timeout,
-  err,
-  ok,
-} from "./result.js";
-import { ProcessTimeoutError, exec } from "./subprocess.js";
+import { type Result, err, ok } from "../result.js";
+import { type Timeout, ProcessTimeoutError, exec } from "./subprocess.js";
+
+// ---------- Error and result types ----------
+
+/** Non-zero gh CLI exit. */
+export interface GhErr {
+  readonly kind: "gh-err";
+  readonly returncode: number;
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly cmd: readonly string[];
+}
+
+export type GhResult<T> = Result<T, GhErr>;
+export type GhCheckResult = Result<null, GhErr | Timeout>;
 
 // ---------- Supporting types ----------
 

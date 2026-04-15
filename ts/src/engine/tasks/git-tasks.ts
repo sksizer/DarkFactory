@@ -6,8 +6,8 @@ import {
   commit,
   gitRun,
   worktreeAdd,
-} from "../../utils/git.js";
-import { createPr as ghCreatePr } from "../../utils/github.js";
+} from "../../utils/exec/git.js";
+import { createPr as ghCreatePr } from "../../utils/exec/github.js";
 import { CodeEnv, PrRequest, PrResult, WorktreeState } from "../payloads.js";
 import type { Task } from "../task.js";
 

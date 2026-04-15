@@ -5,17 +5,22 @@
  * and return Result types. Never throws.
  */
 
-import {
-  type CheckResult,
-  type GitErr,
-  type GitResult,
-  type Timeout,
-  err,
-  ok,
-} from "./result.js";
-import { ProcessTimeoutError, exec } from "./subprocess.js";
+import { type Result, err, ok } from "../result.js";
+import { type Timeout, ProcessTimeoutError, exec } from "./subprocess.js";
 
 // ---------- Types ----------
+
+/** Non-zero git CLI exit. */
+export interface GitErr {
+  readonly kind: "git-err";
+  readonly returncode: number;
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly cmd: readonly string[];
+}
+
+export type GitResult<T> = Result<T, GitErr>;
+export type CheckResult = Result<null, GitErr | Timeout>;
 
 export interface WorktreeEntry {
   readonly path: string;

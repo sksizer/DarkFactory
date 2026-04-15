@@ -47,7 +47,9 @@ export function create(cwd: string): Workflow {
         sentinelSuccess: "PRD_EXECUTE_OK",
       })
     )
-    .add(shellTask({ name: "verify", cmd: "just test", onFailure: "ignore" }))
+    .add(shellTask({ name: "format", cmd: "just format", onFailure: "fail" }))
+    .add(shellTask({ name: "test", cmd: "just test", onFailure: "fail" }))
+    .add(shellTask({ name: "lint", cmd: "just lint", onFailure: "fail" }))
     .add(commitTask({ message: "chore: security review findings" }))
     .add(pushBranch())
     .add(createPr())

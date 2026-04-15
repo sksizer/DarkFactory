@@ -4,7 +4,7 @@
  * Both functions delegate to utils/subprocess.ts.
  */
 
-import { type Result, err, ok } from "./result.js";
+import { type Result, err, ok } from "../result.js";
 import {
   type ExecErr,
   type ExecResult,

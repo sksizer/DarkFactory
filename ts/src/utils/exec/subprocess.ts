@@ -35,6 +35,13 @@ export class ProcessTimeoutError extends Error {
   }
 }
 
+/** Subprocess timeout. */
+export interface Timeout {
+  readonly kind: "timeout";
+  readonly cmd: readonly string[];
+  readonly timeout: number;
+}
+
 /** Error for exec-level failures (non-zero exit, spawn failure) used by shell.ts */
 export interface ExecErr {
   readonly kind: "exec-err";

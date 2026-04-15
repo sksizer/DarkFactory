@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { match } from "ts-pattern";
-import type { Result } from "./result.js";
+import type { Result } from "../result.js";
 import { type PrerequisiteErr, checkPrerequisites } from "./system.js";
 
 describe("checkPrerequisites", () => {

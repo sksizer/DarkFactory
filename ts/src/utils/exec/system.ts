@@ -6,7 +6,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { type Result, err, ok } from "./result.js";
+import { type Result, err, ok } from "../result.js";
 import { which } from "./subprocess.js";
 
 export interface PrerequisiteErr {

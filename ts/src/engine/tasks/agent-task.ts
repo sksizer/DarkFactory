@@ -1,5 +1,5 @@
 import { match } from "ts-pattern";
-import { invokeClaude } from "../../utils/claude-code.js";
+import { invokeClaude } from "../../utils/exec/claude-code.js";
 import { AgentResult, CodeEnv } from "../payloads.js";
 import type { Task } from "../task.js";
 

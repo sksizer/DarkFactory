@@ -40,36 +40,3 @@ export function isErr<T, E>(result: Result<T, E>): result is Err<E> {
   return result.kind === "err";
 }
 
-// ---------- Domain-specific error types ----------
-
-/** Non-zero git CLI exit. */
-export interface GitErr {
-  readonly kind: "git-err";
-  readonly returncode: number;
-  readonly stdout: string;
-  readonly stderr: string;
-  readonly cmd: readonly string[];
-}
-
-/** Non-zero gh CLI exit. */
-export interface GhErr {
-  readonly kind: "gh-err";
-  readonly returncode: number;
-  readonly stdout: string;
-  readonly stderr: string;
-  readonly cmd: readonly string[];
-}
-
-/** Subprocess timeout. */
-export interface Timeout {
-  readonly kind: "timeout";
-  readonly cmd: readonly string[];
-  readonly timeout: number;
-}
-
-// ---------- Convenience type aliases ----------
-
-export type GitResult<T> = Result<T, GitErr>;
-export type GhResult<T> = Result<T, GhErr>;
-export type CheckResult = Result<null, GitErr | Timeout>;
-export type GhCheckResult = Result<null, GhErr | Timeout>;

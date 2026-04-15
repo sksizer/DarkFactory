@@ -1,15 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { match } from "ts-pattern";
-import {
-  type CheckResult,
-  type GhCheckResult,
-  type GitResult,
-  type Result,
-  err,
-  isErr,
-  isOk,
-  ok,
-} from "./result.js";
+import { type Result, err, isErr, isOk, ok } from "./result.js";
+import type { CheckResult, GitResult } from "./exec/git.js";
+import type { GhCheckResult } from "./exec/github.js";
 
 describe("ok / err constructors", () => {
   it("ok sets kind=ok, value, and stdout", () => {

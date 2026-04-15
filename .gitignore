@@ -34,3 +34,4 @@ build/
 ts/node_modules/
 ts/dist/
 ts/coverage/
+node_modules

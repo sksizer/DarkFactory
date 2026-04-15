@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { match } from "ts-pattern";
 import { getPrState, ghJson, ghRun, listOpenPrs } from "./github.js";
-import type { GhCheckResult, GhResult } from "./result.js";
+import type { GhCheckResult, GhResult } from "./github.js";
 
 const REPO_ROOT = process.cwd();
 

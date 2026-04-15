@@ -5,7 +5,7 @@
  * All fallible operations return Result types — never throws.
  */
 
-import { type Result, err, ok } from "./result.js";
+import { type Result, err, ok } from "../result.js";
 import { ProcessTimeoutError, exec, execForeground } from "./subprocess.js";
 
 // ---------- Types ----------
