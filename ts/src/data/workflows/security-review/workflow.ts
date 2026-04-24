@@ -16,8 +16,8 @@ import {capabilityToModel} from "../../../utils/index.js";
 
 const scanPrompt = readFileSync(join(import.meta.dirname, "scan.md"), "utf-8");
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
+function timestamp(): string {
+  return new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 }
 
 export function create(cwd: string): Workflow {
@@ -29,13 +29,13 @@ export function create(cwd: string): Workflow {
     .seed(new CodeEnv({ repoRoot: cwd, cwd }))
     .seed(
       new WorktreeState({
-        branch: `security-review/${today()}`,
+        branch: `security-review/${timestamp()}`,
         baseRef: "main",
       })
     )
     .seed(
       new PrRequest({
-        title: `Security Review — ${today()}`,
+        title: `Security Review — ${timestamp()}`,
         body: "Automated security scan findings",
       })
     )
