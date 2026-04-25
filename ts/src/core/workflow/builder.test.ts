@@ -96,4 +96,36 @@ describe("WorkflowBuilder", () => {
     const built = wf.build();
     expect(built.name).toBe("conv");
   });
+
+  describe("onFailure.retry validation", () => {
+    const recoveryTask = fakeTask<"CodeEnv", never>("recover", [CodeEnv]);
+    const failingTask = fakeTask<"CodeEnv", never>("fail", [CodeEnv]);
+
+    function buildWith(retry: number) {
+      return () =>
+        workflow("test", "desc")
+          .seed(new CodeEnv({ repoRoot: "/r", cwd: "/r" }))
+          .add(failingTask, { onFailure: { task: recoveryTask, retry } });
+    }
+
+    it("accepts non-negative integers", () => {
+      expect(buildWith(0)).not.toThrow();
+      expect(buildWith(3)).not.toThrow();
+    });
+
+    it("rejects negative numbers", () => {
+      expect(buildWith(-1)).toThrow(/non-negative integer/);
+    });
+
+    it("rejects non-integers", () => {
+      expect(buildWith(1.5)).toThrow(/non-negative integer/);
+    });
+
+    it("rejects Infinity and NaN", () => {
+      expect(buildWith(Number.POSITIVE_INFINITY)).toThrow(
+        /non-negative integer/
+      );
+      expect(buildWith(Number.NaN)).toThrow(/non-negative integer/);
+    });
+  });
 });

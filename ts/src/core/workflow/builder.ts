@@ -1,6 +1,18 @@
 import type { BrandOf, Task } from "./engine/task.js";
-import type { InputMapping, WrappedTask } from "./engine/types.js";
+import type {
+  FailureHandler,
+  InputMapping,
+  WrappedTask,
+} from "./engine/types.js";
 import type { Workflow } from "./types.js";
+
+function validateRetry(retry: number, taskName: string): void {
+  if (!Number.isInteger(retry) || retry < 0) {
+    throw new Error(
+      `onFailure.retry for task "${taskName}" must be a non-negative integer; got ${String(retry)}`
+    );
+  }
+}
 
 export class WorkflowBuilder<Ctx extends string = never> {
   private readonly _name: string;
@@ -30,9 +42,18 @@ export class WorkflowBuilder<Ctx extends string = never> {
   }
 
   add<R extends Ctx, W extends string>(
-    task: Task<R, W>
+    task: Task<R, W>,
+    options?: { onFailure?: FailureHandler }
   ): WorkflowBuilder<Ctx | W> {
-    this._tasks.push({ task, inputMapping: undefined, outputId: undefined });
+    if (options?.onFailure !== undefined) {
+      validateRetry(options.onFailure.retry, task.name);
+    }
+    this._tasks.push({
+      task,
+      inputMapping: undefined,
+      outputId: undefined,
+      onFailure: options?.onFailure,
+    });
     return this as unknown as WorkflowBuilder<Ctx | W>;
   }
 

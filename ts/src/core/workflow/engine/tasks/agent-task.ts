@@ -4,7 +4,7 @@ import {
   invokeClaude,
 } from "../../../../utils/exec/claude-code.js";
 import { AgentResult, CodeEnv } from "../payloads.js";
-import type { Task } from "../task.js";
+import type { InputResolver, Task } from "../task.js";
 
 function tailLines(text: string, n: number): string {
   const lines = text.trim().split("\n");
@@ -49,7 +49,7 @@ function enrichFailureReason(args: {
 
 export function agentTask(config: {
   name: string;
-  prompt: string;
+  prompt: string | ((resolve: InputResolver) => string);
   tools: string[];
   model?: string | undefined;
   sentinelSuccess?: string | undefined;
@@ -76,9 +76,14 @@ export function agentTask(config: {
         };
       }
 
+      const prompt =
+        typeof config.prompt === "function"
+          ? config.prompt(resolve)
+          : config.prompt;
+
       const result = await invokeClaude({
         cwd: codeEnv.cwd,
-        prompt: config.prompt,
+        prompt,
         tools: config.tools,
         model: config.model ?? "sonnet",
       });
