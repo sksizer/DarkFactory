@@ -18,6 +18,7 @@ import {
   QualityResult,
   WorktreeState,
 } from "../../../core/workflow/engine/payloads.js";
+import type { InputResolver } from "../../../core/workflow/engine/task.js";
 import {
   agentTask,
   codeQualityTask,
@@ -31,9 +32,7 @@ import {
 import type { Workflow } from "../../../core/workflow/types.js";
 import { currentBranch } from "../../../utils/exec/git.js";
 
-function qualityFixPrompt(
-  resolve: import("../../../core/workflow/engine/task.js").InputResolver
-): string {
+function qualityFixPrompt(resolve: InputResolver): string {
   const qr = resolve(QualityResult);
   const failures = qr.checks
     .filter((c) => !c.success)

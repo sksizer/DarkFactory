@@ -1,3 +1,5 @@
+import type { DarkFactoryConfig } from "../../../config/types.js";
+
 export class CodeEnv {
   declare readonly _brand: "CodeEnv";
   readonly repoRoot: string;
@@ -44,8 +46,8 @@ export class PrResult {
 
 export class ProjectConfig {
   declare readonly _brand: "ProjectConfig";
-  readonly config: import("../../../config/types.js").DarkFactoryConfig;
-  constructor(config: import("../../../config/types.js").DarkFactoryConfig) {
+  readonly config: DarkFactoryConfig;
+  constructor(config: DarkFactoryConfig) {
     this.config = config;
   }
 }

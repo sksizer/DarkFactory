@@ -26,6 +26,23 @@ export async function runWorkflow(
   return runTasks(wf.tasks, state, env);
 }
 
+/**
+ * Build the `resolve` function that a task receives as its second argument
+ * for reading payloads out of the shared {@link PhaseState}.
+ *
+ * Resolution rules, in priority order:
+ * 1. Explicit id passed at the call site (`resolve(Payload, "my-id")`) —
+ *    looked up directly in state, bypassing any mapping.
+ * 2. A per-task `inputMapping` entry keyed by the payload class name. The
+ *    mapping value can be either a literal id string or a function that
+ *    derives one from the current state (used when the id depends on
+ *    runtime data).
+ * 3. Default lookup with no id — returns the most recently written
+ *    instance of that payload class.
+ *
+ * The resolver is created fresh for each task so its `wrapped` closure
+ * carries that task's specific input mapping.
+ */
 function makeResolver(wrapped: WrappedTask, state: PhaseState): InputResolver {
   return <T>(cls: PayloadClass<T>, id?: string): T => {
     if (id != null) return state.get(cls, id);
