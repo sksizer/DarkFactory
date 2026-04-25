@@ -28,13 +28,13 @@ export function camelToKebab(name: string): string {
   return name.replace(/([A-Z])/g, "-$1").toLowerCase();
 }
 
-function unwrapDefaults(schema: z.ZodTypeAny): {
-  inner: z.ZodTypeAny;
+function unwrapDefaults(schema: z.ZodType): {
+  inner: z.ZodType;
   hadDefault: boolean;
   defaultDisplay: string | undefined;
   hadOptional: boolean;
 } {
-  let current: z.ZodTypeAny = schema;
+  let current: z.ZodType = schema;
   let hadDefault = false;
   let hadOptional = false;
   let defaultDisplay: string | undefined;
@@ -46,7 +46,7 @@ function unwrapDefaults(schema: z.ZodTypeAny): {
       current as {
         def?: {
           type?: string;
-          innerType?: z.ZodTypeAny;
+          innerType?: z.ZodType;
           defaultValue?: unknown;
         };
       }
@@ -71,7 +71,7 @@ function unwrapDefaults(schema: z.ZodTypeAny): {
   return { inner: current, hadDefault, defaultDisplay, hadOptional };
 }
 
-function classifyType(inner: z.ZodTypeAny): "boolean" | "number" | "string" {
+function classifyType(inner: z.ZodType): "boolean" | "number" | "string" {
   const def = (inner as { def?: { type?: string } }).def;
   switch (def?.type) {
     case "boolean":
@@ -88,7 +88,7 @@ export function describeParams(schema: WorkflowParamsSchema): ParamSpec[] {
   const specs: ParamSpec[] = [];
   const shape = schema.shape;
   for (const [key, raw] of Object.entries(shape)) {
-    const field = raw as z.ZodTypeAny;
+    const field = raw as z.ZodType;
     const { inner, hadDefault, defaultDisplay, hadOptional } =
       unwrapDefaults(field);
     const description = field.description;
@@ -210,7 +210,7 @@ export function parseWorkflowParams(
       .join("; ");
     throw new WorkflowParamsError(`Invalid workflow params: ${issues}`);
   }
-  return parsed.data as Record<string, unknown>;
+  return parsed.data;
 }
 
 /**

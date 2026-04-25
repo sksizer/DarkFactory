@@ -283,15 +283,16 @@ export function workflowCommand(): Command {
     // overflows the single <name> argument. Bypass by parsing manually.
     .allowUnknownOption(true)
     .allowExcessArguments(true)
-    .action(async function (this: Command) {
-      // The root program's rawArgs is the canonical source: it contains
-      // exactly what was passed into parseAsync (with two synthetic
-      // prefix entries when invoked via `from: "user"`, which splitRunArgs
-      // tolerates by anchoring on the "run" token).
-      let root: Command = this;
-      while (root.parent) root = root.parent;
-      // `rawArgs` is set by Commander on the root after .parse()/.parseAsync()
-      // but is not exposed in its public TS types. Cast to read it.
+    .action(async (_name, _opts, command: Command) => {
+      // Walk up to the root program to read rawArgs (Commander sets this
+      // on the root after parseAsync; it is not exposed in the public TS
+      // types so we cast). Aliasing `this` to a local would trip the
+      // no-this-alias lint, so we accept the action's `command` arg
+      // instead.
+      let root: Command = command;
+      while (root.parent !== null) {
+        root = root.parent;
+      }
       const rawArgs =
         (root as unknown as { rawArgs?: string[] }).rawArgs ?? process.argv;
       const split = splitRunArgs(rawArgs);
