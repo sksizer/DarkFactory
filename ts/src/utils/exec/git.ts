@@ -1,8 +1,10 @@
 /**
  * git.ts — git CLI wrappers.
  *
- * All functions call exec(["git", ...args]) via utils/subprocess.ts
+ * Async functions call exec(["git", ...args]) via utils/subprocess.ts
  * and return Result types. Never throws.
+ * Sync helpers (e.g. currentBranch) use execFileSync from node:child_process
+ * and also return Result types. Never throws.
  */
 
 import { execFileSync } from "node:child_process";
