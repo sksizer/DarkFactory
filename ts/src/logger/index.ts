@@ -44,11 +44,7 @@ export function resolveLogLevel(opts: {
   cli?: string | undefined;
   config?: string | undefined;
 }): LogLevel {
-  const sources = [
-    opts.cli,
-    process.env.DARKFACTORY_LOG_LEVEL,
-    opts.config,
-  ];
+  const sources = [opts.cli, process.env.DARKFACTORY_LOG_LEVEL, opts.config];
 
   for (const src of sources) {
     if (src !== undefined && isLogLevel(src)) {
