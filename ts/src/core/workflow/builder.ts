@@ -6,6 +6,14 @@ import type {
 } from "./engine/types.js";
 import type { Workflow } from "./types.js";
 
+function validateRetry(retry: number, taskName: string): void {
+  if (!Number.isInteger(retry) || retry < 0) {
+    throw new Error(
+      `onFailure.retry for task "${taskName}" must be a non-negative integer; got ${String(retry)}`
+    );
+  }
+}
+
 export class WorkflowBuilder<Ctx extends string = never> {
   private readonly _name: string;
   private readonly _description: string;
@@ -37,6 +45,9 @@ export class WorkflowBuilder<Ctx extends string = never> {
     task: Task<R, W>,
     options?: { onFailure?: FailureHandler }
   ): WorkflowBuilder<Ctx | W> {
+    if (options?.onFailure !== undefined) {
+      validateRetry(options.onFailure.retry, task.name);
+    }
     this._tasks.push({
       task,
       inputMapping: undefined,

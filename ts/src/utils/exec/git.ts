@@ -375,8 +375,11 @@ export function currentBranch(cwd: string): GitResult<string> {
       encoding: "utf-8",
     }).trim();
     if (branch === "") {
+      // git exits 0 on detached HEAD (just prints empty); we surface it as
+      // an error with returncode=-1 so the GitErr "non-zero exit" contract
+      // holds and callers don't conflate it with a successful run.
       return err(
-        makeGitErr(0, "", "detached HEAD — no current branch", [
+        makeGitErr(-1, "", "detached HEAD — no current branch", [
           "git",
           "branch",
           "--show-current",
