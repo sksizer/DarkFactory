@@ -101,3 +101,42 @@ export class AgentResult {
     this.invokeCount = init.invokeCount;
   }
 }
+
+export interface OpenPrInfo {
+  readonly number: number;
+  readonly headRefName: string;
+  readonly baseRefName: string;
+  readonly title: string;
+  readonly isDraft: boolean;
+}
+
+export class OpenPrList {
+  declare readonly _brand: "OpenPrList";
+  readonly prs: readonly OpenPrInfo[];
+  constructor(init: { prs: readonly OpenPrInfo[] }) {
+    this.prs = init.prs;
+  }
+}
+
+export type PrUpdateOutcome =
+  | { kind: "already-up-to-date" }
+  | { kind: "fast-forward-merged" }
+  | { kind: "merged-clean" }
+  | { kind: "merged-with-agent"; sentinel: string | undefined }
+  | { kind: "skipped"; reason: string }
+  | { kind: "failed"; reason: string };
+
+export interface PrUpdateEntry {
+  readonly number: number;
+  readonly headRefName: string;
+  readonly baseRefName: string;
+  readonly outcome: PrUpdateOutcome;
+}
+
+export class PrUpdateSummary {
+  declare readonly _brand: "PrUpdateSummary";
+  readonly entries: readonly PrUpdateEntry[];
+  constructor(init: { entries: readonly PrUpdateEntry[] }) {
+    this.entries = init.entries;
+  }
+}

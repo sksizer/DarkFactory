@@ -10,6 +10,7 @@
  */
 
 import { tryLoadConfig } from "../../../config/index.js";
+import { workflow } from "../../../core/workflow/builder.js";
 import {
   CodeEnv,
   PrRequest,
@@ -27,7 +28,6 @@ import {
   interactiveClaudeTask,
   pushBranch,
 } from "../../../core/workflow/engine/tasks/index.js";
-import { workflow } from "../../../core/workflow/builder.js";
 import type { Workflow } from "../../../core/workflow/types.js";
 import { currentBranch } from "../../../utils/exec/git.js";
 

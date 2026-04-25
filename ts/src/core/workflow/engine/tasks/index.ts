@@ -10,3 +10,4 @@ export {
   pushBranch,
   createPr,
 } from "./git-tasks.js";
+export { listOpenPrsForUpdate, updateOpenPrs } from "./pr-update-task.js";

@@ -7,7 +7,7 @@
 
 import { execFileSync } from "node:child_process";
 import { type Result, err, ok } from "../result.js";
-import { type Timeout, ProcessTimeoutError, exec } from "./subprocess.js";
+import { ProcessTimeoutError, type Timeout, exec } from "./subprocess.js";
 
 // ---------- Types ----------
 
@@ -386,4 +386,134 @@ export function currentBranch(cwd: string): GitResult<string> {
     const stderr = e instanceof Error ? e.message : String(e);
     return err(makeGitErr(-1, "", stderr, ["git", "branch", "--show-current"]));
   }
+}
+
+// ---------- Fetch and merge ----------
+
+/** Fetch a specific ref from origin. */
+export async function fetchRef(ref: string, cwd: string): Promise<CheckResult> {
+  return gitRun(["fetch", "origin", ref], { cwd, timeout: 60_000 });
+}
+
+/** Return true if `ancestor` is an ancestor of `descendant`. */
+export async function isAncestor(
+  ancestor: string,
+  descendant: string,
+  cwd: string
+): Promise<GitResult<boolean>> {
+  const result = await gitRun(
+    ["merge-base", "--is-ancestor", ancestor, descendant],
+    { cwd }
+  );
+  if (result.kind === "ok") return ok(true, "");
+  if (result.error.kind === "timeout") {
+    return err(
+      makeGitErr(
+        -1,
+        "",
+        `timed out after ${String(result.error.timeout)}ms`,
+        result.error.cmd
+      )
+    );
+  }
+  // Exit 1 = not an ancestor (expected answer, not an error)
+  if (result.error.returncode === 1) {
+    return ok(false, "");
+  }
+  return err(result.error);
+}
+
+export type MergeOutcome =
+  | { kind: "already-up-to-date" }
+  | { kind: "fast-forward" }
+  | { kind: "merge-commit" }
+  | { kind: "conflict" };
+
+/**
+ * Attempt `git merge <ref> --no-edit`. Returns a structured outcome rather
+ * than a CheckResult because "conflict" is an expected outcome, not an error.
+ */
+export async function mergeRef(
+  ref: string,
+  cwd: string
+): Promise<GitResult<MergeOutcome>> {
+  const result = await gitRun(["merge", "--no-edit", ref], { cwd });
+  if (result.kind === "ok") {
+    const out = result.stdout;
+    if (/Already up to date\.?/i.test(out)) {
+      return ok({ kind: "already-up-to-date" }, out);
+    }
+    if (/Fast-forward/i.test(out)) {
+      return ok({ kind: "fast-forward" }, out);
+    }
+    return ok({ kind: "merge-commit" }, out);
+  }
+  if (result.error.kind === "timeout") {
+    return err(
+      makeGitErr(
+        -1,
+        "",
+        `timed out after ${String(result.error.timeout)}ms`,
+        result.error.cmd
+      )
+    );
+  }
+  // Conflict: git merge exits non-zero but stdout/stderr mention CONFLICT
+  const combined = `${result.error.stdout}\n${result.error.stderr}`;
+  if (/CONFLICT/.test(combined) || result.error.returncode === 1) {
+    return ok({ kind: "conflict" }, combined);
+  }
+  return err(result.error);
+}
+
+/** Abort an in-progress merge. */
+export async function mergeAbort(cwd: string): Promise<CheckResult> {
+  return gitRun(["merge", "--abort"], { cwd });
+}
+
+/** Return true if a merge is in progress (.git/MERGE_HEAD exists). */
+export async function mergeInProgress(
+  cwd: string
+): Promise<GitResult<boolean>> {
+  const result = await gitRun(
+    ["rev-parse", "--verify", "--quiet", "MERGE_HEAD"],
+    { cwd }
+  );
+  if (result.kind === "ok") return ok(true, "");
+  if (result.error.kind === "timeout") {
+    return err(
+      makeGitErr(
+        -1,
+        "",
+        `timed out after ${String(result.error.timeout)}ms`,
+        result.error.cmd
+      )
+    );
+  }
+  if (result.error.returncode === 1) return ok(false, "");
+  return err(result.error);
+}
+
+/** Return porcelain status lines that are unmerged (UU/AA/DD/AU/UA/DU/UD). */
+export async function unmergedPaths(cwd: string): Promise<GitResult<string[]>> {
+  const result = await gitRun(["status", "--porcelain"], { cwd });
+  if (result.kind === "err") {
+    if (result.error.kind === "timeout") {
+      return err(
+        makeGitErr(
+          -1,
+          "",
+          `timed out after ${String(result.error.timeout)}ms`,
+          result.error.cmd
+        )
+      );
+    }
+    return err(result.error);
+  }
+  const unmerged = result.stdout
+    .split("\n")
+    .filter(Boolean)
+    .filter((line) => /^(UU|AA|DD|AU|UA|DU|UD) /.test(line))
+    .map((line) => line.slice(3));
+  return ok(unmerged, result.stdout);
 }

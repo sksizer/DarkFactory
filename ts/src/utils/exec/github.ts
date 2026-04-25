@@ -6,7 +6,7 @@
  */
 
 import { type Result, err, ok } from "../result.js";
-import { type Timeout, ProcessTimeoutError, exec } from "./subprocess.js";
+import { ProcessTimeoutError, type Timeout, exec } from "./subprocess.js";
 
 // ---------- Error and result types ----------
 
@@ -277,6 +277,75 @@ export async function listOpenPrs(
     headRefName: pr.headRefName,
   }));
   return ok(infos, result.stdout);
+}
+
+export interface PrDetail {
+  readonly number: number;
+  readonly headRefName: string;
+  readonly baseRefName: string;
+  readonly title: string;
+  readonly isDraft: boolean;
+}
+
+export interface ListOpenPrDetailsOptions {
+  readonly limit?: number;
+  /** Filter by author. Pass "@me" for the current user. */
+  readonly author?: string;
+  /** Exclude draft PRs if true (default: false). */
+  readonly excludeDrafts?: boolean;
+}
+
+/**
+ * List open PRs with enough detail to update against their base branch.
+ */
+export async function listOpenPrDetails(
+  repoRoot: string,
+  options: ListOpenPrDetailsOptions = {}
+): Promise<GhResult<PrDetail[]>> {
+  const limit = options.limit ?? 100;
+  const args: string[] = [
+    "pr",
+    "list",
+    "--state",
+    "open",
+    "--limit",
+    String(limit),
+    "--json",
+    "number,headRefName,baseRefName,title,isDraft",
+  ];
+  if (options.author !== undefined) {
+    args.push("--author", options.author);
+  }
+  const result = await ghJson<
+    Array<{
+      number: number;
+      headRefName: string;
+      baseRefName: string;
+      title: string;
+      isDraft: boolean;
+    }>
+  >(args, { cwd: repoRoot });
+  if (result.kind === "err") return result;
+  const prs = result.value;
+  if (!Array.isArray(prs)) {
+    return err(
+      makeGhErr(-1, result.stdout, "unexpected response format", [
+        "gh",
+        "pr",
+        "list",
+      ])
+    );
+  }
+  const filtered =
+    options.excludeDrafts === true ? prs.filter((p) => !p.isDraft) : prs;
+  const details: PrDetail[] = filtered.map((pr) => ({
+    number: pr.number,
+    headRefName: pr.headRefName,
+    baseRefName: pr.baseRefName,
+    title: pr.title,
+    isDraft: pr.isDraft,
+  }));
+  return ok(details, result.stdout);
 }
 
 /**

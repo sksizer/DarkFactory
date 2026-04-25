@@ -17,8 +17,19 @@ const CodeConfigSchema = z.object({
   quality: z.record(z.string(), QualityCheckSchema).default({}),
 });
 
+const LogLevelSchema = z.enum([
+  "trace",
+  "debug",
+  "info",
+  "warn",
+  "error",
+  "fatal",
+  "silent",
+]);
+
 const ConfigV1Schema = z.object({
   code: CodeConfigSchema.default({ quality: {} }),
+  log_level: LogLevelSchema.optional(),
   workflow: z
     .object({
       directories: z.array(z.string()).optional(),
