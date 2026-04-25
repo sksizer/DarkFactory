@@ -1,7 +1,51 @@
 import { match } from "ts-pattern";
-import { invokeClaude } from "../../../../utils/exec/claude-code.js";
+import {
+  type InvokeResult,
+  invokeClaude,
+} from "../../../../utils/exec/claude-code.js";
 import { AgentResult, CodeEnv } from "../payloads.js";
 import type { Task } from "../task.js";
+
+function tailLines(text: string, n: number): string {
+  const lines = text.trim().split("\n");
+  return lines.slice(-n).join("\n");
+}
+
+function describeExitCode(
+  exitCode: number,
+  invFailureReason: string | undefined
+): string {
+  if (invFailureReason !== undefined && invFailureReason !== "") {
+    return invFailureReason;
+  }
+  if (exitCode === -1) {
+    return "claude process did not produce an exit code (likely timeout, signal, or spawn failure)";
+  }
+  return `claude exited with code ${String(exitCode)}`;
+}
+
+function enrichFailureReason(args: {
+  primary: string;
+  inv: InvokeResult;
+}): string {
+  const { primary, inv } = args;
+  const parts: string[] = [primary];
+  const stderrTail = tailLines(inv.stderr, 10);
+  if (stderrTail !== "") {
+    parts.push(`--- stderr ---\n${stderrTail}`);
+  }
+  // For unexpected failures (no sentinel found, non-zero exit), include a
+  // tail of stdout to surface what the agent actually said before dying.
+  const stdoutTail = tailLines(inv.stdout, 10);
+  if (
+    stdoutTail !== "" &&
+    !primary.startsWith("Failure sentinel") &&
+    inv.exitCode !== 0
+  ) {
+    parts.push(`--- stdout (last 10 lines) ---\n${stdoutTail}`);
+  }
+  return parts.join("\n");
+}
 
 export function agentTask(config: {
   name: string;
@@ -65,13 +109,17 @@ export function agentTask(config: {
             const successMarker = config.sentinelSuccess ?? "PRD_EXECUTE_OK";
 
             if (inv.stdout.includes(failureMarker)) {
+              const reason = enrichFailureReason({
+                primary: `Failure sentinel "${failureMarker}" found in agent output`,
+                inv,
+              });
               return {
                 success: false,
-                failureReason: "Failure sentinel found in agent output",
+                failureReason: reason,
                 value: new AgentResult({
                   ...base,
                   success: false,
-                  failureReason: "Failure sentinel found in agent output",
+                  failureReason: reason,
                 }),
               };
             }
@@ -89,23 +137,29 @@ export function agentTask(config: {
           }
 
           const ok = inv.exitCode === 0;
+          const failureReason = ok
+            ? undefined
+            : enrichFailureReason({
+                primary: describeExitCode(inv.exitCode, inv.failureReason),
+                inv,
+              });
           return {
             success: ok,
-            failureReason: ok
-              ? undefined
-              : `Agent exited with code ${String(inv.exitCode)}`,
+            failureReason,
             value: new AgentResult({
               ...base,
               success: ok,
-              failureReason: ok
-                ? undefined
-                : `Agent exited with code ${String(inv.exitCode)}`,
+              failureReason,
             }),
           };
         })
         .with({ kind: "err" }, ({ error }) => ({
           success: false,
-          failureReason: `Agent invocation failed: ${error.reason}`,
+          failureReason: `Agent invocation failed (exit ${String(error.exitCode)}): ${error.reason}${
+            error.stderr.trim() !== ""
+              ? `\n--- stderr ---\n${tailLines(error.stderr, 10)}`
+              : ""
+          }`,
         }))
         .exhaustive();
     },

@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CodeEnv, PrRequest, WorktreeState } from "../../../core/workflow/engine/payloads.js";
+import { workflow } from "../../../core/workflow/builder.js";
+import {
+  CodeEnv,
+  PrRequest,
+  WorktreeState,
+} from "../../../core/workflow/engine/payloads.js";
 import {
   agentTask,
   commitTask,
@@ -10,32 +15,31 @@ import {
   pushBranch,
   shellTask,
 } from "../../../core/workflow/engine/tasks/index.js";
-import { workflow } from "../../../core/workflow/builder.js";
 import type { Workflow } from "../../../core/workflow/types.js";
-import {capabilityToModel} from "../../../utils/index.js";
+import { capabilityToModel } from "../../../utils/index.js";
 
 const scanPrompt = readFileSync(join(import.meta.dirname, "scan.md"), "utf-8");
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
+function timestamp(): string {
+  return new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 }
 
 export function create(cwd: string): Workflow {
   return workflow(
     "security-review",
     "Scan codebase for security issues, propose fixes, open a PR",
-      "project"
+    "project"
   )
     .seed(new CodeEnv({ repoRoot: cwd, cwd }))
     .seed(
       new WorktreeState({
-        branch: `security-review/${today()}`,
+        branch: `security-review/${timestamp()}`,
         baseRef: "main",
       })
     )
     .seed(
       new PrRequest({
-        title: `Security Review — ${today()}`,
+        title: `Security Review — ${timestamp()}`,
         body: "Automated security scan findings",
       })
     )

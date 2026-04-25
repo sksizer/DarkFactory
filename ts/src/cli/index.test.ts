@@ -46,7 +46,12 @@ describe("CLI", () => {
     );
     const errSpy = spyOn(console, "error").mockImplementation(() => {});
 
-    const code = await main(["workflow", "run", "security-review", "--dry-run"]);
+    const code = await main([
+      "workflow",
+      "run",
+      "security-review",
+      "--dry-run",
+    ]);
 
     logSpy.mockRestore();
     errSpy.mockRestore();

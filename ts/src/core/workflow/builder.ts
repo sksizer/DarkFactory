@@ -63,6 +63,10 @@ export class WorkflowBuilder<Ctx extends string = never> {
   }
 }
 
-export function workflow(name: string, description: string, category?: string): WorkflowBuilder {
+export function workflow(
+  name: string,
+  description: string,
+  category?: string
+): WorkflowBuilder {
   return new WorkflowBuilder(name, description, category ?? "default");
 }

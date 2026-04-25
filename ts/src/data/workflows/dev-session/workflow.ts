@@ -9,6 +9,7 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { workflow } from "../../../core/workflow/builder.js";
 import {
   CodeEnv,
   PrRequest,
@@ -23,7 +24,6 @@ import {
   pushBranch,
   shellTask,
 } from "../../../core/workflow/engine/tasks/index.js";
-import { workflow } from "../../../core/workflow/builder.js";
 import type { Workflow } from "../../../core/workflow/types.js";
 
 function currentBranch(cwd: string): string {
@@ -66,7 +66,7 @@ export function create(cwd: string): Workflow {
         message: "Create a PR with these changes?",
       })
     )
-    .add(commitTask({ message: `feat: dev session changes` }))
+    .add(commitTask({ message: "feat: dev session changes" }))
     .add(pushBranch())
     .add(createPr())
     .build();
