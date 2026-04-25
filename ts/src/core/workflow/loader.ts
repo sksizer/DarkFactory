@@ -1,5 +1,6 @@
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
+import type { WorkflowParamsSchema } from "./params.js";
 import type { Workflow } from "./types.js";
 
 type WorkflowSource = "builtin" | "user" | "project";
@@ -9,7 +10,8 @@ export interface DiscoveredWorkflow {
   readonly category: string | undefined;
   readonly description: string;
   readonly source: WorkflowSource;
-  readonly resolve: (cwd: string) => Workflow;
+  readonly params: WorkflowParamsSchema | undefined;
+  readonly resolve: (cwd: string, params?: Record<string, unknown>) => Workflow;
 }
 
 function validateWorkflow(
@@ -62,9 +64,15 @@ async function scanLayer(
 
     try {
       const mod = (await import(workflowFile)) as Record<string, unknown>;
+      const paramsExport = mod.params as WorkflowParamsSchema | undefined;
 
       if (typeof mod.create === "function") {
-        const createFn = mod.create as (cwd: string) => Workflow;
+        const createFn = mod.create as (
+          cwd: string,
+          params?: Record<string, unknown>
+        ) => Workflow;
+        // Probe with empty params: workflows are expected to handle this
+        // (all fields optional, or schema accepts {} via .default()).
         const probe = createFn(".");
         validateWorkflow(probe, entry);
         results.push({
@@ -72,6 +80,7 @@ async function scanLayer(
           category: probe.category,
           description: probe.description,
           source,
+          params: paramsExport,
           resolve: createFn,
         });
       } else if (mod.workflow != null && typeof mod.workflow === "object") {
@@ -82,6 +91,7 @@ async function scanLayer(
           category: wf.category,
           description: wf.description,
           source,
+          params: paramsExport,
           resolve: () => wf,
         });
       } else {
