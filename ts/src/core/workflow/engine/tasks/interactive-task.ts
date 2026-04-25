@@ -19,9 +19,10 @@ export function interactiveClaudeTask(config: {
       if (env.dryRun) return { success: true };
 
       const codeEnv = resolve(CodeEnv);
-      const result = await spawnClaude(codeEnv.cwd, {
-        prompt: config.prompt,
-      });
+      const result = await spawnClaude(
+        codeEnv.cwd,
+        config.prompt === undefined ? {} : { prompt: config.prompt }
+      );
 
       if (result.kind === "err") {
         return { success: false, failureReason: result.error.reason };
