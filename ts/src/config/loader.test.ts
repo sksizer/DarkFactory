@@ -19,12 +19,12 @@ describe("loadConfig", () => {
 
     const test = quality.test;
     expect(test).toBeDefined();
-    expect(test!.name).toBe("test");
-    expect(test!.cmds.length).toBeGreaterThan(0);
+    expect(test?.name).toBe("test");
+    expect(test?.cmds.length).toBeGreaterThan(0);
 
     const format = quality.format;
     expect(format).toBeDefined();
-    expect(format!.name).toBe("format");
+    expect(format?.name).toBe("format");
   });
 
   it("throws on missing config file", () => {

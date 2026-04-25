@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
+import { runWorkflow } from "./runner.js";
 import type { InputResolver } from "./task.js";
 import type { TaskEnv, TaskOutput } from "./types.js";
-import { runWorkflow } from "./runner.js";
 
 // ---------- Helpers ----------
 

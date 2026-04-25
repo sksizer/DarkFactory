@@ -11,8 +11,8 @@ import { runShell } from "../../../../utils/exec/shell.js";
 import {
   CodeEnv,
   ProjectConfig,
-  QualityResult,
   type QualityCheckOutcome,
+  QualityResult,
 } from "../payloads.js";
 import type { Task } from "../task.js";
 
