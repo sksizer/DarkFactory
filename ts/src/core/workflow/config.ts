@@ -1,2 +1,1 @@
-type WorkflowConfig = {
-};
+export type WorkflowConfig = Record<string, never>;

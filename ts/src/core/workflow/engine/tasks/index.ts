@@ -1,5 +1,7 @@
 export { agentTask } from "./agent-task.js";
 export { shellTask } from "./shell-task.js";
+export { interactiveClaudeTask } from "./interactive-task.js";
+export { confirmTask, diffCheckTask } from "./prompt-task.js";
 export {
   createWorktree,
   enterWorktree,
@@ -7,3 +9,4 @@ export {
   pushBranch,
   createPr,
 } from "./git-tasks.js";
+export { listOpenPrsForUpdate, updateOpenPrs } from "./pr-update-task.js";

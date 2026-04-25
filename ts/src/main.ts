@@ -1,7 +1,7 @@
-import './cli/index.js'
+import "./cli/index.js";
 
 function main() {
-    console.log("Hello World")
+  console.log("Hello World");
 }
 
 main();

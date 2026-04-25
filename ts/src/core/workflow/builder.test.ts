@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
+import { WorkflowBuilder, workflow } from "./builder.js";
 import { AgentResult, CodeEnv, WorktreeState } from "./engine/payloads.js";
 import type { PayloadClass, Task } from "./engine/task.js";
-import { WorkflowBuilder, workflow } from "./builder.js";
 
 function fakeTask<R extends string, W extends string>(
   name: string,

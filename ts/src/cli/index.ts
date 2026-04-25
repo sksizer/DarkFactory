@@ -1,90 +1,43 @@
-import { join } from "node:path";
-import { runWorkflow } from "../core/workflow/engine/runner.js";
-import { discoverWorkflows } from "../core/workflow/loader.js";
+import { Command } from "commander";
+import { tryLoadConfig } from "../config/index.js";
+import { initLogger, resolveLogLevel } from "../logger/index.js";
+import { CliError } from "./error.js";
+import { workflowCommand } from "./subcommand/workflow.js";
 
-export async function listWorkflows(): Promise<void> {
-  const workflows = await discoverWorkflows(
-    join(process.cwd(), ".darkfactory", "workflows")
-  );
+export function buildProgram(): Command {
+  const program = new Command()
+    .name("darkfactory")
+    .description("DarkFactory CLI")
+    .version("0.0.1")
+    .option(
+      "--log-level <level>",
+      "Log level (trace, debug, info, warn, error, fatal, silent)"
+    );
 
-  const grouped = new Map<string, typeof workflows>();
-  for (const wf of workflows) {
-    const cat = wf.category ?? "uncategorized";
-    const list = grouped.get(cat);
-    if (list !== undefined) {
-      list.push(wf);
-    } else {
-      grouped.set(cat, [wf]);
-    }
-  }
+  program.addCommand(workflowCommand());
 
-  console.log("Available workflows:");
-  for (const [category, wfs] of grouped) {
-    console.log(`\n  ${category}`);
-    for (const wf of wfs) {
-      console.log(`    ${wf.name.padEnd(20)} ${wf.description}`);
-    }
-  }
+  program.hook("preAction", () => {
+    const opts = program.opts<{ logLevel?: string }>();
+    const config = tryLoadConfig(process.cwd());
+    const level = resolveLogLevel({
+      cli: opts.logLevel,
+      config: config.v1.log_level,
+    });
+    initLogger(level);
+  });
+
+  return program;
 }
 
-export async function run(name: string, dryRun: boolean): Promise<void> {
-  const workflows = await discoverWorkflows(
-    join(process.cwd(), ".darkfactory", "workflows")
-  );
-
-  const found = workflows.find((w) => w.name === name);
-  if (found === undefined) {
-    console.error(`Error: unknown workflow "${name}"`);
-    console.error(
-      `Available workflows: ${workflows.map((w) => w.name).join(", ")}`
-    );
-    process.exit(1);
-  }
-
-  const wf = found.resolve(process.cwd());
-  console.log(`Running workflow: ${wf.name}`);
-  if (dryRun) console.log("  (dry-run mode)");
-
-  const result = await runWorkflow(wf, { dryRun });
-
-  for (const step of result.steps) {
-    const status = step.success ? "+" : "x";
-    const reason =
-      step.failureReason !== undefined ? ` -- ${step.failureReason}` : "";
-    console.log(`  ${status} ${step.name}${reason}`);
-  }
-
-  if (result.success) {
-    console.log("Workflow completed successfully.");
-  } else {
-    console.error(
-      `Workflow failed: ${result.failureReason ?? "unknown reason"}`
-    );
-    process.exit(1);
-  }
-}
-
-export async function main(args: string[]): Promise<void> {
-  console.log("DarkFactory CLI");
-  const command = args[0];
-
-  if (command === "list-workflows") {
-    await listWorkflows();
-    return;
-  }
-
-  if (command === "run") {
-    const name = args[1];
-    if (name === undefined) {
-      console.error("Usage: run <workflow> [--dry-run]");
-      process.exit(1);
+export async function main(args: string[]): Promise<number> {
+  const program = buildProgram();
+  try {
+    await program.parseAsync(args, { from: "user" });
+    return 0;
+  } catch (e) {
+    if (e instanceof CliError) {
+      return e.exitCode;
     }
-    const dryRun = args.includes("--dry-run");
-    await run(name, dryRun);
-    return;
+    throw e;
   }
-
-  console.error(`Unknown command: ${command ?? "(none)"}`);
-  console.error("Usage: <list-workflows | run <workflow> [--dry-run]>");
-  process.exit(1);
 }
