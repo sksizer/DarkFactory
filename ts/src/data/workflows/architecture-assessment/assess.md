@@ -3,6 +3,7 @@
 Perform a thorough, read-only architecture and API-usability assessment of this
 codebase. Produce a single markdown report at the path provided below.
 
+{{ADDITIONAL_CONTEXT}}
 ## Output
 
 Write the full report to: `{{REPORT_PATH}}`

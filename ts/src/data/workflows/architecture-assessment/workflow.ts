@@ -10,6 +10,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { z } from "zod";
 import { workflow } from "../../../core/workflow/builder.js";
 import {
   CodeEnv,
@@ -26,6 +27,17 @@ import {
 } from "../../../core/workflow/engine/tasks/index.js";
 import type { Workflow } from "../../../core/workflow/types.js";
 
+export const params = z.object({
+  additionalContext: z
+    .string()
+    .optional()
+    .describe(
+      "Free-form context to inject into the assessment prompt (focus areas, known issues, audience, constraints)"
+    ),
+});
+
+export type Params = z.infer<typeof params>;
+
 const promptTemplate = readFileSync(
   join(import.meta.dirname, "assess.md"),
   "utf-8"
@@ -40,10 +52,30 @@ function timestamp(): string {
   return `${date}-${time}`;
 }
 
-export function create(cwd: string): Workflow {
+function renderAdditionalContext(text: string | undefined): string {
+  const trimmed = text?.trim() ?? "";
+  if (trimmed === "") return "";
+  return [
+    "## Additional context from caller",
+    "",
+    "The user supplied this context when invoking the assessment. Treat it as",
+    "high-signal direction about focus areas, known issues, or constraints —",
+    "but still cover the categories below as the baseline.",
+    "",
+    trimmed,
+    "",
+  ].join("\n");
+}
+
+export function create(cwd: string, opts?: Params): Workflow {
   const stamp = timestamp();
   const reportPath = `ARCHITECTURE-ASSESSMENT-${stamp}.md`;
-  const prompt = promptTemplate.replaceAll("{{REPORT_PATH}}", reportPath);
+  const additionalContextBlock = renderAdditionalContext(
+    opts?.additionalContext
+  );
+  const prompt = promptTemplate
+    .replaceAll("{{REPORT_PATH}}", reportPath)
+    .replaceAll("{{ADDITIONAL_CONTEXT}}", additionalContextBlock);
 
   return workflow(
     "architecture-assessment",
