@@ -321,4 +321,125 @@ describe("onFailure recovery", () => {
 
     expect(recoverySeenValue).toBe(42);
   });
+
+  it("recovery uses FailureHandler.inputMapping to read named upstream outputs", async () => {
+    let recoverySeenValue: number | undefined;
+
+    // Upstream task writes Counter to Counter:upstream-id
+    const upstream = {
+      name: "upstream",
+      reads: [] as const,
+      writes: Counter,
+      run(): TaskOutput {
+        return { success: true, value: new Counter(99) };
+      },
+    };
+
+    // Parent task fails — its recovery wants to read upstream's value, but
+    // it lives at Counter:upstream-id, not Counter:default. Without
+    // FailureHandler.inputMapping, recovery's resolve(Counter) would throw.
+    const failingParent = failingTask("parent", "parent broke");
+
+    const recoveryReader = {
+      name: "recovery-reader",
+      reads: [Counter] as const,
+      run(_env: TaskEnv, resolve: InputResolver): TaskOutput {
+        recoverySeenValue = resolve(Counter).count;
+        return { success: true };
+      },
+    };
+
+    await runWorkflow(
+      {
+        name: "test-wf",
+        description: "test",
+        seeds: [],
+        tasks: [
+          {
+            task: upstream,
+            inputMapping: undefined,
+            outputId: "upstream-id",
+          },
+          {
+            task: failingParent,
+            inputMapping: undefined,
+            outputId: undefined,
+            onFailure: {
+              task: recoveryReader,
+              retry: 1,
+              inputMapping: { Counter: "upstream-id" },
+            },
+          },
+        ],
+      },
+      dryRunOff
+    );
+
+    expect(recoverySeenValue).toBe(99);
+  });
+
+  it("recovery's output lands at FailureHandler.outputId when set", async () => {
+    let downstreamSeenValue: number | undefined;
+    let parentCalls = 0;
+
+    const flakyParent = {
+      name: "flaky-parent",
+      reads: [] as const,
+      run(): TaskOutput {
+        parentCalls++;
+        return parentCalls === 1
+          ? { success: false, failureReason: "first attempt" }
+          : { success: true };
+      },
+    };
+
+    const recoveryProducer = {
+      name: "recovery",
+      reads: [] as const,
+      writes: Counter,
+      run(): TaskOutput {
+        return { success: true, value: new Counter(123) };
+      },
+    };
+
+    // Downstream task explicitly reads Counter from "recovery-slot" via
+    // its own inputMapping — proving the recovery wrote to that named slot.
+    const downstream = {
+      name: "downstream",
+      reads: [Counter] as const,
+      run(_env: TaskEnv, resolve: InputResolver): TaskOutput {
+        downstreamSeenValue = resolve(Counter).count;
+        return { success: true };
+      },
+    };
+
+    const result = await runWorkflow(
+      {
+        name: "test-wf",
+        description: "test",
+        seeds: [],
+        tasks: [
+          {
+            task: flakyParent,
+            inputMapping: undefined,
+            outputId: undefined,
+            onFailure: {
+              task: recoveryProducer,
+              retry: 1,
+              outputId: "recovery-slot",
+            },
+          },
+          {
+            task: downstream,
+            inputMapping: { Counter: "recovery-slot" },
+            outputId: undefined,
+          },
+        ],
+      },
+      dryRunOff
+    );
+
+    expect(result.success).toBe(true);
+    expect(downstreamSeenValue).toBe(123);
+  });
 });

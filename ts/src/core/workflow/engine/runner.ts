@@ -101,11 +101,15 @@ export async function runTasks(
           failureReason: output.failureReason,
         });
 
-        // Run recovery task
+        // Run recovery task. inputMapping/outputId are propagated from the
+        // FailureHandler so recoveries can read named slots (e.g. the failing
+        // parent's named output, or any upstream named output) and write
+        // their output to a named slot if desired. Both default to undefined,
+        // which preserves the prior "default-slot only" behavior.
         const recoveryWrapped: WrappedTask = {
           task: handler.task,
-          inputMapping: undefined,
-          outputId: undefined,
+          inputMapping: handler.inputMapping,
+          outputId: handler.outputId,
         };
 
         let recoveryOutput: TaskOutput;

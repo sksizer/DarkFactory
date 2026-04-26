@@ -33,6 +33,20 @@ export interface FailureHandler {
   readonly task: Task;
   /** Max times to run recovery + re-try the original task. */
   readonly retry: number;
+  /**
+   * Optional input mapping for the recovery task. Same semantics as
+   * {@link WrappedTask.inputMapping}: lets the recovery read non-default
+   * payload slots — e.g. an upstream task's named output, or the failing
+   * parent's own named output. Without this, the recovery's `resolve(cls)`
+   * only reads the `default` slot.
+   */
+  readonly inputMapping?: InputMapping | undefined;
+  /**
+   * Optional output id for the recovery's `writes`. Defaults to the
+   * `default` slot, mirroring `.add()` vs `.named()` semantics for
+   * normal tasks.
+   */
+  readonly outputId?: string | undefined;
 }
 
 export interface WrappedTask {
