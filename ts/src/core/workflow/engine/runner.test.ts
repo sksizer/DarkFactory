@@ -213,6 +213,68 @@ describe("onFailure recovery", () => {
     expect(result.failureReason).toContain("recovery broke");
   });
 
+  it("writes recovery task's output value into state for downstream tasks", async () => {
+    let downstreamSeenValue: number | undefined;
+    let parentCalls = 0;
+
+    // Flaky parent: fails first attempt, succeeds on retry. The retry
+    // path is what lets the workflow continue to the downstream task.
+    const flakyParent = {
+      name: "flaky-parent",
+      reads: [] as const,
+      run(): TaskOutput {
+        parentCalls++;
+        return parentCalls === 1
+          ? { success: false, failureReason: "first attempt" }
+          : { success: true };
+      },
+    };
+
+    // Recovery task declares it writes Counter — runner must persist it.
+    const recoveryProducer = {
+      name: "recovery",
+      reads: [] as const,
+      writes: Counter,
+      run(): TaskOutput {
+        return { success: true, value: new Counter(7) };
+      },
+    };
+
+    const downstream = {
+      name: "downstream",
+      reads: [Counter] as const,
+      run(_env: TaskEnv, resolve: InputResolver): TaskOutput {
+        downstreamSeenValue = resolve(Counter).count;
+        return { success: true };
+      },
+    };
+
+    const result = await runWorkflow(
+      {
+        name: "test-wf",
+        description: "test",
+        seeds: [],
+        tasks: [
+          {
+            task: flakyParent,
+            inputMapping: undefined,
+            outputId: undefined,
+            onFailure: { task: recoveryProducer, retry: 1 },
+          },
+          {
+            task: downstream,
+            inputMapping: undefined,
+            outputId: undefined,
+          },
+        ],
+      },
+      dryRunOff
+    );
+
+    expect(result.success).toBe(true);
+    expect(downstreamSeenValue).toBe(7);
+  });
+
   it("writes value to state on failure so recovery task can read it", async () => {
     let recoverySeenValue: number | undefined;
 
