@@ -121,6 +121,19 @@ export async function runTasks(
           return { success: false, failureReason: reason, steps };
         }
 
+        // Persist recovery output to state, parallel to the parent task path
+        // above. Written before the success check so downstream observers
+        // can inspect recovery output even when recovery itself failed.
+        if (
+          recoveryOutput.value != null &&
+          recoveryWrapped.task.writes != null
+        ) {
+          state.put(
+            recoveryOutput.value as object,
+            recoveryWrapped.outputId ?? "default"
+          );
+        }
+
         steps.push({
           name: handler.task.name,
           success: recoveryOutput.success,
