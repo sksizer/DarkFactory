@@ -1,10 +1,13 @@
 /**
  * git.ts — git CLI wrappers.
  *
- * All functions call exec(["git", ...args]) via utils/subprocess.ts
+ * Async functions call exec(["git", ...args]) via utils/subprocess.ts
  * and return Result types. Never throws.
+ * Sync helpers (e.g. currentBranch) use execFileSync from node:child_process
+ * and also return Result types. Never throws.
  */
 
+import { execFileSync } from "node:child_process";
 import { type Result, err, ok } from "../result.js";
 import { ProcessTimeoutError, type Timeout, exec } from "./subprocess.js";
 
@@ -360,6 +363,34 @@ export async function worktreeRemove(
   repoRoot: string
 ): Promise<CheckResult> {
   return gitRun(["worktree", "remove", "--force", wtPath], { cwd: repoRoot });
+}
+
+// ---------- Sync helpers ----------
+
+/** Return the current branch name. Sync. */
+export function currentBranch(cwd: string): GitResult<string> {
+  try {
+    const branch = execFileSync("git", ["branch", "--show-current"], {
+      cwd,
+      encoding: "utf-8",
+    }).trim();
+    if (branch === "") {
+      // git exits 0 on detached HEAD (just prints empty); we surface it as
+      // an error with returncode=-1 so the GitErr "non-zero exit" contract
+      // holds and callers don't conflate it with a successful run.
+      return err(
+        makeGitErr(-1, "", "detached HEAD — no current branch", [
+          "git",
+          "branch",
+          "--show-current",
+        ])
+      );
+    }
+    return ok(branch);
+  } catch (e) {
+    const stderr = e instanceof Error ? e.message : String(e);
+    return err(makeGitErr(-1, "", stderr, ["git", "branch", "--show-current"]));
+  }
 }
 
 // ---------- Fetch and merge ----------

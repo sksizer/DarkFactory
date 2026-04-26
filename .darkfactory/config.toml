@@ -19,3 +19,11 @@ operations = ".darkfactory/operations"
 # min_severity = "warning"
 # model_default = "haiku"
 # model_severe = "sonnet"
+
+[v1.code]
+dev = "just dev"
+
+[v1.code.quality]
+test = { name = "test", cmds = ["just ts-test", "just test"] }
+typecheck = { name = "typecheck", cmds = ["just ts-typecheck", "just typecheck"] }
+format = { name = "format", cmds = ["just ts-format", "just format"] }

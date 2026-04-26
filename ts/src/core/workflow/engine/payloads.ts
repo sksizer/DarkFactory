@@ -1,3 +1,5 @@
+import type { DarkFactoryConfig } from "../../../config/types.js";
+
 export class CodeEnv {
   declare readonly _brand: "CodeEnv";
   readonly repoRoot: string;
@@ -39,6 +41,32 @@ export class PrResult {
   readonly url: string | undefined;
   constructor(init: { url?: string | undefined }) {
     this.url = init.url;
+  }
+}
+
+export class ProjectConfig {
+  declare readonly _brand: "ProjectConfig";
+  readonly config: DarkFactoryConfig;
+  constructor(config: DarkFactoryConfig) {
+    this.config = config;
+  }
+}
+
+export interface QualityCheckOutcome {
+  readonly name: string;
+  readonly success: boolean;
+  readonly exitCode: number;
+  readonly cmd: string;
+  readonly stderr: string;
+}
+
+export class QualityResult {
+  declare readonly _brand: "QualityResult";
+  readonly checks: readonly QualityCheckOutcome[];
+  readonly allPassed: boolean;
+  constructor(checks: readonly QualityCheckOutcome[]) {
+    this.checks = checks;
+    this.allPassed = checks.every((c) => c.success);
   }
 }
 
